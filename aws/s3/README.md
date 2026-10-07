@@ -17,7 +17,7 @@ Actualmente Bluehost aloja:
 - correo electrónico de Castillo IT;
 - archivos asociados a la aplicación.
 
-Bluehost continuará siendo inicialmente el **Cardona/Bastion Core**.
+Bluehost continuará siendo inicialmente el **Cardona/Bastion Nucleo**.
 
 ## 5.2 AWS Lightsail
 
@@ -92,8 +92,8 @@ Repositorios propuestos:
 ```text
 CastilloIT/
 ├── bastion
-│   ├── backend
-│   └── frontend
+│   ├── servidor
+│   └── interfaz
 ├── honducompras-crawler
 └── infrastructure
 ```
@@ -111,7 +111,7 @@ CastilloIT/
 
 # 7. Responsabilidad por ubicación
 
-## 7.1 Bluehost — Bastion Core
+## 7.1 Bluehost — Bastion Nucleo
 
 Ejecuta:
 
@@ -152,7 +152,7 @@ Almacena en MySQL:
 - workflows;
 - aprobaciones;
 - auditoría;
-- estado AI;
+- estado IA;
 - referencias a documentos.
 
 ## 7.2 AWS Lightsail
@@ -238,7 +238,7 @@ Nunca almacenar:
 | metadata documentos | MySQL |
 | código | GitHub |
 | backups | S3 |
-| prompts/config AI | GitHub/MySQL según uso |
+| prompts/config IA | GitHub/MySQL según uso |
 | RAG index | servicio RAG futuro |
 
 ---
