@@ -166,7 +166,8 @@ backups/mysql/
 
 ```mermaid
 flowchart LR
-    P[Procesos] -->|crear borrador| Q[Cotizaciones]
+    P[Procesos] -->|cliente + expediente| Q[Cotización borrador]
+    P -. source_process_id .-> Q
     C[Clientes] --> Q
     C --> O[Órdenes de Compra]
     C --> I[Facturas]
@@ -208,12 +209,63 @@ order_id -> invoice_id
 
 Una conversión nunca depende exclusivamente de navegación o mapeo en Angular.
 
+### 6.1 Proceso -> Cotización
+
+La integración entre Procesos y Cotizaciones queda definida como una acción nativa del sistema:
+
+```http
+POST /api/v1/processes/{process}/create-quote
+```
+
+La acción crea una **cotización borrador** y transfiere exclusivamente:
+
+```text
+cliente / entidad -> cliente de la cotización
+expediente        -> referencia visible del proceso
+process.id        -> source_process_id
+```
+
+No se copian automáticamente items, precios, cantidades, especificaciones, documentos, fechas, marks, notas personales, scores IA ni raw del crawler.
+
+La relación es:
+
+```text
+processes 1 ---- N quotes
+```
+
+Un proceso no se consume ni cambia de naturaleza al crear una cotización. Puede originar múltiples cotizaciones deliberadas.
+
+La cotización debe conservar:
+
+```text
+source_process_id nullable
+process_reference_snapshot nullable
+client_id nullable
+client_name_snapshot
+```
+
+Si la entidad del proceso coincide con un cliente existente mediante resolución exacta/canónica, se usa su `client_id`. Si no existe coincidencia, la creación **no se bloquea**: se conserva el nombre como snapshot manual y el usuario puede vincular o crear el cliente después.
+
+El crawler y la IA nunca crean automáticamente el cliente maestro como efecto secundario de esta operación.
+
+Para evitar duplicados por doble clic o retry, la creación puede aceptar `Idempotency-Key`. Una nueva intención explícita puede crear otra cotización para el mismo proceso.
+
+Permisos mínimos:
+
+```text
+procesos.view
+cotizaciones.create
+```
+
+La creación básica no depende de IA. Una acción posterior puede analizar las especificaciones y **proponer** items para la cotización, manteniéndose separada de la transferencia inicial de cliente + expediente.
+
 ## 7. Eventos estándar
 
 ```text
 process.created
 process.updated
 process.marked
+process.quote_created
 
 client.created
 client.updated
