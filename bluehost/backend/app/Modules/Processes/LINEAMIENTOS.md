@@ -345,23 +345,135 @@ per_page
 - neutraliza `=`, `+`, `-`, `@`;
 - autorización obligatoria.
 
-## IA
+## Integración de IA
 
-Jobs posibles:
+La IA opera sobre la **versión normalizada y/o documentos autorizados** del proceso. Nunca modifica el raw del crawler.
+
+Tools:
 
 ```text
-classify_process
-summarize_process
-extract_requirements
-calculate_relevance
-match_internal_history
-search_suppliers
-suggest_bid_or_no_bid
+get_process()
+get_process_versions()
+summarize_process()
+classify_process()
+extract_requirements()
+calculate_relevance()
+identify_process_items()
+match_internal_history()
+search_suppliers()
+suggest_bid_or_no_bid()
+suggest_quote_items()
 ```
 
-Los resultados IA se guardan por versión e `input_hash`.
+### Flujo asíncrono
 
-La creación básica de cotización no depende de IA. Una acción posterior puede proponer items desde especificaciones.
+Después de una ingestión exitosa:
+
+```text
+process.created / process.updated
+        |
+        v
+ai_task
+        |
+        v
+AI Gateway
+        |
+        v
+structured result
+        |
+        v
+ai_runs + datos derivados
+```
+
+La transacción de ingestión no espera la respuesta del modelo.
+
+### Resultados derivados
+
+Guardar por separado del dato de fuente:
+
+```text
+summary
+classification
+requirements
+relevance_score
+identified_items
+bid_recommendation
+analysis_status
+analysis_version
+ai_run_id
+```
+
+El raw y la versión del proceso siguen siendo inmutables.
+
+### Versionado e invalidación
+
+Un resultado IA debe vincularse al `process_version_id` o `content_hash` analizado.
+
+Si cambia el contenido significativo:
+
+```text
+process_versions.content_hash cambia
+    -> análisis previo = stale
+    -> nueva tarea opcional
+```
+
+Si el hash no cambia, puede reutilizarse el análisis para evitar costo duplicado.
+
+### Relevancia / Bid-No Bid
+
+La IA puede proponer:
+
+```text
+relevance_score
+bid_recommendation
+reason_summary
+confidence
+```
+
+pero no marca automáticamente el proceso como descartado, adjudicado o comprometido. La decisión comercial pertenece al usuario/Workflow.
+
+### Identificación de items
+
+`identify_process_items()` puede convertir especificaciones en una propuesta estructurada de items. Esa propuesta:
+
+- no modifica el proceso;
+- no crea automáticamente items de Cotización;
+- puede ser consumida luego por `suggest_quote_items()`;
+- conserva referencias a la versión y evidencia de origen.
+
+### Proceso -> Cotización
+
+La creación básica permanece determinista:
+
+```text
+cliente + expediente -> cotización borrador
+```
+
+Luego, opcionalmente:
+
+```text
+[Generar items con IA]
+```
+
+analiza la versión del proceso y propone items para revisión humana.
+
+### Prompt injection
+
+Todo contenido de HonduCompras se trata como `UNTRUSTED_EXTERNAL_CONTENT`. Instrucciones embebidas en especificaciones no pueden habilitar tools, cambiar Policies ni ordenar envíos/compras.
+
+### Observabilidad
+
+La UI debe poder mostrar al menos:
+
+```text
+Sin analizar
+Analizando
+Analizado
+Falló
+Desactualizado
+```
+
+sin bloquear el uso normal del proceso.
 
 ## Seguridad
 
@@ -383,6 +495,8 @@ cotizaciones.create
 
 Ingestión utiliza identidad machine-to-machine del crawler Lightsail.
 
+Las tools IA heredan los permisos del actor; un usuario sin `procesos.view` no puede consultar un proceso mediante el asistente.
+
 ## Criterios de aceptación
 
 - El crawler sigue ejecutándose en Lightsail.
@@ -399,3 +513,7 @@ Ingestión utiliza identidad machine-to-machine del crawler Lightsail.
 - Un proceso puede relacionarse con varias cotizaciones.
 - Cliente desconocido no bloquea la creación.
 - Doble clic/retry no crea duplicados involuntarios.
+- IA nunca modifica raw/versiones del crawler.
+- Resultados IA quedan asociados al `process_version_id`/hash analizado.
+- Crear cotización sigue funcionando sin IA.
+- Items/requisitos IA son propuestas revisables, no cambios silenciosos.
