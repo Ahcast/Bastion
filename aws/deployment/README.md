@@ -1,6 +1,29 @@
-# Despliegue AWS
+# Despliegue Lightsail
 
-Ámbito: crawler, S3 y workers externos propuestos. No incluye aplicación web, MySQL ni correo.
-Elegir runtime después de medir duración, memoria, dependencias y costo; no se ha seleccionado EC2, Lightsail, Lambda ni contenedores.
-Antes de publicar: verificar IAM, bucket privado, retención, programación, logs, presupuesto, reintentos y recuperación.
-No hay infraestructura como código ni scripts ejecutables todavía.
+Fuente: [Documento maestro v0.5](../../docs/Proyecto_Bastion_Documento_Maestro.md). Alcance conceptual; implementación y validación técnica pendientes.
+
+# 38. Despliegue
+
+## 38.1 Lightsail
+
+GitHub Actions o deploy manual controlado:
+
+- SSH;
+- pull;
+- venv;
+- dependencies;
+- restart scheduler/service.
+
+## 38.2 Bluehost
+
+Mecanismo a validar:
+
+- SSH;
+- SFTP;
+- deploy nativo;
+- Git support.
+
+Debe quedar definido por senior según capacidades reales del plan.
+
+---
+

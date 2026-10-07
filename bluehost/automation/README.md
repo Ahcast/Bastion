@@ -1,6 +1,51 @@
-# Automatización en Bluehost
+# Background jobs y dashboard
 
-Cron y jobs cortos para importar lotes desde S3, coordinar trabajos externos y enviar correo aprobado.
-Estado de negocio y deduplicación persistidos en MySQL. Locks con vencimiento, duración máxima y reintentos limitados.
-No ejecutar crawling pesado, OCR ni inferencia dentro de una petición HTTP. Validar frecuencia y límites reales de Bluehost.
-Ver [reglas compartidas](../../docs/automation/README.md).
+Fuente: [Documento maestro v0.5](../../docs/Proyecto_Bastion_Documento_Maestro.md). Alcance conceptual; implementación y validación técnica pendientes.
+
+# 32. Background jobs
+
+Operaciones que no deben bloquear request HTTP:
+
+- importaciones;
+- generación PDF;
+- emails;
+- AI tasks;
+- document processing;
+- reportes pesados;
+- notificaciones.
+
+Inicial:
+
+- Laravel Queue;
+- driver database.
+
+Si Bluehost no permite worker persistente:
+
+- cron;
+- `queue:work --stop-when-empty`;
+- o worker separado.
+
+Futuro:
+
+- Redis;
+- Amazon SQS.
+
+---
+
+
+# 33. Dashboard realtime
+
+MVP:
+
+- polling cada 15–30 s.
+
+Fase 2:
+
+- WebSocket administrado:
+  - Ably;
+  - Pusher.
+
+Laravel Reverb solo si Bluehost soporta procesos persistentes.
+
+---
+

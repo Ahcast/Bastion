@@ -1,13 +1,11 @@
 # AWS
 
-## Responsabilidades
-- crawler/: extracción de HonduCompras.
-- storage/: S3 para lotes originales, resultados y respaldos.
-- automation/: planificación, reintentos y coordinación de tareas externas.
-- workers/: procesamiento pesado propuesto (IA, OCR y documentos).
-- security/: identidad de servicios y permisos.
-- deployment/: runtime y despliegue independiente.
+Responsabilidades aprobadas en el documento maestro:
 
-La aplicación web, MySQL y correo permanecen en Bluehost. AWS no necesita alojar una copia de la aplicación.
-El bucket conocido es castilloit-honducompras-crawler, región us-east-1. Configuración real pendiente de inspección.
-El runtime del crawler y workers queda por definir; esta estructura no obliga a contratar EC2, Lightsail ni otro servicio. IA puede usar un proveedor externo mediante un worker.
+- [Lightsail](lightsail/README.md): crawler HonduCompras, Python, scheduler, retries, checkpoints, estado técnico, entrega a Bluehost y backup worker.
+- [S3](s3/README.md): raw, snapshots, documentos, histórico y backups.
+- [Seguridad](security/README.md)
+- [Despliegue](deployment/README.md)
+
+Instancia documentada: 1 GB RAM, 2 vCPU, 40 GB SSD. No es adecuada para un RAG/vector DB completo. RAG y su infraestructura permanecen pendientes.
+No se asignan workers OCR, AI o compilación pesada a AWS sin una decisión aprobada.

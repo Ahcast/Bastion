@@ -1,5 +1,26 @@
-# Frontend Angular
+# Frontend y menú aprobado
 
-Interfaz SPA bajo el mismo origen que Laravel. Módulos de pantalla alineados con ../backend/modules/. CSRF y cookies de sesión; sin tokens en localStorage.
-Presentar estados de carga, error, importación parcial, revisión y aprobación. La API decide los permisos.
-Compilar fuera de Bluehost y publicar el resultado según el diseño final. No hay código Angular todavía.
+Fuente: [Documento maestro v0.5](../../docs/Proyecto_Bastion_Documento_Maestro.md). Alcance conceptual; implementación y validación técnica pendientes.
+
+# 10. Módulos de la aplicación
+
+Menú aprobado:
+
+```text
+Inicio
+Clientes
+Proveedores
+Órdenes de Compra
+Cotizaciones
+Facturas
+Gastos
+Reportes
+Procesos
+Colaboración
+Configuración
+```
+
+---
+
+
+Baseline propuesto en sección 8.1: Angular 22.x, TypeScript 6.x, RxJS 7.x y Node.js 24 LTS para build; sujeto a revisión senior.

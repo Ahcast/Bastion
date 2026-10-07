@@ -1,12 +1,12 @@
-# Bluehost
+# Bluehost — Bastion Core
 
-## Responsabilidades
-- frontend/: SPA Angular.
-- backend/: API Laravel y modules/ con reglas de negocio.
-- database/: MySQL, migraciones futuras y política de datos.
-- email/: integración con el correo alojado en Bluehost.
-- automation/: cron y jobs cortos de importación, coordinación y envío.
-- deployment/: publicación y límites del hosting.
-- security/: controles de aplicación y hosting.
+Angular SPA, Laravel, REST API, autenticación, RBAC, workflow, aprobaciones, auditoría e importación; MySQL y correo permanecen en Bluehost.
 
-Bluehost es dueño del estado de negocio, usuarios, permisos y aprobaciones. AWS intercambia archivos y resultados mediante contratos, sin escribir directamente en MySQL.
+- [Frontend](frontend/README.md)
+- [Backend](backend/README.md)
+- [MySQL](database/README.md)
+- [Correo](email/README.md)
+- [Jobs](automation/README.md)
+- [Despliegue](deployment/README.md)
+
+Fuente: documento maestro, secciones 5.1 y 7.1. No hay implementación.

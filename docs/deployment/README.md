@@ -1,7 +1,59 @@
-# Despliegues independientes
+# CI/CD y despliegue
 
-- [Bluehost](../../bluehost/deployment/README.md): aplicación web, API, MySQL y tareas cortas.
-- [AWS](../../aws/deployment/README.md): crawler, almacenamiento y workers.
+Fuente: [Documento maestro v0.5](../../docs/Proyecto_Bastion_Documento_Maestro.md). Alcance conceptual; implementación y validación técnica pendientes.
 
-Publicar únicamente el componente del entorno correspondiente. No subir todo el repositorio al webroot.
-Versionar contratos y mantener compatibilidad durante actualizaciones. Cada despliegue requiere validación, respaldo y rollback.
+# 37. CI/CD
+
+GitHub flow:
+
+```text
+feature branch
+  ↓
+commit
+  ↓
+tests
+  ↓
+pull request
+  ↓
+review
+  ↓
+merge
+  ↓
+deploy
+```
+
+Branching sugerido:
+
+- `main`;
+- feature branches.
+
+Evitar complejidad innecesaria con `develop` si el equipo es pequeño.
+
+---
+
+
+# 38. Despliegue
+
+## 38.1 Lightsail
+
+GitHub Actions o deploy manual controlado:
+
+- SSH;
+- pull;
+- venv;
+- dependencies;
+- restart scheduler/service.
+
+## 38.2 Bluehost
+
+Mecanismo a validar:
+
+- SSH;
+- SFTP;
+- deploy nativo;
+- Git support.
+
+Debe quedar definido por senior según capacidades reales del plan.
+
+---
+

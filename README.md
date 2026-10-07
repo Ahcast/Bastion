@@ -1,12 +1,12 @@
-# Bastion
+# Proyecto Bastion
 
-Plataforma interna de Castillo IT. Repositorio organizado por entorno de ejecución.
+Ecosistema operativo de Castillo IT. Estructura basada en el [Documento maestro v0.5](docs/Proyecto_Bastion_Documento_Maestro.md), 6 de octubre de 2026.
 
-| Carpeta | Destino |
+| Carpeta | Responsabilidad |
 | --- | --- |
-| [bluehost/](bluehost/README.md) | Angular, Laravel, MySQL, módulos de negocio, correo y tareas cortas |
-| [aws/](aws/README.md) | Crawler, S3, programación de extracción y workers pesados propuestos |
-| [docs/](docs/README.md) | Arquitectura, seguridad, contratos y hoja de ruta compartidos |
+| [bluehost/](bluehost/README.md) | Angular, Laravel, MySQL, correo y núcleo de negocio |
+| [aws/](aws/README.md) | Lightsail: crawler y workers técnicos. S3: raw, documentos y backups |
+| [docs/](docs/README.md) | Documento maestro y arquitectura compartida |
 
-Solo carpetas y Markdown. Ningún servicio ni control de seguridad está implementado o desplegado.
-La ubicación de los workers en AWS es una propuesta; runtime, servicios y presupuesto pendientes de definir. El correo permanece en Bluehost.
+Solo carpetas y Markdown. La arquitectura conceptual es la base aprobada; las versiones, contratos y detalles técnicos siguen sujetos a la revisión senior indicada en el documento maestro.
+Se conserva la separación por entorno solicitada, dentro de este repositorio. No se crean otros repositorios ni recursos externos.

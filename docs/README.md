@@ -1,11 +1,14 @@
-# Documentación compartida
+# Documentación
+
+[Documento maestro v0.5](Proyecto_Bastion_Documento_Maestro.md) es la referencia funcional de esta estructura.
 
 - [Arquitectura](architecture/README.md)
-- [Seguridad global](security/README.md)
-- [Despliegue por entorno](deployment/README.md)
-- [Contrato de crawler e importación](contracts/crawler-import.md)
-- [Contrato de trabajos](contracts/jobs.md)
-- [Automatización y recuperación](automation/README.md)
-- [Hoja de ruta](roadmap/README.md)
+- [Seguridad](security/README.md)
+- [Crawler](contracts/crawler-import.md)
+- [API/MCP](contracts/api-mcp.md)
+- [Observabilidad](observability/README.md)
+- [Roadmap](roadmap/README.md)
+- [RAG pendiente](knowledge-rag/README.md)
+- [Despliegue](deployment/README.md)
 
-Esta carpeta no se despliega como aplicación. Cada entorno mantiene sus instrucciones operativas en su propio directorio.
+Los documentos de carpetas reproducen secciones del maestro; no agregan módulos aprobados nuevos. El maestro incluye estados conceptuales alternativos, ejemplos y decisiones pendientes que requieren refinamiento senior.
