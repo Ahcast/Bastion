@@ -237,6 +237,7 @@ flowchart LR
     O --> R[Reportes]
     O --> I[Inicio]
     COL[Colaboración/S3] -. documentos .-> O
+    AI[AI Gateway] -. costos / proveedor / riesgo .-> O
 ```
 
 ## Seguridad
@@ -252,20 +253,93 @@ ordenes.convert
 
 Entrega, eliminación y conversión requieren auditoría.
 
-## IA
+## Integración de IA
 
 Tools:
 
 ```text
-get_order
-get_order_items
-suggest_supplier
-suggest_purchase_cost
-calculate_order_margin
-draft_order_comments
+get_order()
+get_order_items()
+suggest_supplier()
+suggest_purchase_cost()
+get_supplier_price_history()
+calculate_order_margin()
+detect_order_risk()
+draft_order_comments()
+compare_order_with_quote()
 ```
 
-La IA no marca `Comprado`, `Entregado` ni factura sin policy/autorización.
+### Casos de uso
+
+- sugerir proveedor por item;
+- recuperar precios históricos autorizados;
+- proponer costo de compra con evidencia;
+- comparar Orden contra Cotización de origen;
+- detectar items sin proveedor/costo/tracking;
+- explicar margen o desviaciones;
+- preparar comentarios internos;
+- priorizar compras pendientes.
+
+### Evidencia de precio
+
+Una sugerencia de costo debe distinguir:
+
+```text
+precio histórico interno
+precio web observado
+cotización de proveedor
+estimación IA
+```
+
+Nunca deben presentarse como equivalentes.
+
+Cada sugerencia externa conserva fuente, fecha, moneda y supuestos.
+
+### Estados protegidos
+
+La IA no puede cambiar por sí sola:
+
+```text
+Pendiente -> Comprado
+Listo -> Entregado
+```
+
+ni ejecutar:
+
+```text
+order.deliver
+order.convert-to-invoice
+```
+
+sin permiso explícito y, por defecto, aprobación humana.
+
+### Cálculos
+
+La IA no calcula de forma autoritativa subtotal, impuesto, inversión o utilidad. Debe llamar a servicios canónicos de Laravel:
+
+```text
+OrderFinancials
+```
+
+El modelo puede explicar el resultado, no redefinirlo.
+
+### Automatización futura
+
+Un evento como:
+
+```text
+order.created
+```
+
+puede disparar de forma asíncrona:
+
+```text
+identify_missing_costs
+suggest_suppliers
+analyze_margin
+```
+
+Los resultados se guardan como recomendaciones, no como cambios silenciosos de la Orden.
 
 ## Criterios de aceptación
 
@@ -276,3 +350,6 @@ La IA no marca `Comprado`, `Entregado` ni factura sin policy/autorización.
 - Clonar reinicia entrega y factura.
 - Documentos fuera de webroot.
 - Reportes/Inicio usan las mismas fórmulas.
+- IA puede sugerir costos/proveedores sin alterar estados automáticamente.
+- Todo precio externo sugerido conserva evidencia.
+- La Orden sigue operativa si la IA está deshabilitada.
