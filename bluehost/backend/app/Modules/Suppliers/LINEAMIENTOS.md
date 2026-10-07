@@ -81,8 +81,7 @@ Filtros: `search`, `country`, `is_active`, `page`, `per_page`.
 flowchart LR
     S[Proveedores] --> O[Órdenes]
     S --> G[Gastos]
-    S --> AI[IA / investigación]
-    AI -->|sugerencias verificables| S
+    AI[AI Gateway] -. investigación / matching / RFQ .-> S
 ```
 
 ### Órdenes
@@ -101,24 +100,90 @@ proveedores.create
 proveedores.update
 ```
 
-## IA y automatización
+## Integración de IA
 
 Tools:
 
 ```text
-search_suppliers
-get_supplier
-find_supplier_candidates
-get_supplier_price_history
-create_supplier_draft
-draft_supplier_rfq
+search_suppliers()
+get_supplier()
+find_supplier_candidates()
+get_supplier_price_history()
+create_supplier_draft()
+draft_supplier_rfq()
+record_supplier_research()
 ```
 
-Toda investigación externa debe conservar fuente, fecha, precio observado, moneda y confianza. Un resultado IA no equivale a una cotización oficial.
+### Casos de uso
+
+- buscar proveedores existentes;
+- encontrar candidatos externos para un item/requisito;
+- comparar precio histórico con precio observado;
+- proponer proveedor para un item de Orden;
+- preparar RFQ;
+- resumir historial de relación comercial;
+- identificar proveedor potencialmente duplicado.
+
+### Investigación externa
+
+Cada resultado externo debe conservar evidencia suficiente:
+
+```text
+source_url
+source_type
+captured_at
+observed_price nullable
+currency nullable
+availability nullable
+supplier_name
+part_number nullable
+confidence nullable
+ai_run_id
+```
+
+La IA no puede convertir una búsqueda web en dato maestro sin revisión.
+
+### Proveedores candidatos
+
+Un resultado de investigación debe poder vivir primero como:
+
+```text
+supplier_candidate
+```
+
+antes de convertirse en `supplier` definitivo.
+
+Crear o promover un proveedor maestro requiere permiso/policy y queda auditado.
+
+### RFQ
+
+Preferir tools limitadas:
+
+```text
+draft_supplier_rfq()
+send_supplier_rfq()
+```
+
+en lugar de correo genérico.
+
+El borrador puede generarse automáticamente. Enviar el RFQ requiere aprobación humana por defecto o una regla de automatización aprobada que limite destinatario, frecuencia, template, item y cooldown.
+
+### Límites
+
+La IA no puede:
+
+- crear proveedores definitivos sin policy;
+- sobrescribir datos maestros por investigación web;
+- marcar una cotización de proveedor como oficial si solo proviene de una página web;
+- enviar RFQ ilimitados;
+- revelar credenciales SMTP;
+- asumir que un precio observado incluye impuestos, envío o disponibilidad sin evidencia.
 
 ## Criterios de aceptación
 
 - CRUD legacy preservado.
 - Órdenes siguen seleccionando proveedor.
 - Gastos históricos por texto siguen funcionando.
-- IA solo propone candidatos/borradores hasta aprobación.
+- Toda investigación IA conserva fuente y fecha.
+- IA puede proponer candidatos/borradores sin alterar automáticamente el maestro.
+- RFQ puede prepararse por IA y enviarse solo bajo policy/aprobación.
