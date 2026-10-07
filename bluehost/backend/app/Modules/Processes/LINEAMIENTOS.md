@@ -2,13 +2,31 @@
 
 ## Objetivo
 
-Convertir Procesos en el punto de entrada de oportunidades de HonduCompras, preservando filtros, marcas, notas y exportación legacy, pero sustituyendo CSV/FTPS/manual por ingestión API, versionado y automatización.
+Convertir Procesos en el punto de entrada de oportunidades de HonduCompras, preservando filtros, marcas, notas y exportación legacy, con ingestión API, versionado, trazabilidad y conexión nativa hacia Cotizaciones.
+
+## Runtime aprobado
+
+**El crawler de HonduCompras se ejecuta en AWS Lightsail.**
+
+GitHub conserva código, documentación y CI/CD, pero no es el runtime del crawler.
+
+```mermaid
+flowchart LR
+    HC["HonduCompras"] --> CR["Crawler<br/>AWS Lightsail"]
+    CR --> S3[("S3 RAW")]
+    CR --> API["POST /api/v1/ingestion/processes<br/>Bluehost"]
+    API --> DB[("MySQL")]
+    DB --> EV["Eventos"]
+    EV --> AI["IA / automatizaciones"]
+```
+
+El crawler reporta `crawler_run_id` y nunca escribe directo a MySQL.
 
 ## Funcionalidad legacy a conservar
 
 ### Visualización y filtros
 
-- tarjetas/bloques visuales de 10;
+- tarjetas/bloques visuales;
 - entidad;
 - keyword;
 - búsqueda sobre especificaciones y expediente;
@@ -29,19 +47,19 @@ Convertir Procesos en el punto de entrada de oportunidades de HonduCompras, pres
 
 ### Administración
 
-- status de fuente/importación;
-- actualizar/importar;
+- estado de fuente/ingestión;
+- actualizar/refrescar;
 - exportar CSV;
 - resumen de leídas/nuevas/actualizadas/inactivas/errores;
 - administración/depuración restringida.
 
 ## Debilidades legacy a eliminar
 
-- crawler fuera de integración formal;
+- crawler sin contrato formal de ingestión;
 - FTPS + CSV como acoplamiento principal;
-- importación manual;
+- importación manual como flujo diario;
 - identidad hash ambigua;
-- sin historial durable por ejecución;
+- ausencia de historial durable por ejecución;
 - `active` confundido con vigencia;
 - filtros/paginación en memoria;
 - frontend limitado por primera página grande;
@@ -49,19 +67,26 @@ Convertir Procesos en el punto de entrada de oportunidades de HonduCompras, pres
 - purge físico destructivo;
 - formula injection en CSV.
 
-## Nueva ingestión
+## Ingestión y tolerancia a fallos
 
-```mermaid
-flowchart LR
-    GH[GitHub Actions crawler] --> HC[HonduCompras]
-    GH --> S3[(S3 RAW)]
-    GH --> API[POST /api/v1/ingestion/processes]
-    API --> DB[(MySQL)]
-    DB --> EV[Eventos]
-    EV --> AI[IA / automatizaciones]
+Flujo:
+
+```text
+HonduCompras
+  -> crawler Lightsail
+  -> snapshot raw S3
+  -> Laravel ingestion API
+  -> MySQL
 ```
 
-El crawler reporta `crawler_run_id` y nunca escribe directo a MySQL.
+Reglas:
+
+- cada ejecución tiene `crawler_run_id`;
+- la misma entrada puede reintentarse sin duplicar;
+- una ejecución parcial/fallida no puede inactivar procesos por ausencia;
+- el backend decide normalización, deduplicación/upsert y reglas de negocio;
+- S3 conserva evidencia raw;
+- CSV queda como exportación o mecanismo de recuperación manual.
 
 ## Modelo objetivo
 
@@ -82,6 +107,7 @@ source
 started_at
 finished_at
 status
+is_complete
 records_found
 new_records
 updated_records
@@ -110,13 +136,13 @@ created_at
 updated_at
 ```
 
-Restricción:
+Identidad:
 
 ```text
 UNIQUE(source, external_id)
 ```
 
-Si la fuente no entrega ID confiable, la estrategia de identidad debe ser explícita y versionada.
+Si la fuente no entrega ID confiable, la estrategia sustituta debe ser explícita y versionada.
 
 ### process_versions
 
@@ -130,12 +156,12 @@ raw_data
 created_at
 ```
 
-Solo se crea versión cuando cambia contenido significativo.
+Solo se crea una versión nueva cuando cambia contenido significativo.
 
 ## Active vs vigencia
 
 ```text
-is_source_active = apareció en la fuente esperada
+is_source_active = observado correctamente en la fuente
 is_current       = closing_at >= ahora según reglas de negocio
 ```
 
@@ -154,42 +180,42 @@ Contrato uniforme:
 
 Son por usuario y sobreviven a nuevas versiones.
 
+---
+
 ## Conversión Proceso -> Cotización
 
 ### Regla funcional
 
-Un proceso puede crear una **cotización borrador** arrastrando exclusivamente los dos datos comerciales que el proceso garantiza para esta operación:
+Un proceso puede crear una **cotización borrador** transfiriendo exclusivamente:
 
 ```text
 cliente / entidad
 expediente
 ```
 
-Además se conserva la relación técnica:
+y conserva:
 
 ```text
 process.id -> quotes.source_process_id
 ```
 
-La conversión **no consume, reemplaza ni modifica** el proceso. El proceso continúa existiendo y puede tener varias cotizaciones relacionadas.
+La acción no consume, reemplaza ni modifica el proceso.
 
-Cardinalidad objetivo:
+Cardinalidad:
 
 ```text
 processes 1 ---- N quotes
 ```
 
-Esto permite crear alternativas, revisiones u ofertas diferentes para un mismo expediente.
-
 ### Datos transferidos
 
 | Proceso | Cotización |
 |---|---|
-| `entity` / cliente de fuente | `client_id` si existe match y `client_name_snapshot` |
-| `expediente` | `process_reference_snapshot` / expediente visible |
+| `entity` | `client_id` si existe match + `client_name_snapshot` |
+| `expediente` | `process_reference_snapshot` |
 | `id` | `source_process_id` |
 
-No se copian automáticamente:
+No se transfieren automáticamente:
 
 ```text
 especificaciones
@@ -204,17 +230,9 @@ precios
 cantidades
 ```
 
-La cotización se crea con items vacíos y estado de borrador.
+La cotización queda en borrador con items vacíos.
 
 ### Resolución del cliente
-
-El valor de entidad proveniente del proceso se resuelve mediante un servicio de dominio, por ejemplo:
-
-```text
-ClientResolver
-```
-
-Flujo:
 
 ```text
 process.entity
@@ -230,62 +248,53 @@ ClientResolver
 Reglas:
 
 - no crear clientes automáticamente desde el crawler;
-- no bloquear la creación de cotización si el cliente no existe en catálogo;
-- cuando no hay match, la cotización conserva el nombre como snapshot manual;
-- la UI debe permitir luego `Vincular cliente` o `Crear cliente` de forma explícita;
-- actualizar el cliente maestro en el futuro no altera el snapshot de la cotización.
+- no bloquear la cotización por falta de match;
+- permitir `Vincular cliente` o `Crear cliente` posteriormente;
+- editar el cliente maestro no altera el snapshot histórico.
 
-### API de conversión
+### API
 
 ```http
 POST /api/v1/processes/{process}/create-quote
 ```
 
-La acción debe:
+La Action debe:
 
-1. autenticar al usuario;
-2. exigir acceso al proceso y permiso `cotizaciones.create`;
-3. cargar el proceso en backend;
-4. resolver cliente;
-5. copiar expediente;
-6. crear la cotización borrador mediante la Action pública del módulo Quotes;
-7. guardar `source_process_id`;
-8. registrar auditoría;
-9. publicar `process.quote_created`;
-10. devolver la cotización creada para que Angular navegue al editor.
+1. autenticar;
+2. autorizar acceso al proceso;
+3. exigir `cotizaciones.create`;
+4. cargar proceso;
+5. resolver cliente;
+6. copiar expediente;
+7. llamar a la Action pública de Quotes;
+8. persistir `source_process_id`;
+9. auditar;
+10. publicar `process.quote_created`;
+11. devolver la cotización para abrir el editor.
 
-Respuesta conceptual:
-
-```json
-{
-  "quote_id": 1247,
-  "quote_number": "COT-001247",
-  "status": "draft",
-  "source_process_id": 918
-}
-```
-
-La operación puede aceptar `Idempotency-Key` para impedir duplicados causados por doble clic o retry. Una nueva intención explícita con otra llave puede crear otra cotización para el mismo proceso.
+Debe admitir protección idempotente frente a doble clic/retry sin impedir que una nueva intención explícita cree otra cotización para el mismo proceso.
 
 ### UX
 
-Cada proceso debe ofrecer:
+Proceso:
 
 ```text
 [Crear cotización]
+
+Cotizaciones relacionadas
+COT-001247  Borrador
+COT-001251  Enviada
 ```
 
-Después de crearla, el proceso muestra una sección:
+Cotización:
 
 ```text
-Cotizaciones relacionadas
-COT-001247   Borrador
-COT-001251   Enviada
+Proceso de origen
+ENEE-CM-...
+[Ver proceso]
 ```
 
-Cada registro enlaza al editor/detalle de la cotización.
-
-La cotización, a su vez, muestra `Proceso de origen` y un enlace de regreso al expediente.
+---
 
 ## API objetivo
 
@@ -305,7 +314,7 @@ POST  /api/v1/ingestion/processes
 POST  /api/v1/ingestion/runs
 ```
 
-Filtros server-side:
+Filtros:
 
 ```text
 search
@@ -323,39 +332,22 @@ per_page
 
 ## Importar/Actualizar en UI
 
-Para conservar la funcionalidad percibida:
-
-- `Actualizar` refresca datos y estado;
-- admin puede solicitar reingestión/reprocesamiento;
-- puede existir importador CSV de emergencia separado;
-- UI muestra última ejecución, éxito, encontrados, nuevos, cambiados y errores.
+- `Actualizar` refresca datos y estado de la última ingestión;
+- admin puede solicitar reprocesamiento;
+- puede existir importador CSV de emergencia;
+- mostrar última ejecución, última exitosa, encontrados, nuevos, cambiados y errores.
 
 ## Export CSV
 
-Se conserva y debe:
-
-- aplicar filtros server-side;
-- exportar UTF-8;
-- incluir metadata;
-- neutralizar celdas que inicien con `=`, `+`, `-`, `@`;
-- exigir autorización.
-
-## Conexiones
-
-```mermaid
-flowchart LR
-    P[Procesos] -->|cliente + expediente + source_process_id| Q[Cotización borrador]
-    P --> I[Inicio]
-    P --> AI[IA]
-    AI -->|score/resumen/requisitos| P
-    COL[Documentos/S3] --> P
-```
-
-La relación `source_process_id` es persistente y permite navegar en ambos sentidos.
+- server-side;
+- UTF-8;
+- respeta filtros;
+- neutraliza `=`, `+`, `-`, `@`;
+- autorización obligatoria.
 
 ## IA
 
-Jobs:
+Jobs posibles:
 
 ```text
 classify_process
@@ -367,9 +359,9 @@ search_suppliers
 suggest_bid_or_no_bid
 ```
 
-Resultados IA se guardan por versión e `input_hash`. Nunca modifican el raw original.
+Los resultados IA se guardan por versión e `input_hash`.
 
-La creación básica de una cotización **no depende de IA**. Una acción posterior y separada puede proponer items desde las especificaciones del proceso.
+La creación básica de cotización no depende de IA. Una acción posterior puede proponer items desde especificaciones.
 
 ## Seguridad
 
@@ -382,26 +374,28 @@ procesos.ingest
 procesos.admin
 ```
 
-Crear una cotización desde un proceso requiere como mínimo:
+Crear cotización:
 
 ```text
 procesos.view
 cotizaciones.create
 ```
 
-Ingestión usa identidad machine-to-machine del crawler.
+Ingestión utiliza identidad machine-to-machine del crawler Lightsail.
 
 ## Criterios de aceptación
 
+- El crawler sigue ejecutándose en Lightsail.
 - Filtros, marcas, notas y export continúan.
-- Sin tope de 1000 filas en frontend.
+- No hay tope silencioso de filas.
 - Reintentos no duplican procesos.
+- Runs parciales/fallidos no inactivan por ausencia.
 - Cambios generan versiones.
 - Marks/notas sobreviven.
-- `active` y `vigente` separados.
-- CSV deja de ser mecanismo principal.
-- Un proceso puede crear una cotización borrador con cliente y expediente en una sola acción.
-- La conversión no copia items, precios ni especificaciones automáticamente.
+- `active` y `vigente` permanecen separados.
+- CSV no es integración primaria.
+- Un proceso crea una cotización borrador con cliente y expediente.
+- No se copian items/precios/especificaciones automáticamente.
 - Un proceso puede relacionarse con varias cotizaciones.
-- El cliente desconocido no bloquea la creación y queda como snapshot manual.
+- Cliente desconocido no bloquea la creación.
 - Doble clic/retry no crea duplicados involuntarios.
