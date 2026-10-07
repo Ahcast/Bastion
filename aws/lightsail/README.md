@@ -17,7 +17,7 @@ Actualmente Bluehost aloja:
 - correo electrónico de Castillo IT;
 - archivos asociados a la aplicación.
 
-Bluehost continuará siendo inicialmente el **Cardona/Bastion Core**.
+Bluehost continuará siendo inicialmente el **Bastion Core**.
 
 ## 5.2 AWS Lightsail
 

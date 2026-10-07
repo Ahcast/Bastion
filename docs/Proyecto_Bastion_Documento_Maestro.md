@@ -40,7 +40,7 @@ El nombre oficial del proyecto es:
 
 > **Proyecto Bastion**
 
-El nombre anterior **Proyecto Cardona** queda obsoleto.
+El nombre oficial debe usarse en toda la documentación del proyecto.
 
 ---
 
@@ -134,7 +134,7 @@ Actualmente Bluehost aloja:
 - correo electrónico de Castillo IT;
 - archivos asociados a la aplicación.
 
-Bluehost continuará siendo inicialmente el **Cardona/Bastion Core**.
+Bluehost continuará siendo inicialmente el **Bastion Core**.
 
 ## 5.2 AWS Lightsail
 
@@ -653,7 +653,7 @@ Propuesta:
 - Authorization Code;
 - PKCE.
 
-Cardona debe registrar:
+Bastion debe registrar:
 
 ```text
 AI actor = grok-office-assistant

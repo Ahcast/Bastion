@@ -78,7 +78,7 @@ Propuesta:
 - Authorization Code;
 - PKCE.
 
-Cardona debe registrar:
+Bastion debe registrar:
 
 ```text
 AI actor = grok-office-assistant
