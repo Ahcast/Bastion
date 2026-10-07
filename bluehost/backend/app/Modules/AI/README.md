@@ -18,90 +18,20 @@ Su función es proporcionar una capa común para:
 
 La aplicación debe seguir funcionando cuando cualquier proveedor de IA esté caído o deshabilitado.
 
-## 2. Principio arquitectónico
-
-```text
-Usuario / evento / job
-        |
-        v
-Laravel Domain Action
-        |
-        v
-AI Gateway
-        |
-        +--> Prompt Registry
-        +--> Tool Registry
-        +--> Policy / Approval Engine
-        +--> Provider Router
-        |
-        +--> OpenAIProvider
-        +--> FutureProvider
-        |
-        v
-Structured Result
-        |
-        v
-Domain Action / Draft / Review
-```
-
-La IA **nunca** recibe acceso directo a MySQL, credenciales de administración, shell del servidor, cPanel, S3 completo ni SMTP genérico.
-
-Toda interacción con Bastion ocurre mediante tools de aplicación que reutilizan las mismas Actions/Services y Policies usadas por REST y MCP.
+## 2. Principio arquitectónico y ejecución
+Ver [pipeline vigente](../../../../../docs/architecture/ai-integration.md), [contrato](../../../../../docs/contracts/ai-pipeline.md) y [resultados](../../../../../docs/modules/ai-results.md).
+Bastion guarda tareas -> ChatGPT Work con skills reclama pendientes mediante MCP -> investiga -> guarda resultados validados -> usuario revisa.
+AI es transversal y administra estado; Core mantiene API/MCP, Policies, auditoría, archivos y correo. No hay acceso directo externo a MySQL, shell, cPanel, S3 completo ni SMTP genérico.
 
 ## 3. Ubicación
+AI permanece en `bluehost/backend/app/Modules/AI/`. Laravel ejecuta operaciones acotadas de administración de tareas y resultados. La investigación/modelo ocurre en Work, aprovechando prioritariamente el plan Plus del usuario, sujeto a prueba de capacidades reales.
+Lightsail conserva crawler y backups. OCR pesado y otros ejecutores requieren validación separada. Grokbot atiende RFQ autorizadas; alojamiento/conexión por confirmar.
+RAG inicial: documentos/texto en S3, índices/metadatos y recuperación por Laravel/MySQL. No requiere vector DB ni un servidor RAG dedicado.
 
-El AI Gateway comienza como parte del monolito Laravel en Bluehost:
-
-```text
-bluehost/backend/app/Modules/AI/
-  Providers/
-  Tools/
-  Prompts/
-  Policies/
-  DTO/
-  Jobs/
-  Actions/
-```
-
-No se crea un microservicio de IA en la primera etapa.
-
-Los modelos se consumen como servicios externos. Los jobs cortos pueden ejecutarse mediante Laravel database queue y Scheduler. Si en el futuro aparecen cargas largas o intensivas, podrán delegarse a un worker dedicado sin cambiar el contrato de tools ni los módulos de negocio.
-
-AWS Lightsail mantiene su responsabilidad aprobada: crawler HonduCompras y workers técnicos de backup hacia S3. No se asume como runtime de IA salvo decisión futura explícita.
-
-## 4. Abstracción de proveedor
-
-Los módulos no deben llamar directamente a un SDK de proveedor.
-
-Contrato conceptual:
-
-```text
-AIProvider
-  -> generateStructured()
-  -> generateText()
-  -> useTools()
-```
-
-Adaptadores:
-
-```text
-OpenAIProvider
-FutureProvider
-LocalProvider opcional futuro
-```
-
-La aplicación solicita capacidades, no modelos concretos:
-
-```text
-analyze_process()
-extract_requirements()
-compare_products()
-classify_expense()
-summarize_document()
-draft_email()
-```
-
-El proveedor/modelo real se decide en el AI Gateway según configuración, costo, disponibilidad y política.
+## 4. Ejecutor y adaptadores
+Work consulta la cola lógica mediante MCP; cron Laravel no llama a Plus como API ni despierta automáticamente el chat. Versionar skills y registrar la versión usada.
+Adaptadores API de proveedores pueden añadirse en el futuro sin cambiar Actions/Policies. No son requisito ni fallback automático de pago. La selección de modelo/uso depende del ejecutor; registrar solo datos observables, sin inventar tokens/costos.
+Validar tareas desatendidas, plugin, permisos, búsqueda web, transferencia documental, lectura/escritura y capacidad diaria antes de activar.
 
 ## 5. Identidad delegada y autorización
 
@@ -320,17 +250,10 @@ result_summary
 
 No guardar secretos, credenciales ni contenido sensible innecesario en logs.
 
-## 9. Idempotencia y cache semántica de tareas
-
-Una misma tarea sobre la misma versión de entidad puede reutilizar resultado cuando:
-
-```text
-task_type + entity_version + prompt_version + input_hash
-```
-
-no han cambiado.
-
-Ejemplo: si `process_versions.content_hash` es igual, no se vuelve a pagar automáticamente por el mismo resumen salvo solicitud explícita o cambio de prompt/modelo.
+## 9. Idempotencia y reanudación
+Aplicar [contrato IA](../../../../../docs/contracts/ai-pipeline.md): reserva atómica con vencimiento, lease token, versión/hash de entrada e idempotencia. Rechazar escrituras tardías o desactualizadas como resultado vigente.
+Puntuar una vez cada proceso pendiente, incluidos rezagados; marcar completado solo al guardar correctamente. Versiones nuevas relevantes pueden crear revisiones separadas bajo política explícita. Cambiar prompt/skill/modelo no dispara por sí solo reprocesamiento masivo.
+Guardar avances por ítem; fallos y límites de Work dejan pendientes recuperables. Datos insuficientes no equivalen a irrelevancia.
 
 ## 10. Datos externos y prompt injection
 
@@ -362,42 +285,16 @@ Reglas:
 - las credenciales nunca se insertan en prompts;
 - un documento no puede autorizar envíos, pagos o escrituras.
 
-## 11. Procesamiento síncrono y asíncrono
+## 11. Pipeline asíncrono
+1. Puntuación diaria con skill sobre pendientes.
+2. Investigación de ítems relevantes: precios publicados/catálogos y comparación técnica.
+3. Paso 2.5: RFQ de alto interés sin precio; ChatGPT prepara y Grokbot tramita envío autorizado por Core.
+4. Presentación progresiva dentro de Procesos.
+5. Skill + RAG para rango de venta; cálculos deterministas en Laravel.
+6. Ficha oficial o ficha propia de Castillo IT sustentada.
+7. Usuario selecciona y crea/completa cotización.
 
-### Síncrono
-
-Solo operaciones rápidas de UX:
-
-```text
-resumen corto
-clasificación simple
-redacción asistida
-```
-
-### Asíncrono
-
-```text
-análisis de procesos
-extracción de documentos grandes
-investigación de proveedores/precios
-comparaciones extensas
-generación de paquetes documentales
-```
-
-Flujo:
-
-```text
-Domain Event
-  -> ai_task
-  -> Laravel queue
-  -> AI Gateway
-  -> provider
-  -> structured result
-  -> ai_run
-  -> Domain Event
-```
-
-La UI consulta estado o recibe actualización mediante el mecanismo que se defina; no mantiene una petición HTTP abierta durante tareas largas.
+Resultados por ítem y evidencia en cada etapa. RFQ pendiente no bloquea otros ítems. Jobs cortos de Bluehost, nunca requests abiertos durante investigaciones ni workers durmiendo por respuestas. UI consulta estado.
 
 ## 12. Roles funcionales de IA
 
@@ -511,8 +408,8 @@ ai.tool_called
 Eventos de negocio pueden disparar IA sin convertir la IA en parte de la transacción principal:
 
 ```text
-process.created -> analyze_process
-process.updated -> reanalyze_if_content_changed
+process.created -> enqueue_initial_scoring_if_pending
+process.updated -> request_revision_if_relevant_under_policy
 document.uploaded -> extract_document_fields
 ```
 
@@ -534,3 +431,7 @@ document.uploaded -> extract_document_fields
 AI consume [Core](../../Core/README.md), cumple el [contrato modular](../../../../../docs/contracts/modules.md) y sigue la [arquitectura v2](../../../../../docs/architecture/oficina-ai-v2.md).
 
 Workflow conserva aprobaciones y transiciones; AI solicita aprobaciones, no las implementa por su cuenta.
+
+## Desarrollo operativo del pipeline
+
+La skill define criterios de negocio aún por concretar. Fuentes y variantes exactas por oferta; datos desconocidos no son cero. RFQ registra contactos verificados, autorización y respuesta correlacionada; SMTP incierto no se reenvía a ciegas. Precio sugerido utiliza antecedentes con condiciones comparables, y fichas propias declaran autoría sin inventar certificaciones. Usuario puede incorporar únicamente selección revisada a Cotizaciones; envío de oferta sigue sujeto a autorización.

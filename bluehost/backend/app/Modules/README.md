@@ -53,3 +53,7 @@ Reglas:
 La especificación completa está en [AI/README.md](AI/README.md).
 
 Índice funcional completo: [docs/modules/README.md](../../../../docs/modules/README.md). Arquitectura objetivo: [Oficina AI v2](../../../../docs/architecture/oficina-ai-v2.md). Contrato base: [contrato modular](../../../../docs/contracts/modules.md).
+
+## Ejecutor IA inicial
+
+El Gateway de AI administra tareas/resultados; ChatGPT Work/Plus ejecuta skills mediante MCP. Proveedores por API quedan opcionales, no obligatorios. Ver [arquitectura IA](../../../../docs/architecture/ai-integration.md).

@@ -34,8 +34,14 @@ GitHub
 Cloudflare
   -> DNS / TLS / WAF / DDoS / rate limiting / bots
 
-OpenAI y proveedores futuros
-  -> inferencia a través del AI Gateway de Laravel
+ChatGPT Work / plan Plus
+  -> skills y tareas externas mediante MCP de Bastion
+
+Grokbot
+  -> RFQ autorizadas mediante API/MCP; integración por validar
+
+Proveedores de inferencia por API
+  -> alternativa futura explícita, no dependencia inicial
 ```
 
 No se requieren EC2, ECS ni RDS en esta etapa. **Lightsail sí forma parte de la arquitectura.**
@@ -86,7 +92,10 @@ flowchart TB
     BW -->|"backups"| S3
     API -->|"documentos / archivos generados"| S3
 
-    AIGW --> AI["OpenAI / proveedores futuros"]
+    WORK["ChatGPT Work y skills"] <-->|"HTTPS tools"| MCP["MCP Core"]
+    MCP --> API
+    API --> AIGW
+    GROK["Grokbot RFQ"] <-->|"API autorizada"| API
 
     GH["GitHub<br/>repo · documentación · CI/CD"] -. versionado/despliegue .-> BH
     GH -. versionado/despliegue .-> LS
@@ -104,9 +113,9 @@ flowchart TB
 | AWS Lightsail | Runtime técnico del crawler y de los workers de backup |
 | AWS S3 | Binarios, documentos, snapshots raw, archivos generados y backups |
 | GitHub | Código, documentación, CI/CD; **no es runtime del crawler** |
-| Laravel AI Gateway | Punto único de conexión con proveedores IA y tools autorizadas |
+| Módulo AI / Gateway interno | Tareas, resultados y herramientas; ejecución externa inicial en Work mediante MCP |
 | Workflow / Approval Engine | Aprobaciones, transiciones y control de acciones sensibles |
-| OpenAI / otros | Inferencia; nunca fuente de verdad ni acceso directo a MySQL |
+| ChatGPT Work / Grokbot | Skills e investigación / RFQ; conexión y capacidad por validar, sin acceso directo a MySQL |
 
 ---
 
@@ -400,58 +409,15 @@ Trabajos técnicos largos que pertenezcan al crawler o backup permanecen en Ligh
 
 ## 12. Integración de IA
 
-### 12.1 AI Gateway
+### 12.1 Arquitectura de ejecución actualizada
+La especificación detallada es [integración IA](ai-integration.md). AI permanece dentro del monolito Laravel: administra tareas, reservas, resultados, versiones y herramientas. Core conserva MCP/API y seguridad; Workflow conserva aprobaciones.
+ChatGPT Work con skills y mecanismos del plan Plus es el ejecutor inicial prioritario. Consulta pendientes por MCP y guarda resultados en Bastion; el modelo no corre en Bluehost ni en Lightsail.
+Grokbot atiende RFQ autorizadas mediante herramientas de Bastion. Correo y credenciales SMTP siguen en Bluehost; integración/alojamiento y lectura de respuestas por validar.
+El RAG inicial usa fuentes S3 y recuperación Laravel/MySQL. No necesita vector DB dedicada; S3 Vectors queda opcional.
 
-El AI Gateway comienza como módulo interno de Laravel, no como microservicio separado:
-
-```text
-App\Modules\AI
-  Providers/
-  Tools/
-  Prompts/
-  Policies/
-  DTO/
-  Jobs/
-  Actions/
-```
-
-Los módulos de negocio no llaman a proveedores directamente.
-
-```text
-Module Action
-    |
-    v
-AI Gateway
-    |
-    +--> Provider Router
-    +--> Prompt Registry
-    +--> Tool Registry
-    +--> Policy / Approval Engine
-    |
-    v
-OpenAI / proveedor futuro
-```
-
-### 12.2 Abstracción de proveedor
-
-Contrato conceptual:
-
-```text
-AIProvider
-  -> generateStructured()
-  -> generateText()
-  -> useTools()
-```
-
-Adaptadores:
-
-```text
-OpenAIProvider
-FutureProvider
-LocalProvider opcional futuro
-```
-
-La aplicación solicita capacidades, no modelos concretos.
+### 12.2 Adaptadores futuros
+No llamar directamente a proveedores desde módulos de negocio. Una integración API de inferencia puede añadirse tras decisión explícita; no es dependencia inicial ni fallback automático de pago cuando Work alcanza límites. Laravel no invoca una suscripción Plus como API.
+Capacidad desatendida, límites, herramientas y escrituras de Work deben probarse con el plugin real. Skills versionadas; desconocimiento de modelo/tokens/costo se registra como tal.
 
 ### 12.3 Tools
 
@@ -578,32 +544,10 @@ UNTRUSTED_EXTERNAL_CONTENT
 
 Instrucciones contenidas en un documento no cambian permisos ni habilitan tools.
 
-### 12.8 Síncrono vs asíncrono
-
-Síncrono solo para operaciones rápidas de UX.
-
-Asíncrono para:
-
-```text
-análisis de procesos
-extracción documental grande
-investigación de proveedores/precios
-comparaciones extensas
-generación de paquetes documentales
-```
-
-Flujo:
-
-```text
-Domain Event
-  -> ai_task
-  -> Laravel queue
-  -> AI Gateway
-  -> provider
-  -> structured result
-  -> ai_run
-  -> Domain Event
-```
+### 12.8 Ejecución y pipeline
+Evento de dominio -> tarea durable en MySQL -> ejecución programada Work reclama pendientes por MCP -> skill -> guardado validado -> siguiente tarea.
+La ejecución diaria puntúa solo procesos sin puntuación completada, incluidos rezagados. La investigación avanza por ítem; RFQ de alto interés sin precio; presentación progresiva; skill/RAG para precio y fichas. Usuario decide y crea cotización.
+No mantener HTTP abierto ni dormir workers esperando proveedores. Reservas con vencimiento, control de versión, guardado incremental y deduplicación según [contrato IA](../contracts/ai-pipeline.md). Cambios relevantes generan revisiones separadas, no reprocesamiento diario de todo el histórico.
 
 ### 12.9 Capacidades por módulo
 
@@ -725,3 +669,7 @@ Puede desplegar/versionar componentes hacia Bluehost y Lightsail.
 11. Workflow/Approval Engine para acciones sensibles.
 12. Backup workers Lightsail -> S3.
 13. Retiro gradual de endpoints y persistencia legacy después de equivalencia funcional.
+
+## Actualización de presentación y conversión asistida
+
+[Resultados IA](../modules/ai-results.md) se muestran en Procesos. La conversión básica de la sección 8 sigue copiando solo entidad/expediente/referencia. Una acción adicional explícita del usuario puede incorporar ítems, alternativas, cantidades, precios y adjuntos seleccionados a un borrador mediante Quotes, con previsualización, idempotencia y control de versión. No copiar automáticamente toda la investigación ni sobrescribir ediciones humanas.

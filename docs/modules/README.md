@@ -88,3 +88,7 @@ AI Tool ------------/
 ```
 
 No se duplican reglas de negocio por canal de entrada.
+
+## Ejecución inicial y experiencia de usuario
+
+La [integración IA](../architecture/ai-integration.md) actualiza el Gateway como coordinador de tareas/resultados en Laravel, con ejecución externa prioritaria en ChatGPT Work/Plus mediante MCP. Los adaptadores API son opcionales futuros. [Resultados](ai-results.md) se presentan dentro de Procesos y se incorporan a Cotizaciones solo por selección del usuario. El RAG inicial recupera antecedentes de S3/MySQL.

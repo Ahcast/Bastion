@@ -163,3 +163,14 @@ Antes de iniciar implementación formal deben quedar aprobados:
 
 ---
 
+## Actualización IA — secuencia vigente 2026-10-07
+
+Este desarrollo actualiza las fases históricas 4, 5 y 8: Work/Plus mediante skills y MCP realiza puntuación e investigación; Grokbot atiende RFQ. El objetivo del RAG ya está definido como apoyo a precio de venta con antecedentes; inicial S3/MySQL, vector search opcional.
+
+1. Prueba real Work–MCP: leer pendientes, guardar resultado y reanudar interrupción.
+2. Skill de puntuación diaria con criterios de Castillo IT y reservas durables.
+3. Investigación por ítem, evidencia y presentación progresiva.
+4. RFQ autorizadas, Grokbot y retorno de respuestas.
+5. Skill comercial/RAG inicial y fichas técnicas; selección humana a cotización.
+
+Pendientes y condiciones de aceptación: [pipeline](../architecture/ai-integration.md). No activar programación, correo ni consumo de proveedores como consecuencia de documentar.

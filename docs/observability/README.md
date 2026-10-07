@@ -94,3 +94,6 @@ Mitigación:
 
 ---
 
+## Observabilidad del pipeline IA
+
+Última ejecución Work satisfactoria, pendientes/antigüedad por etapa, reservas vencidas, fallos, procesos relevantes próximos a cierre y RFQ sin respuesta. Métricas comerciales: investigación -> cotización -> oferta presentada, tiempo por oferta y motivos de descarte. Nunca contar tareas completadas como ofertas. Correlación proceso/ítem/tarea/run/RFQ/documento; modelo/tokens/costo desconocidos se mantienen null, no cero.

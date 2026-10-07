@@ -14,13 +14,16 @@
 - [API/MCP](contracts/api-mcp.md)
 - [Observabilidad](observability/README.md)
 - [Roadmap](roadmap/README.md)
-- [RAG pendiente](knowledge-rag/README.md)
+- [RAG de precios: S3 y MySQL](knowledge-rag/README.md)
+- [Integración y pipeline IA](architecture/ai-integration.md)
+- [Contrato de tareas IA](contracts/ai-pipeline.md)
+- [Presentación de resultados](modules/ai-results.md)
 - [Despliegue](deployment/README.md)
 
 [Política de idioma](idioma.md): interfaz y contenido visible en español; nombres técnicos en inglés permitidos.
 
 ## Precedencia de arquitectura
 
-`architecture/oficina-ai-v2.md` recoge la arquitectura objetivo más reciente para el nuevo desarrollo y los módulos: Bluehost Choice Plus aloja Angular, Laravel, MySQL y email; Cloudflare protege el perímetro; S3 almacena documentos, snapshots y backups; y GitHub Actions se plantea como ejecutor del crawler. Cuando una referencia anterior conserve supuestos de infraestructura incompatibles —por ejemplo, Lightsail como ejecutor permanente— prevalece la arquitectura v2 hasta que esos documentos históricos sean consolidados.
+`architecture/oficina-ai-v2.md` recoge la arquitectura general. `architecture/ai-integration.md` desarrolla y actualiza la ejecución de IA: ChatGPT Work/Plus y skills mediante MCP, tareas/resultados en Bastion y RAG inicial S3/MySQL. Bluehost aloja Angular, Laravel, MySQL y email. Crawler y backup workers permanecen en AWS Lightsail; GitHub Actions se limita a CI/CD. Core mantiene identidad, API/MCP y seguridad. Los documentos describen objetivos, no conexiones o despliegues verificados.
 
 Los documentos de módulos preservan las funcionalidades legacy verificadas, pero aplican seguridad server-side, persistencia transaccional en MySQL, archivos privados en S3, idempotencia, auditoría, eventos y conexión controlada con IA.

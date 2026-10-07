@@ -23,3 +23,7 @@ Interfaz y vistas en español; nombres técnicos en inglés. Ver [idioma](docs/i
 ## Lineamientos consolidados
 
 Ver [core.md](docs/architecture/core.md) para el alcance completo del Core, infraestructura confirmada, tecnologías API/MCP, seguridad, operación y decisiones pendientes de esta sesión.
+
+## Integración de IA
+
+[Arquitectura y pipeline](docs/architecture/ai-integration.md): puntuación diaria de pendientes, investigación por ítem, RFQ con Grokbot, resultados dentro de Procesos, precio sugerido con [RAG S3/MySQL](docs/knowledge-rag/README.md) y fichas técnicas. ChatGPT Work/Plus es el ejecutor externo prioritario mediante MCP, sujeto a prueba de capacidades. El usuario revisa y crea la cotización. Esta actualización es documental.

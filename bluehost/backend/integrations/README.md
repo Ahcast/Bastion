@@ -111,3 +111,6 @@ request_approval()
 
 ---
 
+## Integración operativa IA
+
+Ver [arquitectura](../../../docs/architecture/ai-integration.md) y [contrato](../../../docs/contracts/ai-pipeline.md). ChatGPT Work con skills consulta tareas y entrega resultados mediante MCP; no requiere una llamada de inferencia desde Bluehost. Grokbot usa API/MCP autenticado para RFQ; credenciales SMTP permanecen en Core y correo Bluehost. Recepción de respuestas y alojamiento Grokbot pendientes de validar.

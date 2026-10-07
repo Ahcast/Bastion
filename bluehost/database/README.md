@@ -90,7 +90,10 @@ crawler_deliveries
 | código | GitHub |
 | backups | S3 |
 | prompts/config AI | GitHub/MySQL según uso |
-| RAG index | servicio RAG futuro |
+| Recuperación RAG | MySQL para índices/metadatos y S3 para fuentes/texto; vector search opcional |
 
 ---
 
+## Estado durable de IA
+
+Tareas, ejecuciones, reservas con vencimiento, puntuaciones, ofertas encontradas, comparación por requisito, RFQ, recomendaciones y feedback según [contrato IA](../../docs/contracts/ai-pipeline.md). Estados separados del estado comercial. Restricciones únicas e idempotencia contra duplicados; transacciones/actualizaciones condicionales compatibles con MySQL 5.7, sin asumir SKIP LOCKED. AI escribe sus resultados y usa Actions del propietario para efectos comerciales.
