@@ -214,7 +214,7 @@ Nunca almacenar:
 | código | GitHub |
 | backups | S3 |
 | prompts/config AI | GitHub/MySQL según uso |
-| RAG index | servicio RAG futuro |
+| Recuperación RAG | MySQL para índices/metadatos y S3 para fuentes/texto; vector search opcional |
 
 ---
 
@@ -239,3 +239,6 @@ Nunca almacenar:
 
 ---
 
+## Integración IA vigente
+
+Ver [pipeline IA](ai-integration.md), [contrato](../contracts/ai-pipeline.md) y [presentación](../modules/ai-results.md). ChatGPT Work consulta pendientes y guarda resultados mediante MCP; Laravel no invoca Plus como API. Recuperación inicial en Laravel/MySQL sobre documentos S3; no requiere servidor vectorial dedicado. Grokbot y recepción de respuestas usan contratos autorizados pendientes de implementación.

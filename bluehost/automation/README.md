@@ -49,3 +49,6 @@ Laravel Reverb solo si Bluehost soporta procesos persistentes.
 
 ---
 
+## Pipeline IA y programación
+
+Work ejecuta la puntuación diariamente (hora por definir en America/Tegucigalpa), recoge pendientes de cualquier fecha y persiste avances mediante MCP. Laravel crea tareas/outbox y mantiene reservas, vencimientos, alertas y resultados; su cron no invoca la suscripción Plus ni garantiza despertar Work. Investigaciones se procesan por lotes según límites medidos. Jobs Bluehost acotados por tiempo/memoria/cantidad y sin solapamientos; stop-when-empty solo no basta. Ver [pipeline](../../docs/architecture/ai-integration.md). No se crean tareas programadas reales con este documento.

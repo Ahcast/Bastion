@@ -239,7 +239,10 @@ Nunca almacenar:
 | código | GitHub |
 | backups | S3 |
 | prompts/config AI | GitHub/MySQL según uso |
-| RAG index | servicio RAG futuro |
+| Recuperación RAG | MySQL para índices/metadatos y S3 para fuentes/texto; vector search opcional |
 
 ---
 
+## Artefactos de IA y RAG
+
+Según [arquitectura IA](../../docs/architecture/ai-integration.md), S3 guarda originales, texto extraído por versión, evidencia, RFQ/adjuntos y fichas. MySQL guarda estado, precios y metadatos. Buckets privados, acceso por documento autorizado, checksum y carga verificada; enlaces temporales no se almacenan como rutas definitivas. S3 Vectors es opcional y distinto de un bucket normal; embeddings/costos por definir. No se crean buckets en esta actualización.

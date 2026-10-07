@@ -356,15 +356,15 @@ Reglas obligatorias al implementarlo:
 
 El mecanismo actual de push CSV todavía requiere documentación. Este borrador no supone que esos endpoints ya existan ni cambia el crawler actual.
 
-## 15. Integración futura de IA y MCP
+## 15. Integración de IA y MCP
 
-AI orquesta tareas y proveedores; MCP será un adaptador hacia las mismas Actions de Laravel. El Core no contendrá lógica exclusiva para una marca de modelo.
+AI administra tareas durables, ejecutores y resultados; MCP es un adaptador Core hacia las mismas Actions de Laravel. El ejecutor inicial prioritario es ChatGPT Work con skills mediante el plan del usuario; Laravel no consume Plus como API de inferencia. Ver [integración IA](ai-integration.md) y [contrato](../contracts/ai-pipeline.md). El Core no contendrá lógica exclusiva para una marca de modelo.
 
 Registrar tarea, actor, delegación, herramientas usadas, resultado, errores y costos cuando estén disponibles. Establecer presupuestos, límites y cancelación. Un proveedor fuera de servicio deja trabajo pendiente o fallido, sin bloquear la operación manual.
 
 Documentos, páginas y correos son datos no confiables: su contenido no puede otorgar permisos, cambiar políticas ni autorizar acciones. Las herramientas validan argumentos y permisos independientemente de lo que produzca el modelo.
 
-MCP pertenece expresamente al Core desde el diseño; AI administra modelos, proveedores y ejecuciones. MCP se habilita por fases, comenzando por consulta y luego escritura autorizada. RAG mantiene su revisión independiente; no se requiere para operar Core.
+MCP pertenece expresamente al Core; AI administra tareas y resultados sin duplicar Actions/Policies. MCP se habilita por fases, comenzando por consulta y escritura acotada de resultados. El RAG inicial apoya pricing con fuentes S3 e índices/metadatos MySQL; búsqueda vectorial opcional posterior. No se requiere RAG para operar Core. Compatibilidad Work/Plus, ejecución diaria desatendida, Grokbot y corpus requieren validación antes de activar.
 
 ## 16. Core de la interfaz
 

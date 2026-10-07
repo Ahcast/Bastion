@@ -2738,3 +2738,7 @@ supervisión, análisis y autorizaciones
 # 53. Regla final del proyecto
 
 > **Bastion debe ser el sistema operativo de la oficina de Castillo IT: modular, seguro, auditable, automatizable y capaz de incorporar agentes AI sin entregarles control irrestricto sobre los datos o las decisiones críticas.**
+
+## Actualización de integración IA — 2026-10-07
+
+Este maestro v0.5 se conserva como referencia histórica. Para la integración vigente prevalecen [pipeline IA](architecture/ai-integration.md), [contrato](contracts/ai-pipeline.md), [RAG de precios S3/MySQL](knowledge-rag/README.md) y [presentación](modules/ai-results.md). ChatGPT Work con skills puntúa pendientes e investiga; Grokbot atiende RFQ mediante Bastion; la decisión y creación de la oferta permanecen en el usuario. El RAG ya tiene este objetivo funcional; su infraestructura avanzada y criterios concretos siguen pendientes. Core/API/MCP y módulos conservan sus límites; crawler y backups siguen en Lightsail.
