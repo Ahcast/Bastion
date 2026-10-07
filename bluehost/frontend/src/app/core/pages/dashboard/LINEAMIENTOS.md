@@ -90,6 +90,7 @@ flowchart LR
     I -->|drill-down| F
     I -->|drill-down| O
     I -->|drill-down| P
+    AI[AI Gateway] -. resumen ejecutivo / prioridades .-> I
 ```
 
 Cada tarjeta/gráfico debe navegar al módulo fuente con filtros equivalentes.
@@ -104,15 +105,88 @@ inicio.view
 
 Inicio no puede exponer datos de módulos que el usuario no tenga permiso de ver.
 
-## IA
+## Integración de IA
 
-Puede generar resumen ejecutivo usando métricas ya calculadas:
+La IA de Inicio funciona como **capa narrativa y de priorización** sobre datos ya calculados por los servicios de dominio.
+
+Tools:
 
 ```text
-generate_daily_business_summary
+get_dashboard_metrics()
+get_priority_processes()
+get_pending_orders_summary()
+get_receivables_summary()
+get_system_health_summary()
+generate_daily_business_summary()
+explain_dashboard_alert()
 ```
 
-La IA no recalcula totales.
+### Resumen ejecutivo
+
+Puede producir, según permisos del usuario:
+
+```text
+procesos nuevos y prioritarios
+cotizaciones que requieren acción
+órdenes pendientes/listas/atrasadas
+facturas y saldos pendientes
+gastos o variaciones relevantes
+estado del crawler
+estado de backups
+errores de automatizaciones/IA
+```
+
+### Regla de fuente de verdad
+
+La IA no calcula KPIs directamente a partir de filas raw.
+
+```text
+Domain/Report Services
+      -> métricas
+      -> AI Gateway
+      -> narrativa/prioridad
+```
+
+Los números visibles en el resumen deben provenir de la misma respuesta/servicio que alimenta los widgets del dashboard.
+
+### Priorización
+
+La IA puede proponer prioridades usando señales ya disponibles, por ejemplo:
+
+```text
+closing_at próximo
+process relevance
+factura vencida
+orden sin costo/proveedor
+fallo reciente del crawler
+backup fallido
+```
+
+La prioridad es una recomendación, no cambia automáticamente estados de negocio.
+
+### Drill-down
+
+Cada observación IA debe incluir referencias navegables cuando sea posible:
+
+```text
+entity_type
+entity_id
+reason_summary
+```
+
+para que el usuario pueda abrir el Proceso, Orden, Factura u otra entidad correspondiente.
+
+### Degradación segura
+
+Si IA falla o está deshabilitada:
+
+- las métricas/gráficos siguen cargando;
+- las alertas deterministas siguen funcionando;
+- únicamente desaparece el resumen/narrativa IA.
+
+### Privacidad
+
+El resumen respeta los permisos de cada módulo fuente. Un usuario sin acceso a Facturas no recibe cifras de Facturas a través de la IA.
 
 ## Criterios de aceptación
 
@@ -121,3 +195,6 @@ La IA no recalcula totales.
 - Anuladas no reaparecen.
 - Procesos expirados no cuentan como vigentes.
 - Backend hace agregaciones.
+- IA no recalcula totales ni KPIs.
+- Cada recomendación IA puede enlazar a la entidad de origen cuando corresponda.
+- Dashboard funciona normalmente sin IA.
