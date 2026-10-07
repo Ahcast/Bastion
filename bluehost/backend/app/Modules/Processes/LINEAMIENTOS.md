@@ -154,6 +154,139 @@ Contrato uniforme:
 
 Son por usuario y sobreviven a nuevas versiones.
 
+## Conversión Proceso -> Cotización
+
+### Regla funcional
+
+Un proceso puede crear una **cotización borrador** arrastrando exclusivamente los dos datos comerciales que el proceso garantiza para esta operación:
+
+```text
+cliente / entidad
+expediente
+```
+
+Además se conserva la relación técnica:
+
+```text
+process.id -> quotes.source_process_id
+```
+
+La conversión **no consume, reemplaza ni modifica** el proceso. El proceso continúa existiendo y puede tener varias cotizaciones relacionadas.
+
+Cardinalidad objetivo:
+
+```text
+processes 1 ---- N quotes
+```
+
+Esto permite crear alternativas, revisiones u ofertas diferentes para un mismo expediente.
+
+### Datos transferidos
+
+| Proceso | Cotización |
+|---|---|
+| `entity` / cliente de fuente | `client_id` si existe match y `client_name_snapshot` |
+| `expediente` | `process_reference_snapshot` / expediente visible |
+| `id` | `source_process_id` |
+
+No se copian automáticamente:
+
+```text
+especificaciones
+fechas
+documentos
+notas personales
+marks
+score IA
+raw crawler
+items
+precios
+cantidades
+```
+
+La cotización se crea con items vacíos y estado de borrador.
+
+### Resolución del cliente
+
+El valor de entidad proveniente del proceso se resuelve mediante un servicio de dominio, por ejemplo:
+
+```text
+ClientResolver
+```
+
+Flujo:
+
+```text
+process.entity
+    |
+    v
+ClientResolver
+    |
+    +-- match exacto/canónico -> client_id + snapshot
+    |
+    +-- sin match -> client_id = null + client_name_snapshot
+```
+
+Reglas:
+
+- no crear clientes automáticamente desde el crawler;
+- no bloquear la creación de cotización si el cliente no existe en catálogo;
+- cuando no hay match, la cotización conserva el nombre como snapshot manual;
+- la UI debe permitir luego `Vincular cliente` o `Crear cliente` de forma explícita;
+- actualizar el cliente maestro en el futuro no altera el snapshot de la cotización.
+
+### API de conversión
+
+```http
+POST /api/v1/processes/{process}/create-quote
+```
+
+La acción debe:
+
+1. autenticar al usuario;
+2. exigir acceso al proceso y permiso `cotizaciones.create`;
+3. cargar el proceso en backend;
+4. resolver cliente;
+5. copiar expediente;
+6. crear la cotización borrador mediante la Action pública del módulo Quotes;
+7. guardar `source_process_id`;
+8. registrar auditoría;
+9. publicar `process.quote_created`;
+10. devolver la cotización creada para que Angular navegue al editor.
+
+Respuesta conceptual:
+
+```json
+{
+  "quote_id": 1247,
+  "quote_number": "COT-001247",
+  "status": "draft",
+  "source_process_id": 918
+}
+```
+
+La operación puede aceptar `Idempotency-Key` para impedir duplicados causados por doble clic o retry. Una nueva intención explícita con otra llave puede crear otra cotización para el mismo proceso.
+
+### UX
+
+Cada proceso debe ofrecer:
+
+```text
+[Crear cotización]
+```
+
+Después de crearla, el proceso muestra una sección:
+
+```text
+Cotizaciones relacionadas
+COT-001247   Borrador
+COT-001251   Enviada
+```
+
+Cada registro enlaza al editor/detalle de la cotización.
+
+La cotización, a su vez, muestra `Proceso de origen` y un enlace de regreso al expediente.
+
 ## API objetivo
 
 ```http
@@ -162,6 +295,8 @@ GET   /api/v1/processes/{id}
 GET   /api/v1/processes/{id}/versions
 PATCH /api/v1/processes/{id}/interest
 PATCH /api/v1/processes/{id}/note
+
+POST  /api/v1/processes/{id}/create-quote
 
 GET   /api/v1/processes/status
 POST  /api/v1/processes/export
@@ -209,14 +344,14 @@ Se conserva y debe:
 
 ```mermaid
 flowchart LR
-    P[Procesos] -->|crear borrador| Q[Cotizaciones]
+    P[Procesos] -->|cliente + expediente + source_process_id| Q[Cotización borrador]
     P --> I[Inicio]
     P --> AI[IA]
     AI -->|score/resumen/requisitos| P
     COL[Documentos/S3] --> P
 ```
 
-`source_process_id` permite trazabilidad hacia Cotizaciones.
+La relación `source_process_id` es persistente y permite navegar en ambos sentidos.
 
 ## IA
 
@@ -234,6 +369,8 @@ suggest_bid_or_no_bid
 
 Resultados IA se guardan por versión e `input_hash`. Nunca modifican el raw original.
 
+La creación básica de una cotización **no depende de IA**. Una acción posterior y separada puede proponer items desde las especificaciones del proceso.
+
 ## Seguridad
 
 ```text
@@ -243,6 +380,13 @@ procesos.note
 procesos.export
 procesos.ingest
 procesos.admin
+```
+
+Crear una cotización desde un proceso requiere como mínimo:
+
+```text
+procesos.view
+cotizaciones.create
 ```
 
 Ingestión usa identidad machine-to-machine del crawler.
@@ -256,3 +400,8 @@ Ingestión usa identidad machine-to-machine del crawler.
 - Marks/notas sobreviven.
 - `active` y `vigente` separados.
 - CSV deja de ser mecanismo principal.
+- Un proceso puede crear una cotización borrador con cliente y expediente en una sola acción.
+- La conversión no copia items, precios ni especificaciones automáticamente.
+- Un proceso puede relacionarse con varias cotizaciones.
+- El cliente desconocido no bloquea la creación y queda como snapshot manual.
+- Doble clic/retry no crea duplicados involuntarios.
