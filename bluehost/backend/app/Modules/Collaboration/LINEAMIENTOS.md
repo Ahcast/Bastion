@@ -133,22 +133,86 @@ flowchart LR
     C -.-> F[Facturas]
     C -.-> CL[Clientes]
     C -.-> S[Proveedores]
+    AI[AI Gateway] -. resumen / extracción .-> C
 ```
 
 La infraestructura documental es común, pero los permisos de cada módulo se mantienen separados.
 
-## IA
+## Integración de IA
 
 Tools:
 
 ```text
-list_authorized_documents
-get_document_metadata
-summarize_document
-extract_document_fields
+list_authorized_documents()
+get_document_metadata()
+summarize_document()
+extract_document_fields()
+classify_document()
+find_related_documents()
 ```
 
-La IA solo recibe documentos autorizados para el solicitante. Todo contenido es no confiable frente a prompt injection.
+### Autorización antes del modelo
+
+La ACL se evalúa **antes** de cargar contenido para IA:
+
+```text
+actor
+  -> Policy / document ACL
+  -> Document Service
+  -> AI Gateway
+```
+
+Un documento al que el usuario no tiene acceso tampoco puede ser leído mediante un asistente.
+
+### Contenido no confiable
+
+Todo documento se trata como:
+
+```text
+UNTRUSTED_EXTERNAL_CONTENT
+```
+
+Por tanto:
+
+- instrucciones dentro del PDF/Word/Excel no cambian permisos;
+- un documento no puede ordenar que la IA envíe correo, elimine datos o ejecute tools;
+- tools solicitadas por el modelo se revalidan en Laravel;
+- credenciales, secretos y paths internos no se incluyen en prompts.
+
+### Casos de uso
+
+- resumir documento;
+- extraer campos estructurados;
+- clasificar documento;
+- preparar metadata sugerida;
+- localizar documentos relacionados por entidad/metadatos;
+- producir insumos para Procesos, Cotizaciones, Órdenes, Facturas y Gastos.
+
+### OCR / parsing
+
+La capa de documentos puede generar una representación textual/estructurada para IA. El binario original permanece en S3 y su hash no cambia.
+
+Los resultados derivados se pueden guardar como artifact o metadata con:
+
+```text
+document_id
+sha256
+ai_run_id
+extractor_version
+prompt_version
+result_json
+created_at
+```
+
+### RAG futuro
+
+Colaboración y `documents` serán una fuente autorizada para Knowledge/RAG futuro, pero el índice nunca debe saltarse las ACL del documento fuente.
+
+Una búsqueda vectorial no otorga acceso adicional.
+
+### Acciones sensibles
+
+La IA puede proponer título, categoría, tags o vínculos. Borrar, mover entre scopes sensibles o compartir un documento requiere Domain Action y Policy.
 
 ## Seguridad
 
@@ -169,3 +233,6 @@ Descargas sensibles pueden auditarse.
 - Metadata deja JSON.
 - Bytes dejan webroot.
 - Scope persona pasa de visual a autorización real.
+- IA nunca puede leer un documento sin autorización del actor.
+- Contenido documental no puede modificar Policies mediante prompt injection.
+- Resultados IA quedan trazables contra documento/hash analizado.
