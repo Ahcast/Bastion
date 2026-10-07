@@ -59,6 +59,7 @@ flowchart TB
         SCH["Laravel Scheduler"]
         Q[("Laravel database queue")]
         AIGW["AI Gateway interno"]
+        WF["Workflow / Approval Engine"]
     end
 
     API --> DB
@@ -67,6 +68,8 @@ flowchart TB
     SCH --> Q
     Q --> API
     API --> AIGW
+    API --> WF
+    AIGW --> WF
 
     subgraph AWS["AWS"]
         LS["Lightsail"]
@@ -102,6 +105,7 @@ flowchart TB
 | AWS S3 | Binarios, documentos, snapshots raw, archivos generados y backups |
 | GitHub | Código, documentación, CI/CD; **no es runtime del crawler** |
 | Laravel AI Gateway | Punto único de conexión con proveedores IA y tools autorizadas |
+| Workflow / Approval Engine | Aprobaciones, transiciones y control de acciones sensibles |
 | OpenAI / otros | Inferencia; nunca fuente de verdad ni acceso directo a MySQL |
 
 ---
@@ -121,10 +125,12 @@ flowchart TB
 11. **Auditoría** de cambios relevantes.
 12. **No hard-delete por defecto** para documentos y registros con trazabilidad.
 13. **Cálculos críticos en Laravel.**
-14. **IA sin acceso directo a DB ni shell.**
+14. **IA sin acceso directo a DB, shell, cPanel ni credenciales SMTP.**
 15. **Human-in-the-loop** para acciones de alto impacto.
 16. Todo contenido externo se trata como `UNTRUSTED_EXTERNAL_CONTENT`.
 17. Frontend, estados visibles, reportes y documentos para usuarios en español.
+18. **La aplicación debe funcionar sin IA.** Ninguna función transaccional esencial depende de un modelo externo.
+19. **Provider-neutral.** Ningún módulo de negocio llama directamente a OpenAI u otro SDK.
 
 ---
 
@@ -159,6 +165,8 @@ El crawler debe poder ingerir procesos y reportar runs, pero no administrar clie
 
 Los workers de backup deben poder acceder únicamente a las fuentes necesarias para respaldar y al destino S3 correspondiente.
 
+Un agente IA delegado no puede superar los permisos del usuario que lo invoca.
+
 ---
 
 ## 6. Persistencia transversal
@@ -172,7 +180,11 @@ audit_logs
 domain_events
 jobs
 failed_jobs
+ai_tasks
 ai_runs
+ai_tool_calls
+ai_prompt_versions
+ai_feedback
 automation_rules
 automation_runs
 idempotency_keys
@@ -189,11 +201,14 @@ documents/invoices/{id}/
 documents/collaboration/
 generated/quotes/{id}/
 generated/invoices/{id}/
+ai/artifacts/{run_id}/
 backups/mysql/
 backups/application/
 ```
 
 `documents` guarda metadata; S3 guarda bytes.
+
+`ai_runs` guarda trazabilidad de cada ejecución; nunca secretos.
 
 ---
 
@@ -229,6 +244,16 @@ flowchart LR
     COL -. documentos .-> I
     COL -. documentos .-> C
     COL -. documentos .-> S
+
+    AIGW["AI Gateway"] -. tools .-> P
+    AIGW -. tools .-> Q
+    AIGW -. tools .-> O
+    AIGW -. tools .-> I
+    AIGW -. tools .-> G
+    AIGW -. tools .-> R
+    AIGW -. tools .-> C
+    AIGW -. tools .-> S
+    AIGW -. tools .-> COL
 ```
 
 Trazabilidad:
@@ -287,6 +312,8 @@ sin match     -> client_id = null + client_name_snapshot
 ```
 
 La creación no se bloquea si el cliente no existe y no se crea un cliente maestro automáticamente.
+
+La creación básica **no depende de IA**. Después puede ejecutarse una acción separada para proponer items desde especificaciones.
 
 ---
 
@@ -371,35 +398,240 @@ Trabajos técnicos largos que pertenezcan al crawler o backup permanecen en Ligh
 
 ---
 
-## 12. AI Gateway
+## 12. Integración de IA
 
-Servicio interno de Laravel:
+### 12.1 AI Gateway
+
+El AI Gateway comienza como módulo interno de Laravel, no como microservicio separado:
 
 ```text
-app/AI/
-  AIManager.php
+App\Modules\AI
   Providers/
   Tools/
   Prompts/
   Policies/
   DTO/
+  Jobs/
+  Actions/
 ```
 
-Tools ejemplo:
+Los módulos de negocio no llaman a proveedores directamente.
+
+```text
+Module Action
+    |
+    v
+AI Gateway
+    |
+    +--> Provider Router
+    +--> Prompt Registry
+    +--> Tool Registry
+    +--> Policy / Approval Engine
+    |
+    v
+OpenAI / proveedor futuro
+```
+
+### 12.2 Abstracción de proveedor
+
+Contrato conceptual:
+
+```text
+AIProvider
+  -> generateStructured()
+  -> generateText()
+  -> useTools()
+```
+
+Adaptadores:
+
+```text
+OpenAIProvider
+FutureProvider
+LocalProvider opcional futuro
+```
+
+La aplicación solicita capacidades, no modelos concretos.
+
+### 12.3 Tools
+
+Ejemplos:
 
 ```text
 search_processes()
 get_process()
-get_client()
+search_clients()
+suggest_client_match()
 search_suppliers()
-get_previous_prices()
-calculate_margin()
-create_quote_draft()
+find_supplier_candidates()
+get_supplier_price_history()
+create_quote_draft_from_process()
+suggest_quote_items()
+compare_quote_with_process()
+calculate_quote_margin()
+get_order()
+suggest_purchase_cost()
+get_invoice()
+classify_expense()
+get_report_metrics()
+list_authorized_documents()
+summarize_document()
 draft_email()
 create_task()
+request_approval()
 ```
 
-No se autoriza SQL arbitrario.
+No se ofrece:
+
+```text
+run_sql()
+execute_shell()
+read_all_s3()
+send_email_unrestricted()
+```
+
+### 12.4 Niveles de riesgo
+
+```text
+Nivel 1: lectura/análisis           -> automático si hay permiso
+Nivel 2: creación de borradores     -> automático/auditable
+Nivel 3: escritura interna reversible -> policy explícita
+Nivel 4: externa/financiera/irreversible -> aprobación humana por defecto
+```
+
+Nivel 4 incluye:
+
+```text
+enviar email
+emitir/enviar cotización
+marcar orden Comprada/Entregada
+crear factura definitiva
+registrar pago
+anular factura
+fusionar clientes/proveedores
+eliminar datos
+cambiar datos fiscales
+```
+
+### 12.5 Identidad delegada
+
+Cuando un usuario usa un asistente:
+
+```text
+Usuario
+  -> AI Assistant
+  -> Tool Policy
+  -> misma autorización del usuario
+```
+
+La IA no hereda permisos de administrador por existir como servicio.
+
+### 12.6 Persistencia IA
+
+`ai_runs` mínimo:
+
+```text
+id
+task_type
+entity_type
+entity_id
+actor_type
+actor_id
+provider
+model
+prompt_version
+input_hash
+status
+started_at
+finished_at
+input_tokens
+output_tokens
+cost
+confidence nullable
+result_json
+error_code nullable
+created_at
+```
+
+`ai_tool_calls`:
+
+```text
+id
+ai_run_id
+tool_name
+risk_level
+input_hash
+status
+approval_id nullable
+started_at
+finished_at
+result_summary
+```
+
+### 12.7 Contenido externo y prompt injection
+
+Todo contenido procedente de HonduCompras, email, web, proveedores o documentos se considera:
+
+```text
+UNTRUSTED_EXTERNAL_CONTENT
+```
+
+Instrucciones contenidas en un documento no cambian permisos ni habilitan tools.
+
+### 12.8 Síncrono vs asíncrono
+
+Síncrono solo para operaciones rápidas de UX.
+
+Asíncrono para:
+
+```text
+análisis de procesos
+extracción documental grande
+investigación de proveedores/precios
+comparaciones extensas
+generación de paquetes documentales
+```
+
+Flujo:
+
+```text
+Domain Event
+  -> ai_task
+  -> Laravel queue
+  -> AI Gateway
+  -> provider
+  -> structured result
+  -> ai_run
+  -> Domain Event
+```
+
+### 12.9 Capacidades por módulo
+
+| Módulo | Capacidades IA | Límite |
+|---|---|---|
+| Inicio | resumen ejecutivo, prioridades, alertas explicadas | no recalcula KPIs |
+| Clientes | matching, duplicados sugeridos | no fusiona automáticamente |
+| Proveedores | investigación, candidatos, historial, RFQ borrador | evidencia/fuente obligatoria |
+| Procesos | clasificación, resumen, requisitos, relevancia, items sugeridos | raw/versiones inmutables |
+| Cotizaciones | items sugeridos, comparación, margen, email | creación desde proceso no depende de IA; envío requiere aprobación |
+| Órdenes | proveedor/costo sugerido, riesgo/margen | no marca Comprado/Entregado automáticamente |
+| Facturas | validación cruzada, inconsistencias, borradores | no altera correlativo, pagos o SAR |
+| Gastos | OCR, extracción, clasificación, duplicados | usuario confirma registro |
+| Reportes | narrativa, anomalías, explicación | usa métricas canónicas |
+| Colaboración | resumen/extracción de documentos | respeta ACL |
+
+### 12.10 API/MCP
+
+REST, MCP y tools internas convergen en las mismas Domain Actions:
+
+```text
+REST Controller ----\
+                    -> Domain Action -> Policy -> MySQL/S3/Email
+MCP Tool -----------/
+AI Tool ------------/
+```
+
+No se duplican reglas de negocio por canal.
 
 ---
 
@@ -442,7 +674,13 @@ expense.updated
 document.uploaded
 document.deleted
 
+ai.task_created
+ai.run_started
 ai.run_completed
+ai.run_failed
+ai.approval_required
+ai.tool_called
+
 automation.completed
 automation.failed
 
@@ -481,6 +719,9 @@ Puede desplegar/versionar componentes hacia Bluehost y Lightsail.
 5. Migración de JSON a MySQL.
 6. Binarios privados a S3.
 7. Conversión Proceso -> Cotización.
-8. Eventos / queue / AI Gateway.
-9. Backup workers Lightsail -> S3.
-10. Retiro gradual de endpoints y persistencia legacy después de equivalencia funcional.
+8. `ai_tasks`, `ai_runs`, `ai_tool_calls` + AI Gateway.
+9. Tools read-only y análisis de Procesos/Documentos.
+10. Borradores IA de Cotizaciones/RFQ/correo.
+11. Workflow/Approval Engine para acciones sensibles.
+12. Backup workers Lightsail -> S3.
+13. Retiro gradual de endpoints y persistencia legacy después de equivalencia funcional.
