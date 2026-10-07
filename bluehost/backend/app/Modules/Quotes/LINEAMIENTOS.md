@@ -356,6 +356,7 @@ flowchart LR
     Q -->|convertir| O[Órdenes]
     Q -->|convertir| F[Facturas]
     S3[(S3)] --> Q
+    AI[AI Gateway] -. items / comparación / margen / email .-> Q
 ```
 
 ## Seguridad
@@ -378,41 +379,110 @@ cotizaciones.create
 
 La Action `CreateQuoteFromProcess` vuelve a aplicar autorización y validación; no confía en que Angular haya ocultado o mostrado correctamente el botón.
 
-## IA
+## Integración de IA
+
+La creación básica desde un proceso **no depende de IA**. IA entra después como una capa opcional de asistencia.
 
 Tools:
 
 ```text
-get_quote
-create_quote_draft
-suggest_quote_items
-compare_quote_with_process
-calculate_margin
-draft_quote_email
+get_quote()
+create_quote_draft()
+create_quote_draft_from_process()
+suggest_quote_items()
+compare_quote_with_process()
+find_missing_requirements()
+get_previous_prices()
+calculate_quote_margin()
+draft_quote_email()
+explain_quote_risk()
 ```
 
-La IA crea borradores; enviar requiere policy/approval.
+### Generar items desde Proceso con IA
 
-La creación básica desde un proceso **no depende de IA**.
-
-Después de creada la cotización puede existir una acción separada:
+Acción separada:
 
 ```text
-Generar items desde proceso con IA
+Cotización borrador
+  -> source_process_id
+  -> AI: extract/suggest_quote_items
+  -> propuesta estructurada
+  -> revisión del usuario
+  -> agregar items aprobados
 ```
 
-Esa acción puede analizar las especificaciones del proceso y proponer items, pero los resultados son borradores/recomendaciones y no forman parte de la transferencia inicial cliente + expediente.
+La propuesta debe incluir por item, cuando sea posible:
+
+```text
+description
+quantity nullable
+unit nullable
+technical_requirements
+source_reference
+confidence
+notes
+```
+
+La IA no inserta silenciosamente items definitivos. El usuario puede aceptar, editar o rechazar.
+
+### Comparación contra requisitos
+
+Si existe `source_process_id`, la IA puede comparar:
+
+```text
+requisitos del proceso
+vs
+items de la cotización
+```
+
+para identificar:
+
+- requisitos no cubiertos;
+- diferencias técnicas;
+- items posiblemente faltantes;
+- campos ambiguos que requieren revisión.
+
+El resultado es una ayuda de validación, no certificación de cumplimiento.
+
+### Precios y margen
+
+La IA no define los cálculos canónicos. Debe usar:
+
+```text
+QuoteCalculator
+get_previous_prices()
+calculate_quote_margin()
+```
+
+Los precios sugeridos deben diferenciar histórico, fuente externa, cotización de proveedor y estimación.
+
+### Email
+
+`draft_quote_email()` puede generar asunto/cuerpo. `send` permanece separado y requiere `cotizaciones.send` más policy/aprobación correspondiente.
+
+### Riesgo y trazabilidad
+
+Toda ejecución relevante guarda `ai_run_id`, `prompt_version`, `input_hash`, provider/model y resultado estructurado.
+
+No se insertan notas privadas en prompts o outputs públicos salvo necesidad explícita y autorización.
 
 ## Eventos
 
-Al crear desde proceso se publican, después del commit, eventos compatibles con auditoría y automatizaciones:
+Al crear desde proceso:
 
 ```text
 quote.created
 process.quote_created
 ```
 
-El payload debe identificar `process_id`, `quote_id` y actor, sin incluir secretos ni contenido raw innecesario.
+Eventos que pueden disparar IA de forma asíncrona:
+
+```text
+quote.created -> analyze_quote_if_requested
+quote.updated -> invalidate_stale_ai_analysis
+```
+
+La IA no forma parte de la transacción principal.
 
 ## Criterios de aceptación
 
@@ -429,3 +499,5 @@ El payload debe identificar `process_id`, `quote_id` y actor, sin incluir secret
 - Cliente desconocido no bloquea la creación y queda como snapshot manual.
 - La creación desde proceso no copia items, precios ni especificaciones automáticamente.
 - La creación no depende de OpenAI ni de otro proveedor de IA.
+- IA puede sugerir items y comparar requisitos, pero el usuario controla qué entra a la cotización.
+- Enviar cotización/correo sigue requiriendo autorización independiente de la IA.
