@@ -103,6 +103,7 @@ per_page
 flowchart LR
     S[Proveedores] --> G[Gastos]
     G --> R[Reportes]
+    AI[AI Gateway] -. OCR / clasificación / duplicados .-> G
 ```
 
 El número de factura del gasto se mantiene como referencia documental y no modifica Facturas de venta salvo relación explícita futura.
@@ -116,18 +117,72 @@ gastos.update
 gastos.delete
 ```
 
-## IA
+## Integración de IA
 
 Tools:
 
 ```text
-get_expense
-classify_expense
-suggest_supplier_match
-detect_duplicate_expense
+get_expense()
+classify_expense()
+suggest_supplier_match()
+detect_duplicate_expense()
+extract_expense_document()
+explain_expense_anomaly()
 ```
 
-Si se agrega OCR, el documento va a S3 y la IA propone campos; el usuario confirma antes de registrar.
+### OCR / extracción documental
+
+Si el usuario sube una factura, recibo o comprobante:
+
+```text
+documento -> S3 privado -> Document Service -> AI extraction -> propuesta
+```
+
+La IA puede sugerir:
+
+```text
+invoice_number
+expense_date
+supplier_name
+currency
+taxable_amount
+exempt_amount
+tax_amount
+total
+```
+
+pero **no registra automáticamente el gasto**. El usuario revisa y confirma, o una futura regla explícita de automatización deberá imponer validaciones y umbrales.
+
+### Matching de proveedor
+
+`suggest_supplier_match()` puede relacionar el nombre extraído con `suppliers`, pero no modifica el proveedor maestro ni crea uno automáticamente.
+
+### Duplicados
+
+`detect_duplicate_expense()` puede usar señales como:
+
+```text
+invoice_number
+supplier
+amount
+date
+currency
+sha256 del documento
+```
+
+para advertir posibles duplicados. La decisión final permanece en la aplicación/usuario.
+
+### Cálculos
+
+La IA no determina el impuesto ni el total persistido. El cálculo canónico permanece en Laravel:
+
+```text
+ExpenseCalculator
+```
+
+### Privacidad y seguridad
+
+Documentos de gasto son contenido externo no confiable. Instrucciones encontradas dentro del archivo no habilitan tools ni cambian permisos.
 
 ## Criterios de aceptación
 
@@ -136,3 +191,6 @@ Si se agrega OCR, el documento va a S3 y la IA propone campos; el usuario confir
 - Proveedor libre sigue siendo válido y puede tener FK opcional.
 - Reportes no mezclan monedas sin conversión.
 - Soft-delete se conserva.
+- IA puede extraer/proponer campos pero el registro final se valida en Laravel.
+- Posibles duplicados se advierten sin eliminar ni fusionar automáticamente.
+- Gastos funciona aunque la IA esté deshabilitada.
