@@ -1,15 +1,21 @@
 # Proyecto Bastion
 
-Ecosistema operativo de Castillo IT. Estructura basada en el [Documento maestro v0.5](docs/Proyecto_Bastion_Documento_Maestro.md), 6 de octubre de 2026.
+Plataforma operativa de Castillo IT. Aplicación modular en Bluehost y extracción técnica en AWS.
 
-| Carpeta | Responsabilidad |
+| Ubicación | Responsabilidad |
 | --- | --- |
-| [bluehost/](bluehost/README.md) | Angular, Laravel, MySQL, correo y núcleo de negocio |
-| [aws/](aws/README.md) | Lightsail: crawler y workers técnicos. S3: raw, documentos y backups |
-| [docs/](docs/README.md) | Documento maestro y arquitectura compartida |
+| [Core backend](bluehost/backend/app/Core/README.md) | Usuarios, RBAC, MFA, configuración, SMTP, API, MCP y servicios comunes. |
+| [Módulos backend](bluehost/backend/app/Modules/README.md) | Reglas y datos de los módulos existentes. |
+| [Frontend](bluehost/frontend/README.md) | Angular: Core, módulos y componentes compartidos. |
+| [AWS](aws/README.md) | Crawler y workers en Lightsail; almacenamiento en S3. |
+| [Documentación](docs/README.md) | Arquitectura, contratos y seguridad. |
 
-Solo carpetas y Markdown. La arquitectura conceptual es la base aprobada; las versiones, contratos y detalles técnicos siguen sujetos a la revisión senior indicada en el documento maestro.
-Se conserva la separación por entorno solicitada, dentro de este repositorio. No se crean otros repositorios ni recursos externos.
+## Estado
 
-## Idioma
-Frontend y vistas en español. Nomenclatura técnica en inglés conforme a la estructura aprobada. Ver [política de idioma](docs/idioma.md).
+La aplicación de Bluehost sigue siendo una estructura documental; esta reorganización no instala Laravel ni Angular. El crawler en AWS ya contiene código y pruebas. No se despliega ningún servicio al reorganizar carpetas.
+
+Dominio definido: `https://bastion.castilloit.net`.
+
+La [estructura Core y módulos](docs/architecture/core-modules.md) actualiza la organización inicial del [documento maestro v0.5](docs/Proyecto_Bastion_Documento_Maestro.md), que se conserva como referencia histórica. Se mantienen los módulos funcionales existentes.
+
+Interfaz y vistas en español; nombres técnicos en inglés. Ver [idioma](docs/idioma.md).

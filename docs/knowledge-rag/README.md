@@ -1,6 +1,6 @@
 # RAG pendiente
 
-Fuente: [Documento maestro v0.5](../../docs/Proyecto_Bastion_Documento_Maestro.md). Alcance conceptual; implementación y validación técnica pendientes.
+Fuente: [Documento maestro v0.5](../Proyecto_Bastion_Documento_Maestro.md). Alcance conceptual; implementación y validación técnica pendientes.
 
 # 39. Knowledge / RAG Engine
 

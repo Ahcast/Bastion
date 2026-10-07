@@ -1,5 +1,7 @@
 # Bluehost — Bastion Core
 
+Organización vigente: [Core y módulos](../docs/architecture/core-modules.md). Esta referencia actualiza las rutas de los fragmentos históricos reproducidos abajo.
+
 Angular SPA, Laravel, REST API, autenticación, RBAC, workflow, aprobaciones, auditoría e importación; MySQL y correo permanecen en Bluehost.
 
 - [Frontend](frontend/README.md)

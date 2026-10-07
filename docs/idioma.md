@@ -1,5 +1,7 @@
 # Idioma de la interfaz y nomenclatura técnica
 
+Organización vigente: [Core y módulos](architecture/core-modules.md). Esta referencia actualiza las rutas de los fragmentos históricos reproducidos abajo.
+
 ## Interfaz en español — obligatorio
 La interfaz de Bastion y sus vistas deben estar en español.
 Menú aprobado: Inicio, Clientes, Proveedores, Órdenes de Compra, Cotizaciones, Facturas, Gastos, Reportes, Procesos, Colaboración y Configuración.

@@ -1,6 +1,8 @@
 # Arquitectura y responsabilidades
 
-Fuente: [Documento maestro v0.5](../../docs/Proyecto_Bastion_Documento_Maestro.md). Alcance conceptual; implementación y validación técnica pendientes.
+Organización vigente: [Core y módulos](core-modules.md). Esta referencia actualiza las rutas de los fragmentos históricos reproducidos abajo.
+
+Fuente: [Documento maestro v0.5](../Proyecto_Bastion_Documento_Maestro.md). Alcance conceptual; implementación y validación técnica pendientes.
 
 # 4. Principios de arquitectura
 

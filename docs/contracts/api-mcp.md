@@ -1,6 +1,6 @@
 # Castillo API y MCP
 
-Fuente: [Documento maestro v0.5](../../docs/Proyecto_Bastion_Documento_Maestro.md). Alcance conceptual; implementación y validación técnica pendientes.
+Fuente: [Documento maestro v0.5](../Proyecto_Bastion_Documento_Maestro.md). Alcance conceptual; implementación y validación técnica pendientes.
 
 # 30. Castillo API
 

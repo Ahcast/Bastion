@@ -1,5 +1,7 @@
 # Backend Laravel
 
+Organización vigente: [Core y módulos](../../docs/architecture/core-modules.md). Esta referencia actualiza las rutas de los fragmentos históricos reproducidos abajo.
+
 Fuente: [Documento maestro v0.5](../../docs/Proyecto_Bastion_Documento_Maestro.md). Alcance conceptual; implementación y validación técnica pendientes.
 
 # 8. Stack tecnológico propuesto
@@ -37,7 +39,7 @@ src/app/
 │   ├── pipes/
 │   ├── directives/
 │   └── utils/
-└── features/
+└── modules/
     ├── dashboard/
     ├── customers/
     ├── suppliers/
@@ -72,7 +74,6 @@ Estructura propuesta:
 ```text
 app/
 └── Modules/
-    ├── Core/
     ├── Customers/
     ├── Suppliers/
     ├── Processes/

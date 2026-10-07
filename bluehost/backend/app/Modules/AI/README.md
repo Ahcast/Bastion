@@ -320,3 +320,7 @@ STALE
 
 ---
 
+
+## Integración con Core
+
+Este módulo conserva su alcance funcional. Consume [Core](../../Core/README.md) y cumple el [contrato modular](../../../../../docs/contracts/modules.md). Sus endpoints REST y herramientas MCP reutilizan las mismas Actions/Services y Policies.

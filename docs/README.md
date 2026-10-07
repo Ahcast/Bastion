@@ -14,3 +14,10 @@
 Los documentos de carpetas reproducen secciones del maestro; no agregan módulos aprobados nuevos. El maestro incluye estados conceptuales alternativos, ejemplos y decisiones pendientes que requieren refinamiento senior.
 
 [Política de idioma](idioma.md): interfaz y contenido visible en español; nombres técnicos en inglés permitidos.
+
+## Organización vigente
+
+- [Separación Core y módulos](architecture/core-modules.md).
+- [Contrato modular](contracts/modules.md).
+
+Estas páginas actualizan la organización de carpetas del maestro v0.5; sus extractos se conservan como contexto histórico.
