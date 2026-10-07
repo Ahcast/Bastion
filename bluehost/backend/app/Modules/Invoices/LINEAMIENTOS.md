@@ -206,6 +206,7 @@ flowchart LR
     F --> R[Reportes]
     F --> I[Inicio]
     F --> COL[Documentos]
+    AI[AI Gateway] -. validación / comparación / borrador .-> F
 ```
 
 ## Seguridad
@@ -220,9 +221,83 @@ facturas.payment
 
 Emisión, cancelación y pagos siempre auditados.
 
-## IA
+## Integración de IA
 
-Puede preparar borradores, detectar inconsistencias y comparar documentos. No puede cambiar correlativo, registrar pago real, anular ni alterar snapshot SAR sin tool/policy explícita.
+La IA se limita a asistencia, revisión y preparación de borradores. Las reglas fiscales y financieras permanecen en Laravel.
+
+Tools:
+
+```text
+get_invoice()
+get_invoice_items()
+compare_invoice_with_quote()
+compare_invoice_with_order()
+detect_invoice_inconsistencies()
+summarize_invoice_status()
+draft_invoice_notes()
+extract_invoice_supporting_document()
+```
+
+### Casos de uso
+
+- comparar factura contra cotización/orden de origen;
+- detectar diferencias de items, cantidades, precios o cliente;
+- señalar inconsistencias entre total, pagos y saldo;
+- resumir estado de crédito/cobro;
+- extraer datos de documentos soporte como propuesta;
+- preparar notas internas o explicación para el usuario.
+
+### Límites fiscales y financieros
+
+La IA **no puede** por sí sola:
+
+```text
+asignar/cambiar invoice_number
+incrementar/decrementar correlativo
+alterar sar_snapshot_json
+registrar un pago real
+anular/cancelar factura
+cambiar total persistido fuera de InvoiceFinancials
+marcar pagada manualmente
+```
+
+Estas operaciones requieren Domain Actions específicas, permisos y, para acciones sensibles, aprobación humana.
+
+### Cálculos
+
+La IA nunca recalcula de forma autoritativa:
+
+```text
+subtotal
+discount_total
+tax_15
+tax_18
+tax_total
+total
+paid_total
+balance
+profit
+```
+
+Debe consumir servicios canónicos del backend y limitarse a explicar o validar los resultados.
+
+### Documentos
+
+Si se analiza un PDF o soporte, el documento se obtiene mediante el Document Service y ACL. El modelo no recibe acceso general a S3.
+
+Los campos extraídos son propuestas que deben validarse antes de modificar la factura.
+
+### Cobranza asistida
+
+Puede generar:
+
+```text
+payment_due_summary
+draft_collection_email
+credit_risk_note
+```
+
+pero enviar correo o registrar un pago son acciones separadas.
 
 ## Criterios de aceptación
 
@@ -233,3 +308,6 @@ Puede preparar borradores, detectar inconsistencias y comparar documentos. No pu
 - Snapshot SAR histórico.
 - Nota de entrega y recibo disponibles.
 - Tests de contado, crédito, abonos, sobrepago, anulación, clonación y correlativo.
+- IA puede detectar inconsistencias sin alterar datos fiscales automáticamente.
+- Ninguna ejecución IA puede modificar correlativo, SAR o pagos sin Domain Action autorizada.
+- Facturas funciona completamente aunque el proveedor IA esté fuera de servicio.
