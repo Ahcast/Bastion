@@ -89,6 +89,7 @@ flowchart LR
     C[Clientes] --> Q[Cotizaciones]
     C --> O[Órdenes]
     C --> F[Facturas]
+    AI[AI Gateway] -. matching / consulta .-> C
 ```
 
 ## Seguridad
@@ -99,17 +100,81 @@ clientes.create
 clientes.update
 ```
 
-## IA
+## Integración de IA
+
+La IA consume Clientes mediante tools del módulo; no consulta la tabla directamente.
 
 Tools:
 
 ```text
-search_clients
-get_client
-suggest_client_match
+search_clients()
+get_client()
+suggest_client_match()
+detect_client_duplicates()
+summarize_client_activity()
 ```
 
-La IA puede sugerir duplicados; no fusionarlos automáticamente.
+### Casos de uso
+
+- resolver la entidad de un Proceso contra el catálogo al crear una Cotización;
+- sugerir coincidencias por nombre normalizado/RTN;
+- detectar posibles duplicados;
+- resumir relación comercial usando información autorizada de cotizaciones, órdenes y facturas;
+- ayudar al usuario a encontrar el cliente correcto desde lenguaje natural.
+
+### ClientResolver y Procesos
+
+La resolución de cliente usada por `Proceso -> Cotización` debe ser determinista primero:
+
+```text
+normalización / match exacto / RTN
+        |
+        +-- match -> client_id
+        |
+        +-- sin match -> snapshot manual
+```
+
+La IA puede **sugerir** coincidencias adicionales cuando no exista match determinista, pero no bloquea la creación de la cotización y no crea/fusiona clientes automáticamente.
+
+### Acciones permitidas
+
+Automáticas/read-only:
+
+```text
+buscar
+leer
+sugerir coincidencia
+sugerir duplicado
+resumir actividad
+```
+
+Requieren acción humana o permiso explícito:
+
+```text
+crear cliente maestro
+actualizar datos maestros
+fusionar duplicados
+inactivar cliente
+```
+
+### Trazabilidad IA
+
+Toda sugerencia de matching debe poder registrar en `ai_runs`:
+
+```text
+client_candidate_ids
+confidence
+reason_summary
+input_hash
+prompt_version
+model/provider
+```
+
+La confianza es informativa y nunca sustituye una Policy.
+
+### Privacidad
+
+La IA solo recibe los campos necesarios para la tarea. No se envían indiscriminadamente todos los datos de clientes ni documentos asociados.
 
 ## Criterios de aceptación
 
@@ -118,3 +183,5 @@ La IA puede sugerir duplicados; no fusionarlos automáticamente.
 - No se crean duplicados concurrentes equivalentes.
 - Documentos históricos mantienen snapshot.
 - Cotizaciones, órdenes y facturas enlazan al cliente sin depender de él para reconstruir historia.
+- La IA puede sugerir matches/duplicados sin alterar automáticamente el catálogo.
+- `Proceso -> Cotización` funciona aunque la IA esté deshabilitada.
