@@ -1,8 +1,8 @@
 # Arquitectura y responsabilidades
 
-Organización vigente: [Core y módulos](core-modules.md). Esta referencia actualiza las rutas de los fragmentos históricos reproducidos abajo.
+Organización vigente: [Core y módulos](core-modules.md). El maestro vigente y el detalle del Core definen las rutas de implementación.
 
-Fuente: [Documento maestro v0.5](../Proyecto_Bastion_Documento_Maestro.md). Alcance conceptual; implementación y validación técnica pendientes.
+Fuente: [Documento maestro vigente](../Proyecto_Bastion_Documento_Maestro.md). Alcance conceptual; implementación y validación técnica pendientes.
 
 # 4. Principios de arquitectura
 
@@ -29,57 +29,26 @@ Las reglas base del proyecto son:
 
 # 6. Arquitectura general
 
-```text
-                                   USUARIOS
-                                      │
-                                      ▼
-                                Angular SPA
-                                      │
-                                    HTTPS
-                                      │
-                                      ▼
-                            ┌──────────────────┐
-                            │ Laravel / Bastion│
-                            │      Core        │
-                            └────────┬─────────┘
-                                     │
-                  ┌──────────────────┼──────────────────┐
-                  │                  │                  │
-                  ▼                  ▼                  ▼
-                MySQL               S3          Knowledge/RAG
-                  │                                     │
-                  │                                     │
-                  └────────── Castillo API/MCP ─────────┘
-                                     │
-                     ┌───────────────┼───────────────┐
-                     │               │               │
-                     ▼               ▼               ▼
-                  ChatGPT         Grok Auto      Grok Assistant
-
-
-HonduCompras
-     │
-     ▼
-AWS Lightsail
-     │
-     ├── crawler
-     ├── retries
-     ├── checkpoints
-     ├── raw
-     └── backup worker
-        │
-        ├──────────────► Amazon S3
-        │
-        └──────────────► Bluehost / Bastion
-
-
-GitHub
-  │
-  ├── crawler
-  ├── Laravel
-  ├── Angular
-  └── infrastructure
+```mermaid
+flowchart TB
+    U["Usuarios Angular"] --> API["Laravel API y Policies"]
+    WORK["ChatGPT Work y skills"] <-->|Herramientas| MCP["MCP Core"]
+    MCP --> API
+    API --> AI["AI y Workflow"]
+    AI --> DB["MySQL: tareas y resultados"]
+    API --> S3["S3 privado"]
+    API --> RAG["Recuperación de antecedentes"]
+    RAG --> DB
+    RAG --> S3
+    HC["HonduCompras"] --> CR["Crawler Lightsail"]
+    CR --> API
+    CR --> S3
+    BW["Backup worker Lightsail"] --> S3
+    GB["Grokbot RFQ"] <-->|API autorizada| API
+    API --> MAIL["Correo Bluehost"]
 ```
+
+Core/API/MCP, módulos y Angular se alojan en Bluehost. Work ejecuta IA externamente; Grokbot y recepción de respuestas requieren conexión y runtime validados. No existe acceso directo de agentes a MySQL. [Detalle de conexiones](ai-integration.md).
 
 ---
 

@@ -206,7 +206,7 @@ created_at
 
 ### RAG futuro
 
-Colaboración y `documents` serán una fuente autorizada para Knowledge/RAG futuro, pero el índice nunca debe saltarse las ACL del documento fuente.
+Colaboración y `documents` aportan fuentes autorizadas al RAG inicial S3/MySQL para pricing; índices y fragmentos respetan las ACL del documento fuente. La búsqueda vectorial es opcional posterior.
 
 Una búsqueda vectorial no otorga acceso adicional.
 

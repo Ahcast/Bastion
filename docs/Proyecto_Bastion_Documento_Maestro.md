@@ -4,8 +4,28 @@
 **Empresa:** Castillo IT S. de R.L.  
 **Proyecto:** Bastion  
 **Estado:** Arquitectura conceptual aprobada como base, pendiente de validación senior y refinamiento técnico  
-**Versión documental:** 0.5 — Documento maestro consolidado  
-**Fecha:** 6 de octubre de 2026
+**Versión documental:** 0.6 — Maestro vigente consolidado  
+**Fecha:** 7 de octubre de 2026
+
+## Uso de esta especificación por desarrolladores e IA
+
+Este maestro define alcance y decisiones transversales vigentes. El historial anterior se conserva en Git, no como instrucciones alternativas dentro del documento. “Debe” expresa un objetivo; no demuestra implementación ni despliegue.
+
+| Tema | Documento de detalle |
+| --- | --- |
+| Core, identidad, API/MCP y seguridad | [Core](architecture/core.md) |
+| Rutas y dependencias | [Core y módulos](architecture/core-modules.md) |
+| Arquitectura general | [Oficina AI](architecture/oficina-ai-v2.md) |
+| Ejecución IA y pipeline | [Integración IA](architecture/ai-integration.md) |
+| Tareas, reservas y resultados IA | [Contrato IA](contracts/ai-pipeline.md) |
+| Antecedentes de precios | [RAG](knowledge-rag/README.md) |
+| Presentación de resultados | [UX IA](modules/ai-results.md) |
+| Reglas comerciales por módulo | [Índice de módulos](modules/README.md) |
+| Protocolo del cliente crawler existente | [Contrato del crawler](../aws/lightsail/crawler/docs/IMPORT_CONTRACT.md) |
+
+Leer maestro y detalle del área antes de implementar. El documento especializado detalla su contrato; no autoriza cambiar el alcance, los permisos o una decisión transversal. Si persiste una contradicción, documentarla y resolverla explícitamente, no elegir silenciosamente una variante ni mezclar esquemas.
+Separar decisiones definidas, propuestas por validar y capacidades implementadas. Ejemplos de tablas, rutas, estados y horarios no constituyen migraciones ni servicios activos. No implementar opciones futuras como requisitos de la primera versión.
+La aplicación nueva de Bluehost sigue en etapa documental; el crawler tiene código y pruebas, sin que ello acredite un receptor Laravel desplegado.
 
 ---
 
@@ -19,8 +39,8 @@ Su propósito es convertir la operación de la oficina en un sistema integrado d
 - los procesos se versionan y conservan históricamente;
 - la AI clasifica, puntúa y analiza oportunidades;
 - un agente autónomo investiga productos, precios y proveedores;
-- si no existe un precio público, se generan y envían RFQ a proveedores;
-- los empleados pueden operar el sistema mediante un asistente conversacional;
+- si no existe precio público y el interés es alto, se preparan RFQ y se envían bajo autorización;
+- los empleados podrán usar un asistente delegado como ampliación por fases;
 - clientes, proveedores, cotizaciones, órdenes de compra, facturas y gastos quedan conectados;
 - todas las acciones relevantes quedan auditadas;
 - las acciones de alto impacto requieren autorización;
@@ -77,7 +97,7 @@ Bastion debe cubrir:
 - integración con correo;
 - integración con GitHub;
 - backups automáticos;
-- futura integración con un Knowledge/RAG Engine.
+- recuperación de antecedentes S3/MySQL para recomendar precios; búsqueda vectorial opcional posterior.
 
 ## 3.3 Objetivos no funcionales
 
@@ -122,162 +142,47 @@ Las reglas base del proyecto son:
 # 5. Infraestructura actual
 
 ## 5.1 Bluehost
-
-Castillo IT tiene **Bluehost Choice Plus Hosting**.
-
-Actualmente Bluehost aloja:
-
-- aplicación web;
-- Laravel;
-- Angular SPA;
-- MySQL;
-- correo electrónico de Castillo IT;
-- archivos asociados a la aplicación.
-
-Bluehost continuará siendo inicialmente el **Bastion Core**.
+Plan Choice Plus: destino de Angular, Laravel, MySQL y correo. La nueva aplicación Bastion aún no se acredita desplegada.
+- Dominio: `https://bastion.castilloit.net`.
+- PHP seleccionable 8.1–8.5; objetivo 8.5, CLI/extensiones por verificar.
+- SSH y FTP disponibles; usar SSH/SFTP para despliegue.
+- Cron mínimo de un minuto.
+- Document root: `~/public_html/website_091cdca8`; exponer solo activos públicos.
+- Servidor reportado: **Percona Server for MySQL 5.7.44-48**. Compatibilidad de paquetes/migraciones y soporte de seguridad por validar.
 
 ## 5.2 AWS Lightsail
-
-Instancia actual:
-
-- **1 GB RAM**
-- **2 vCPU**
-- **40 GB SSD**
-
-Responsabilidades previstas:
-
-- crawler HonduCompras;
-- Python;
-- cron/scheduler;
-- retries;
-- checkpoints;
-- estado técnico local;
-- generación de CSV/JSON;
-- subida de raw a S3;
-- backup worker;
-- sincronizaciones técnicas;
-- logs.
-
-El Lightsail actual **no se considera adecuado para un RAG/vector DB completo** por la RAM disponible.
+Instancia documentada: 1 GB RAM, 2 vCPU, 40 GB SSD. Ejecuta crawler, retries, checkpoints, entrega y workers de backup. No es la base maestra ni se le asignan modelos locales, OCR pesado o vector DB por defecto.
 
 ## 5.3 Amazon S3
-
-Bucket existente:
-
-`castilloit-honducompras-crawler`
-
-Región:
-
-`us-east-1` — Norte de Virginia.
-
-Usos:
-
-- raw crawler;
-- snapshots;
-- CSV;
-- JSON;
-- manifests;
-- logs;
-- documentos descargados;
-- reconstrucción/replay.
-
-Bucket propuesto adicional:
-
-`castilloit-backups`
-
-Usos:
-
-- backups de MySQL;
-- backups de Bluehost;
-- uploads;
-- documentos;
-- aplicación;
-- manifests de backups.
-
-En el futuro puede crearse:
-
-`castilloit-documents`
-
-para separar documentación operativa de backups y raw del crawler.
+Bucket confirmado por el usuario: `castilloit-honducompras-crawler`, región `us-east-1`. Documentos operativos y backups requieren ubicación/aislamiento definidos; nombres como `castilloit-backups` y `castilloit-documents` son propuestas, no buckets cuya creación esté verificada. Archivos privados, versiones y metadatos en MySQL.
 
 ## 5.4 GitHub
-
-GitHub será la fuente oficial del código.
-
-Repositorios propuestos:
-
-```text
-CastilloIT/
-├── bastion
-│   ├── backend
-│   └── frontend
-├── honducompras-crawler
-└── infrastructure
-```
-
-Alternativa inicial simplificada:
-
-```text
-CastilloIT/
-├── bastion
-└── honducompras-crawler
-```
+Repositorio vigente: [Ahcast/Bastion](https://github.com/Ahcast/Bastion). Monorepo con `bluehost/`, `aws/` y `docs/`. GitHub mantiene código, documentación y CI/CD; crawler y backups se ejecutan en Lightsail.
 
 ---
 
 # 6. Arquitectura general
 
-```text
-                                   USUARIOS
-                                      │
-                                      ▼
-                                Angular SPA
-                                      │
-                                    HTTPS
-                                      │
-                                      ▼
-                            ┌──────────────────┐
-                            │ Laravel / Bastion│
-                            │      Core        │
-                            └────────┬─────────┘
-                                     │
-                  ┌──────────────────┼──────────────────┐
-                  │                  │                  │
-                  ▼                  ▼                  ▼
-                MySQL               S3          Knowledge/RAG
-                  │                                     │
-                  │                                     │
-                  └────────── Castillo API/MCP ─────────┘
-                                     │
-                     ┌───────────────┼───────────────┐
-                     │               │               │
-                     ▼               ▼               ▼
-                  ChatGPT         Grok Auto      Grok Assistant
-
-
-HonduCompras
-     │
-     ▼
-AWS Lightsail
-     │
-     ├── crawler
-     ├── retries
-     ├── checkpoints
-     ├── raw
-     └── backup worker
-        │
-        ├──────────────► Amazon S3
-        │
-        └──────────────► Bluehost / Bastion
-
-
-GitHub
-  │
-  ├── crawler
-  ├── Laravel
-  ├── Angular
-  └── infrastructure
+```mermaid
+flowchart TB
+    U["Usuarios Angular"] --> API["Laravel API y Policies"]
+    WORK["ChatGPT Work y skills"] <-->|Herramientas| MCP["MCP Core"]
+    MCP --> API
+    API --> AI["AI y Workflow"]
+    AI --> DB["MySQL: tareas y resultados"]
+    API --> S3["S3 privado"]
+    API --> RAG["Recuperación de antecedentes"]
+    RAG --> DB
+    RAG --> S3
+    HC["HonduCompras"] --> CR["Crawler Lightsail"]
+    CR --> API
+    CR --> S3
+    BW["Backup worker Lightsail"] --> S3
+    GB["Grokbot RFQ"] <-->|API autorizada| API
+    API --> MAIL["Correo Bluehost"]
 ```
+
+Core/API/MCP, módulos y Angular se alojan en Bluehost. Work ejecuta IA externamente; Grokbot y recepción de respuestas requieren conexión y runtime validados. No existe acceso directo de agentes a MySQL. [Detalle de conexiones](architecture/ai-integration.md).
 
 ---
 
@@ -392,285 +297,50 @@ Nunca almacenar:
 # 8. Stack tecnológico propuesto
 
 ## 8.1 Frontend
-
-Baseline:
-
-- **Angular 22.x**
-- **TypeScript 6.x**
-- **RxJS 7.x**
-- Angular Router
-- Angular Signals
-- Reactive Forms
-- HttpClient
-- standalone components
-- lazy loading por feature
-
-Build/CI:
-
-- **Node.js 24 LTS**
-
-Estructura:
-
-```text
-src/app/
-├── core/
-│   ├── auth/
-│   ├── api/
-│   ├── guards/
-│   ├── interceptors/
-│   └── config/
-├── shared/
-│   ├── ui/
-│   ├── pipes/
-│   ├── directives/
-│   └── utils/
-└── features/
-    ├── dashboard/
-    ├── customers/
-    ├── suppliers/
-    ├── processes/
-    ├── quotes/
-    ├── purchase-orders/
-    ├── invoices/
-    ├── expenses/
-    ├── reports/
-    ├── collaboration/
-    └── settings/
-```
+Baseline propuesto: Angular 22.x, TypeScript 6.x, RxJS 7.x y Node 24 LTS para build; versiones/compatibilidad por validar antes de instalar. Angular Router, Signals, Reactive Forms, HttpClient, standalone components y carga diferida por módulo.
+Rutas vigentes:
+- `bluehost/frontend/src/app/core/`: sesión, API, guards, configuración y shell; Inicio/Configuración en `core/pages/dashboard` y `core/pages/settings`.
+- `bluehost/frontend/src/app/modules/`: customers, suppliers, processes, quotes, purchase-orders, invoices, expenses, reports y collaboration.
+- `bluehost/frontend/src/app/shared/`: UI, pipes, directivas y utilidades.
+Interfaz íntegramente en español; identificadores técnicos en inglés.
 
 ## 8.2 Backend
-
-Baseline:
-
-- **Laravel 13.x**
-- **PHP 8.5.x**
-- Composer 2.x
-
-Fallback temporal si Bluehost no ofrece PHP 8.5:
-
-- PHP 8.4
-
-Patrón:
-
-> **Modular Monolith**
-
-Estructura propuesta:
-
-```text
-app/
-└── Modules/
-    ├── Core/
-    ├── Customers/
-    ├── Suppliers/
-    ├── Processes/
-    ├── Quotes/
-    ├── PurchaseOrders/
-    ├── Invoices/
-    ├── Expenses/
-    ├── Reports/
-    ├── Collaboration/
-    ├── Workflow/
-    └── AI/
-```
-
-Cada módulo puede contener:
-
-```text
-Models/
-Services/
-Actions/
-DTOs/
-Policies/
-Events/
-Listeners/
-Jobs/
-Controllers/
-Requests/
-Resources/
-Routes/
-```
+Monolito modular, Laravel 13/PHP 8.5 como objetivo sujeto a compatibilidad real; Composer 2.
+- `bluehost/backend/app/Core/`: identidad, RBAC/MFA, configuración/SMTP, API/MCP, auditoría, archivos y ejecución común.
+- `bluehost/backend/app/Modules/`: Customers, Suppliers, Processes, Quotes, PurchaseOrders, Invoices, Expenses, Reports, Collaboration, Workflow y AI.
+Core no importa módulos concretos. Los módulos usan contratos públicos y no escriben tablas de otros módulos directamente. Actions/Policies se comparten entre entradas.
 
 ## 8.3 Base de datos
-
-Propuesta:
-
-- **MySQL 8.x**
-- InnoDB
-- utf8mb4
-
-Pendiente:
-
-- confirmar versión exacta ofrecida por Bluehost;
-- validar límites de conexiones;
-- validar tamaño;
-- validar performance;
-- validar procedimientos de backup.
+Destino confirmado: **Percona/MySQL 5.7.44-48**, InnoDB y utf8mb4 según configuración a validar. No depender de funciones exclusivas de MySQL 8. Verificar soporte/parches, conexiones, índices, migraciones, rendimiento y restauración. Un cambio de versión exige decisión/migración explícita.
 
 ## 8.4 Crawler
-
-Baseline:
-
-- **Python 3.12+**
-
-Preferencia:
-
-- HTTPX o Requests;
-- lxml;
-- BeautifulSoup.
-
-Solo si HonduCompras exige JavaScript:
-
-- Playwright;
-- Chromium headless.
-
-Dado el Lightsail de 1 GB RAM, se prefiere extracción HTTP directa antes que browser automation.
-
-Estado técnico:
-
-- SQLite o archivos estructurados.
+Código existente bajo `aws/lightsail/crawler/`: Python 3.12+, Requests, BeautifulSoup y SQLite. Dependencias y ejecución reales: README/OPERATIONS/lockfile del crawler. No introducir navegador ni otro cliente HTTP por referencias conceptuales anteriores.
 
 ## 8.5 API
-
-API principal:
-
-> **REST JSON versionada sobre HTTPS**
-
-Namespace público/interno:
-
-```text
-/api/v1/
-/api/internal/v1/
-```
-
-Contrato:
-
-- **OpenAPI 3.1**
-
-Convenciones:
-
-- JSON;
-- códigos HTTP coherentes;
-- pagination;
-- filtering;
-- sorting;
-- request IDs;
-- correlation IDs;
-- Idempotency-Key;
-- versionado mayor para breaking changes.
+Core: REST JSON/HTTPS, `/api/v1/` y `/api/internal/v1/`; OpenAPI 3.1/Scramble propuestos. Paginación, filtros permitidos, correlación, idempotencia y validación. El prefijo internal no concede privacidad por sí solo.
 
 ## 8.6 MCP
-
-Endpoint conceptual:
-
-```text
-/mcp
-```
-
-MCP será una capa de herramientas para agentes.
-
-MCP:
-
-- no reemplaza REST;
-- no accede directo a MySQL;
-- no contiene lógica empresarial exclusiva;
-- llama Application Services/Actions de Laravel.
+Core: `https://bastion.castilloit.net/mcp`, laravel/mcp y Streamable HTTP propuestos; Passport/OAuth con PKCE para delegación. Validar descubrimiento, audiencia, revocación, protocolo y clientes. MCP invoca las mismas Actions/Policies; no duplica negocio. Ver [Core](architecture/core.md).
 
 ---
 
 # 9. Autenticación y autorización
 
-## 9.1 SPA Angular
+## 9.1 SPA
+Sanctum con sesión por cookies, CSRF, Fortify y TOTP obligatorio. Mismo origen en bastion.castilloit.net; cookie `__Host-bastion_session`, Secure, HttpOnly, SameSite=Lax, Path=/, sin Domain. No tokens de sesión en localStorage. Sin acceso a negocio antes de completar MFA; recuperar contraseña no elimina MFA.
 
-Se propone:
+## 9.2 Servicios
+Crawler, backup, Work y Grokbot usan identidades separadas, revocables y con mínimo alcance. `crawler-lightsail` solo ingiere y reporta sus runs. Permisos/scopes concretos y guard correspondiente según Core; no aceptar tokens indistintamente entre SPA, MCP y servicios.
 
-- Laravel Sanctum;
-- cookie de sesión HTTP-only;
-- CSRF;
-- first-party SPA.
+## 9.3 Grokbot RFQ
+Identidad de propósito limitado para consultar RFQ autorizadas y solicitar envío mediante Core. No pagos, ofertas presentadas, administración ni credenciales SMTP. La lectura/escritura de precios desde respuestas requiere contrato y permiso específico.
 
-Evitar:
+## 9.4 Asistente delegado
+Capacidad futura bajo permisos efectivos del empleado, conexión y Policy. requested_by se deriva de delegación autenticada; no se confía en argumentos enviados por el modelo.
 
-- JWT persistido en localStorage.
-
-## 9.2 Crawler
-
-Identidad:
-
-`crawler-lightsail`
-
-Autenticación:
-
-- service bearer token;
-- scopes;
-- rotación;
-- opcional allowlist por IP.
-
-Scopes ejemplo:
-
-```text
-crawler.runs.create
-crawler.processes.import
-crawler.runs.complete
-```
-
-## 9.3 Grok Autonomous Procurement
-
-Identidad:
-
-`grok-procurement`
-
-Scopes:
-
-```text
-process.read
-product.read
-price.read
-price.write
-supplier.read
-supplier_candidate.write
-rfq.create
-rfq.send
-documents.read
-```
-
-Sin:
-
-```text
-invoice.create
-purchase_order.approve
-payment.approve
-bid.submit
-user.admin
-```
-
-## 9.4 Office Assistant
-
-Debe operar con identidad delegada del empleado.
-
-Propuesta:
-
-- OAuth 2.1/OIDC;
-- Authorization Code;
-- PKCE.
-
-Bastion debe registrar:
-
-```text
-AI actor = grok-office-assistant
-requested_by = user_id
-```
-
-y aplicar los permisos reales del usuario.
-
-## 9.5 ChatGPT
-
-Acceso mediante:
-
-- MCP;
-- API;
-- token u OAuth según uso.
-
-Nunca acceso directo a MySQL.
+## 9.5 ChatGPT Work
+Conecta por MCP con alcance explícito para consultar tareas, leer contexto autorizado y guardar resultados. Las automatizaciones desatendidas requieren validar credenciales/delegación persistente y compatibilidad real de cuenta. Nunca acceso directo a MySQL.
+Detalles de OAuth, RBAC, sesiones y reautenticación en [Core](architecture/core.md); no ampliar permisos para sortear un fallo de automatización.
 
 ---
 
@@ -721,7 +391,7 @@ Debe mostrar:
 Feed de actividad:
 
 ```text
-17:31 Grok encontró precio para item X
+17:31 Investigación IA disponible para ítem X
 17:22 ENEE modificó proceso Y
 17:10 proveedor respondió RFQ-581
 16:58 cotización Q-1432 aprobada
@@ -819,6 +489,8 @@ Funciones:
 - iniciar research;
 - iniciar procurement.
 
+Resultados IA dentro de Procesos: bandeja priorizada con cierre/responsable/avance; detalle con resumen, alternativas por ítem, cumplimiento con evidencia, RFQ, precio sugerido, documentos e historial. Publicación progresiva; información insuficiente no equivale a irrelevancia. Ver [presentación](modules/ai-results.md).
+
 ---
 
 # 15. Módulo Cotizaciones
@@ -866,6 +538,10 @@ Vencida
 ```
 
 ---
+
+## 15.1 Incorporación de resultados IA
+
+La creación básica desde proceso transfiere cliente/entidad, expediente y source_process_id sin depender de IA. Una acción adicional explícita permite incorporar solo ítems, cantidades, alternativas, precios y adjuntos seleccionados a un borrador. Previsualización, idempotencia y control de versión; no sobrescribir ediciones humanas. Costos, proveedores, márgenes y notas permanecen internos salvo selección autorizada. Múltiples cotizaciones por proceso siguen permitidas.
 
 # 16. Módulo Órdenes de Compra
 
@@ -1154,37 +830,16 @@ Objetivo:
 
 # 24. Approval Engine
 
-Separación:
+Workflow administra aprobaciones; Core aporta identidad, Policies y auditoría.
 
-## 24.1 Autónomo
+## 24.1 Análisis y borradores
+Con permiso puede analizar, clasificar, investigar, buscar precios/proveedores, preparar candidatos, documentos y borradores de RFQ. Preparar una solicitud no autoriza su envío.
 
-AI puede:
+## 24.2 Escrituras y correo
+Cambios comerciales requieren permiso/Policy del módulo. Envíos RFQ o follow-up requieren aprobación por defecto o regla previa explícitamente autorizada con propósito, destinatarios y límites. El correo al cliente y acciones sensibles siguen los controles Core/Workflow.
 
-- analizar;
-- clasificar;
-- investigar;
-- buscar precios;
-- buscar proveedores;
-- crear candidatos;
-- generar documentos;
-- solicitar cotizaciones;
-- hacer follow-up.
-
-## 24.2 Según rol
-
-- crear factura;
-- editar cotización;
-- enviar email al cliente;
-- modificar ciertos registros.
-
-## 24.3 Requiere aprobación
-
-- presentar oferta;
-- emitir OC a proveedor;
-- comprometer dinero;
-- autorizar pago;
-- acciones críticas;
-- acciones irreversibles.
+## 24.3 Acciones críticas
+Presentar ofertas, emitir órdenes a proveedores, comprometer dinero y autorizar pagos requieren decisión humana. Aprobación vinculada a acción, entidad, versión/hash y vigencia; cambios relevantes invalidan la aprobación. Reevaluar antes de ejecutar y evitar duplicados.
 
 ---
 
@@ -1406,7 +1061,7 @@ Si mismo nombre pero contenido distinto:
 
 ## 26.11 Runs
 
-Cada run:
+Ejemplo conceptual de identificador; el formato operativo lo define el código/contrato del crawler:
 
 ```text
 HC-YYYYMMDD-HHMM
@@ -1481,7 +1136,7 @@ Estado técnico local:
 
 ## 26.15 Artefactos
 
-Cada run produce:
+Nombres conceptuales de artefactos (el contrato operativo, estructura y manifests reales se consultan en el README/OPERATIONS del crawler):
 
 ```text
 processes.csv
@@ -1507,40 +1162,12 @@ s3://castilloit-honducompras-crawler/raw/
 ```
 
 ## 26.17 Delivery
-
-Hoy:
-
-- crawler genera CSV;
-- hace push a Bluehost;
-- app carga MySQL.
-
-El protocolo exacto del push actual debe documentarse.
-
-Objetivo:
-
-```http
-POST /api/internal/v1/crawler/runs
-POST /api/internal/v1/crawler/runs/{run_id}/processes
-POST /api/internal/v1/crawler/runs/{run_id}/complete
-```
-
-Batches ejemplo:
-
-100 registros/request.
+El código del crawler y su contrato de entrega se encuentran en [IMPORT_CONTRACT](../aws/lightsail/crawler/docs/IMPORT_CONTRACT.md). No asumir receptor Laravel implementado ni interoperabilidad ya probada.
+Base objetivo: `/api/internal/v1/crawler`; crear runs, entregar lotes de procesos y completar. Implementar el receptor contra el schema/checksums/fields_present y reglas de orden del contrato del cliente existente; no inventar otro protocolo desde ejemplos del maestro.
 
 ## 26.18 ACK
-
-Bluehost debe responder:
-
-```json
-{
-  "received": 1847,
-  "new": 21,
-  "updated": 7,
-  "unchanged": 1819,
-  "errors": 0
-}
-```
+El cliente actual exige 200/201 y status IMPORTED con batch_id para procesos; complete confirma COMPLETED. Persistir transacción y ACK antes de responder. HTTP 202 de recepción no equivale a importación y requiere ampliar el cliente con polling antes de usarlo.
+Un sublote rechazado se revierte y permanece reintentable. Ausencia de campos/documentos en una entrega parcial no borra información ni revierte observaciones más recientes.
 
 ## 26.19 Idempotencia
 
@@ -1647,145 +1274,59 @@ pending_uploads: 0
 Bastion decide:
 
 ```text
-NEW + COMPLETE -> analizar
-UPDATED relevante -> reanalizar
-NEW + EMPTY -> esperar
-UNCHANGED -> nada
+Sin puntuación completada -> pendiente, incluidos rezagados
+Parcial con datos útiles -> evaluación provisional
+Cambio relevante -> revisión separada según política
+Vacío -> información insuficiente, esperar datos
+Sin cambios con tarea pendiente -> retomar
+Sin cambios ya puntuado -> no repetir
 ```
 
 ---
 
 # 27. ChatGPT en Bastion
 
-ChatGPT se plantea como:
+ChatGPT Work es el ejecutor inicial prioritario del pipeline, aprovechando mecanismos del plan Plus con skills y tareas programadas. Bastion administra pendientes/resultados; Laravel no invoca Plus como API. Compatibilidad, límites y ejecución desatendida requieren prueba real.
 
-- supervisor;
-- analista;
-- interfaz gerencial;
-- soporte a investigación;
-- Work;
-- Codex para ingeniería.
+## 27.1 Pipeline
+| Paso | Trabajo | Resultado |
+| --- | --- | --- |
+| 1 | Puntuación diaria de nuevos sin análisis completado y rezagados | Interés, razones, dudas y versión |
+| 2 | Investigación web/catálogos por ítem relevante | Alternativas, precios fechados y cumplimiento por requisito |
+| 2.5 | Alto interés sin precio: localizar contactos y preparar RFQ para Grokbot | Solicitud trazable |
+| 3 | Publicar avances en Procesos | Revisión progresiva por usuario |
+| 4 | Skill comercial + antecedentes RAG; cálculos Laravel | Rango y precio sugerido |
+| 5 | Ficha fabricante o propia sustentada | Adjunto ligado al producto exacto |
 
-## 27.1 Supervisor
+Tareas con reservas temporales, idempotencia y guardado por unidad. Analizado solo después de persistir; límites/fallos conservan pendientes. Datos insuficientes no implican descarte. Precios, documentos y stock requieren evidencia/fecha. Una ficha propia declara autoría Castillo IT y no inventa certificaciones.
+El usuario selecciona producto/precio y crea la cotización; investigación completa no significa oferta presentada.
 
-Consultas:
+## 27.2 Supervisión
+Puede consultar prioridades, pendientes y avances dentro de sus permisos. No modifica KPIs canónicos ni decisiones de negocio sin Actions autorizadas.
 
-- qué procesos entraron;
-- cuáles tienen score alto;
-- qué RFQ esperan;
-- qué proveedores no respondieron;
-- qué cotizaciones necesitan acción.
+## 27.3 Ingeniería
+Codex trabaja en código, pruebas, PR y migraciones sin acceso automático a producción. Ese rol es distinto del ejecutor operativo Work configurado para investigación.
 
-## 27.2 Analista
-
-- clasificación;
-- scoring;
-- comparaciones;
-- análisis de documentos;
-- investigación.
-
-## 27.3 Codex
-
-- GitHub;
-- desarrollo;
-- tests;
-- PR;
-- refactor;
-- migrations;
-- infraestructura.
-
-Codex no debe ser procurement agent operativo.
+Contratos y condiciones de salida: [integración IA](architecture/ai-integration.md) y [tareas IA](contracts/ai-pipeline.md).
 
 ---
 
-# 28. Grok Employee #1 — Autonomous Procurement
+# 28. Grokbot — RFQ y respuestas
 
-Rol:
+Grokbot atiende las RFQ preparadas por ChatGPT para ítems de alto interés sin precio publicado. Su alojamiento y conexión siguen pendientes de validar.
 
-> resolver items pendientes de precio hasta encontrar un precio confiable o dejar RFQ enviado y trazable.
+1. Bastion registra RFQ con ítems, especificaciones, cantidades, contacto verificado/fuente y fecha límite.
+2. Workflow valida aprobación o regla previa autorizada.
+3. Grokbot reclama tarea y solicita `send_supplier_rfq`.
+4. Core envía por SMTP Bluehost y registra estado/correlación.
+5. Worker de correo propuesto recupera respuestas y adjuntos; ubicación por capacidad.
+6. Bastion deduplica/vincula respuesta; ambigüedad va a revisión. La IA puede extraer precios conservando original.
 
-## 28.1 Flujo
-
-```text
-Proceso analizado
-    ↓
-Items
-    ↓
-pricing_tasks
-    ↓
-Grok Procurement
-    ↓
-fuentes internas
-    ↓
-web
-    ↓
-precio?
- ┌──┴──┐
- sí    no
- ↓      ↓
-guardar buscar proveedor
-        ↓
-       RFQ
-        ↓
-      email
-```
-
-## 28.2 Fuentes
-
-Orden conceptual:
-
-1. catálogo local;
-2. histórico;
-3. Knowledge/RAG;
-4. web;
-5. Amazon;
-6. eBay;
-7. distribuidores;
-8. fabricantes;
-9. proveedores existentes;
-10. nuevos proveedores;
-11. RFQ.
-
-## 28.3 Estados
-
-```text
-NEEDS_PRICE
-RESEARCHING
-PRICE_FOUND
-NO_PRICE
-SUPPLIER_SEARCH
-RFQ_CREATED
-RFQ_SENT
-WAITING_REPLY
-FOLLOW_UP_DUE
-QUOTED
-```
-
-## 28.4 Email
-
-No dar una herramienta genérica:
-
-`send_email()`
-
-Preferir:
-
-`send_supplier_rfq()`
-
-para limitar contexto y destino.
-
-La API debe controlar:
-
-- destinatario;
-- proveedor;
-- template;
-- producto;
-- límites;
-- duplicados;
-- cooldown.
+No herramienta de correo arbitrario ni credenciales SMTP para el bot. SMTP aceptado no prueba entrega; timeout incierto requiere conciliación antes de repetir. Follow-up solo con autorización y límites. La investigación principal del pipeline corresponde a Work; no se impone un segundo investigador Grok en la primera versión.
 
 ---
 
-# 29. Grok Employee #2 — Office Assistant
+# 29. Asistente de oficina — ampliación por fases
 
 Rol:
 
@@ -1863,76 +1404,18 @@ POST /api/v1/rfqs
 
 # 31. Castillo MCP
 
-Herramientas propuestas:
-
-```text
-search_processes()
-get_process()
-get_process_items()
-save_analysis()
-
-search_products()
-get_price_history()
-save_price()
-
-search_suppliers()
-get_supplier()
-create_supplier_candidate()
-
-create_rfq()
-send_supplier_rfq()
-get_pending_rfqs()
-record_supplier_quote()
-
-get_quote()
-create_quote()
-update_quote()
-generate_quote_datasheet()
-
-get_invoice()
-create_invoice()
-generate_invoice_pdf()
-
-find_document()
-generate_datasheet_package()
-
-draft_email()
-send_customer_email()
-
-get_pending_tasks()
-complete_task()
-request_approval()
-```
+MCP es la entrada Core para herramientas autorizadas, con schemas versionados y Actions comunes a REST. No es el módulo AI ni el motor que ejecuta modelos.
+El catálogo inicial para este pipeline incluye claim_scoring_tasks, get_process_context, save_process_score, claim_research_tasks, save_item_research, create_rfq_request, search_pricing_history, save_price_recommendation, register_artifact y complete_task.
+Grokbot usa herramientas RFQ acotadas con permisos separados. Nombres/esquemas siguen siendo propuestas de implementación.
+Fuente contractual: [pipeline IA](contracts/ai-pipeline.md). [API/MCP](contracts/api-mcp.md) conserva capacidades de otros módulos; su presencia en un catálogo no las habilita para todos los agentes.
 
 ---
 
 # 32. Background jobs
 
-Operaciones que no deben bloquear request HTTP:
-
-- importaciones;
-- generación PDF;
-- emails;
-- AI tasks;
-- document processing;
-- reportes pesados;
-- notificaciones.
-
-Inicial:
-
-- Laravel Queue;
-- driver database.
-
-Si Bluehost no permite worker persistente:
-
-- cron;
-- `queue:work --stop-when-empty`;
-- o worker separado.
-
-Futuro:
-
-- Redis;
-- Amazon SQS.
+Laravel Queue con driver database y cron ejecuta jobs cortos de importación, correo, notificaciones, mantenimiento de tareas y procesamiento documental acotado. Controlar solapamientos, memoria, tiempo y número de jobs; stop-when-empty solo no impone presupuesto máximo.
+Work ejecuta las investigaciones externamente y recoge tareas persistidas por MCP. El cron Laravel no invoca Plus ni garantiza despertar Work. RFQ en espera no ocupa un worker.
+OCR/procesamiento intensivo requiere ejecutor evaluado; no asumir capacidad en Lightsail 1 GB. Redis/SQS y workers dedicados son opciones futuras, no requisitos iniciales.
 
 ---
 
@@ -2018,7 +1501,7 @@ Cada backup:
 }
 ```
 
-## 34.5 Retención
+## 34.5 Retención propuesta, pendiente de validación
 
 ```text
 diarios: 30 días
@@ -2200,33 +1683,16 @@ Debe quedar definido por senior según capacidades reales del plan.
 
 # 39. Knowledge / RAG Engine
 
-El RAG es importante para AI, pero su diseño funcional **queda pendiente**.
+El objetivo definido es recuperar antecedentes para sugerir precio de venta con una skill comercial. No inferir equivalencia técnica por similitud.
 
-Aclaración importante:
+Primera etapa:
+- S3 privado: originales, texto extraído y documentos versionados.
+- MySQL: metadatos, productos/referencias, precios, fechas, monedas, condiciones y referencias a fragmentos.
+- Laravel: búsqueda autorizada por campos/texto y entrega de antecedentes mediante MCP.
+- Work: aplica skill, explica comparables y registra recomendación.
 
-> El RAG no debe asumirse como una búsqueda de items iguales o equivalentes técnicos.
-
-La relación histórica que debe usar para apoyar pricing y decisiones aún debe definirse.
-
-Por ahora la arquitectura reserva:
-
-```text
-Knowledge/RAG Service
-  │
-  ├── S3 documents
-  ├── vector/knowledge index
-  └── Bastion API/MCP
-```
-
-No se fija todavía:
-
-- Qdrant;
-- embeddings;
-- reglas de similitud;
-- infraestructura final;
-- lógica de pricing basada en RAG.
-
-El diseño RAG tendrá revisión independiente.
+Preparar/extractar una vez por versión; OCR según necesidad y capacidad. No leer todo el histórico en cada ejecución. Laravel calcula costos/márgenes; el usuario fija el precio. Antecedentes insuficientes se declaran, no se inventa competitividad.
+S3 Vectors es ampliación opcional: requiere embeddings/índice/modelo compatible y presupuesto explícito, no incluido por almacenar PDFs ni presumido dentro de Plus. Corpus, calidad, retención y criterios comerciales siguen pendientes. Ver [RAG](knowledge-rag/README.md).
 
 ---
 
@@ -2342,7 +1808,7 @@ crawler_deliveries
 | código | GitHub |
 | backups | S3 |
 | prompts/config AI | GitHub/MySQL según uso |
-| RAG index | servicio RAG futuro |
+| Recuperación RAG | Índices/metadatos MySQL y fuentes/texto S3; vectores opcionales |
 
 ---
 
@@ -2362,7 +1828,7 @@ crawler_deliveries
 | ChatGPT | Bastion | MCP/API HTTPS |
 | Grok | Bastion | MCP/API HTTPS |
 | Office Assistant | Bastion | MCP + OAuth delegated identity |
-| Bastion | Email | connector/API/SMTP según diseño final |
+| Bastion | Email Bluehost | SMTP por Core; lectura de buzón por worker propuesto |
 
 ---
 
@@ -2397,30 +1863,10 @@ para correlacionar replies.
 
 # 45. Estados AI
 
-## Procurement
-
-```text
-PENDING
-RESEARCHING
-PRICE_FOUND
-RFQ_REQUIRED
-RFQ_SENT
-WAITING_REPLY
-FOLLOW_UP_DUE
-QUOTED
-FAILED
-NEEDS_REVIEW
-```
-
-## Analysis
-
-```text
-PENDING
-RUNNING
-COMPLETED
-FAILED
-STALE
-```
+Estados técnicos comunes de tareas: pending (Pendiente), running (En ejecución), waiting_supplier (En espera de proveedor), needs_review (Requiere revisión), completed (Completada), failed (Fallida), cancelled (Cancelada).
+El contrato de transición/reserva/reintento está en [tareas IA](contracts/ai-pipeline.md).
+Resultados como precio encontrado o puntuación provisional son atributos de etapa; no crear otra máquina de estados incompatible a partir de ejemplos antiguos. Un resultado de entrada anterior se conserva como histórico/desactualizado, no reemplaza el vigente.
+Estados comerciales, revisado por usuario y oferta presentada son independientes.
 
 ---
 
@@ -2497,135 +1943,38 @@ Mitigación:
 
 # 48. Roadmap de implementación
 
-## Fase 0 — revisión senior
+| Etapa | Entregable | Condición |
+| --- | --- | --- |
+| 0 | Validar entorno y dependencias | Compatibilidad Bluehost/PHP/Percona y seguridad |
+| 1 | Crawler y entrega | Código existente probado con receptor/ACK, retries y recuperación |
+| 2 | Core y módulos base | Identidad/MFA, API/MCP, auditoría y persistencia |
+| 3 | Comercial | Cotizaciones, órdenes, facturas, gastos y reportes |
+| 4 | IA inicial | Prueba Work–MCP, puntuación diaria recuperable y skill revisada |
+| 5 | Investigación y RFQ | Evidencia por ítem, presentación, Grokbot y retorno de respuestas |
+| 6 | Precios y fichas | RAG S3/MySQL, skill comercial y adjuntos verificados |
+| 7 | Colaboración/asistente ampliado | Capacidades habilitadas por fases y permisos |
+| Posterior | Búsqueda vectorial u otros proveedores | Necesidad medida y autorización explícita |
 
-Validar:
-
-- arquitectura;
-- versiones;
-- hosting;
-- API;
-- auth;
-- crawler;
-- S3;
-- GitHub;
-- queues;
-- realtime;
-- security;
-- deploy.
-
-## Fase 1 — estabilizar crawler
-
-- GitHub;
-- runs;
-- retry;
-- checkpoints;
-- raw S3;
-- idempotencia;
-- append;
-- versionado;
-- ACK;
-- health.
-
-## Fase 2 — Bastion Core
-
-- módulos;
-- auth;
-- RBAC;
-- audit;
-- processes;
-- customers;
-- suppliers;
-- API;
-- workflow base.
-
-## Fase 3 — comercial
-
-- quotes;
-- purchase orders;
-- invoices;
-- expenses;
-- reports.
-
-## Fase 4 — AI analysis
-
-- pending-analysis;
-- score;
-- classification;
-- save analysis;
-- audit.
-
-## Fase 5 — Grok Procurement
-
-Primero:
-
-- read-only;
-- recommendations.
-
-Después:
-
-- save price.
-
-Después:
-
-- supplier candidate.
-
-Después:
-
-- RFQ send.
-
-## Fase 6 — Office Assistant
-
-- read;
-- create docs;
-- quotes;
-- invoices;
-- email;
-- delegated auth.
-
-## Fase 7 — Collaboration
-
-- S3 docs;
-- folders;
-- comments;
-- tasks;
-- versions.
-
-## Fase 8 — RAG
-
-Solo después de definir su objetivo funcional exacto.
+La aplicación manual sigue operativa sin IA. Fechas, presupuestos y umbrales no se inventan. No se activa automatización ni correo por publicar documentación.
 
 ---
 
 # 49. Decisiones pendientes
 
-El desarrollador senior debe validar:
+## Definido
+Monolito modular; Bluehost para aplicación/DB/correo; Lightsail para crawler/backups; S3 para archivos; GitHub Ahcast/Bastion; dominio bastion.castilloit.net; Percona 5.7 reportado; Core separado de módulos; frontend español; MFA; API/MCP; pipeline asistido Work; RAG inicial S3/MySQL.
 
-1. Laravel 13.x como baseline.
-2. PHP 8.5 o fallback 8.4 en Bluehost.
-3. Angular 22.x.
-4. TypeScript 6.x.
-5. Node 24 LTS build.
-6. MySQL exacto disponible.
-7. modular monolith.
-8. namespaces REST.
-9. OpenAPI 3.1.
-10. Sanctum SPA auth.
-11. OAuth/OIDC para AI delegado.
-12. service tokens.
-13. queue strategy.
-14. realtime strategy.
-15. deploy Bluehost.
-16. deploy Lightsail.
-17. crawler stack HTTP vs Playwright.
-18. protocolo actual de push CSV.
-19. futura API crawler.
-20. backups.
-21. security model.
-22. audit model.
-23. AI scopes.
-24. MCP design.
-25. RAG deferred design.
+## Por validar o concretar
+- Versiones exactas/lockfiles y compatibilidad Laravel/PHP/Angular; PHP CLI/extensiones y soporte de Percona.
+- Límites de hosting, despliegue, colas, WAF, retención y restauración/RPO/RTO.
+- Receptor Laravel compatible con el cliente crawler existente y su ACK.
+- Roles, scopes, delegación MCP, aprobadores y reglas específicas de envío.
+- Prueba Work/Plus desatendida, plugin, capacidad, hora diaria y lotes.
+- Skills: rubros/pesos/umbrales, corpus RAG, evaluación de calidad y criterios comerciales.
+- Runtime/integración Grokbot, lectura de correo, OCR/cuarentena y transporte de artefactos.
+- Índice vectorial/embeddings solo si la recuperación inicial es insuficiente.
+
+Estas cuestiones no reabren decisiones ya definidas ni acreditan servicios implementados.
 
 ---
 
@@ -2718,27 +2067,25 @@ supervisión, análisis y autorizaciones
 
 # 52. Resumen de responsabilidades
 
-| Componente | Responsabilidad principal |
-|---|---|
-| Angular | experiencia de usuario |
-| Laravel | lógica empresarial |
-| MySQL | verdad transaccional |
-| S3 | archivos, raw, histórico, backups |
-| Lightsail | crawler y workers técnicos |
-| GitHub | verdad del código |
-| ChatGPT | supervisor/analista |
-| Codex | ingeniería |
-| Grok Autonomous | procurement automático |
-| Grok Assistant | asistente de empleados |
-| RAG | conocimiento AI futuro |
-| Email | comunicación con clientes/proveedores |
+| Componente | Responsabilidad |
+| --- | --- |
+| Angular | Interfaz española y revisión de resultados |
+| Core Laravel | Identidad, RBAC/MFA, configuración, API/MCP, auditoría, archivos y SMTP |
+| Módulos | Reglas comerciales y Actions propias |
+| AI / Workflow | Tareas/resultados / reglas y aprobaciones |
+| MySQL | Verdad transaccional, pendientes e índices/metadatos de antecedentes |
+| S3 | Originales, evidencia, texto, fichas, raw y backups |
+| Lightsail | Crawler y workers de backup |
+| GitHub | Código, documentación, contratos y futuras skills |
+| ChatGPT Work | Puntuación e investigación con skills; recomendación y documentación |
+| Grokbot | RFQ autorizadas; conexión/runtime por validar |
+| Codex | Ingeniería |
+| Asistente delegado | Capacidad ampliada futura bajo permisos del usuario |
+| Usuario | Selección, precio final, creación/revisión de cotización y decisión de ofertar |
+| Correo Bluehost | Transporte y buzones; respuestas registradas en Bastion |
 
 ---
 
 # 53. Regla final del proyecto
 
 > **Bastion debe ser el sistema operativo de la oficina de Castillo IT: modular, seguro, auditable, automatizable y capaz de incorporar agentes AI sin entregarles control irrestricto sobre los datos o las decisiones críticas.**
-
-## Actualización de integración IA — 2026-10-07
-
-Este maestro v0.5 se conserva como referencia histórica. Para la integración vigente prevalecen [pipeline IA](architecture/ai-integration.md), [contrato](contracts/ai-pipeline.md), [RAG de precios S3/MySQL](knowledge-rag/README.md) y [presentación](modules/ai-results.md). ChatGPT Work con skills puntúa pendientes e investiga; Grokbot atiende RFQ mediante Bastion; la decisión y creación de la oferta permanecen en el usuario. El RAG ya tiene este objetivo funcional; su infraestructura avanzada y criterios concretos siguen pendientes. Core/API/MCP y módulos conservan sus límites; crawler y backups siguen en Lightsail.

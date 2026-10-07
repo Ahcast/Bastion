@@ -25,7 +25,7 @@ Base del repositorio revisada antes de esta actualización: `main`, commit `6ab6
 | Propuesta técnica | Paquetes, parámetros de seguridad y medidas operativas planteados; se conservan como propuesta hasta su validación. |
 | Pendiente de verificación | Compatibilidad exacta, recursos y configuración efectiva del hosting. |
 
-«Debe» describe un requisito objetivo, no un control ya instalado. Los valores propuestos no se convierten en aprobaciones por recopilarse aquí. Este documento es la referencia consolidada del Core; junto con [core-modules.md](core-modules.md) actualiza las rutas y supuestos de infraestructura del maestro v0.5. El maestro conserva el alcance funcional histórico. Las diferencias de negocio futuras requieren una decisión explícita.
+«Debe» describe un requisito objetivo, no un control ya instalado. Los valores propuestos no se convierten en aprobaciones por recopilarse aquí. Este documento detalla el Core y [core-modules.md](core-modules.md) sus rutas, coherentes con el maestro vigente v0.6. El maestro fija alcance transversal; los contratos especializados desarrollan cada área. Las contradicciones deben resolverse explícitamente, sin ampliar alcance ni permisos.
 
 ## 2. Base que se conserva
 
@@ -652,7 +652,7 @@ La estructura del repositorio ya fue reorganizada; el Core aún debe implementar
 
 ## 26. Referencias y trazabilidad
 
-- [Documento maestro v0.5](../Proyecto_Bastion_Documento_Maestro.md): alcance funcional previo.
+- [Documento maestro vigente](../Proyecto_Bastion_Documento_Maestro.md): alcance y decisiones transversales.
 - [Estructura Core y módulos](core-modules.md) y [contrato modular](../contracts/modules.md).
 - [Core backend](../../bluehost/backend/app/Core/README.md) y [Core frontend](../../bluehost/frontend/src/app/core/README.md).
 - [Idioma](../idioma.md), [contrato de importación conceptual](../contracts/crawler-import.md) y [contrato del crawler implementado](../../aws/lightsail/crawler/docs/IMPORT_CONTRACT.md). Antes de implementar el receptor, conciliar ambos; los endpoints de este documento son objetivos y no acreditan interoperabilidad ya probada.

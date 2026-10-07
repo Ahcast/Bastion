@@ -1,6 +1,6 @@
 # Crawler HonduCompras
 
-Fuente: [Documento maestro v0.5](../../../docs/Proyecto_Bastion_Documento_Maestro.md). Alcance conceptual; implementación y validación técnica pendientes.
+Fuente: [Documento maestro vigente](../../../docs/Proyecto_Bastion_Documento_Maestro.md). Alcance conceptual; implementación y validación técnica pendientes.
 
 # 25. Auditoría
 
@@ -462,10 +462,12 @@ pending_uploads: 0
 Bastion decide:
 
 ```text
-NEW + COMPLETE -> analizar
-UPDATED relevante -> reanalizar
-NEW + EMPTY -> esperar
-UNCHANGED -> nada
+Sin puntuación completada -> pendiente, incluidos rezagados
+Parcial con datos útiles -> evaluación provisional
+Cambio relevante -> revisión separada según política
+Vacío -> información insuficiente, esperar datos
+Sin cambios con tarea pendiente -> retomar
+Sin cambios ya puntuado -> no repetir
 ```
 
 ---
