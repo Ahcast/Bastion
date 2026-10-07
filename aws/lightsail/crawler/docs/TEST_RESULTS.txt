@@ -1,0 +1,31 @@
+test_absent_vs_empty (test_core.Tests.test_absent_vs_empty) ... ok
+test_api_uncommitted_ack_rejected (test_core.Tests.test_api_uncommitted_ack_rejected) ... ok
+test_checkpoint_survives_restart (test_core.Tests.test_checkpoint_survives_restart) ... ok
+test_corruption_rejected (test_core.Tests.test_corruption_rejected) ... ok
+test_delivery_failure_does_not_erase_data (test_core.Tests.test_delivery_failure_does_not_erase_data) ... {"coverage":null,"coverage_note":"Unknown total until verified end of pagination","finished":"2026-10-07T07:16:14.415143+00:00","id":"HC-20261007T071614Z-7a7732e6","listing_complete":0,"pages_expected":null,"pages_processed":0,"pending_units":0,"records":0,"run_id":"HC-20261007T071614Z-7a7732e6","schema_version":"1.0","started":"2026-10-07T07:16:14.415063+00:00","status":"FAILED"}
+{"batch_id":"HC-20261007T071614Z-7a7732e6-eea67a494df7","component":"delivery","error_type":"TimeoutError","target":"s3","timestamp":"2026-10-07T07:16:14.416281+00:00"}
+ok
+test_duplicate_task (test_core.Tests.test_duplicate_task) ... ok
+test_empty_retained (test_core.Tests.test_empty_retained) ... ok
+test_identity_stable (test_core.Tests.test_identity_stable) ... ok
+test_no_false_document_removal (test_core.Tests.test_no_false_document_removal) ... ok
+test_normalized_hash (test_core.Tests.test_normalized_hash) ... ok
+test_pager (test_core.Tests.test_pager) ... ok
+test_partial_export_and_immutable_batches (test_core.Tests.test_partial_export_and_immutable_batches) ... {"coverage":null,"coverage_note":"Unknown total until verified end of pagination","finished":"2026-10-07T07:16:14.423789+00:00","id":"HC-20261007T071614Z-dccde70b","listing_complete":0,"pages_expected":null,"pages_processed":0,"pending_units":1,"records":1,"run_id":"HC-20261007T071614Z-dccde70b","schema_version":"1.0","started":"2026-10-07T07:16:14.423325+00:00","status":"PARTIAL_SUCCESS"}
+{"coverage":null,"coverage_note":"Unknown total until verified end of pagination","finished":"2026-10-07T07:16:14.424539+00:00","id":"HC-20261007T071614Z-dccde70b","listing_complete":0,"pages_expected":null,"pages_processed":0,"pending_units":1,"records":1,"run_id":"HC-20261007T071614Z-dccde70b","schema_version":"1.0","started":"2026-10-07T07:16:14.423325+00:00","status":"PARTIAL_SUCCESS"}
+ok
+test_retry_persistent (test_core.Tests.test_retry_persistent) ... {"component":"detail","error":"TimeoutError: timeout","run_id":"HC-20261007T071614Z-ceb12c64","severity":"ERROR","timestamp":"2026-10-07T07:16:14.425735+00:00","unit":"u"}
+ok
+test_unexpected_html (test_core.Tests.test_unexpected_html) ... ok
+test_http_404_not_retried (test_recovery.Recovery.test_http_404_not_retried) ... ok
+test_http_only_three_attempts (test_recovery.Recovery.test_http_only_three_attempts) ... ok
+test_page_failure_keeps_observation_then_resume (test_recovery.Recovery.test_page_failure_keeps_observation_then_resume) ... {"component":"detail","process_id":"official:[[\"id\",\"1\"]]","run_id":"HC-20261007T071614Z-148121b7","severity":"INFO","timestamp":"2026-10-07T07:16:14.429862+00:00"}
+{"component":"listing","error":"TimeoutError: site unavailable","run_id":"HC-20261007T071614Z-148121b7","severity":"ERROR","timestamp":"2026-10-07T07:16:14.429934+00:00","unit":"scan"}
+{"coverage":null,"coverage_note":"Unknown total until verified end of pagination","finished":"2026-10-07T07:16:14.430348+00:00","id":"HC-20261007T071614Z-148121b7","listing_complete":0,"pages_expected":null,"pages_processed":1,"pending_units":1,"records":1,"run_id":"HC-20261007T071614Z-148121b7","schema_version":"1.0","started":"2026-10-07T07:16:14.429492+00:00","status":"PARTIAL_SUCCESS"}
+{"coverage":100,"coverage_note":"Unknown total until verified end of pagination","finished":"2026-10-07T07:16:14.431394+00:00","id":"HC-20261007T071614Z-148121b7","listing_complete":1,"pages_expected":1,"pages_processed":1,"pending_units":0,"records":1,"run_id":"HC-20261007T071614Z-148121b7","schema_version":"1.0","started":"2026-10-07T07:16:14.429492+00:00","status":"SUCCESS"}
+ok
+
+----------------------------------------------------------------------
+Ran 17 tests in 0.027s
+
+OK
