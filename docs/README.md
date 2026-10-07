@@ -1,8 +1,14 @@
 # Documentación
 
-[Documento maestro v0.5](Proyecto_Bastion_Documento_Maestro.md) es la referencia funcional de esta estructura.
+[Documento maestro v0.5](Proyecto_Bastion_Documento_Maestro.md) se conserva como referencia funcional e histórica de la estructura inicial.
 
-- [Arquitectura](architecture/README.md)
+## Referencias vigentes
+
+- [Arquitectura objetivo Oficina AI v2](architecture/oficina-ai-v2.md)
+- [Lineamientos por módulo](modules/README.md)
+- [Core](architecture/core.md)
+- [Separación Core y módulos](architecture/core-modules.md)
+- [Contrato modular](contracts/modules.md)
 - [Seguridad](security/README.md)
 - [Crawler](contracts/crawler-import.md)
 - [API/MCP](contracts/api-mcp.md)
@@ -11,17 +17,10 @@
 - [RAG pendiente](knowledge-rag/README.md)
 - [Despliegue](deployment/README.md)
 
-Los documentos de carpetas reproducen secciones del maestro; no agregan módulos aprobados nuevos. El maestro incluye estados conceptuales alternativos, ejemplos y decisiones pendientes que requieren refinamiento senior.
-
 [Política de idioma](idioma.md): interfaz y contenido visible en español; nombres técnicos en inglés permitidos.
 
-## Organización vigente
+## Precedencia de arquitectura
 
-- [Separación Core y módulos](architecture/core-modules.md).
-- [Contrato modular](contracts/modules.md).
+`architecture/oficina-ai-v2.md` recoge la arquitectura objetivo más reciente para el nuevo desarrollo y los módulos: Bluehost Choice Plus aloja Angular, Laravel, MySQL y email; Cloudflare protege el perímetro; S3 almacena documentos, snapshots y backups; y GitHub Actions se plantea como ejecutor del crawler. Cuando una referencia anterior conserve supuestos de infraestructura incompatibles —por ejemplo, Lightsail como ejecutor permanente— prevalece la arquitectura v2 hasta que esos documentos históricos sean consolidados.
 
-Estas páginas actualizan la organización de carpetas del maestro v0.5; sus extractos se conservan como contexto histórico.
-
-## Lineamientos consolidados
-
-Ver [core.md](architecture/core.md) para el alcance completo del Core, infraestructura confirmada, tecnologías API/MCP, seguridad, operación y decisiones pendientes de esta sesión.
+Los documentos de módulos preservan las funcionalidades legacy verificadas, pero aplican seguridad server-side, persistencia transaccional en MySQL, archivos privados en S3, idempotencia, auditoría, eventos y conexión controlada con IA.
