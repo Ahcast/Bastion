@@ -470,3 +470,7 @@ UNCHANGED -> nada
 
 ---
 
+
+## Implementación Python v1
+
+Código en `bastion_crawler/`. Consulte [operación y limitaciones](OPERATIONS.md), [instalación y rollback](deploy/INSTALL.md) y [contrato del cliente](docs/IMPORT_CONTRACT.md). Pruebas offline incluidas; pendiente de validación en vivo e integración del importador Laravel.

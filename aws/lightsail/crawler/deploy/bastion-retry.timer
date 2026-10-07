@@ -1,0 +1,7 @@
+[Unit]
+Description=Recuperación de pendientes Bastion
+[Timer]
+OnCalendar=*-*-* *:30:00 America/Tegucigalpa
+Persistent=true
+[Install]
+WantedBy=timers.target

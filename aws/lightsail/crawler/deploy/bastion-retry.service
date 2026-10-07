@@ -1,0 +1,23 @@
+[Unit]
+Description=Bastion crawler recuperación
+After=network-online.target
+Wants=network-online.target
+[Service]
+Type=oneshot
+User=bastion-crawler
+Group=bastion-crawler
+WorkingDirectory=/opt/bastion-crawler
+EnvironmentFile=/etc/bastion-crawler.env
+ExecStart=/opt/bastion-crawler/.venv/bin/python -m bastion_crawler retry
+TimeoutStartSec=5h
+MemoryMax=600M
+CPUQuota=80%
+Nice=10
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/bastion-crawler
+StandardOutput=journal
+StandardError=journal
