@@ -16,7 +16,7 @@ La aplicación de Bluehost sigue siendo una estructura documental; esta reorgani
 
 Dominio definido: `https://bastion.castilloit.net`.
 
-La [estructura Core y módulos](docs/architecture/core-modules.md) actualiza la organización inicial del [documento maestro v0.5](docs/Proyecto_Bastion_Documento_Maestro.md), que se conserva como referencia histórica. Se mantienen los módulos funcionales existentes.
+El [maestro vigente v0.6](docs/Proyecto_Bastion_Documento_Maestro.md) consolida alcance, infraestructura e integración IA. La [estructura Core y módulos](docs/architecture/core-modules.md) detalla rutas y dependencias. El historial permanece en Git; se mantienen los módulos funcionales existentes.
 
 Interfaz y vistas en español; nombres técnicos en inglés. Ver [idioma](docs/idioma.md).
 

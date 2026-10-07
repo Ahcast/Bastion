@@ -1,6 +1,6 @@
 # Workflow
 
-Fuente: [Documento maestro v0.5](../../../../../docs/Proyecto_Bastion_Documento_Maestro.md). Alcance conceptual; implementación y validación técnica pendientes.
+Fuente: [Documento maestro vigente](../../../../../docs/Proyecto_Bastion_Documento_Maestro.md). Alcance conceptual; implementación y validación técnica pendientes.
 
 # 22. Workflow Engine
 
@@ -69,37 +69,16 @@ Objetivo:
 
 # 24. Approval Engine
 
-Separación:
+Workflow administra aprobaciones; Core aporta identidad, Policies y auditoría.
 
-## 24.1 Autónomo
+## 24.1 Análisis y borradores
+Con permiso puede analizar, clasificar, investigar, buscar precios/proveedores, preparar candidatos, documentos y borradores de RFQ. Preparar una solicitud no autoriza su envío.
 
-AI puede:
+## 24.2 Escrituras y correo
+Cambios comerciales requieren permiso/Policy del módulo. Envíos RFQ o follow-up requieren aprobación por defecto o regla previa explícitamente autorizada con propósito, destinatarios y límites. El correo al cliente y acciones sensibles siguen los controles Core/Workflow.
 
-- analizar;
-- clasificar;
-- investigar;
-- buscar precios;
-- buscar proveedores;
-- crear candidatos;
-- generar documentos;
-- solicitar cotizaciones;
-- hacer follow-up.
-
-## 24.2 Según rol
-
-- crear factura;
-- editar cotización;
-- enviar email al cliente;
-- modificar ciertos registros.
-
-## 24.3 Requiere aprobación
-
-- presentar oferta;
-- emitir OC a proveedor;
-- comprometer dinero;
-- autorizar pago;
-- acciones críticas;
-- acciones irreversibles.
+## 24.3 Acciones críticas
+Presentar ofertas, emitir órdenes a proveedores, comprometer dinero y autorizar pagos requieren decisión humana. Aprobación vinculada a acción, entidad, versión/hash y vigencia; cambios relevantes invalidan la aprobación. Reevaluar antes de ejecutar y evitar duplicados.
 
 ---
 

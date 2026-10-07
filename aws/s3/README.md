@@ -1,110 +1,26 @@
 # S3 y almacenamiento
 
-Fuente: [Documento maestro v0.5](../../docs/Proyecto_Bastion_Documento_Maestro.md). Alcance conceptual; implementación y validación técnica pendientes.
+Fuente: [Documento maestro vigente](../../docs/Proyecto_Bastion_Documento_Maestro.md). Alcance conceptual; implementación y validación técnica pendientes.
 
 # 5. Infraestructura actual
 
 ## 5.1 Bluehost
-
-Castillo IT tiene **Bluehost Choice Plus Hosting**.
-
-Actualmente Bluehost aloja:
-
-- aplicación web;
-- Laravel;
-- Angular SPA;
-- MySQL;
-- correo electrónico de Castillo IT;
-- archivos asociados a la aplicación.
-
-Bluehost continuará siendo inicialmente el **Bastion Core**.
+Plan Choice Plus: destino de Angular, Laravel, MySQL y correo. La nueva aplicación Bastion aún no se acredita desplegada.
+- Dominio: `https://bastion.castilloit.net`.
+- PHP seleccionable 8.1–8.5; objetivo 8.5, CLI/extensiones por verificar.
+- SSH y FTP disponibles; usar SSH/SFTP para despliegue.
+- Cron mínimo de un minuto.
+- Document root: `~/public_html/website_091cdca8`; exponer solo activos públicos.
+- Servidor reportado: **Percona Server for MySQL 5.7.44-48**. Compatibilidad de paquetes/migraciones y soporte de seguridad por validar.
 
 ## 5.2 AWS Lightsail
-
-Instancia actual:
-
-- **1 GB RAM**
-- **2 vCPU**
-- **40 GB SSD**
-
-Responsabilidades previstas:
-
-- crawler HonduCompras;
-- Python;
-- cron/scheduler;
-- retries;
-- checkpoints;
-- estado técnico local;
-- generación de CSV/JSON;
-- subida de raw a S3;
-- backup worker;
-- sincronizaciones técnicas;
-- logs.
-
-El Lightsail actual **no se considera adecuado para un RAG/vector DB completo** por la RAM disponible.
+Instancia documentada: 1 GB RAM, 2 vCPU, 40 GB SSD. Ejecuta crawler, retries, checkpoints, entrega y workers de backup. No es la base maestra ni se le asignan modelos locales, OCR pesado o vector DB por defecto.
 
 ## 5.3 Amazon S3
-
-Bucket existente:
-
-`castilloit-honducompras-crawler`
-
-Región:
-
-`us-east-1` — Norte de Virginia.
-
-Usos:
-
-- raw crawler;
-- snapshots;
-- CSV;
-- JSON;
-- manifests;
-- logs;
-- documentos descargados;
-- reconstrucción/replay.
-
-Bucket propuesto adicional:
-
-`castilloit-backups`
-
-Usos:
-
-- backups de MySQL;
-- backups de Bluehost;
-- uploads;
-- documentos;
-- aplicación;
-- manifests de backups.
-
-En el futuro puede crearse:
-
-`castilloit-documents`
-
-para separar documentación operativa de backups y raw del crawler.
+Bucket confirmado por el usuario: `castilloit-honducompras-crawler`, región `us-east-1`. Documentos operativos y backups requieren ubicación/aislamiento definidos; nombres como `castilloit-backups` y `castilloit-documents` son propuestas, no buckets cuya creación esté verificada. Archivos privados, versiones y metadatos en MySQL.
 
 ## 5.4 GitHub
-
-GitHub será la fuente oficial del código.
-
-Repositorios propuestos:
-
-```text
-CastilloIT/
-├── bastion
-│   ├── backend
-│   └── frontend
-├── honducompras-crawler
-└── infrastructure
-```
-
-Alternativa inicial simplificada:
-
-```text
-CastilloIT/
-├── bastion
-└── honducompras-crawler
-```
+Repositorio vigente: [Ahcast/Bastion](https://github.com/Ahcast/Bastion). Monorepo con `bluehost/`, `aws/` y `docs/`. GitHub mantiene código, documentación y CI/CD; crawler y backups se ejecutan en Lightsail.
 
 ---
 

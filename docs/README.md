@@ -1,6 +1,6 @@
 # Documentación
 
-[Documento maestro v0.5](Proyecto_Bastion_Documento_Maestro.md) se conserva como referencia funcional e histórica de la estructura inicial.
+El [documento maestro vigente v0.6](Proyecto_Bastion_Documento_Maestro.md) consolida alcance y decisiones transversales. Leerlo antes del detalle del área. Las versiones anteriores se consultan en Git, no son instrucciones alternativas de implementación.
 
 ## Referencias vigentes
 

@@ -13,13 +13,13 @@ Fecha: 7 de octubre de 2026. Cambio estructural solicitado; no representa softwa
 | `bluehost/frontend/src/app/shared` | Componentes y utilidades reutilizables sin lógica de negocio. |
 | `aws` | Crawler, workers técnicos y documentación de S3. |
 
-## Cambios respecto al maestro v0.5
+## Organización consolidada en el maestro v0.6
 
-- `bluehost/backend/app/Modules/Core` pasa a `bluehost/backend/app/Core`.
-- `bluehost/frontend/src/app/features` se divide entre `modules` y `core/pages`.
+- Core vive en `bluehost/backend/app/Core`, separado de módulos.
+- El frontend organiza negocio en `modules` y pantallas comunes en `core/pages`.
 - `dashboard` y `settings` pasan a `core/pages`; los demás features pasan a `modules`.
 - No se agregan módulos de negocio ni se cambia el menú aprobado.
-- Los fragmentos de estructura del documento maestro se conservan como antecedente; esta página define las rutas vigentes.
+- Esta página detalla las mismas rutas del maestro vigente; estructuras anteriores se consultan en Git.
 
 ## Dependencias
 

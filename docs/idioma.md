@@ -1,6 +1,6 @@
 # Idioma de la interfaz y nomenclatura técnica
 
-Organización vigente: [Core y módulos](architecture/core-modules.md). Esta referencia actualiza las rutas de los fragmentos históricos reproducidos abajo.
+Organización vigente: [Core y módulos](architecture/core-modules.md). El maestro vigente y el detalle del Core definen las rutas de implementación.
 
 ## Interfaz en español — obligatorio
 La interfaz de Bastion y sus vistas deben estar en español.
