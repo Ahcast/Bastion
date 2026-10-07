@@ -124,6 +124,7 @@ flowchart LR
     F[Facturas] --> R
     G[Gastos] --> R
     R --> I[Inicio]
+    AI[AI Gateway] -. narrativa / anomalías / explicación .-> R
 ```
 
 ## Seguridad
@@ -135,9 +136,59 @@ reportes.export
 
 Exports privados y expirables.
 
-## IA
+## Integración de IA
 
-Puede generar resumen financiero, anomalías y explicaciones textuales usando datos ya calculados por Reportes.
+La IA trabaja **sobre métricas calculadas por Reportes**, no sobre cálculos financieros improvisados en el modelo.
+
+Tools:
+
+```text
+get_report_metrics()
+get_report_rows()
+explain_report()
+detect_report_anomalies()
+compare_periods()
+draft_management_summary()
+```
+
+### Casos de uso
+
+- generar resumen ejecutivo del período;
+- explicar variaciones en facturación, inversión, utilidad o gastos;
+- comparar períodos;
+- señalar datos atípicos que merecen revisión;
+- responder preguntas de lenguaje natural sobre métricas autorizadas;
+- preparar narrativa para gerencia.
+
+### Fuente de verdad
+
+Flujo obligatorio:
+
+```text
+MySQL
+  -> Report Service
+  -> métricas canónicas
+  -> AI Gateway
+  -> explicación/narrativa
+```
+
+No:
+
+```text
+MySQL raw -> modelo -> modelo calcula totales
+```
+
+### Anomalías
+
+Una anomalía generada por IA es una señal, no un hallazgo contable definitivo. Debe mostrar qué datos/metadatos sustentan la observación y permitir navegar al módulo fuente.
+
+### Permisos
+
+La IA solo puede analizar los conjuntos de datos que el usuario tenga permiso de ver. Un resumen no puede filtrar datos de Facturas o Gastos a un usuario que carezca de acceso a esos módulos.
+
+### Exportaciones y IA
+
+La generación de Excel permanece determinista. IA puede sugerir una interpretación o portada/resumen adicional, pero no modifica silenciosamente los valores exportados.
 
 ## Criterios de aceptación
 
@@ -146,3 +197,6 @@ Puede generar resumen financiero, anomalías y explicaciones textuales usando da
 - Excel requiere autorización.
 - Gastos se agrupan por moneda si no hay FX.
 - No hay límites silenciosos del frontend.
+- IA explica métricas calculadas por backend y no redefine fórmulas.
+- Toda observación IA puede relacionarse con datos autorizados de origen.
+- Reportes funciona sin IA.
