@@ -1,15 +1,29 @@
-# Idioma obligatorio de Bastion
+# Idioma de la interfaz y nomenclatura técnica
 
-La aplicación está en español. Este requisito es obligatorio y prevalece sobre los nombres en inglés usados como ejemplos en el documento maestro v0.5.
+## Interfaz en español — obligatorio
+La interfaz de Bastion y sus vistas deben estar en español.
+Menú aprobado: Inicio, Clientes, Proveedores, Órdenes de Compra, Cotizaciones, Facturas, Gastos, Reportes, Procesos, Colaboración y Configuración.
+Botones, etiquetas, formularios, estados visibles, validaciones, errores mostrados, notificaciones y contenido de reportes y documentos destinados al usuario deben redactarse en español.
+Traducir errores y estados técnicos antes de presentarlos en una vista.
 
-## Interfaz
-Menús: Inicio, Clientes, Proveedores, Órdenes de Compra, Cotizaciones, Facturas, Gastos, Reportes, Procesos, Colaboración y Configuración.
-Botones, formularios, estados visibles, validaciones, errores, notificaciones, reportes y documentos destinados al usuario deben redactarse en español.
+## Lenguaje técnico en inglés — permitido
+Se conservan los nombres técnicos de la estructura aprobada: frontend, backend, app/Modules, Core, Customers, Suppliers, Processes, Quotes, PurchaseOrders, Invoices, Expenses, Reports, Collaboration, Workflow y AI.
+Código, clases, rutas técnicas, entidades, contratos API, scopes, estados internos, comandos y nombres de herramientas pueden mantenerse en inglés.
+Las secciones técnicas del frontend pueden llamarse dashboard, customers, suppliers, processes, quotes, purchase-orders, invoices, expenses, reports, collaboration y settings; sus etiquetas y contenido visibles se muestran en español.
 
-## Nombres del proyecto
-Carpetas funcionales y módulos propios en español. Para rutas se usan nombres sin tildes: Nucleo, Clientes, Proveedores, Procesos, Cotizaciones, OrdenesCompra, Facturas, Gastos, Reportes, Colaboracion, FlujosTrabajo e IA.
-Esto conserva los mismos módulos aprobados; solo cambia su nomenclatura.
+## Correspondencia
+| Identificador técnico | Nombre visible |
+| --- | --- |
+| dashboard | Inicio |
+| customers | Clientes |
+| suppliers | Proveedores |
+| purchase-orders | Órdenes de Compra |
+| quotes | Cotizaciones |
+| invoices | Facturas |
+| expenses | Gastos |
+| reports | Reportes |
+| processes | Procesos |
+| collaboration | Colaboración |
+| settings | Configuración |
 
-## Referencia histórica y protocolos
-El documento maestro original se conserva íntegro como referencia. Sus ejemplos de nombres ingleses no son una instrucción de idioma para la aplicación.
-Nombres de productos, comandos de frameworks, scopes y contratos externos no se traducen automáticamente. La terminología visible al usuario siempre debe estar en español.
+Esta instrucción sustituye el requisito anterior de traducir carpetas y módulos técnicos. El documento maestro original se conserva íntegro.

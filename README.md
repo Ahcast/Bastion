@@ -11,5 +11,5 @@ Ecosistema operativo de Castillo IT. Estructura basada en el [Documento maestro 
 Solo carpetas y Markdown. La arquitectura conceptual es la base aprobada; las versiones, contratos y detalles técnicos siguen sujetos a la revisión senior indicada en el documento maestro.
 Se conserva la separación por entorno solicitada, dentro de este repositorio. No se crean otros repositorios ni recursos externos.
 
-## Idioma obligatorio
-Bastion se desarrolla y se presenta en español. Ver [requisito de idioma](docs/idioma.md). Las carpetas y módulos funcionales usan nombres españoles.
+## Idioma
+Frontend y vistas en español. Nomenclatura técnica en inglés conforme a la estructura aprobada. Ver [política de idioma](docs/idioma.md).
