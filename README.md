@@ -19,3 +19,7 @@ Dominio definido: `https://bastion.castilloit.net`.
 La [estructura Core y módulos](docs/architecture/core-modules.md) actualiza la organización inicial del [documento maestro v0.5](docs/Proyecto_Bastion_Documento_Maestro.md), que se conserva como referencia histórica. Se mantienen los módulos funcionales existentes.
 
 Interfaz y vistas en español; nombres técnicos en inglés. Ver [idioma](docs/idioma.md).
+
+## Lineamientos consolidados
+
+Ver [core.md](docs/architecture/core.md) para el alcance completo del Core, infraestructura confirmada, tecnologías API/MCP, seguridad, operación y decisiones pendientes de esta sesión.

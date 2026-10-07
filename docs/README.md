@@ -21,3 +21,7 @@ Los documentos de carpetas reproducen secciones del maestro; no agregan módulos
 - [Contrato modular](contracts/modules.md).
 
 Estas páginas actualizan la organización de carpetas del maestro v0.5; sus extractos se conservan como contexto histórico.
+
+## Lineamientos consolidados
+
+Ver [core.md](architecture/core.md) para el alcance completo del Core, infraestructura confirmada, tecnologías API/MCP, seguridad, operación y decisiones pendientes de esta sesión.

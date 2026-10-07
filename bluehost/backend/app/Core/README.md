@@ -19,3 +19,7 @@ Namespace objetivo: `App\Core`. Núcleo común del monolito Laravel, separado de
 Core no depende de clases concretas de módulos. Workflow conserva aprobaciones y transiciones; AI conserva proveedores y tareas de IA; Collaboration conserva organización documental y comentarios.
 
 Estas carpetas documentan responsabilidades; todavía no contienen servicios ejecutables. El contrato de integración está en [Core y módulos](../../../../docs/architecture/core-modules.md).
+
+## Lineamientos consolidados
+
+Ver [core.md](../../../../docs/architecture/core.md) para el alcance completo del Core, infraestructura confirmada, tecnologías API/MCP, seguridad, operación y decisiones pendientes de esta sesión.

@@ -49,3 +49,7 @@ Denegación por defecto, MFA obligatorio, Policies por registro, autorización d
 Los valores de sesión, límites y proveedor WAF discutidos son propuestas pendientes de configuración y prueba, no controles ya implementados.
 
 Ver [contrato modular](../contracts/modules.md).
+
+## Lineamientos consolidados
+
+Ver [core.md](core.md) para el alcance completo del Core, infraestructura confirmada, tecnologías API/MCP, seguridad, operación y decisiones pendientes de esta sesión.
