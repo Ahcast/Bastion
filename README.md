@@ -1,19 +1,12 @@
 # Bastion
 
-Plataforma interna de Castillo IT para gestionar procesos, licitaciones y automatización de Oficina AI.
+Plataforma interna de Castillo IT. Repositorio organizado por entorno de ejecución.
 
-## Estado
-Estructura y documentación inicial. No hay aplicación, dependencias, migraciones ni automatizaciones ejecutables. Los controles descritos son requisitos de diseño; todavía no están implementados.
+| Carpeta | Destino |
+| --- | --- |
+| [bluehost/](bluehost/README.md) | Angular, Laravel, MySQL, módulos de negocio, correo y tareas cortas |
+| [aws/](aws/README.md) | Crawler, S3, programación de extracción y workers pesados propuestos |
+| [docs/](docs/README.md) | Arquitectura, seguridad, contratos y hoja de ruta compartidos |
 
-## Organización
-- [Arquitectura](docs/architecture/README.md)
-- [Seguridad](docs/security/README.md)
-- [Despliegue](docs/deployment/README.md)
-- [Hoja de ruta](docs/roadmap/README.md)
-- [Módulos](modules/README.md)
-- [Integraciones](integrations/README.md)
-- [Automatización](automation/README.md)
-- [Frontend](frontend/README.md)
-- [Backend](backend/README.md)
-
-La aplicación, base de datos y correo se proyectan en Bluehost Choice Plus. Las capacidades reales del hosting deben validarse antes de implementar. El crawler y los trabajos pesados se integrarán mediante contratos explícitos.
+Solo carpetas y Markdown. Ningún servicio ni control de seguridad está implementado o desplegado.
+La ubicación de los workers en AWS es una propuesta; runtime, servicios y presupuesto pendientes de definir. El correo permanece en Bluehost.

@@ -1,26 +1,20 @@
-# Arquitectura propuesta
+# Arquitectura por entorno
 
-## Enfoque
-Monolito modular Laravel con MySQL y frontend Angular. Angular y API se sirven bajo un mismo origen HTTPS. Cada módulo posee sus reglas y operaciones; las integraciones usan servicios definidos, sin acceso directo a tablas ajenas.
+| Entorno | Responsabilidad | Datos |
+| --- | --- | --- |
+| Bluehost | Angular, API Laravel, autorización, negocio, importación y correo | MySQL como fuente de verdad de negocio |
+| AWS | Crawler, lotes S3 y workers externos propuestos | Archivos originales, artefactos y resultados |
+| Compartido | Contratos, seguridad y decisiones | Documentación versionada |
 
-## Componentes
-| Componente | Responsabilidad |
-| --- | --- |
-| Angular | Interfaz y navegación; no decide permisos |
-| Laravel | Autenticación, autorización, validación y operaciones |
-| MySQL | Estado de negocio, historial, jobs y auditoría |
-| Integraciones | Crawler, proveedores de IA, correo y almacenamiento |
-| Cron y colas | Ejecutar trabajos limitados y recuperables |
+## Flujo de procesos
+Crawler AWS → lote CSV y manifiesto en S3 → importador Laravel en Bluehost → validación, idempotencia e historial MySQL → revisión humana.
 
-## Flujo principal
-Crawler → lote de importación → validación → procesos e historial → clasificación asistida por IA → revisión humana → cotización y expediente → aprobación.
+## Flujo de trabajos pesados propuesto
+Laravel crea job autorizado → worker AWS procesa entrada privada → resultado privado → Laravel valida y registra resultado → aprobación humana cuando corresponda.
+Transporte y runtime por elegir. Ningún worker obtiene acceso directo a MySQL ni permisos de aprobación.
 
-## Reglas
-- La API aplica autorización por recurso y operación.
-- Ningún endpoint público ejecuta comandos arbitrarios.
-- Archivos privados fuera del directorio público; descargas autorizadas.
-- Los eventos de negocio y jobs deben persistirse de forma consistente, usando un patrón outbox cuando corresponda.
-- Correo en Bluehost. No se presupone migración.
-- No se requieren EC2 ni Lightsail para alojar la aplicación.
-- Ubicación y runtime del crawler por decidir; no asumir que Bluehost admite sus dependencias.
-- Este documento propone la nueva base; no representa un inventario verificado del sistema legacy.
+## Límites
+Angular y API comparten origen HTTPS. Laravel aplica políticas y mantiene sesiones/MFA. El correo sigue en Bluehost.
+AWS conserva originales y ejecuta extracción; Bluehost interpreta los datos y decide los cambios de negocio.
+Cron y jobs cortos en Bluehost sujetos a sus límites. OCR, IA y generación pesada se reservan a workers externos propuestos.
+No hay servicios implementados ni recursos provisionados.

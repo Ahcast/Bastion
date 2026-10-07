@@ -1,6 +1,6 @@
 # Hoja de ruta
 
-1. Validar hosting y concretar contratos de datos.
+1. Validar Bluehost, definir runtime AWS y concretar contratos entre entornos.
 2. Implementar identidad, MFA, permisos y auditoría.
 3. Importación idempotente de crawler, historial y observabilidad.
 4. Proveedores, cotizaciones y licitaciones.

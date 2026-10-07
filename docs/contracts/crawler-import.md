@@ -11,3 +11,6 @@ Nunca TRUNCATE + reload. Un lote parcial no elimina procesos ausentes. Una ausen
 
 ## Recuperación
 run_id e identidad única evitan duplicados. Transacciones por unidad de trabajo, checkpoints, reintentos limitados con backoff y jitter; errores permanentes a revisión. Reprocesar un lote debe conservar el mismo resultado.
+
+## Responsabilidad por entorno
+AWS extrae y conserva el lote original en S3. Bluehost valida e importa a MySQL, registra historial y aplica decisiones de negocio. La entrega se propone mediante lectura autenticada de S3, sin acceso AWS directo a MySQL.
