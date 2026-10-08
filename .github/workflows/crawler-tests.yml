@@ -1,9 +1,9 @@
 name: Crawler tests
 on:
   push:
-    paths: ['aws/lightsail/crawler/**', '.github/workflows/crawler-tests.yml']
+    paths: ['backend/crawler/**', '.github/workflows/crawler-tests.yml']
   pull_request:
-    paths: ['aws/lightsail/crawler/**', '.github/workflows/crawler-tests.yml']
+    paths: ['backend/crawler/**', '.github/workflows/crawler-tests.yml']
 permissions:
   contents: read
 jobs:
@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: aws/lightsail/crawler
+        working-directory: backend/crawler
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -19,3 +19,4 @@ jobs:
           python-version: '3.12'
       - run: pip install -r requirements.lock
       - run: python -m unittest discover -s tests -v
+

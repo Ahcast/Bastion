@@ -1,55 +1,28 @@
-# Estructura de Core y módulos
+# Estructura del repositorio
 
-Fecha: 7 de octubre de 2026. Cambio estructural solicitado; no representa software desplegado.
+Distribución aprobada el 7 de octubre de 2026; no acredita despliegue.
 
-## Organización vigente
+| Ruta | Responsabilidad | Runtime/alojamiento |
+| --- | --- | --- |
+| `frontend/src/app/core` | Sesión, API, shell, Inicio y Configuración | Angular estático Bluehost |
+| `frontend/src/app/modules` | Módulos de presentación | Bluehost |
+| `frontend/src/app/shared` | UI y utilidades reutilizables | Bluehost |
+| `backend/internal/core` | Identidad, RBAC/MFA, settings/SMTP, API/MCP, auditoría, archivos y ejecución | Go Lightsail |
+| `backend/internal/modules` | Módulos de negocio aprobados, AI y Workflow | Go Lightsail |
+| `backend/database` | Esquema, migraciones y contratos de datos | Percona/MySQL Bluehost |
+| `backend/crawler` | Extracción y estado técnico SQLite | Python Lightsail |
+| `backend/workers` y `backend/scheduler` | Trabajos, outbox, retries y backups | Lightsail |
+| `backend/storage/s3` | Contratos de archivos y respaldo | Amazon S3 |
+| `backend/deployment` | Operación/despliegue backend | Lightsail |
+| `frontend/deployment` | Despliegue estático | Bluehost |
+| `docs` | Maestro y contratos transversales | GitHub |
 
-| Ruta | Responsabilidad |
-| --- | --- |
-| `bluehost/backend/app/Core` | Identidad, acceso, configuración, SMTP, API, MCP y capacidades comunes. |
-| `bluehost/backend/app/Modules` | Customers, Suppliers, Processes, Quotes, PurchaseOrders, Invoices, Expenses, Reports, Collaboration, Workflow y AI. |
-| `bluehost/frontend/src/app/core` | Servicios comunes, shell y pantallas de Inicio/Configuración. |
-| `bluehost/frontend/src/app/modules` | Pantallas y lógica de presentación por módulo. |
-| `bluehost/frontend/src/app/shared` | Componentes y utilidades reutilizables sin lógica de negocio. |
-| `aws` | Crawler, workers técnicos y documentación de S3. |
+La ubicación del código de BD no modifica su hosting: MySQL y correo permanecen en Bluehost. No hay carpetas raíz por proveedor.
 
-## Organización consolidada en el maestro v0.6
+Core no importa módulos concretos; la composición raíz registra módulos y sus rutas/herramientas. Módulos consumen contratos de Core. API REST y MCP llaman los mismos servicios de aplicación. Workflow conserva aprobaciones y AI tareas/resultados. No se agregan módulos ni se cambia el menú.
 
-- Core vive en `bluehost/backend/app/Core`, separado de módulos.
-- El frontend organiza negocio en `modules` y pantallas comunes en `core/pages`.
-- `dashboard` y `settings` pasan a `core/pages`; los demás features pasan a `modules`.
-- No se agregan módulos de negocio ni se cambia el menú aprobado.
-- Esta página detalla las mismas rutas del maestro vigente; estructuras anteriores se consultan en Git.
+Frontend compone rutas desde la raíz; módulos consumen Core/shared, shared no importa negocio. Texto visible en español; nombres técnicos en inglés.
 
-## Dependencias
+Go y librerías concretas pendientes de validación. MySQL 5.7.44-48 reportado; no asumir SQL MySQL 8. Dominio frontend bastion.castilloit.net, API/MCP api.bastion.castilloit.net propuesto. CORS, cookies host-only y CSRF explícito. Sin OCR ni inferencia en Lightsail.
 
-Core no importa módulos concretos. Los módulos dependen de contratos de Core. Las integraciones entre módulos pasan por servicios públicos o eventos, con dependencias declaradas. REST y MCP son adaptadores hacia las mismas operaciones. Workflow conserva aprobaciones y AI conserva orquestación de modelos; no se fusionan dentro de Core.
-
-Frontend: la composición raíz registra módulos y sus rutas; módulos consumen Core/shared, y shared no depende de Core ni de módulos. El dashboard obtiene agregados autorizados mediante contratos, sin importar implementaciones privadas.
-
-## Infraestructura confirmada por el usuario
-
-- Dominio: `https://bastion.castilloit.net`.
-- PHP seleccionable entre 8.1 y 8.5; objetivo propuesto 8.5, pendiente CLI/extensiones.
-- SSH y FTP disponibles; despliegue previsto con SSH/SFTP.
-- Cron con frecuencia mínima de un minuto.
-- Document root actual: `~/public_html/website_091cdca8`.
-- Base de datos: Percona Server for MySQL 5.7.44-48. Consultas y migraciones deberán probarse contra MySQL 5.7; soporte/parches por confirmar con Bluehost.
-
-Solo activos públicos se despliegan en document root. El backend privado, secretos y logs deben quedar fuera de `public_html`.
-
-## Tecnologías propuestas en la revisión
-
-Laravel 13, PHP 8.5, Sanctum/Fortify, Spatie Permission y Policies; REST JSON/OpenAPI 3.1 con Scramble; laravel/mcp y Passport para delegación OAuth; colas database y cron. Versiones exactas, extensiones, protocolo MCP y dependencias se validarán antes de instalar. No se introducen dependencias ejecutables en este cambio.
-
-## Seguridad común
-
-Denegación por defecto, MFA obligatorio, Policies por registro, autorización de conexiones MCP y herramientas, auditoría, idempotencia y secretos protegidos. Configuración SMTP, usuarios, RBAC, sesiones, API y MCP pertenecen al Core. Las herramientas no pueden saltarse aprobaciones ni otorgarse permisos mediante contenido externo.
-
-Los valores de sesión, límites y proveedor WAF discutidos son propuestas pendientes de configuración y prueba, no controles ya implementados.
-
-Ver [contrato modular](../contracts/modules.md).
-
-## Lineamientos consolidados
-
-Ver [core.md](core.md) para el alcance completo del Core, infraestructura confirmada, tecnologías API/MCP, seguridad, operación y decisiones pendientes de esta sesión.
+Ver [Core](core.md), [contrato modular](../contracts/modules.md) y [maestro](../Proyecto_Bastion_Documento_Maestro.md).

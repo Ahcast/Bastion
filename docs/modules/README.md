@@ -5,26 +5,26 @@ Este índice reúne los lineamientos funcionales y arquitectónicos para preserv
 Referencias transversales:
 
 - [Arquitectura Oficina AI v2](../architecture/oficina-ai-v2.md)
-- [Módulo AI](../../bluehost/backend/app/Modules/AI/README.md)
+- [Módulo AI](../../backend/internal/modules/AI/README.md)
 
 ## Módulos
 
 | Módulo visible | Propietario técnico | Lineamientos |
 |---|---|---|
-| Inicio | Core frontend / dashboard | [Inicio](../../bluehost/frontend/src/app/core/pages/dashboard/LINEAMIENTOS.md) |
-| Clientes | `App\Modules\Customers` | [Clientes](../../bluehost/backend/app/Modules/Customers/LINEAMIENTOS.md) |
-| Proveedores | `App\Modules\Suppliers` | [Proveedores](../../bluehost/backend/app/Modules/Suppliers/LINEAMIENTOS.md) |
-| Órdenes de Compra | `App\Modules\PurchaseOrders` | [Órdenes de Compra](../../bluehost/backend/app/Modules/PurchaseOrders/LINEAMIENTOS.md) |
-| Cotizaciones | `App\Modules\Quotes` | [Cotizaciones](../../bluehost/backend/app/Modules/Quotes/LINEAMIENTOS.md) |
-| Facturas | `App\Modules\Invoices` | [Facturas](../../bluehost/backend/app/Modules/Invoices/LINEAMIENTOS.md) |
-| Gastos | `App\Modules\Expenses` | [Gastos](../../bluehost/backend/app/Modules/Expenses/LINEAMIENTOS.md) |
-| Reportes | `App\Modules\Reports` | [Reportes](../../bluehost/backend/app/Modules/Reports/LINEAMIENTOS.md) |
-| Procesos | `App\Modules\Processes` | [Procesos](../../bluehost/backend/app/Modules/Processes/LINEAMIENTOS.md) |
-| Colaboración | `App\Modules\Collaboration` | [Colaboración](../../bluehost/backend/app/Modules/Collaboration/LINEAMIENTOS.md) |
+| Inicio | Core frontend / dashboard | [Inicio](../../frontend/src/app/core/pages/dashboard/LINEAMIENTOS.md) |
+| Clientes | `backend/internal/modules/Customers` | [Clientes](../../backend/internal/modules/Customers/LINEAMIENTOS.md) |
+| Proveedores | `backend/internal/modules/Suppliers` | [Proveedores](../../backend/internal/modules/Suppliers/LINEAMIENTOS.md) |
+| Órdenes de Compra | `backend/internal/modules/PurchaseOrders` | [Órdenes de Compra](../../backend/internal/modules/PurchaseOrders/LINEAMIENTOS.md) |
+| Cotizaciones | `backend/internal/modules/Quotes` | [Cotizaciones](../../backend/internal/modules/Quotes/LINEAMIENTOS.md) |
+| Facturas | `backend/internal/modules/Invoices` | [Facturas](../../backend/internal/modules/Invoices/LINEAMIENTOS.md) |
+| Gastos | `backend/internal/modules/Expenses` | [Gastos](../../backend/internal/modules/Expenses/LINEAMIENTOS.md) |
+| Reportes | `backend/internal/modules/Reports` | [Reportes](../../backend/internal/modules/Reports/LINEAMIENTOS.md) |
+| Procesos | `backend/internal/modules/Processes` | [Procesos](../../backend/internal/modules/Processes/LINEAMIENTOS.md) |
+| Colaboración | `backend/internal/modules/Collaboration` | [Colaboración](../../backend/internal/modules/Collaboration/LINEAMIENTOS.md) |
 
 ## Distribución documental
 
-Los lineamientos de cada dominio viven junto al módulo backend que posee sus reglas, persistencia y Policies. Las pantallas Angular consumen esos contratos y no mantienen una segunda especificación funcional duplicada.
+Los lineamientos de cada dominio viven junto al módulo backend que posee sus reglas, persistencia y políticas de autorización. Las pantallas Angular consumen esos contratos y no mantienen una segunda especificación funcional duplicada.
 
 `Inicio` es la excepción: continúa como página del Core frontend porque no posee tablas ni reglas transaccionales propias y agrega información de Facturas, Órdenes y Procesos.
 
@@ -32,13 +32,13 @@ Los módulos transversales `AI` y `Workflow` permanecen separados y no agregan e
 
 ## Integración transversal de IA
 
-La IA no vive dentro de cada módulo como una integración distinta. Todos consumen el mismo `App\Modules\AI` mediante tools autorizadas y Actions públicas de dominio.
+La IA no vive dentro de cada módulo como una integración distinta. Todos consumen el mismo `backend/internal/modules/AI` mediante tools autorizadas y servicios de aplicación públicos de dominio.
 
 ```text
 Angular / evento / agente
           |
           v
-      Laravel
+      Go
           |
           v
       AI Gateway
@@ -54,7 +54,7 @@ Reglas comunes:
 1. ningún módulo llama directamente a OpenAI u otro proveedor;
 2. ninguna API key llega al frontend;
 3. la IA no accede directamente a MySQL, shell, cPanel, SMTP o S3 completo;
-4. cada tool reutiliza Policies y Actions del módulo propietario;
+4. cada tool reutiliza políticas de autorización y servicios de aplicación del módulo propietario;
 5. resultados estructurados se validan antes de persistirse;
 6. cada ejecución relevante queda registrada en `ai_runs` y cada tool call sensible en `ai_tool_calls`;
 7. acciones externas, financieras o irreversibles requieren aprobación humana por defecto;
@@ -78,7 +78,7 @@ Reglas comunes:
 
 ## Relación con API/MCP
 
-REST, MCP y las tools internas de IA deben converger en las mismas Actions de aplicación:
+REST, MCP y las tools internas de IA deben converger en los mismos servicios de aplicación de aplicación:
 
 ```text
 REST Controller ----\
@@ -91,4 +91,5 @@ No se duplican reglas de negocio por canal de entrada.
 
 ## Ejecución inicial y experiencia de usuario
 
-La [integración IA](../architecture/ai-integration.md) actualiza el Gateway como coordinador de tareas/resultados en Laravel, con ejecución externa prioritaria en ChatGPT Work/Plus mediante MCP. Los adaptadores API son opcionales futuros. [Resultados](ai-results.md) se presentan dentro de Procesos y se incorporan a Cotizaciones solo por selección del usuario. El RAG inicial recupera antecedentes de S3/MySQL.
+La [integración IA](../architecture/ai-integration.md) actualiza el Gateway como coordinador de tareas/resultados en Go, con ejecución externa prioritaria en ChatGPT Work/Plus mediante MCP. Los adaptadores API son opcionales futuros. [Resultados](ai-results.md) se presentan dentro de Procesos y se incorporan a Cotizaciones solo por selección del usuario. El RAG inicial recupera antecedentes de S3/MySQL.
+

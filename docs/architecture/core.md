@@ -1,9 +1,9 @@
 # Bastion — Lineamientos del Core de la aplicación
 
 **Empresa:** Castillo IT S. de R.L.  
-**Versión:** 0.2 — Consolidación de la sesión del 7 de octubre de 2026  
+**Versión:** 0.3 — Backend Go y conexión MySQL remota; revisión del 7 de octubre de 2026  
 **Fecha:** 7 de octubre de 2026  
-**Destino:** Bluehost Choice Plus  
+**Destino:** AWS Lightsail para Core/API/MCP/workers; Bluehost para frontend, BD y correo  
 **Ubicación en el repositorio:** `docs/architecture/core.md`
 
 ## 1. Propósito y estado del documento
@@ -14,7 +14,7 @@ El Core debe permitir construir primero una aplicación funcional y segura, y ag
 
 Este documento consolida el borrador inicial y las decisiones posteriores de la sesión: dominio, capacidades reportadas de Bluehost, pertenencia al Core de usuarios/RBAC/MFA/SMTP, tecnologías API y MCP, política de ciberseguridad y separación física de Core y módulos.
 
-Base del repositorio revisada antes de esta actualización: `main`, commit `6ab601d79cf9ce7f164d97ae4a780e3ce3db339b`. El backend y frontend de Bluehost siguen siendo estructura documental. El crawler en AWS ya contiene implementación y pruebas. No se ha inspeccionado ni desplegado una aplicación en producción mediante esta sesión.
+Base del repositorio revisada antes de esta actualización: `main`, commit `8c9dd10aefbae91ea7e38a25bb141588e6dca23d`. El backend Go en AWS y frontend Angular en Bluehost siguen siendo estructura documental. El crawler en AWS ya contiene implementación y pruebas. No se ha inspeccionado ni desplegado una aplicación en producción mediante esta sesión.
 
 ### 1.1 Estado y precedencia
 
@@ -25,15 +25,15 @@ Base del repositorio revisada antes de esta actualización: `main`, commit `6ab6
 | Propuesta técnica | Paquetes, parámetros de seguridad y medidas operativas planteados; se conservan como propuesta hasta su validación. |
 | Pendiente de verificación | Compatibilidad exacta, recursos y configuración efectiva del hosting. |
 
-«Debe» describe un requisito objetivo, no un control ya instalado. Los valores propuestos no se convierten en aprobaciones por recopilarse aquí. Este documento detalla el Core y [core-modules.md](core-modules.md) sus rutas, coherentes con el maestro vigente v0.6. El maestro fija alcance transversal; los contratos especializados desarrollan cada área. Las contradicciones deben resolverse explícitamente, sin ampliar alcance ni permisos.
+«Debe» describe un requisito objetivo, no un control ya instalado. Los valores propuestos no se convierten en aprobaciones por recopilarse aquí. Este documento detalla el Core y [core-modules.md](core-modules.md) sus rutas, coherentes con el maestro vigente v0.7. El maestro fija alcance transversal; los contratos especializados desarrollan cada área. Las contradicciones deben resolverse explícitamente, sin ampliar alcance ni permisos.
 
 ## 2. Base que se conserva
 
-1. La aplicación será un **monolito modular**: un backend Laravel y una SPA Angular, con límites internos claros.
-2. Bluehost alojará la aplicación, MySQL y el correo de Castillo IT.
+1. La aplicación será un **monolito modular**: un backend Go y una SPA Angular, con límites internos claros.
+2. Bluehost alojará Angular, MySQL y correo; AWS Lightsail ejecutará backend Go, API, MCP, crawler y workers.
 3. MySQL será la fuente de verdad transaccional; S3 almacenará archivos, históricos y backups; GitHub conservará código y documentación.
 4. El crawler permanecerá en AWS Lightsail. Su lógica de extracción no pertenece al Core.
-5. Laravel controlará las reglas de negocio para todas las entradas: interfaz, API, automatizaciones y agentes.
+5. Go controlará las reglas de negocio para todas las entradas: interfaz, API, automatizaciones y agentes.
 6. La aplicación seguirá funcionando cuando la IA o el crawler estén temporalmente fuera de servicio.
 7. La interfaz, sus mensajes, estados visibles, reportes y documentos para usuarios estarán en español. El código y los identificadores técnicos podrán permanecer en inglés.
 8. Se conservarán los módulos existentes en el repositorio; este borrador no agrega módulos de negocio al menú aprobado.
@@ -43,7 +43,7 @@ Base del repositorio revisada antes de esta actualización: `main`, commit `6ab6
 | Componente | Responsabilidad | Límite |
 | --- | --- | --- |
 | Angular en Bluehost | Interfaz, navegación, formularios y presentación | No decide permisos ni reglas de negocio definitivas. |
-| Laravel en Bluehost | Core, módulos, API, validación, autorización y operaciones | No ejecuta el crawler ni modelos de IA locales. |
+| Go en AWS Lightsail | Core, módulos, API, validación, autorización y operaciones | Crawler Python en servicio separado; sin OCR ni inferencia. |
 | MySQL en Bluehost | Estado operativo, relaciones, transacciones y metadatos | No funciona como almacén de archivos binarios masivos. |
 | Lightsail | Extracción, reintentos técnicos y backup worker | No es el maestro de datos de negocio. |
 | S3 | Archivos privados, evidencia, raw y recuperación | No reemplaza la base transaccional. |
@@ -53,8 +53,8 @@ Base del repositorio revisada antes de esta actualización: `main`, commit `6ab6
 
 El término Core comprende dos partes coordinadas:
 
-- **Core backend:** `bluehost/backend/app/Core`, responsable de identidad y capacidades técnicas compartidas.
-- **Core frontend:** `bluehost/frontend/src/app/core`, responsable de sesión, cliente API, configuración y protección de navegación. Los componentes visuales reutilizables pertenecen a `shared`. Inicio y Configuración se ubican en `core/pages`; el shell común en `core/shell`.
+- **Core backend:** `backend/internal/core`, responsable de identidad y capacidades técnicas compartidas.
+- **Core frontend:** `frontend/src/app/core`, responsable de sesión, cliente API, configuración y protección de navegación. Los componentes visuales reutilizables pertenecen a `shared`. Inicio y Configuración se ubican en `core/pages`; el shell común en `core/shell`.
 
 Workflow y AI son módulos transversales separados en el repositorio. Aunque forman parte de la plataforma, no se fusionan dentro de Core.
 
@@ -83,33 +83,33 @@ Se mantienen estas ubicaciones existentes:
 
 | Ruta | Uso |
 | --- | --- |
-| `bluehost/backend/app/Core/` | Servicios transversales y sus contratos. |
-| `bluehost/backend/app/Modules/Workflow/` | Flujos y aprobaciones. |
-| `bluehost/backend/app/Modules/AI/` | Orquestación de tareas de IA. |
-| `bluehost/backend/app/Modules/<Module>/` | Lógica de cada módulo aprobado. |
-| `bluehost/backend/integrations/` | Documentación de integraciones; no asumir que ya es un namespace ejecutable. |
-| `bluehost/frontend/src/app/core/` | Autenticación, API, guards, interceptors y configuración. |
-| `bluehost/frontend/src/app/shared/` | UI, pipes, directivas y utilidades reutilizables. |
-| `bluehost/frontend/src/app/modules/` | Pantallas de los módulos. |
+| `backend/internal/core/` | Servicios transversales y sus contratos. |
+| `backend/internal/modules/Workflow/` | Flujos y aprobaciones. |
+| `backend/internal/modules/AI/` | Orquestación de tareas de IA. |
+| `backend/internal/modules/<Module>/` | Lógica de cada módulo aprobado. |
+| `backend/integrations/` | Documentación de integraciones; no asumir que ya es un namespace ejecutable. |
+| `frontend/src/app/core/` | Autenticación, API, guards, interceptors y configuración. |
+| `frontend/src/app/shared/` | UI, pipes, directivas y utilidades reutilizables. |
+| `frontend/src/app/modules/` | Pantallas de los módulos. |
 | `docs/contracts/` | Contratos públicos y de integración. |
 
-La estructura documental vigente de Core separa `Identity`, `Access`, `Settings`, `Api`, `Mcp`, `Audit`, `Messaging`, `Files`, `Execution`, `Contracts` y `Modules`. Esta última área registra módulos; no contiene su lógica de negocio. Namespace objetivo: `App\Core`; módulos: `App\Modules`.
+La estructura documental vigente de Core separa `Identity`, `Access`, `Settings`, `Api`, `Mcp`, `Audit`, `Messaging`, `Files`, `Execution`, `Contracts` y `Modules`. Esta última área registra módulos; no contiene su lógica de negocio. Paquetes objetivo: `backend/internal/core`; módulos: `backend/internal/modules`.
 
-Cada área incorporará Actions, Services, Models, Policies u otros elementos cuando exista código que los justifique. La composición usará `config/modules.php`, Service Providers y `routes/ai.php` al inicializar Laravel; esos archivos ejecutables todavía no existen por esta definición.
+Cada área incorpora paquetes y contratos Go cuando haya código que los justifique. La composición raíz registra módulos, rutas y herramientas MCP; Core no importa módulos concretos.
 
 ### 4.1 Reglas de dependencia
 
 - Los módulos consumen contratos públicos de Core; Core no importa clases concretas de los módulos de negocio.
-- Las operaciones entre módulos pasan por Actions/Services públicos o eventos. Un módulo no modifica directamente las tablas de otro.
+- Las operaciones entre módulos pasan por servicios de aplicación/Services públicos o eventos. Un módulo no modifica directamente las tablas de otro.
 - Los controladores validan la entrada y delegan; la lógica reutilizable no vive dentro del controlador.
-- Jobs, API REST y adaptadores MCP usan las mismas acciones de aplicación y las mismas Policies.
+- Jobs, API REST y adaptadores MCP usan las mismas acciones de aplicación y las mismas políticas de autorización.
 - Las consultas transversales de reportes pueden usar proyecciones o consultas de lectura documentadas; no permiten escrituras encubiertas.
 - Los adaptadores externos encapsulan credenciales, protocolo y traducción de errores. No se dispersan llamadas al proveedor por los módulos.
 - Una utilidad solo se incorpora a Core cuando es transversal o protege una regla común. No se traslada lógica comercial por comodidad.
 
 ## 5. Contrato para incorporar módulos
 
-**Propuesta de implementación:** registrar módulos mediante configuración versionada y Service Providers. No se necesita un marketplace ni instalación de código desde la interfaz.
+**Propuesta de implementación:** registrar módulos mediante configuración versionada y registro explícito de módulos Go. No se necesita un marketplace ni instalación de código desde la interfaz.
 
 Cada módulo debe declarar:
 
@@ -117,7 +117,7 @@ Cada módulo debe declarar:
 2. Versión y dependencias obligatorias.
 3. Tablas y datos que administra.
 4. Rutas, acciones públicas y contratos de entrada/salida.
-5. Permisos y Policies por acción y registro.
+5. Permisos y políticas de autorización por acción y registro.
 6. Eventos que publica y consume.
 7. Jobs, horarios, límites y reglas de reintento.
 8. Participación en auditoría, documentos, notificaciones y Workflow.
@@ -145,11 +145,11 @@ La presencia de una carpeta no activa el módulo. Habilitarlo requiere dependenc
 
 ### 6.1 Usuarios de la SPA
 
-Base de diseño: Sanctum con sesión por cookies y CSRF, Fortify para autenticación y TOTP obligatorio. El alcance de usuarios, RBAC, MFA, sesiones y configuración SMTP dentro del Core fue confirmado expresamente en la sesión.
+Base de diseño: sesiones opacas del Core Go con cookies, CSRF y TOTP obligatorio. El alcance de usuarios, RBAC, MFA, sesiones y configuración SMTP dentro del Core fue confirmado expresamente en la sesión.
 
 Lineamientos del borrador:
 
-- Angular y Laravel se servirán desde el mismo origen: `https://bastion.castilloit.net`.
+- Angular en `https://bastion.castilloit.net` y API en `https://api.bastion.castilloit.net` (propuesto) son orígenes distintos. Configurar CORS con origen exacto, credenciales y CSRF explícito; no usar wildcard.
 - Cookie de sesión `__Host-bastion_session`, con `Secure`, `HttpOnly`, `SameSite=Lax`, `Path=/` y sin atributo `Domain`.
 - La cookie de sesión no se comparte con WordPress. El aislamiento de cookies no sustituye el aislamiento de archivos y permisos dentro del hosting.
 - La cookie CSRF es distinta de la cookie de sesión y debe ser accesible según el mecanismo CSRF del cliente; no se le aplica indiscriminadamente `HttpOnly`.
@@ -171,17 +171,16 @@ Para acciones críticas se exigirá reautenticación reciente. La aprobación de
 - `backup-worker` utiliza permisos específicos de backup, separados de la aplicación y del crawler.
 - Un asistente delegado opera con la intersección de permisos del usuario, alcance de la integración y política sobre el recurso.
 - `requested_by` se deriva de la identidad autenticada/delegación validada; no se acepta como prueba de identidad un campo enviado libremente por el agente.
-- La tecnología propuesta para delegación MCP es Passport con OAuth y PKCE. No se presupone un proveedor OIDC ni que Sanctum resuelva ese flujo. Deben probarse emisor, audiencia, revocación y compatibilidad del cliente.
+- La tecnología propuesta para delegación MCP es implementación OAuth por seleccionar con OAuth y PKCE. No se presupone un proveedor OIDC ni que sesiones del Core resuelva ese flujo. Deben probarse emisor, audiencia, revocación y compatibilidad del cliente.
 
 ## 7. Autorización uniforme
 
 **Denegar por defecto.** Toda acción debe comprobar identidad activa, permiso, acceso al registro y restricciones de estado. Cuando corresponda, también debe comprobar aprobación y reautenticación.
 
-Los permisos distinguen consultar, crear, modificar, enviar, aprobar, exportar y administrar. Los roles agrupan permisos; las Policies incorporan propietario, equipo, asignación u otras restricciones reales. No se crean todavía roles comerciales no aprobados.
+Los permisos distinguen consultar, crear, modificar, enviar, aprobar, exportar y administrar. Los roles agrupan permisos; las políticas de autorización incorporan propietario, equipo, asignación u otras restricciones reales. No se crean todavía roles comerciales no aprobados.
 
 Los guards de Angular mejoran la navegación, pero el backend decide. Listados, búsquedas, adjuntos, exportaciones y endpoints de detalle deben aplicar las mismas restricciones.
 
-En Sanctum, `tokenCan()` no sustituye una Policy de usuario: para peticiones de la SPA puede devolver verdadero. Por eso se comprobará el permiso efectivo del usuario además del alcance del token cuando exista. Referencia técnica: [Sanctum](https://laravel.com/framework/docs/13.x/sanctum).
 
 Cambiar roles o desactivar una cuenta debe invalidar permisos cacheados y bloquear operaciones posteriores, incluidos jobs delegados todavía pendientes.
 
@@ -262,13 +261,12 @@ El evento tendrá identificador, tipo, versión de esquema, entidad, fecha y cor
 
 Si la transacción falla, no se envía el evento. Si el proceso cae después de confirmar la transacción, el evento pendiente permanece recuperable. Una simple llamada «después del commit» no garantiza por sí sola esa recuperación.
 
-## 11. Trabajos en segundo plano en Bluehost
+## 11. Trabajos en segundo plano en Lightsail
 
-Base existente: Laravel Queue con driver `database`; alternativa de ejecución mediante cron cuando no haya workers persistentes. La disponibilidad concreta del plan está por validar.
+Diseño objetivo (aún no implementado): cola durable MySQL con workers en Lightsail; alternativa de ejecución mediante cron cuando no haya workers persistentes. La disponibilidad concreta del plan está por validar.
 
-**Propuesta inicial:** scheduler y workers acotados mediante cron, con bloqueo contra solapamientos, límite de duración, memoria, cantidad de jobs e intentos. `--stop-when-empty` por sí solo no impone un presupuesto máximo si siguen entrando trabajos.
+**Propuesta inicial:** scheduler y workers acotados mediante cron, con bloqueo contra solapamientos, límite de duración, memoria, cantidad de jobs e intentos. Los workers Go deben detenerse al agotar su presupuesto incluso si siguen entrando tareas.
 
-Laravel ofrece `--max-jobs` y `--max-time`; el timeout del job debe ser menor que `retry_after`. Ver [documentación de colas](https://laravel.com/framework/docs/13.x/queues). Los valores se fijarán tras medir el hosting; también se comprobará la disponibilidad de mecanismos de timeout y las extensiones requeridas.
 
 Todo job debe:
 
@@ -283,7 +281,7 @@ No mantener requests HTTP abiertos durante importaciones grandes, generación ma
 
 No asumir Redis, Supervisor, Docker, WebSockets propios ni Node persistente en Bluehost. Angular se compila fuera del hosting y se despliegan sus archivos estáticos.
 
-OCR, procesamiento documental intensivo y cargas que excedan el presupuesto se delegarán a un ejecutor externo mediante un contrato específico. El Lightsail de 1 GB no se considera automáticamente capaz de recibir todas esas cargas ni debe exponer MySQL para ejecutar workers remotos.
+OCR, procesamiento documental intensivo y cargas que excedan el presupuesto se delegarán a un ejecutor externo mediante un contrato específico. El Lightsail no se considera automáticamente capaz de recibir todas esas cargas ni debe exponer MySQL para ejecutar workers remotos.
 
 ## 12. Auditoría y aprobaciones
 
@@ -358,13 +356,13 @@ El mecanismo actual de push CSV todavía requiere documentación. Este borrador 
 
 ## 15. Integración de IA y MCP
 
-AI administra tareas durables, ejecutores y resultados; MCP es un adaptador Core hacia las mismas Actions de Laravel. El ejecutor inicial prioritario es ChatGPT Work con skills mediante el plan del usuario; Laravel no consume Plus como API de inferencia. Ver [integración IA](ai-integration.md) y [contrato](../contracts/ai-pipeline.md). El Core no contendrá lógica exclusiva para una marca de modelo.
+AI administra tareas durables, ejecutores y resultados; MCP es un adaptador Core hacia los mismos servicios de aplicación de Go. El ejecutor inicial prioritario es ChatGPT Work con skills mediante el plan del usuario; Go no consume Plus como API de inferencia. Ver [integración IA](ai-integration.md) y [contrato](../contracts/ai-pipeline.md). El Core no contendrá lógica exclusiva para una marca de modelo.
 
 Registrar tarea, actor, delegación, herramientas usadas, resultado, errores y costos cuando estén disponibles. Establecer presupuestos, límites y cancelación. Un proveedor fuera de servicio deja trabajo pendiente o fallido, sin bloquear la operación manual.
 
 Documentos, páginas y correos son datos no confiables: su contenido no puede otorgar permisos, cambiar políticas ni autorizar acciones. Las herramientas validan argumentos y permisos independientemente de lo que produzca el modelo.
 
-MCP pertenece expresamente al Core; AI administra tareas y resultados sin duplicar Actions/Policies. MCP se habilita por fases, comenzando por consulta y escritura acotada de resultados. El RAG inicial apoya pricing con fuentes S3 e índices/metadatos MySQL; búsqueda vectorial opcional posterior. No se requiere RAG para operar Core. Compatibilidad Work/Plus, ejecución diaria desatendida, Grokbot y corpus requieren validación antes de activar.
+MCP pertenece expresamente al Core; AI administra tareas y resultados sin duplicar servicios de aplicación/políticas de autorización. MCP se habilita por fases, comenzando por consulta y escritura acotada de resultados. El RAG inicial apoya pricing con fuentes S3 e índices/metadatos MySQL; búsqueda vectorial opcional posterior. No se requiere RAG para operar Core. Compatibilidad Work/Plus, ejecución diaria desatendida, Grokbot y corpus requieren validación antes de activar.
 
 ## 16. Core de la interfaz
 
@@ -386,14 +384,14 @@ La biblioteca de componentes, identidad visual y diseño detallado de pantallas 
 
 ### 17.1 Validación previa de Bluehost
 
-Antes de fijar versiones o desplegar, registrar evidencia de PHP web y CLI, extensiones, motor/versiones de base de datos, SSH/SFTP, cron, límites de ejecución y memoria, conexiones, cuotas de disco, salida HTTPS/SMTP y posibilidad de asignar el document root.
+Antes de desplegar validar runtime Go/Linux en Lightsail, acceso remoto cifrado MySQL, límites de conexiones, SMTP, HTTPS, S3, memoria y despliegue estático Angular en Bluehost.
 
-Objetivo técnico de esta sesión: Laravel 13 y PHP 8.5, con Percona/MySQL 5.7 como restricción real. La posibilidad de seleccionar PHP web 8.5 no confirma PHP CLI ni sus extensiones. Angular 22.x, TypeScript 6.x, RxJS 7.x y Node 24 LTS permanecen como baseline del maestro pendiente de validación conjunta. Fijar versiones y lockfiles tras probar dependencias y migraciones contra el ambiente objetivo.
+Objetivo: Go en Lightsail, Angular en Bluehost y Percona/MySQL 5.7 en Bluehost. Fijar versiones y dependencias tras validar compatibilidad; no se requiere runtime backend para Bastion.
 
 ### 17.2 Despliegue controlado
 
 - Separar desarrollo, pruebas y producción, con credenciales distintas y datos de prueba adecuados.
-- Exponer únicamente el directorio público de Laravel y los activos compilados de Angular. Mantener secretos, backups y logs fuera del document root.
+- En Bluehost exponer únicamente activos compilados de Angular; en Lightsail publicar HTTPS del proxy hacia Go. Mantener secretos, backups y logs fuera del document root.
 - Desactivar debug en producción; HTTPS y protección WAF con reglas compatibles con API, autenticación y cargas autorizadas. Proveedor/configuración final por validar.
 - Construir y comprobar dependencias fuera del hosting cuando sea posible; desplegar un artefacto reproducible asociado a un commit.
 - Respetar el flujo de ramas, PR y revisión del maestro. La protección de `main` no se considera activada por estar documentada; debe verificarse antes de establecer el flujo de despliegue.
@@ -406,7 +404,7 @@ Registrar `request_id`, `correlation_id`, `job_id` y `run_id` donde corresponda.
 
 La respuesta pública de salud será mínima; los diagnósticos internos requerirán permiso. Mostrar en Configuración los estados operativos sin revelar secretos.
 
-Se conserva la arquitectura de backup Bluehost → backup worker Lightsail → S3. No abrir MySQL a Internet para facilitarla. El mecanismo de extracción y credenciales se validará en el hosting.
+Se conserva la arquitectura de backup Bluehost → backup worker Lightsail → S3. No habilitar acceso MySQL irrestricto para facilitarla; usar acceso restringido y cifrado o extracción por SSH. El mecanismo de extracción y credenciales se validará en el hosting.
 
 Un backup no está probado hasta restaurarlo. El plan debe incluir MySQL, archivos y recuperación segura de claves necesarias para descifrar información. Definir RPO, RTO y responsables. La retención sugerida por el maestro —30 diarios, 12 semanales y 12 mensuales— permanece pendiente de validación operativa y de costos.
 
@@ -415,8 +413,8 @@ Un backup no está probado hasta restaurarlo. El plan debe incluir MySQL, archiv
 | Etapa | Entregable | Condición de salida |
 | --- | --- | --- |
 | 0. Validar entorno | Inventario real de Bluehost, versiones y mecanismo de despliegue | La base elegida funciona dentro de sus límites. |
-| 1. Base ejecutable | Laravel, Angular, conexión MySQL, configuración y CI | Despliegue reproducible y navegación básica. |
-| 2. Identidad y acceso | Login, TOTP, sesiones, usuarios, roles y Policies | Sin acceso a negocio antes de MFA; permisos comprobados en backend. |
+| 1. Base ejecutable | Go, Angular, conexión MySQL, configuración y CI | Despliegue reproducible y navegación básica. |
+| 2. Identidad y acceso | Login, TOTP, sesiones, usuarios, roles y políticas de autorización | Sin acceso a negocio antes de MFA; permisos comprobados en backend. |
 | 3. Servicios comunes | Auditoría, idempotencia, outbox, jobs y adaptadores | Recuperación comprobada ante duplicados y fallos. |
 | 4. Contrato modular | Registro de módulos y una integración mínima representativa | Un módulo usa servicios comunes sin modificar internamente Core. |
 | 5. Operación | Backups, restauración, observabilidad y rollback | Ensayo de recuperación satisfactorio. |
@@ -426,7 +424,7 @@ La integración representativa utiliza un módulo ya aprobado; no crea un módul
 
 ## 19. Criterios de aceptación del Core
 
-- [ ] Puede ejecutarse con las capacidades verificadas de Bluehost.
+- [ ] Puede ejecutarse en Lightsail y conectarse de forma segura a MySQL Bluehost.
 - [ ] Mantiene la estructura y menú aprobados, con toda la interfaz en español.
 - [ ] Permite iniciar sesión, completar MFA, cerrar sesión y revocar accesos.
 - [ ] No entrega datos de negocio a sesiones parciales ni a usuarios sin permiso.
@@ -452,7 +450,7 @@ Estos criterios requieren pruebas de integración y escenarios de fallo al imple
 | Stack exacto | Validar baseline del maestro contra Bluehost y dependencias. |
 | Sesiones | Propuestos 30 minutos de inactividad, 12 horas absolutas y reautenticación de 5 minutos; simultaneidad pendiente. |
 | Roles y aprobadores | Elaborar matriz real de empleados, permisos y acciones críticas. |
-| Colas y cron | Driver database; presupuestos y frecuencia tras medición. |
+| Colas y cron | Cola durable MySQL y workers Go; presupuestos y frecuencia tras medición. |
 | Archivos | Confirmar buckets, límites, cuarentena y control de seguridad. |
 | Correo | Confirmar transporte, límites del proveedor y conciliación de envíos inciertos. |
 | Datos y auditoría | Fijar retenciones, precisión monetaria y criterios de versionado. |
@@ -465,22 +463,21 @@ Estos criterios requieren pruebas de integración y escenarios de fallo al imple
 | --- | --- | --- |
 | Dominio | `bastion.castilloit.net` | DNS, HTTPS y reglas de rutas. |
 | Hosting | Bluehost Choice Plus | Recursos efectivos y aislamiento de sitios. |
-| PHP web | Selector entre 8.1 y 8.5 | Selección efectiva y correspondencia con CLI. |
 | Acceso | SSH y FTP posibles | Comprobar SFTP sobre SSH; no usar FTP sin cifrar para despliegue. |
 | Cron | Frecuencia mínima de 1 minuto | Duración permitida, concurrencia y bloqueo. |
 | Document root | `~/public_html/website_091cdca8` | Si puede cambiarse o si debe adaptarse el despliegue. |
 | Base de datos | Percona Server for MySQL **5.7.44-48**, Release 48, Revision `497f936a373` | Límites de conexiones y política de parches/soporte. |
 
-El diseño de consultas y migraciones debe usar MySQL 5.7 como destino, sustituyendo el supuesto anterior de MySQL 8. No depender de funciones exclusivas de MySQL 8. Laravel documenta compatibilidad con MySQL 5.7+, pero esto no acredita compatibilidad de todos los paquetes, sus migraciones o el estado de seguridad del servidor.
+El diseño de consultas y migraciones debe usar MySQL 5.7 como destino, sustituyendo el supuesto anterior de MySQL 8. No depender de funciones exclusivas de MySQL 8. La compatibilidad del driver Go, migraciones y consultas debe probarse contra el servidor real; no se presume por elegir Go.
 
 La compilación Percona reportada corresponde a una serie antigua. Antes de producción, Bluehost debe confirmar soporte extendido/backports o una ruta de migración a versión con soporte vigente. No se ha confirmado esa respuesta.
 
-Si puede modificarse el document root, apuntarlo al `public` del backend. Si no, publicar allí solo el punto de entrada y activos necesarios, con rutas ajustadas hacia el backend privado. No colocar `.env`, vendor privado, logs, dumps ni código completo dentro del directorio público. No se fija una ruta privada definitiva hasta verificar permisos y estructura de la cuenta.
+El document root Bluehost contiene únicamente Angular compilado. Go se despliega como binario y servicio en Lightsail detrás de HTTPS; secretos, logs y backups no se publican.
 
 ### Verificaciones aún necesarias
 
-- PHP web y CLI: versión y extensiones PDO MySQL, mbstring, OpenSSL, cURL, XML, fileinfo, intl, ZIP y BCMath; disponibilidad de PCNTL u otro mecanismo de timeout cuando se requiera.
-- Composer o posibilidad de desplegar dependencias construidas fuera del hosting.
+- Conectividad remota MySQL desde la IP estática de Lightsail y cifrado verificado.
+- Compilación Go reproducible y despliegue de binarios.
 - Memoria, CPU, procesos concurrentes, tiempos máximos web/CLI y conexiones MySQL.
 - Cuota de disco/inodos, límites de subida, `mysqldump`, acceso SSH/SFTP y mecanismo de backup.
 - HTTPS saliente hacia S3/proveedores, SMTP autenticado y reglas rewrite.
@@ -489,15 +486,11 @@ Si puede modificarse el document root, apuntarlo al `public` del backend. Si no,
 Los comandos de diagnóstico compartidos en la sesión son de lectura:
 
 ```bash
-php -v
-php -m
-php -r 'echo "memory_limit=", ini_get("memory_limit"), PHP_EOL, "max_execution_time=", ini_get("max_execution_time"), PHP_EOL;'
-command -v composer
-command -v mysqldump
+go version
 mysql --version
 ```
 
-`mysql --version` informa del cliente; PHP muestra los límites CLI. Ninguno sustituye la comprobación del servidor MySQL o de PHP web. No solicitar contraseñas ni contenido de `.env` para estos diagnósticos.
+`mysql --version` informa del cliente, no del servidor. Validar versión del servidor y cifrado real de la sesión sin exponer secretos.
 
 ## 22. Tecnologías y pertenencia de la API al Core
 
@@ -506,55 +499,55 @@ La API es infraestructura del Core. Los módulos aportan endpoints y reglas; no 
 | Componente | Selección propuesta | Alcance |
 | --- | --- | --- |
 | Transporte | REST JSON sobre HTTPS | Usuarios, crawler e integraciones. |
-| Framework/lenguaje | Laravel 13 + PHP 8.5 | Backend del monolito modular. |
-| Persistencia | Eloquent ORM + Query Builder | Percona/MySQL 5.7, transacciones y migraciones compatibles. |
-| Sesión SPA | Laravel Sanctum | Cookies seguras y CSRF. |
-| Login/MFA | Laravel Fortify | TOTP, recuperación y desafíos; obligatoriedad aplicada por Bastion. |
-| Integraciones técnicas | Tokens Sanctum | Identidades individuales, permisos limitados y expiración. |
-| RBAC | Spatie Laravel Permission + Policies | Roles/permisos y condiciones de acceso a cada registro. |
-| Validación | Laravel Form Requests | Entradas tipadas y errores en español. |
-| Respuestas | Laravel API Resources | Campos explícitos, sin exponer modelos completos. |
-| Documentación | OpenAPI 3.1 + Scramble | Contratos REST y esquemas. |
-| Jobs | Laravel Queue, driver database | Trabajo diferido. |
-| Programación | Laravel Scheduler + cron | Ejecución acotada desde cron de un minuto. |
-| Límites | Laravel Rate Limiter | Presupuestos por identidad, IP y operación. |
-| Pruebas | PHPUnit y pruebas HTTP Laravel | Contratos, permisos, duplicados y recuperación. |
+| Framework/lenguaje | Go | Backend del monolito modular. |
+| Persistencia | database/sql y driver MySQL por validar | Percona/MySQL 5.7, transacciones y migraciones compatibles. |
+| Sesión SPA | sesiones opacas del Core Go | Cookies seguras y CSRF. |
+| Login/MFA | TOTP y recuperación en Go | TOTP, recuperación y desafíos; obligatoriedad aplicada por Bastion. |
+| Integraciones técnicas | Tokens de servicio revocables | Identidades individuales, permisos limitados y expiración. |
+| RBAC | RBAC del Core + políticas de autorización | Roles/permisos y condiciones de acceso a cada registro. |
+| Validación | validación de DTO en Go | Entradas tipadas y errores en español. |
+| Respuestas | DTO de respuesta explícitos | Campos explícitos, sin exponer modelos completos. |
+| Documentación | OpenAPI 3.1 | Contratos REST y esquemas. |
+| Jobs | Cola durable MySQL y workers Lightsail | Trabajo diferido. |
+| Programación | timers systemd/cron Lightsail | Ejecución acotada desde cron de un minuto. |
+| Límites | middleware de límites en Go | Presupuestos por identidad, IP y operación. |
+| Pruebas | go test y pruebas HTTP Go | Contratos, permisos, duplicados y recuperación. |
 
 Rutas objetivo:
 
 | Ruta | Propietario |
 | --- | --- |
-| `https://bastion.castilloit.net/api/v1/` | Infraestructura API Core y endpoints de módulos. |
+| `https://api.bastion.castilloit.net/api/v1/` | Infraestructura API Core y endpoints de módulos. |
 | `/api/v1/users` | Core. |
 | `/api/v1/settings/smtp` | Core; ruta conceptual pendiente de implementación. |
 | `/api/v1/quotes` | Quotes mediante controles Core. |
 | `/api/internal/v1/` | Integraciones técnicas autenticadas. |
-| Rutas Sanctum/Fortify del mismo dominio | CSRF, login y MFA; no es obligatorio forzarlas bajo `/api/v1/`. |
+| Rutas de sesión y TOTP en el origen API | CSRF, login y MFA; no es obligatorio forzarlas bajo `/api/v1/`. |
 
-Core define versionado, middleware, formatos, correlación y contratos comunes; el módulo define los esquemas de negocio. Las versiones exactas de paquetes se fijarán en `composer.lock` tras resolver y probar dependencias.
+Core define versionado, middleware, formatos, correlación y contratos comunes; el módulo define los esquemas de negocio. Las versiones exactas de paquetes se fijarán en `go.mod` y `go.sum` tras resolver y probar dependencias.
 
 ## 23. Tecnologías y pertenencia de MCP al Core
 
-MCP es una segunda entrada al mismo backend, en `https://bastion.castilloit.net/mcp`. No es el módulo AI ni requiere otra copia de la lógica de negocio.
+MCP es una segunda entrada al mismo backend, en `https://api.bastion.castilloit.net/mcp`. No es el módulo AI ni requiere otra copia de la lógica de negocio.
 
 | Componente | Selección propuesta |
 | --- | --- |
-| Servidor | Paquete oficial `laravel/mcp`. |
-| Ejecución | PHP 8.5 y Laravel 13, dentro del Core. |
+| Servidor | SDK MCP para Go por seleccionar y validar; no hay paquete instalado todavía. |
+| Ejecución | Go en AWS Lightsail, dentro del Core. |
 | Transporte | Streamable HTTP sobre HTTPS con solicitudes acotadas; comprobar soporte real del paquete y clientes. |
 | Contratos | JSON Schema para argumentos y resultados estructurados. |
-| Identidad delegada | Passport e integración OAuth de Laravel MCP, con PKCE. |
-| Clientes técnicos compatibles | Sanctum con bearer tokens individuales y revocables. |
+| Identidad delegada | implementación OAuth por seleccionar e integración OAuth de MCP en Go, con PKCE. |
+| Clientes técnicos compatibles | identidades técnicas con bearer tokens individuales y revocables. |
 | Autorización | Permisos de usuario/servicio, conexión, herramienta y Policy del recurso. |
-| Ejecución de negocio | Las mismas Actions/Services usadas por REST, llamadas internamente sin HTTP a la propia API. |
+| Ejecución de negocio | Los mismos servicios de aplicación usados por REST, llamadas internamente sin HTTP a la propia API. |
 | Operaciones largas | Jobs; devolver identificador y exponer consulta de estado autorizada. |
-| Verificación | MCP Inspector en desarrollo y PHPUnit. |
+| Verificación | MCP Inspector en desarrollo y go test. |
 
-La integración OAuth documentada durante la sesión anuncia un scope `mcp:use` y no resuelve scopes personalizados de negocio. Core debe mantener una autorización propia por conexión y herramienta. No confundir autorización de la conexión con acceso a todos los datos del usuario.
+La implementación OAuth/MCP aún debe seleccionarse. Definir scopes de conexión y permisos de negocio por separado; la autorización de conexión no concede acceso global.
 
-Passport para MCP y Sanctum para SPA tendrán guards y rutas explícitos; no se aceptarán tokens indistintamente entre entradas. Instalar Passport no garantiza por sí solo conformidad completa con las exigencias del protocolo: validar descubrimiento, audiencia, PKCE, consentimiento, redirects y revocación.
+OAuth delegado MCP, sesiones SPA y tokens de servicio tendrán validadores separados. Verificar descubrimiento, audiencia, PKCE, consentimiento, redirects y revocación antes de habilitar clientes.
 
-El registro central administra herramientas, recursos y prompts. Cada módulo aporta sus herramientas; la disponibilidad en catálogo no sustituye la autorización en cada invocación. Empezar por consulta y habilitar escritura con Policies y aprobación cuando corresponda. Fijar y probar la versión de protocolo compatible, sin asumir que la versión más reciente sea soportada por todos los clientes.
+El registro central administra herramientas, recursos y prompts. Cada módulo aporta sus herramientas; la disponibilidad en catálogo no sustituye la autorización en cada invocación. Empezar por consulta y habilitar escritura con políticas de autorización y aprobación cuando corresponda. Fijar y probar la versión de protocolo compatible, sin asumir que la versión más reciente sea soportada por todos los clientes.
 
 ## 24. Política consolidada de ciberseguridad
 
@@ -563,14 +556,14 @@ El registro central administra herramientas, recursos y prompts. Cada módulo ap
 | Capa | Propuesta |
 | --- | --- |
 | Perímetro | Cloudflare WAF y protección DDoS; plan/reglas por seleccionar. |
-| Cifrado en tránsito | HTTPS, TLS y Cloudflare Full (strict) con certificado válido en Bluehost. |
-| Identidad | Sanctum, Fortify, TOTP y sesiones administradas por Core. |
-| Autorización | Spatie Permission, Policies y controles por conexión MCP. |
-| OAuth | Passport con PKCE para acceso delegado. |
+| Cifrado en tránsito | HTTPS, TLS y Cloudflare Full (strict) con certificados válidos en ambos orígenes. |
+| Identidad | Sesiones opacas, TOTP y recuperación administrados por Core. |
+| Autorización | RBAC del Core, políticas de autorización y controles por conexión MCP. |
+| OAuth | implementación OAuth por seleccionar con PKCE para acceso delegado. |
 | Protección de aplicación | Middleware, validación, rate limiting, auditoría e idempotencia. |
 | Recuperación | Backups privados en S3 y restauraciones verificadas. |
 
-No cachear respuestas privadas ni autenticadas. API y MCP no deben recibir desafíos interactivos incompatibles con clientes automáticos; mantener reglas WAF adecuadas para esos endpoints. Los límites de Laravel siguen siendo necesarios detrás del WAF.
+No cachear respuestas privadas ni autenticadas. API y MCP no deben recibir desafíos interactivos incompatibles con clientes automáticos; mantener reglas WAF adecuadas para esos endpoints. Los límites de Go siguen siendo necesarios detrás del WAF.
 
 Restringir el acceso directo al origen cuando Bluehost lo permita; de lo contrario, documentar el riesgo de saltarse el perímetro y mantener controles en aplicación. Solo confiar en cabeceras de proxy provenientes de proxies configurados y verificados.
 
@@ -641,11 +634,11 @@ Además de los criterios de la sección 19, comprobar:
 2. Cambiar identificadores no permite consultar registros ajenos ni descargar sus documentos.
 3. Herramientas no autorizadas siguen bloqueadas aunque se invoquen directamente.
 4. Tokens de audiencia incorrecta o delegaciones revocadas son rechazados.
-5. Datos externos maliciosos no permiten eludir Policies, aprobaciones o límites.
+5. Datos externos maliciosos no permiten eludir políticas de autorización, aprobaciones o límites.
 6. Cambiar contenido relevante invalida una aprobación anterior y evita ejecución duplicada.
 7. SMTP/S3/IA/crawler pueden fallar sin perder estados ni producir reintentos ciegos.
 8. API/MCP operan a través del WAF sin cachear datos privados ni depender de desafíos interactivos.
-9. Dependencias y migraciones funcionan en PHP/Percona realmente disponibles.
+9. Dependencias y migraciones funcionan en Go/Percona realmente disponibles.
 10. Backups, claves y rollback permiten una recuperación ensayada.
 
 La estructura del repositorio ya fue reorganizada; el Core aún debe implementarse. La validación de este documento no acredita controles instalados ni una auditoría de seguridad del hosting.
@@ -654,13 +647,22 @@ La estructura del repositorio ya fue reorganizada; el Core aún debe implementar
 
 - [Documento maestro vigente](../Proyecto_Bastion_Documento_Maestro.md): alcance y decisiones transversales.
 - [Estructura Core y módulos](core-modules.md) y [contrato modular](../contracts/modules.md).
-- [Core backend](../../bluehost/backend/app/Core/README.md) y [Core frontend](../../bluehost/frontend/src/app/core/README.md).
-- [Idioma](../idioma.md), [contrato de importación conceptual](../contracts/crawler-import.md) y [contrato del crawler implementado](../../aws/lightsail/crawler/docs/IMPORT_CONTRACT.md). Antes de implementar el receptor, conciliar ambos; los endpoints de este documento son objetivos y no acreditan interoperabilidad ya probada.
-- [Laravel Sanctum](https://laravel.com/framework/docs/13.x/sanctum), [Fortify](https://laravel.com/framework/docs/13.x/fortify), [colas](https://laravel.com/framework/docs/13.x/queues) y [MCP](https://laravel.com/framework/docs/13.x/mcp).
-- [Scramble](https://github.com/dedoc/scramble) y [Spatie Permission](https://spatie.be/docs/laravel-permission/v8/prerequisites): resolver versiones estables compatibles durante implementación.
+- [Core backend](../../backend/internal/core/README.md) y [Core frontend](../../frontend/src/app/core/README.md).
+- [Idioma](../idioma.md), [contrato de importación conceptual](../contracts/crawler-import.md) y [contrato del crawler implementado](../../backend/crawler/docs/IMPORT_CONTRACT.md). Antes de implementar el receptor, conciliar ambos; los endpoints de este documento son objetivos y no acreditan interoperabilidad ya probada.
 - [OWASP autorización](https://cheatsheetseries.owasp.org/cheatsheets/Authorization_Cheat_Sheet.html), [sesiones](https://cheatsheetseries.owasp.org/cheatsheets/Session_Management_Cheat_Sheet.html) y [REST](https://cheatsheetseries.owasp.org/cheatsheets/REST_Security_Cheat_Sheet.html).
 - [MCP autorización](https://modelcontextprotocol.io/specification/2025-11-25/basic/authorization): referencia consultada en la sesión; confirmar revisión compatible con los clientes elegidos.
 - [Cloudflare Full (strict)](https://developers.cloudflare.com/ssl/origin-configuration/ssl-modes/full-strict/).
 - [Percona 5.7.44-48](https://docs.percona.com/percona-server/5.7/release-notes/5.7.44-48.html).
 
 Las fuentes técnicas fueron consultadas durante la sesión del 7 de octubre de 2026. Este archivo consolida las decisiones y propuestas discutidas; no introduce despliegues, recursos nuevos ni cambios de alcance comercial.
+
+
+## Distribución y conexión remota aprobadas — 7 de octubre de 2026
+
+Go/Core/API/MCP/crawler/workers en AWS Lightsail; Angular, Percona/MySQL y correo en Bluehost; archivos en S3. Sin OCR ni inferencia en Lightsail. Objetivo inicial 2 GB RAM, 2 vCPU, 60 GB SSD; capacidad pendiente de medición.
+
+Backend inicia con pool pequeño, timeouts y límites de conexiones. Autorizar únicamente la IP estática Lightsail para acceso MySQL remoto, cifrado TLS con certificado verificado o túnel SSH validado. No usar acceso wildcard ni desactivar verificación TLS. Si no es viable, registrar el bloqueo antes de desplegar.
+
+Frontend y API tienen orígenes distintos pero comparten sitio bajo HTTPS. La cookie `__Host-bastion_session` pertenece al host API, sin Domain; Angular envía credenciales y token CSRF explícitamente para la URL API autorizada. No asumir que el interceptor XSRF predeterminado de Angular cubre peticiones a otro origen. CORS acepta únicamente `https://bastion.castilloit.net`, con credenciales y preflight; validar Origin y CSRF en mutaciones. No almacenar tokens de sesión en localStorage.
+
+El subdominio API/MCP es propuesto y debe validarse en DNS/TLS. Selección concreta de librerías Go para sesiones, TOTP, SQL y OAuth/MCP pendiente; los controles aquí definidos son obligatorios, no software ya implementado.

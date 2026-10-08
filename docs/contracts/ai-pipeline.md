@@ -17,7 +17,7 @@ Fecha: 2026-10-07. Contrato de diseño; nombres de herramientas y esquemas pendi
 | register_artifact | carga autorizada, checksum, vínculos | documento verificado o pendiente |
 | complete_task | tarea, lease y resumen | cierre solo si cumple validaciones de etapa |
 
-Son herramientas propuestas, no endpoints ya disponibles. El catálogo no concede permisos. REST y MCP usan los mismos contratos, Actions, Policies e idempotencia. Core mantiene OAuth/MCP según core.md y credenciales de servicio separadas para Grokbot/worker.
+Son herramientas propuestas, no endpoints ya disponibles. El catálogo no concede permisos. REST y MCP usan los mismos contratos, servicios de aplicación, políticas de autorización e idempotencia. Core mantiene OAuth/MCP según core.md y credenciales de servicio separadas para Grokbot/worker.
 
 ## Sobre común
 Cada escritura incluye schema_version, task_id, run_id, input_version, input_hash, skill_version, idempotency_key y, cuando usa reserva, lease_token. Bastion deriva actor/requested_by de autenticación, nunca de un argumento libre.
@@ -54,7 +54,7 @@ Estos estados no reemplazan los estados comerciales de Processes/Quotes. Revisad
 - Score: clasificación, puntuación según escala versionada, razones, confianza/limitaciones, completitud. Pesos/umbrales por definir.
 - Research: requisito solicitado, candidato exacto, evidencia y cumple/no cumple/no verificable por requisito. Precio con moneda, unidad/paquete, condición, MOQ, stock y fecha. Valores ausentes no son cero.
 - RFQ: referencia, ítems/cantidades, contacto y fuente, contenido/version, autorización, correlación de mensajes. Confirmar que la dirección pertenece al proveedor correcto.
-- Pricing: costos confirmados/estimados separados, tipo de cambio/fecha, comparables y supuestos, margen calculado por Laravel, rango sugerido y vigencia.
+- Pricing: costos confirmados/estimados separados, tipo de cambio/fecha, comparables y supuestos, margen calculado por Go, rango sugerido y vigencia.
 - Artifact: autoría fabricante/Castillo IT, documento/version/checksum, producto/ítem, fuentes y estado de disponibilidad.
 
 ## Conversión a cotización
@@ -65,3 +65,4 @@ Costos, proveedores, márgenes y notas son internos; no se exportan al cliente a
 
 ## Aceptación al implementar
 Duplicados concurrentes; caída tras guardar; lease vencido; resultado tardío; revocación; entrada parcial; incompatibilidad técnica; RFQ duplicada/ambigua; timeout SMTP; documentos no autorizados; cotización existente editada; límite de Work alcanzado conservando pendientes.
+

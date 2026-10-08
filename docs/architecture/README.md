@@ -11,7 +11,7 @@ Las reglas base del proyecto son:
 1. **MySQL es la fuente de verdad de datos estructurados y transaccionales.**
 2. **S3 es almacenamiento histórico, documental, raw y de backups.**
 3. **GitHub es la fuente de verdad del código.**
-4. **Laravel controla la lógica empresarial.**
+4. **Go controla la lógica empresarial.**
 5. **Angular es la interfaz principal para usuarios.**
 6. **Lightsail ejecuta extracción y tareas técnicas, no la lógica principal de negocio.**
 7. **Los agentes AI nunca acceden directamente a MySQL.**
@@ -31,7 +31,7 @@ Las reglas base del proyecto son:
 
 ```mermaid
 flowchart TB
-    U["Usuarios Angular"] --> API["Laravel API y Policies"]
+    U["Usuarios Angular"] --> API["Go API y políticas de autorización"]
     WORK["ChatGPT Work y skills"] <-->|Herramientas| MCP["MCP Core"]
     MCP --> API
     API --> AI["AI y Workflow"]
@@ -48,73 +48,20 @@ flowchart TB
     API --> MAIL["Correo Bluehost"]
 ```
 
-Core/API/MCP, módulos y Angular se alojan en Bluehost. Work ejecuta IA externamente; Grokbot y recepción de respuestas requieren conexión y runtime validados. No existe acceso directo de agentes a MySQL. [Detalle de conexiones](ai-integration.md).
+Core/API/MCP y módulos backend se ejecutan en AWS Lightsail; Angular y MySQL permanecen en Bluehost. Work ejecuta IA externamente; Grokbot y recepción de respuestas requieren conexión y runtime validados. No existe acceso directo de agentes a MySQL. [Detalle de conexiones](ai-integration.md).
 
 ---
 
 
 # 7. Responsabilidad por ubicación
 
-## 7.1 Bluehost — Bastion Core
+## 7.1 Bluehost — frontend, BD y correo
 
-Ejecuta:
+Aloja Angular estático, Percona/MySQL y correo. MySQL conserva usuarios, permisos, datos comerciales, versiones, tareas, resultados IA, auditoría y metadatos. El navegador nunca conecta directamente a MySQL.
 
-- Angular SPA;
-- Laravel;
-- REST API;
-- autenticación;
-- RBAC;
-- workflow engine;
-- approval engine;
-- audit log;
-- importador de procesos;
-- lógica de negocio;
-- integración con MySQL;
-- endpoints para agentes;
-- endpoints internos;
-- generación de documentos cuando sea razonable;
-- jobs según capacidad del hosting.
+## 7.2 AWS Lightsail — backend y ejecución
 
-Almacena en MySQL:
-
-- usuarios;
-- roles;
-- permisos;
-- clientes;
-- proveedores;
-- procesos;
-- versiones de procesos;
-- items;
-- cotizaciones;
-- órdenes de compra;
-- facturas;
-- gastos;
-- RFQ;
-- respuestas de RFQ;
-- precios;
-- tareas;
-- workflows;
-- aprobaciones;
-- auditoría;
-- estado AI;
-- referencias a documentos.
-
-## 7.2 AWS Lightsail
-
-Ejecuta:
-
-- crawler HonduCompras;
-- scheduler;
-- retries;
-- checkpoints;
-- estado técnico del crawler;
-- generación raw;
-- subida a S3;
-- entrega de resultados a Bluehost;
-- backup worker;
-- sincronización de backups a S3.
-
-No debe convertirse en fuente maestra de negocio.
+Ejecuta el monolito Go (Core, módulos, REST API, MCP, autenticación, RBAC, aprobaciones, auditoría e importador), crawler Python, scheduler y workers de correo, outbox y backup. Go accede a MySQL remoto en Bluehost mediante canal cifrado verificado y pool limitado. Crawler entrega a la API en Lightsail; conserva estado técnico SQLite y raw en S3. No hay OCR ni inferencia local en Lightsail.
 
 ## 7.3 Amazon S3
 
@@ -192,12 +139,12 @@ Nunca almacenar:
 
 | Origen | Destino | Mecanismo |
 |---|---|---|
-| Angular | Laravel | HTTPS REST JSON |
-| Laravel | MySQL | conexión DB interna |
-| Laravel | S3 | AWS SDK/HTTPS |
+| Angular | Go | HTTPS REST JSON |
+| Go | MySQL | conexión remota cifrada AWS → Bluehost |
+| Go | S3 | AWS SDK/HTTPS |
 | Lightsail | HonduCompras | HTTP(S) |
 | Lightsail | S3 | boto3/AWS CLI HTTPS |
-| Lightsail | Bluehost | actual push a documentar; objetivo HTTPS API |
+| Crawler Lightsail | Backend Go Lightsail | HTTPS API con token, idempotencia y ACK de importación |
 | Lightsail backup worker | Bluehost | SSH/SFTP/rsync |
 | GitHub Actions | Lightsail | SSH |
 | GitHub Actions | Bluehost | SSH/SFTP/nativo pendiente |
@@ -210,4 +157,5 @@ Nunca almacenar:
 
 ## Integración IA vigente
 
-Ver [pipeline IA](ai-integration.md), [contrato](../contracts/ai-pipeline.md) y [presentación](../modules/ai-results.md). ChatGPT Work consulta pendientes y guarda resultados mediante MCP; Laravel no invoca Plus como API. Recuperación inicial en Laravel/MySQL sobre documentos S3; no requiere servidor vectorial dedicado. Grokbot y recepción de respuestas usan contratos autorizados pendientes de implementación.
+Ver [pipeline IA](ai-integration.md), [contrato](../contracts/ai-pipeline.md) y [presentación](../modules/ai-results.md). ChatGPT Work consulta pendientes y guarda resultados mediante MCP; Go no invoca Plus como API. Recuperación inicial en Go/MySQL sobre documentos S3; no requiere servidor vectorial dedicado. Grokbot y recepción de respuestas usan contratos autorizados pendientes de implementación.
+

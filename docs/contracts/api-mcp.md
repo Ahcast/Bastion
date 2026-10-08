@@ -92,4 +92,5 @@ request_approval()
 
 ## Contrato IA vigente
 
-El [contrato del pipeline IA](ai-pipeline.md) define herramientas acotadas de claim/save/complete, investigación, RFQ, antecedentes y artefactos. Actualiza el catálogo histórico anterior; nombres definitivos y schemas se validarán al implementar. MCP en /mcp pertenece al Core y aplica identidad/delegación, scopes, Policies, idempotencia y auditoría. Toda reserva y resultado queda en MySQL; ningún cliente externo accede directamente a la base.
+El [contrato del pipeline IA](ai-pipeline.md) define herramientas acotadas de claim/save/complete, investigación, RFQ, antecedentes y artefactos. Actualiza el catálogo histórico anterior; nombres definitivos y schemas se validarán al implementar. MCP en /mcp pertenece al Core y aplica identidad/delegación, scopes, políticas de autorización, idempotencia y auditoría. Toda reserva y resultado queda en MySQL; ningún cliente externo accede directamente a la base.
+

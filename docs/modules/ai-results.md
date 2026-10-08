@@ -35,3 +35,4 @@ Alertas accionables: resultados para revisión, respuesta de proveedor, cierre p
 Investigación completa, Revisado por usuario y Oferta presentada son estados independientes.
 Medir conversión a cotizaciones/ofertas, tiempo de preparación, pendientes sin responsable y procesos vencidos sin ofertar con motivo. No contar una tarea IA completada como oferta presentada.
 Configuración: skills/versiones activas, criterios pendientes de definir, conexiones, límites y salud de ejecuciones; nunca secretos visibles.
+

@@ -10,16 +10,15 @@ La distribución aprobada es:
 
 ```text
 Bluehost Choice Plus
-  -> Angular
-  -> Laravel
+  -> Angular estático
   -> MySQL
   -> email
-  -> Scheduler
-  -> jobs ligeros
 
 AWS Lightsail
-  -> crawler HonduCompras
-  -> workers técnicos de backup
+  -> backend y Core Go
+  -> API REST y MCP
+  -> crawler HonduCompras Python
+  -> scheduler y workers
 
 AWS S3
   -> snapshots raw del crawler
@@ -55,17 +54,13 @@ flowchart TB
 
     U["Usuarios"] --> CF["Cloudflare<br/>DNS · TLS · WAF · rate limiting"]
     CF --> FE["Angular SPA<br/>Bluehost"]
-    FE --> API["Laravel API<br/>Bluehost"]
+    FE --> API["Go API en Lightsail"]
 
     subgraph BH["Bluehost Choice Plus"]
         FE
-        API
         DB[("MySQL")]
         MAIL["Email / SMTP Bluehost"]
-        SCH["Laravel Scheduler"]
-        Q[("Laravel database queue")]
-        AIGW["AI Gateway interno"]
-        WF["Workflow / Approval Engine"]
+        Q[("Cola durable MySQL")]
     end
 
     API --> DB
@@ -79,6 +74,11 @@ flowchart TB
 
     subgraph AWS["AWS"]
         LS["Lightsail"]
+        API
+        SCH["Scheduler Lightsail"]
+        AIGW["AI Gateway Go"]
+        WF["Workflow y aprobaciones Go"]
+        MCP
         CR["Crawler HonduCompras"]
         BW["Backup workers"]
         S3[("Amazon S3")]
@@ -88,11 +88,11 @@ flowchart TB
     LS --> BW
     CR --> HC["HonduCompras"]
     CR -->|"snapshot raw"| S3
-    CR -->|"POST /api/v1/ingestion/processes"| API
+    CR -->|"POST /api/internal/v1/crawler/runs/{run_id}/processes"| API
     BW -->|"backups"| S3
     API -->|"documentos / archivos generados"| S3
 
-    WORK["ChatGPT Work y skills"] <-->|"HTTPS tools"| MCP["MCP Core"]
+    WORK["ChatGPT Work y skills"] <-->|"HTTPS tools"| MCP["MCP Core Go"]
     MCP --> API
     API --> AIGW
     GROK["Grokbot RFQ"] <-->|"API autorizada"| API
@@ -108,9 +108,9 @@ flowchart TB
 | Componente | Responsabilidad |
 |---|---|
 | Cloudflare | Perímetro: DNS, TLS, WAF, DDoS, rate limits, bots/scanners y cache del frontend |
-| Bluehost Choice Plus | Angular, Laravel, MySQL, correo, Scheduler y jobs ligeros |
+| Bluehost Choice Plus | Angular estático, MySQL y correo |
 | MySQL Bluehost | Fuente de verdad de datos estructurados/transaccionales |
-| AWS Lightsail | Runtime técnico del crawler y de los workers de backup |
+| AWS Lightsail | Backend Go, API/MCP, crawler Python, scheduler y workers |
 | AWS S3 | Binarios, documentos, snapshots raw, archivos generados y backups |
 | GitHub | Código, documentación, CI/CD; **no es runtime del crawler** |
 | Módulo AI / Gateway interno | Tareas, resultados y herramientas; ejecución externa inicial en Work mediante MCP |
@@ -121,19 +121,19 @@ flowchart TB
 
 ## 4. Reglas globales
 
-1. **API-first.** Angular, crawler, IA y automatizaciones operan a través de Laravel; ningún componente externo escribe directamente a MySQL.
+1. **API-first.** Angular, crawler, IA y automatizaciones operan a través de Go; ningún componente externo escribe directamente a MySQL.
 2. **MySQL = datos estructurados.**
 3. **S3 = binarios, snapshots y backups.**
 4. **Lightsail = runtime técnico externo aprobado.**
 5. **GitHub Actions no sustituye a Lightsail como runtime del crawler.**
-6. **Jobs de Bluehost deben ser cortos y reiniciables.**
+6. **Jobs de Lightsail deben ser cortos y reiniciables.**
 7. **Crawler y backup workers se aíslan de la lógica transaccional de negocio.**
 8. **Transacciones de dominio** para cabecera/detalle/estado/relaciones.
 9. **Idempotencia** para ingestión, conversiones, IA y automatizaciones.
 10. **Autorización server-side** en toda API.
 11. **Auditoría** de cambios relevantes.
 12. **No hard-delete por defecto** para documentos y registros con trazabilidad.
-13. **Cálculos críticos en Laravel.**
+13. **Cálculos críticos en Go.**
 14. **IA sin acceso directo a DB, shell, cPanel ni credenciales SMTP.**
 15. **Human-in-the-loop** para acciones de alto impacto.
 16. Todo contenido externo se trata como `UNTRUSTED_EXTERNAL_CONTENT`.
@@ -334,7 +334,7 @@ El crawler **se ejecuta en AWS Lightsail**.
 flowchart LR
     HC["HonduCompras"] --> CR["Crawler<br/>AWS Lightsail"]
     CR --> RAW["Snapshot raw<br/>S3"]
-    CR --> ING["Laravel ingestion API<br/>Bluehost"]
+    CR --> ING["Go ingestion API en Lightsail"]
     ING --> DB[("MySQL")]
     DB --> EVT["Eventos"]
     EVT --> AI["IA / automatizaciones"]
@@ -346,8 +346,8 @@ Flujo:
 HonduCompras
   -> crawler Lightsail
   -> raw S3
-  -> POST /api/v1/ingestion/processes
-  -> Laravel
+  -> POST /api/internal/v1/crawler/runs/{run_id}/processes
+  -> Go
   -> MySQL
   -> eventos
 ```
@@ -370,7 +370,7 @@ Los **workers de backup se ejecutan en AWS Lightsail** y copian respaldos hacia 
 
 ```mermaid
 flowchart LR
-    BH["Bluehost<br/>MySQL / aplicación"] --> BW["Backup workers<br/>AWS Lightsail"]
+    BH["Bluehost<br/>MySQL / frontend"] --> BW["Backup workers<br/>AWS Lightsail"]
     BW --> S3[("AWS S3<br/>backups")]
 ```
 
@@ -386,19 +386,19 @@ aplicar retención
 alertar fallos
 ```
 
-La forma exacta de extracción desde Bluehost debe implementarse con credenciales de mínimo privilegio y sin hacer público MySQL.
+La forma exacta de extracción desde Bluehost debe implementarse con credenciales de mínimo privilegio y sin acceso MySQL irrestricto; canal remoto cifrado limitado a Lightsail.
 
 ---
 
-## 11. Scheduler y queue en Bluehost
+## 11. Scheduler y queue en Lightsail
 
-cPanel ejecuta Laravel Scheduler:
+Lightsail ejecuta timers systemd o cron:
 
 ```text
 cron
-  -> php artisan schedule:run
+  -> worker Go
   -> jobs cortos
-  -> queue:work --stop-when-empty --max-jobs=N
+  -> tareas acotadas con lease y reintentos
 ```
 
 Bluehost no depende de daemons permanentes.
@@ -410,13 +410,13 @@ Trabajos técnicos largos que pertenezcan al crawler o backup permanecen en Ligh
 ## 12. Integración de IA
 
 ### 12.1 Arquitectura de ejecución actualizada
-La especificación detallada es [integración IA](ai-integration.md). AI permanece dentro del monolito Laravel: administra tareas, reservas, resultados, versiones y herramientas. Core conserva MCP/API y seguridad; Workflow conserva aprobaciones.
+La especificación detallada es [integración IA](ai-integration.md). AI permanece dentro del monolito Go: administra tareas, reservas, resultados, versiones y herramientas. Core conserva MCP/API y seguridad; Workflow conserva aprobaciones.
 ChatGPT Work con skills y mecanismos del plan Plus es el ejecutor inicial prioritario. Consulta pendientes por MCP y guarda resultados en Bastion; el modelo no corre en Bluehost ni en Lightsail.
-Grokbot atiende RFQ autorizadas mediante herramientas de Bastion. Correo y credenciales SMTP siguen en Bluehost; integración/alojamiento y lectura de respuestas por validar.
-El RAG inicial usa fuentes S3 y recuperación Laravel/MySQL. No necesita vector DB dedicada; S3 Vectors queda opcional.
+Grokbot atiende RFQ autorizadas mediante herramientas de Bastion. Correo alojado en Bluehost; credenciales SMTP protegidas en el backend Lightsail; integración/alojamiento y lectura de respuestas por validar.
+El RAG inicial usa fuentes S3 y recuperación Go/MySQL. No necesita vector DB dedicada; S3 Vectors queda opcional.
 
 ### 12.2 Adaptadores futuros
-No llamar directamente a proveedores desde módulos de negocio. Una integración API de inferencia puede añadirse tras decisión explícita; no es dependencia inicial ni fallback automático de pago cuando Work alcanza límites. Laravel no invoca una suscripción Plus como API.
+No llamar directamente a proveedores desde módulos de negocio. Una integración API de inferencia puede añadirse tras decisión explícita; no es dependencia inicial ni fallback automático de pago cuando Work alcanza límites. Go no invoca una suscripción Plus como API.
 Capacidad desatendida, límites, herramientas y escrituras de Work deben probarse con el plugin real. Skills versionadas; desconocimiento de modelo/tokens/costo se registra como tal.
 
 ### 12.3 Tools
@@ -566,7 +566,7 @@ No mantener HTTP abierto ni dormir workers esperando proveedores. Reservas con v
 
 ### 12.10 API/MCP
 
-REST, MCP y tools internas convergen en las mismas Domain Actions:
+REST, MCP y tools internas convergen en las mismas Domain servicios de aplicación:
 
 ```text
 REST Controller ----\
@@ -673,3 +673,4 @@ Puede desplegar/versionar componentes hacia Bluehost y Lightsail.
 ## Actualización de presentación y conversión asistida
 
 [Resultados IA](../modules/ai-results.md) se muestran en Procesos. La conversión básica de la sección 8 sigue copiando solo entidad/expediente/referencia. Una acción adicional explícita del usuario puede incorporar ítems, alternativas, cantidades, precios y adjuntos seleccionados a un borrador mediante Quotes, con previsualización, idempotencia y control de versión. No copiar automáticamente toda la investigación ni sobrescribir ediciones humanas.
+

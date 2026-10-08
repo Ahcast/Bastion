@@ -10,29 +10,29 @@ Referencias: [Core](core.md), [contrato IA](../contracts/ai-pipeline.md), [RAG](
 | Componente | Ejecución y responsabilidad | Persistencia |
 | --- | --- | --- |
 | Angular | Bluehost; bandeja y detalle de Procesos, selección hacia Cotizaciones | Mediante API |
-| Core Laravel | Bluehost; API/MCP, identidad, Policies, auditoría, archivos y correo | MySQL |
-| AI | Módulo Laravel; tareas durables, reservas, resultados, skills/versiones y límites | MySQL; artefactos en S3 |
-| Workflow | Laravel; reglas de avance y aprobaciones | MySQL |
+| Core Go | AWS Lightsail; API/MCP, identidad, políticas de autorización, auditoría, archivos y correo | MySQL |
+| AI | Módulo Go; tareas durables, reservas, resultados, skills/versiones y límites | MySQL; artefactos en S3 |
+| Workflow | Go; reglas de avance y aprobaciones | MySQL |
 | ChatGPT Work | Ejecutor externo en la nube; skills, investigación web y razonamiento | Resultados devueltos a Bastion |
 | Grokbot | Ejecutor RFQ externo; alojamiento y conexión pendientes de validar | RFQ y estados en Bastion |
 | Crawler y backups | AWS Lightsail existente | SQLite técnico; raw y backups en S3 |
 | Worker de correo | Propuesto, ubicación pendiente de capacidad y conectividad | Mensajes/adjuntos en S3, vínculos en MySQL |
 | Preparación documental | Extracción/OCR una vez por versión; ejecutor según capacidad | Texto y originales en S3 |
-| RAG inicial | Recuperación Laravel/MySQL de antecedentes y fragmentos S3 | Índices/metadatos MySQL; documentos S3 |
+| RAG inicial | Recuperación Go/MySQL de antecedentes y fragmentos S3 | Índices/metadatos MySQL; documentos S3 |
 | GitHub | Código, documentación, contratos y futuras skills versionadas | Sin documentos comerciales ni secretos |
 
-El Lightsail actual de 1 GB conserva crawler y backups. No se le asignan por defecto OCR pesado, modelos locales ni vector DB. Bluehost procesa jobs acotados; no mantiene requests abiertos durante investigaciones.
+El Lightsail objetivo de 2 GB ejecuta backend Go, API, MCP, crawler y workers. No ejecuta OCR ni modelos locales; no requiere vector DB. Lightsail procesa jobs acotados; no mantiene requests abiertos durante investigaciones.
 
 ## Conexiones
 ```mermaid
 flowchart TB
     HC["HonduCompras"] --> CR["Crawler Lightsail"]
     CR --> S3["S3 privado"]
-    CR --> API["API Laravel"]
+    CR --> API["API Go"]
     USER["Usuario Angular"] --> API
     WORK["ChatGPT Work y skills"] <-->|Herramientas HTTPS| MCP["MCP del Core"]
     WORK --> WEB["Web y catálogos"]
-    MCP --> ACT["Actions y Policies"]
+    MCP --> ACT["servicios de aplicación y políticas de autorización"]
     API --> ACT
     ACT --> AI["AI y Workflow"]
     AI --> DB["MySQL: tareas y resultados"]
@@ -49,15 +49,15 @@ flowchart TB
 ```
 
 - SPA: `https://bastion.castilloit.net`; API: `/api/v1/`; MCP: `/mcp`.
-- API y MCP convergen en Actions/Policies; no se realiza HTTP interno a la propia API.
+- API y MCP convergen en servicios de aplicación/políticas de autorización; no se realiza HTTP interno a la propia API.
 - Identidad y delegación siguen Core. Los procesos automáticos requieren identidad/alcances explícitos; no credenciales administrativas.
 - ChatGPT utiliza MCP para pedir pendientes y guardar resultados, sin conexión directa a MySQL.
-- Laravel accede a S3 mediante credenciales mínimas; la IA recibe texto autorizado o acceso temporal a objetos concretos.
+- Go accede a S3 mediante credenciales mínimas; la IA recibe texto autorizado o acceso temporal a objetos concretos.
 - GitHub Actions hace CI/CD, nunca sustituye al runtime Lightsail del crawler/backups.
 
 ## Ejecutor inicial y plan Plus
-La prioridad del usuario es aprovechar ChatGPT Work y mecanismos disponibles en su plan Plus, con tareas programadas y skills. Laravel administra la cola lógica, pero no invoca una suscripción Plus como si fuera una API de inferencia.
-Una ejecución de Work consulta pendientes mediante MCP. No se asume que un evento Laravel puede despertar directamente Work: el evento deja trabajo durable y la ejecución programada lo recoge.
+La prioridad del usuario es aprovechar ChatGPT Work y mecanismos disponibles en su plan Plus, con tareas programadas y skills. Go administra la cola lógica, pero no invoca una suscripción Plus como si fuera una API de inferencia.
+Una ejecución de Work consulta pendientes mediante MCP. No se asume que un evento Go puede despertar directamente Work: el evento deja trabajo durable y la ejecución programada lo recoge.
 No se requiere una API de pago como dependencia inicial. Adaptadores de proveedores son una alternativa futura explícita, no un fallback que genere gasto sin autorización.
 Validar en la cuenta: tareas desatendidas, plugin/MCP, lectura y escritura, acceso web/documental, permisos, límites de uso y volumen por ejecución. La documentación de plataforma no prueba disponibilidad ni rendimiento para esta cuenta.
 La memoria del chat no es el registro de trabajos completados. El modelo y consumo se registran cuando sean conocidos; un costo no disponible se guarda como desconocido, no cero.
@@ -69,7 +69,7 @@ La memoria del chat no es el registro de trabajos completados. El modelo y consu
 | 2. Investigación | Desglosar ítems de interés; buscar precios en web, Amazon, eBay y catálogos locales; comparar especificaciones | Candidatos y ofertas por ítem, cumplimiento y fuentes |
 | 2.5. RFQ | Alto interés y precio no encontrado: buscar contactos verificados y preparar solicitud para Grokbot | RFQ trazable y respuesta vinculada |
 | 3. Presentación | Publicar progresivamente resultados dentro de Procesos | Mesa de revisión disponible aun con pendientes |
-| 4. Precio | Skill comercial y RAG recuperan antecedentes; Laravel calcula costos/márgenes | Rango y precio recomendado, supuestos y fuentes |
+| 4. Precio | Skill comercial y RAG recuperan antecedentes; Go calcula costos/márgenes | Rango y precio recomendado, supuestos y fuentes |
 | 5. Fichas | Adjuntar ficha del fabricante o preparar ficha propia sustentada | Documento ligado al modelo e ítem |
 | Cierre humano | Usuario selecciona alternativas y precios, revisa y crea cotización | Borrador comercial revisable |
 
@@ -94,7 +94,7 @@ Un worker propuesto lee respuestas del buzón, deduplica mensajes y vincula RFQ 
 Distinguir pendiente, aceptado por SMTP, fallido, incierto y respondido. SMTP aceptado no equivale a entrega. No reenviar a ciegas ante timeout.
 
 ### Precio y documentación
-Laravel calcula con decimales compra, flete, otros costos, moneda/tipo de cambio fechado, costo puesto en destino, impuestos según configuración y margen. La IA propone con fundamentos; no calcula totales definitivos.
+Go calcula con decimales compra, flete, otros costos, moneda/tipo de cambio fechado, costo puesto en destino, impuestos según configuración y margen. La IA propone con fundamentos; no calcula totales definitivos.
 Comparables históricos se ajustan por fecha, cantidad, modelo, condición, impuestos y entrega. Sin evidencia suficiente, recomendar por costo/margen indicando la limitación; nunca prometer competitividad.
 Ficha oficial preferida. Una ficha propia se identifica como elaborada por Castillo IT, con fuentes y datos verificables; no inventa certificaciones ni sustituye una ficha oficial cuando el pliego exige fabricante.
 
@@ -143,3 +143,4 @@ KPIs: oportunidades sin puntuar, antigüedad de pendientes, cierre cercano, RFQ 
 - [Plugins y MCP](https://developers.openai.com/plugins/build/app-quickstart).
 - [S3 Vectors](https://docs.aws.amazon.com/AmazonS3/latest/userguide/s3-vectors.html).
 Consultadas en la conversación el 7 de octubre de 2026; validar capacidades y condiciones de cuenta antes de implementación.
+

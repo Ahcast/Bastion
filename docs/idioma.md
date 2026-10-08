@@ -9,7 +9,7 @@ Botones, etiquetas, formularios, estados visibles, validaciones, errores mostrad
 Traducir errores y estados técnicos antes de presentarlos en una vista.
 
 ## Lenguaje técnico en inglés — permitido
-Se conservan los nombres técnicos de la estructura aprobada: frontend, backend, app/Modules, Core, Customers, Suppliers, Processes, Quotes, PurchaseOrders, Invoices, Expenses, Reports, Collaboration, Workflow y AI.
+Se conservan los nombres técnicos de la estructura aprobada: frontend, backend, internal/modules, Core, Customers, Suppliers, Processes, Quotes, PurchaseOrders, Invoices, Expenses, Reports, Collaboration, Workflow y AI.
 Código, clases, rutas técnicas, entidades, contratos API, scopes, estados internos, comandos y nombres de herramientas pueden mantenerse en inglés.
 Las secciones técnicas del frontend pueden llamarse dashboard, customers, suppliers, processes, quotes, purchase-orders, invoices, expenses, reports, collaboration y settings; sus etiquetas y contenido visibles se muestran en español.
 
@@ -29,3 +29,4 @@ Las secciones técnicas del frontend pueden llamarse dashboard, customers, suppl
 | settings | Configuración |
 
 Esta instrucción sustituye el requisito anterior de traducir carpetas y módulos técnicos. El documento maestro original se conserva íntegro.
+

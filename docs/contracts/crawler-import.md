@@ -282,7 +282,7 @@ s3://castilloit-honducompras-crawler/raw/
 Hoy:
 
 - crawler genera CSV;
-- hace push a Bluehost;
+- entrega a la API Go en Lightsail;
 - app carga MySQL.
 
 El protocolo exacto del push actual debe documentarse.
@@ -301,7 +301,7 @@ Batches ejemplo:
 
 ## 26.18 ACK
 
-Bluehost debe responder:
+La API Go debe responder:
 
 ```json
 {
@@ -326,14 +326,14 @@ Para:
 - RFQ;
 - acciones reintentables.
 
-## 26.20 Bluehost caído
+## 26.20 API o MySQL temporalmente indisponible
 
 Si scraping terminó:
 
 ```text
 HonduCompras -> OK
 S3 -> OK
-Bluehost -> FAIL
+API Go o MySQL Bluehost -> FAIL
 ```
 
 estado:
@@ -427,4 +427,5 @@ Sin cambios ya puntuado -> no repetir
 ```
 
 ---
+
 

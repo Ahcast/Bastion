@@ -1,6 +1,6 @@
 # Documentación
 
-El [documento maestro vigente v0.6](Proyecto_Bastion_Documento_Maestro.md) consolida alcance y decisiones transversales. Leerlo antes del detalle del área. Las versiones anteriores se consultan en Git, no son instrucciones alternativas de implementación.
+El [documento maestro vigente v0.7](Proyecto_Bastion_Documento_Maestro.md) consolida alcance y decisiones transversales. Leerlo antes del detalle del área. Las versiones anteriores se consultan en Git, no son instrucciones alternativas de implementación.
 
 ## Referencias vigentes
 
@@ -24,6 +24,7 @@ El [documento maestro vigente v0.6](Proyecto_Bastion_Documento_Maestro.md) conso
 
 ## Precedencia de arquitectura
 
-`architecture/oficina-ai-v2.md` recoge la arquitectura general. `architecture/ai-integration.md` desarrolla y actualiza la ejecución de IA: ChatGPT Work/Plus y skills mediante MCP, tareas/resultados en Bastion y RAG inicial S3/MySQL. Bluehost aloja Angular, Laravel, MySQL y email. Crawler y backup workers permanecen en AWS Lightsail; GitHub Actions se limita a CI/CD. Core mantiene identidad, API/MCP y seguridad. Los documentos describen objetivos, no conexiones o despliegues verificados.
+`architecture/oficina-ai-v2.md` recoge la arquitectura general. `architecture/ai-integration.md` desarrolla y actualiza la ejecución de IA: ChatGPT Work/Plus y skills mediante MCP, tareas/resultados en Bastion y RAG inicial S3/MySQL. Bluehost aloja Angular, MySQL y email. AWS Lightsail aloja backend Go, API, MCP, crawler y workers. Crawler y backup workers permanecen en AWS Lightsail; GitHub Actions se limita a CI/CD. Core mantiene identidad, API/MCP y seguridad. Los documentos describen objetivos, no conexiones o despliegues verificados.
 
 Los documentos de módulos preservan las funcionalidades legacy verificadas, pero aplican seguridad server-side, persistencia transaccional en MySQL, archivos privados en S3, idempotencia, auditoría, eventos y conexión controlada con IA.
+

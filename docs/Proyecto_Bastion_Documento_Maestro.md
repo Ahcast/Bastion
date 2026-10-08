@@ -4,7 +4,7 @@
 **Empresa:** Castillo IT S. de R.L.  
 **Proyecto:** Bastion  
 **Estado:** Arquitectura conceptual aprobada como base, pendiente de validación senior y refinamiento técnico  
-**Versión documental:** 0.6 — Maestro vigente consolidado  
+**Versión documental:** 0.7 — Maestro vigente consolidado  
 **Fecha:** 7 de octubre de 2026
 
 ## Uso de esta especificación por desarrolladores e IA
@@ -21,11 +21,11 @@ Este maestro define alcance y decisiones transversales vigentes. El historial an
 | Antecedentes de precios | [RAG](knowledge-rag/README.md) |
 | Presentación de resultados | [UX IA](modules/ai-results.md) |
 | Reglas comerciales por módulo | [Índice de módulos](modules/README.md) |
-| Protocolo del cliente crawler existente | [Contrato del crawler](../aws/lightsail/crawler/docs/IMPORT_CONTRACT.md) |
+| Protocolo del cliente crawler existente | [Contrato del crawler](../backend/crawler/docs/IMPORT_CONTRACT.md) |
 
 Leer maestro y detalle del área antes de implementar. El documento especializado detalla su contrato; no autoriza cambiar el alcance, los permisos o una decisión transversal. Si persiste una contradicción, documentarla y resolverla explícitamente, no elegir silenciosamente una variante ni mezclar esquemas.
 Separar decisiones definidas, propuestas por validar y capacidades implementadas. Ejemplos de tablas, rutas, estados y horarios no constituyen migraciones ni servicios activos. No implementar opciones futuras como requisitos de la primera versión.
-La aplicación nueva de Bluehost sigue en etapa documental; el crawler tiene código y pruebas, sin que ello acredite un receptor Laravel desplegado.
+La aplicación nueva Bastion sigue en etapa documental; el crawler tiene código y pruebas, sin que ello acredite un receptor Go desplegado.
 
 ---
 
@@ -48,7 +48,7 @@ Su propósito es convertir la operación de la oficina en un sistema integrado d
 - MySQL conserva la verdad transaccional;
 - Amazon S3 conserva archivos, histórico y backups;
 - AWS Lightsail ejecuta el crawler y tareas técnicas;
-- Bluehost hospeda el núcleo operativo de Bastion.
+- AWS Lightsail ejecuta el núcleo operativo de Bastion; Bluehost aloja frontend, BD y correo.
 
 La arquitectura debe permanecer **modular, API-first, event-driven y AI-ready**, evitando quedar atada a un único proveedor de AI.
 
@@ -124,7 +124,7 @@ Las reglas base del proyecto son:
 1. **MySQL es la fuente de verdad de datos estructurados y transaccionales.**
 2. **S3 es almacenamiento histórico, documental, raw y de backups.**
 3. **GitHub es la fuente de verdad del código.**
-4. **Laravel controla la lógica empresarial.**
+4. **Go controla la lógica empresarial.**
 5. **Angular es la interfaz principal para usuarios.**
 6. **Lightsail ejecuta extracción y tareas técnicas, no la lógica principal de negocio.**
 7. **Los agentes AI nunca acceden directamente a MySQL.**
@@ -142,22 +142,21 @@ Las reglas base del proyecto son:
 # 5. Infraestructura actual
 
 ## 5.1 Bluehost
-Plan Choice Plus: destino de Angular, Laravel, MySQL y correo. La nueva aplicación Bastion aún no se acredita desplegada.
+Plan Choice Plus: destino de Angular, MySQL y correo; el backend Go se ejecuta en AWS Lightsail. La nueva aplicación Bastion aún no se acredita desplegada.
 - Dominio: `https://bastion.castilloit.net`.
-- PHP seleccionable 8.1–8.5; objetivo 8.5, CLI/extensiones por verificar.
 - SSH y FTP disponibles; usar SSH/SFTP para despliegue.
 - Cron mínimo de un minuto.
 - Document root: `~/public_html/website_091cdca8`; exponer solo activos públicos.
 - Servidor reportado: **Percona Server for MySQL 5.7.44-48**. Compatibilidad de paquetes/migraciones y soporte de seguridad por validar.
 
 ## 5.2 AWS Lightsail
-Instancia documentada: 1 GB RAM, 2 vCPU, 40 GB SSD. Ejecuta crawler, retries, checkpoints, entrega y workers de backup. No es la base maestra ni se le asignan modelos locales, OCR pesado o vector DB por defecto.
+Instancia documentada: 2 GB RAM, 2 vCPU, 60 GB SSD como capacidad inicial propuesta (aprovisionamiento por confirmar). Ejecuta crawler, retries, checkpoints, entrega y workers de backup. No es la base maestra ni se le asignan modelos locales, OCR pesado o vector DB por defecto.
 
 ## 5.3 Amazon S3
 Bucket confirmado por el usuario: `castilloit-honducompras-crawler`, región `us-east-1`. Documentos operativos y backups requieren ubicación/aislamiento definidos; nombres como `castilloit-backups` y `castilloit-documents` son propuestas, no buckets cuya creación esté verificada. Archivos privados, versiones y metadatos en MySQL.
 
 ## 5.4 GitHub
-Repositorio vigente: [Ahcast/Bastion](https://github.com/Ahcast/Bastion). Monorepo con `bluehost/`, `aws/` y `docs/`. GitHub mantiene código, documentación y CI/CD; crawler y backups se ejecutan en Lightsail.
+Repositorio vigente: [Ahcast/Bastion](https://github.com/Ahcast/Bastion). Monorepo con `frontend/`, `backend/` y `docs/`. GitHub mantiene código, documentación y CI/CD; crawler y backups se ejecutan en Lightsail.
 
 ---
 
@@ -165,7 +164,7 @@ Repositorio vigente: [Ahcast/Bastion](https://github.com/Ahcast/Bastion). Monore
 
 ```mermaid
 flowchart TB
-    U["Usuarios Angular"] --> API["Laravel API y Policies"]
+    U["Usuarios Angular"] --> API["Go API y políticas de autorización"]
     WORK["ChatGPT Work y skills"] <-->|Herramientas| MCP["MCP Core"]
     MCP --> API
     API --> AI["AI y Workflow"]
@@ -182,72 +181,19 @@ flowchart TB
     API --> MAIL["Correo Bluehost"]
 ```
 
-Core/API/MCP, módulos y Angular se alojan en Bluehost. Work ejecuta IA externamente; Grokbot y recepción de respuestas requieren conexión y runtime validados. No existe acceso directo de agentes a MySQL. [Detalle de conexiones](architecture/ai-integration.md).
+Core/API/MCP y módulos backend se ejecutan en AWS Lightsail; Angular y MySQL permanecen en Bluehost. Work ejecuta IA externamente; Grokbot y recepción de respuestas requieren conexión y runtime validados. No existe acceso directo de agentes a MySQL. [Detalle de conexiones](architecture/ai-integration.md).
 
 ---
 
 # 7. Responsabilidad por ubicación
 
-## 7.1 Bluehost — Bastion Core
+## 7.1 Bluehost — frontend, BD y correo
 
-Ejecuta:
+Aloja Angular estático, Percona/MySQL y correo. MySQL conserva usuarios, permisos, datos comerciales, versiones, tareas, resultados IA, auditoría y metadatos. El navegador nunca conecta directamente a MySQL.
 
-- Angular SPA;
-- Laravel;
-- REST API;
-- autenticación;
-- RBAC;
-- workflow engine;
-- approval engine;
-- audit log;
-- importador de procesos;
-- lógica de negocio;
-- integración con MySQL;
-- endpoints para agentes;
-- endpoints internos;
-- generación de documentos cuando sea razonable;
-- jobs según capacidad del hosting.
+## 7.2 AWS Lightsail — backend y ejecución
 
-Almacena en MySQL:
-
-- usuarios;
-- roles;
-- permisos;
-- clientes;
-- proveedores;
-- procesos;
-- versiones de procesos;
-- items;
-- cotizaciones;
-- órdenes de compra;
-- facturas;
-- gastos;
-- RFQ;
-- respuestas de RFQ;
-- precios;
-- tareas;
-- workflows;
-- aprobaciones;
-- auditoría;
-- estado AI;
-- referencias a documentos.
-
-## 7.2 AWS Lightsail
-
-Ejecuta:
-
-- crawler HonduCompras;
-- scheduler;
-- retries;
-- checkpoints;
-- estado técnico del crawler;
-- generación raw;
-- subida a S3;
-- entrega de resultados a Bluehost;
-- backup worker;
-- sincronización de backups a S3.
-
-No debe convertirse en fuente maestra de negocio.
+Ejecuta el monolito Go (Core, módulos, REST API, MCP, autenticación, RBAC, aprobaciones, auditoría e importador), crawler Python, scheduler y workers de correo, outbox y backup. Go accede a MySQL remoto en Bluehost mediante canal cifrado verificado y pool limitado. Crawler entrega a la API en Lightsail; conserva estado técnico SQLite y raw en S3. No hay OCR ni inferencia local en Lightsail.
 
 ## 7.3 Amazon S3
 
@@ -299,35 +245,35 @@ Nunca almacenar:
 ## 8.1 Frontend
 Baseline propuesto: Angular 22.x, TypeScript 6.x, RxJS 7.x y Node 24 LTS para build; versiones/compatibilidad por validar antes de instalar. Angular Router, Signals, Reactive Forms, HttpClient, standalone components y carga diferida por módulo.
 Rutas vigentes:
-- `bluehost/frontend/src/app/core/`: sesión, API, guards, configuración y shell; Inicio/Configuración en `core/pages/dashboard` y `core/pages/settings`.
-- `bluehost/frontend/src/app/modules/`: customers, suppliers, processes, quotes, purchase-orders, invoices, expenses, reports y collaboration.
-- `bluehost/frontend/src/app/shared/`: UI, pipes, directivas y utilidades.
+- `frontend/src/app/core/`: sesión, API, guards, configuración y shell; Inicio/Configuración en `core/pages/dashboard` y `core/pages/settings`.
+- `frontend/src/app/modules/`: customers, suppliers, processes, quotes, purchase-orders, invoices, expenses, reports y collaboration.
+- `frontend/src/app/shared/`: UI, pipes, directivas y utilidades.
 Interfaz íntegramente en español; identificadores técnicos en inglés.
 
 ## 8.2 Backend
-Monolito modular, Laravel 13/PHP 8.5 como objetivo sujeto a compatibilidad real; Composer 2.
-- `bluehost/backend/app/Core/`: identidad, RBAC/MFA, configuración/SMTP, API/MCP, auditoría, archivos y ejecución común.
-- `bluehost/backend/app/Modules/`: Customers, Suppliers, Processes, Quotes, PurchaseOrders, Invoices, Expenses, Reports, Collaboration, Workflow y AI.
-Core no importa módulos concretos. Los módulos usan contratos públicos y no escriben tablas de otros módulos directamente. Actions/Policies se comparten entre entradas.
+Monolito modular, Go como objetivo; versión y go.mod/go.sum se fijarán al implementar.
+- `backend/internal/core/`: identidad, RBAC/MFA, configuración/SMTP, API/MCP, auditoría, archivos y ejecución común.
+- `backend/internal/modules/`: Customers, Suppliers, Processes, Quotes, PurchaseOrders, Invoices, Expenses, Reports, Collaboration, Workflow y AI.
+Core no importa módulos concretos. Los módulos usan contratos públicos y no escriben tablas de otros módulos directamente. servicios de aplicación/políticas de autorización se comparten entre entradas.
 
 ## 8.3 Base de datos
 Destino confirmado: **Percona/MySQL 5.7.44-48**, InnoDB y utf8mb4 según configuración a validar. No depender de funciones exclusivas de MySQL 8. Verificar soporte/parches, conexiones, índices, migraciones, rendimiento y restauración. Un cambio de versión exige decisión/migración explícita.
 
 ## 8.4 Crawler
-Código existente bajo `aws/lightsail/crawler/`: Python 3.12+, Requests, BeautifulSoup y SQLite. Dependencias y ejecución reales: README/OPERATIONS/lockfile del crawler. No introducir navegador ni otro cliente HTTP por referencias conceptuales anteriores.
+Código existente bajo `backend/crawler/`: Python 3.12+, Requests, BeautifulSoup y SQLite. Dependencias y ejecución reales: README/OPERATIONS/lockfile del crawler. No introducir navegador ni otro cliente HTTP por referencias conceptuales anteriores.
 
 ## 8.5 API
-Core: REST JSON/HTTPS, `/api/v1/` y `/api/internal/v1/`; OpenAPI 3.1/Scramble propuestos. Paginación, filtros permitidos, correlación, idempotencia y validación. El prefijo internal no concede privacidad por sí solo.
+Core: REST JSON/HTTPS, `/api/v1/` y `/api/internal/v1/`; OpenAPI 3.1 propuestos. Paginación, filtros permitidos, correlación, idempotencia y validación. El prefijo internal no concede privacidad por sí solo.
 
 ## 8.6 MCP
-Core: `https://bastion.castilloit.net/mcp`, laravel/mcp y Streamable HTTP propuestos; Passport/OAuth con PKCE para delegación. Validar descubrimiento, audiencia, revocación, protocolo y clientes. MCP invoca las mismas Actions/Policies; no duplica negocio. Ver [Core](architecture/core.md).
+Core: `https://api.bastion.castilloit.net/mcp`, adaptador MCP en Go y Streamable HTTP propuestos; implementación OAuth por seleccionar/OAuth con PKCE para delegación. Validar descubrimiento, audiencia, revocación, protocolo y clientes. MCP invoca los mismos servicios de aplicación/políticas de autorización; no duplica negocio. Ver [Core](architecture/core.md).
 
 ---
 
 # 9. Autenticación y autorización
 
 ## 9.1 SPA
-Sanctum con sesión por cookies, CSRF, Fortify y TOTP obligatorio. Mismo origen en bastion.castilloit.net; cookie `__Host-bastion_session`, Secure, HttpOnly, SameSite=Lax, Path=/, sin Domain. No tokens de sesión en localStorage. Sin acceso a negocio antes de completar MFA; recuperar contraseña no elimina MFA.
+Sesiones opacas del Core Go con cookies, CSRF y TOTP obligatorio. Orígenes distintos: frontend bastion.castilloit.net y API api.bastion.castilloit.net (subdominio propuesto); CORS exacto con credenciales y CSRF explícito; cookie `__Host-bastion_session`, Secure, HttpOnly, SameSite=Lax, Path=/, sin Domain. No tokens de sesión en localStorage. Sin acceso a negocio antes de completar MFA; recuperar contraseña no elimina MFA.
 
 ## 9.2 Servicios
 Crawler, backup, Work y Grokbot usan identidades separadas, revocables y con mínimo alcance. `crawler-lightsail` solo ingiere y reporta sus runs. Permisos/scopes concretos y guard correspondiente según Core; no aceptar tokens indistintamente entre SPA, MCP y servicios.
@@ -830,7 +776,7 @@ Objetivo:
 
 # 24. Approval Engine
 
-Workflow administra aprobaciones; Core aporta identidad, Policies y auditoría.
+Workflow administra aprobaciones; Core aporta identidad, políticas de autorización y auditoría.
 
 ## 24.1 Análisis y borradores
 Con permiso puede analizar, clasificar, investigar, buscar precios/proveedores, preparar candidatos, documentos y borradores de RFQ. Preparar una solicitud no autoriza su envío.
@@ -1162,7 +1108,7 @@ s3://castilloit-honducompras-crawler/raw/
 ```
 
 ## 26.17 Delivery
-El código del crawler y su contrato de entrega se encuentran en [IMPORT_CONTRACT](../aws/lightsail/crawler/docs/IMPORT_CONTRACT.md). No asumir receptor Laravel implementado ni interoperabilidad ya probada.
+El código del crawler y su contrato de entrega se encuentran en [IMPORT_CONTRACT](../backend/crawler/docs/IMPORT_CONTRACT.md). No asumir receptor Go implementado ni interoperabilidad ya probada.
 Base objetivo: `/api/internal/v1/crawler`; crear runs, entregar lotes de procesos y completar. Implementar el receptor contra el schema/checksums/fields_present y reglas de orden del contrato del cliente existente; no inventar otro protocolo desde ejemplos del maestro.
 
 ## 26.18 ACK
@@ -1182,14 +1128,14 @@ Para:
 - RFQ;
 - acciones reintentables.
 
-## 26.20 Bluehost caído
+## 26.20 API o MySQL temporalmente indisponible
 
 Si scraping terminó:
 
 ```text
 HonduCompras -> OK
 S3 -> OK
-Bluehost -> FAIL
+API Go o MySQL Bluehost -> FAIL
 ```
 
 estado:
@@ -1286,7 +1232,7 @@ Sin cambios ya puntuado -> no repetir
 
 # 27. ChatGPT en Bastion
 
-ChatGPT Work es el ejecutor inicial prioritario del pipeline, aprovechando mecanismos del plan Plus con skills y tareas programadas. Bastion administra pendientes/resultados; Laravel no invoca Plus como API. Compatibilidad, límites y ejecución desatendida requieren prueba real.
+ChatGPT Work es el ejecutor inicial prioritario del pipeline, aprovechando mecanismos del plan Plus con skills y tareas programadas. Bastion administra pendientes/resultados; Go no invoca Plus como API. Compatibilidad, límites y ejecución desatendida requieren prueba real.
 
 ## 27.1 Pipeline
 | Paso | Trabajo | Resultado |
@@ -1295,14 +1241,14 @@ ChatGPT Work es el ejecutor inicial prioritario del pipeline, aprovechando mecan
 | 2 | Investigación web/catálogos por ítem relevante | Alternativas, precios fechados y cumplimiento por requisito |
 | 2.5 | Alto interés sin precio: localizar contactos y preparar RFQ para Grokbot | Solicitud trazable |
 | 3 | Publicar avances en Procesos | Revisión progresiva por usuario |
-| 4 | Skill comercial + antecedentes RAG; cálculos Laravel | Rango y precio sugerido |
+| 4 | Skill comercial + antecedentes RAG; cálculos Go | Rango y precio sugerido |
 | 5 | Ficha fabricante o propia sustentada | Adjunto ligado al producto exacto |
 
 Tareas con reservas temporales, idempotencia y guardado por unidad. Analizado solo después de persistir; límites/fallos conservan pendientes. Datos insuficientes no implican descarte. Precios, documentos y stock requieren evidencia/fecha. Una ficha propia declara autoría Castillo IT y no inventa certificaciones.
 El usuario selecciona producto/precio y crea la cotización; investigación completa no significa oferta presentada.
 
 ## 27.2 Supervisión
-Puede consultar prioridades, pendientes y avances dentro de sus permisos. No modifica KPIs canónicos ni decisiones de negocio sin Actions autorizadas.
+Puede consultar prioridades, pendientes y avances dentro de sus permisos. No modifica KPIs canónicos ni decisiones de negocio sin servicios de aplicación autorizadas.
 
 ## 27.3 Ingeniería
 Codex trabaja en código, pruebas, PR y migraciones sin acceso automático a producción. Ese rol es distinto del ejecutor operativo Work configurado para investigación.
@@ -1404,7 +1350,7 @@ POST /api/v1/rfqs
 
 # 31. Castillo MCP
 
-MCP es la entrada Core para herramientas autorizadas, con schemas versionados y Actions comunes a REST. No es el módulo AI ni el motor que ejecuta modelos.
+MCP es la entrada Core para herramientas autorizadas, con schemas versionados y servicios de aplicación comunes a REST. No es el módulo AI ni el motor que ejecuta modelos.
 El catálogo inicial para este pipeline incluye claim_scoring_tasks, get_process_context, save_process_score, claim_research_tasks, save_item_research, create_rfq_request, search_pricing_history, save_price_recommendation, register_artifact y complete_task.
 Grokbot usa herramientas RFQ acotadas con permisos separados. Nombres/esquemas siguen siendo propuestas de implementación.
 Fuente contractual: [pipeline IA](contracts/ai-pipeline.md). [API/MCP](contracts/api-mcp.md) conserva capacidades de otros módulos; su presencia en un catálogo no las habilita para todos los agentes.
@@ -1413,9 +1359,9 @@ Fuente contractual: [pipeline IA](contracts/ai-pipeline.md). [API/MCP](contracts
 
 # 32. Background jobs
 
-Laravel Queue con driver database y cron ejecuta jobs cortos de importación, correo, notificaciones, mantenimiento de tareas y procesamiento documental acotado. Controlar solapamientos, memoria, tiempo y número de jobs; stop-when-empty solo no impone presupuesto máximo.
-Work ejecuta las investigaciones externamente y recoge tareas persistidas por MCP. El cron Laravel no invoca Plus ni garantiza despertar Work. RFQ en espera no ocupa un worker.
-OCR/procesamiento intensivo requiere ejecutor evaluado; no asumir capacidad en Lightsail 1 GB. Redis/SQS y workers dedicados son opciones futuras, no requisitos iniciales.
+Cola durable MySQL con workers en Lightsail y cron ejecuta jobs cortos de importación, correo, notificaciones, mantenimiento de tareas y mantenimiento acotado. Controlar solapamientos, memoria, tiempo y número de jobs; La cola debe tener presupuesto explícito por ejecución.
+Work ejecuta las investigaciones externamente y recoge tareas persistidas por MCP. El cron Go no invoca Plus ni garantiza despertar Work. RFQ en espera no ocupa un worker.
+OCR/procesamiento intensivo, si se incorpora, requiere ejecutor externo; no se ejecuta en Lightsail. Redis/SQS y workers dedicados son opciones futuras, no requisitos iniciales.
 
 ---
 
@@ -1431,7 +1377,7 @@ Fase 2:
   - Ably;
   - Pusher.
 
-Laravel Reverb solo si Bluehost soporta procesos persistentes.
+Actualización inicial mediante polling HTTP; SSE/WebSocket en Go solo si se justifica y valida. No se ejecutan procesos backend en Bluehost.
 
 ---
 
@@ -1629,30 +1575,7 @@ AI:
 
 # 37. CI/CD
 
-GitHub flow:
-
-```text
-feature branch
-  ↓
-commit
-  ↓
-tests
-  ↓
-pull request
-  ↓
-review
-  ↓
-merge
-  ↓
-deploy
-```
-
-Branching sugerido:
-
-- `main`;
-- feature branches.
-
-Evitar complejidad innecesaria con `develop` si el equipo es pequeño.
+GitHub mantiene una única rama de trabajo `main`, con commits verificables y CI. No crear ramas paralelas para esta reorganización. El historial Git conserva las versiones anteriores; un commit no despliega servicios automáticamente.
 
 ---
 
@@ -1660,24 +1583,11 @@ Evitar complejidad innecesaria con `develop` si el equipo es pequeño.
 
 ## 38.1 Lightsail
 
-GitHub Actions o deploy manual controlado:
-
-- SSH;
-- pull;
-- venv;
-- dependencies;
-- restart scheduler/service.
+Compilar Go reproduciblemente fuera del servidor; desplegar binario, configuración privada y servicios systemd por SSH. Crawler conserva Python, venv, requirements.lock y timers. Workers/scheduler también en Lightsail. Validar salud, API/MCP, conexión cifrada MySQL, consumo y rollback antes de activar.
 
 ## 38.2 Bluehost
 
-Mecanismo a validar:
-
-- SSH;
-- SFTP;
-- deploy nativo;
-- Git support.
-
-Debe quedar definido por senior según capacidades reales del plan.
+Desplegar Angular compilado por SSH/SFTP al document root reportado. MySQL y correo permanecen aquí. Esquema/migraciones los administra el backend con permisos controlados; no desplegar Go ni workers en Bluehost. Validar backup y rollback de migraciones por separado.
 
 ---
 
@@ -1688,10 +1598,10 @@ El objetivo definido es recuperar antecedentes para sugerir precio de venta con 
 Primera etapa:
 - S3 privado: originales, texto extraído y documentos versionados.
 - MySQL: metadatos, productos/referencias, precios, fechas, monedas, condiciones y referencias a fragmentos.
-- Laravel: búsqueda autorizada por campos/texto y entrega de antecedentes mediante MCP.
+- Go: búsqueda autorizada por campos/texto y entrega de antecedentes mediante MCP.
 - Work: aplica skill, explica comparables y registra recomendación.
 
-Preparar/extractar una vez por versión; OCR según necesidad y capacidad. No leer todo el histórico en cada ejecución. Laravel calcula costos/márgenes; el usuario fija el precio. Antecedentes insuficientes se declaran, no se inventa competitividad.
+Preparar/extractar una vez por versión; OCR según necesidad y capacidad. No leer todo el histórico en cada ejecución. Go calcula costos/márgenes; el usuario fija el precio. Antecedentes insuficientes se declaran, no se inventa competitividad.
 S3 Vectors es ampliación opcional: requiere embeddings/índice/modelo compatible y presupuesto explícito, no incluido por almacenar PDFs ni presumido dentro de Plus. Corpus, calidad, retención y criterios comerciales siguen pendientes. Ver [RAG](knowledge-rag/README.md).
 
 ---
@@ -1816,12 +1726,12 @@ crawler_deliveries
 
 | Origen | Destino | Mecanismo |
 |---|---|---|
-| Angular | Laravel | HTTPS REST JSON |
-| Laravel | MySQL | conexión DB interna |
-| Laravel | S3 | AWS SDK/HTTPS |
+| Angular | Go | HTTPS REST JSON |
+| Go | MySQL | conexión remota cifrada AWS → Bluehost |
+| Go | S3 | AWS SDK/HTTPS |
 | Lightsail | HonduCompras | HTTP(S) |
 | Lightsail | S3 | boto3/AWS CLI HTTPS |
-| Lightsail | Bluehost | actual push a documentar; objetivo HTTPS API |
+| Crawler Lightsail | Backend Go Lightsail | HTTPS API con token, idempotencia y ACK de importación |
 | Lightsail backup worker | Bluehost | SSH/SFTP/rsync |
 | GitHub Actions | Lightsail | SSH |
 | GitHub Actions | Bluehost | SSH/SFTP/nativo pendiente |
@@ -1945,7 +1855,7 @@ Mitigación:
 
 | Etapa | Entregable | Condición |
 | --- | --- | --- |
-| 0 | Validar entorno y dependencias | Compatibilidad Bluehost/PHP/Percona y seguridad |
+| 0 | Validar entorno y dependencias | Compatibilidad Bluehost/Go/Percona y seguridad |
 | 1 | Crawler y entrega | Código existente probado con receptor/ACK, retries y recuperación |
 | 2 | Core y módulos base | Identidad/MFA, API/MCP, auditoría y persistencia |
 | 3 | Comercial | Cotizaciones, órdenes, facturas, gastos y reportes |
@@ -1962,12 +1872,12 @@ La aplicación manual sigue operativa sin IA. Fechas, presupuestos y umbrales no
 # 49. Decisiones pendientes
 
 ## Definido
-Monolito modular; Bluehost para aplicación/DB/correo; Lightsail para crawler/backups; S3 para archivos; GitHub Ahcast/Bastion; dominio bastion.castilloit.net; Percona 5.7 reportado; Core separado de módulos; frontend español; MFA; API/MCP; pipeline asistido Work; RAG inicial S3/MySQL.
+Monolito modular; Bluehost para frontend/DB/correo; Lightsail para backend Go/API/MCP/crawler/workers; S3 para archivos; GitHub Ahcast/Bastion; dominio bastion.castilloit.net; Percona 5.7 reportado; Core separado de módulos; frontend español; MFA; API/MCP; pipeline asistido Work; RAG inicial S3/MySQL.
 
 ## Por validar o concretar
-- Versiones exactas/lockfiles y compatibilidad Laravel/PHP/Angular; PHP CLI/extensiones y soporte de Percona.
+- Versiones exactas/lockfiles y compatibilidad Go/Angular y conectividad remota y soporte de Percona.
 - Límites de hosting, despliegue, colas, WAF, retención y restauración/RPO/RTO.
-- Receptor Laravel compatible con el cliente crawler existente y su ACK.
+- Receptor Go compatible con el cliente crawler existente y su ACK.
 - Roles, scopes, delegación MCP, aprobadores y reglas específicas de envío.
 - Prueba Work/Plus desatendida, plugin, capacidad, hora diaria y lotes.
 - Skills: rubros/pesos/umbrales, corpus RAG, evaluación de calidad y criterios comerciales.
@@ -2070,8 +1980,8 @@ supervisión, análisis y autorizaciones
 | Componente | Responsabilidad |
 | --- | --- |
 | Angular | Interfaz española y revisión de resultados |
-| Core Laravel | Identidad, RBAC/MFA, configuración, API/MCP, auditoría, archivos y SMTP |
-| Módulos | Reglas comerciales y Actions propias |
+| Core Go | Identidad, RBAC/MFA, configuración, API/MCP, auditoría, archivos y SMTP |
+| Módulos | Reglas comerciales y servicios de aplicación propias |
 | AI / Workflow | Tareas/resultados / reglas y aprobaciones |
 | MySQL | Verdad transaccional, pendientes e índices/metadatos de antecedentes |
 | S3 | Originales, evidencia, texto, fichas, raw y backups |
@@ -2089,3 +1999,4 @@ supervisión, análisis y autorizaciones
 # 53. Regla final del proyecto
 
 > **Bastion debe ser el sistema operativo de la oficina de Castillo IT: modular, seguro, auditable, automatizable y capaz de incorporar agentes AI sin entregarles control irrestricto sobre los datos o las decisiones críticas.**
+

@@ -8,7 +8,7 @@ Fuente: [Documento maestro vigente](../Proyecto_Bastion_Documento_Maestro.md). A
 
 Se propone:
 
-- Laravel Sanctum;
+- sesiones opacas del Core Go;
 - cookie de sesión HTTP-only;
 - CSRF;
 - first-party SPA.
@@ -206,4 +206,5 @@ Controles:
 - no acciones financieras autónomas.
 
 ---
+
 
