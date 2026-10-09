@@ -1,6 +1,6 @@
 # Estado del proyecto
 
-Actualizado el 9 de octubre de 2026. Core 0.1.0 implementado localmente; producción no desplegada.
+Actualizado el 9 de octubre de 2026. Core 0.1.0 publicado en main y validado en CI; producción no desplegada.
 
 | Área | Estado real |
 | --- | --- |
@@ -26,7 +26,7 @@ Actualizado el 9 de octubre de 2026. Core 0.1.0 implementado localmente; producc
 - npm ci, build Angular y 4 pruebas del cliente/interceptor satisfactorios.
 - Un flujo Playwright contra Angular y API reales en dos orígenes: login→enrolamiento TOTP→recovery→configuración persistida tras recarga→logout. Sin mocks HTTP ni envíos reales.
 - 17 pruebas del crawler Python satisfactorias. Enlaces internos verificados.
-- CI Core configurado para MySQL 5.7, Go/Angular y navegador; resultado remoto se comprueba tras publicación.
+- CI remoto satisfactorio para el commit [322a1d2](https://github.com/Ahcast/Bastion/commit/322a1d2b3fd16f6f7cb94b3226e56747e969f96a): [Core checks](https://github.com/Ahcast/Bastion/actions/runs/37988596602) pasó backend (gofmt, vet, race detector/MySQL 5.7 y builds), frontend (build y tests) y navegador contra API/Angular/MySQL reales. También pasaron [documentación](https://github.com/Ahcast/Bastion/actions/runs/37988596500) y [rama única](https://github.com/Ahcast/Bastion/actions/runs/37988596531).
 
 ## Alcance pendiente antes de producción
 
