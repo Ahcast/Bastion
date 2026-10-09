@@ -45,7 +45,7 @@ Código: backend/internal/modules/customers, internal/composition, migración 00
 - SDK oficial MCP verifica search_customers/get_customer, identidad contextual y revocación; no habilita OAuth Work ni escritura de agentes.
 - npm ci, build y 8 pruebas Angular satisfactorios (4 Core y 4 Clientes). Ficha mantiene edición y clave ante fallo, no envía campos protegidos, respeta lector y paginación del backend. UI usa locale es-HN.
 - Dos flujos de navegador contra MySQL/API/Angular reales satisfactorios: Core y Clientes. Clientes verifica alta/contacto/nota/edición persistida/duplicado/inactivación y filtros.
-- 17 pruebas crawler satisfactorias; gofmt, vet, builds y documentación verificados. CI remoto pendiente de publicación; no comenzar Proveedores hasta su resultado satisfactorio.
+- 17 pruebas crawler satisfactorias; gofmt, vet, builds y documentación verificados. Primer CI remoto 37992217291 bloqueó backend/browser antes de ejecutar pruebas por toomanyrequests al descargar MySQL de Docker Hub; frontend/documentación/rama única pasaron. Se cambió solo CI al mirror oficial ECR Public, con MySQL 5.7.44 y digest verificado. Repetición remota pendiente; no comenzar Proveedores hasta su resultado satisfactorio.
 
 ## Continuidad
 
