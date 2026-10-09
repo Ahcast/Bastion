@@ -1,5 +1,15 @@
-# Angular en Bluehost
+# Frontend Angular — Core
 
-Código pendiente de implementación. Leer [frontend](../docs/frontend.md), [módulos](../docs/modules/README.md), [idioma](../docs/idioma.md) y [stack](../docs/development/stack.md).
+Implementados: login/invitación, TOTP/recuperación, cliente API entre orígenes, guards, shell, Inicio y Configuración con administración/archivos. Módulos comerciales se incorporan al registro/rutas cuando estén implementados; no hay pantallas falsas ni menú de AI/Workflow.
 
-Core visual en src/app/core, módulos en src/app/modules, shared reutilizable. Angular se compila fuera del hosting; solo assets públicos en ~/public_html/website_091cdca8. Backend en AWS; configuración pública API sin secretos. CORS/credenciales/CSRF deben probarse en navegador con dos orígenes. Cálculo financiero definitivo en Go.
+```bash
+cd frontend
+npm ci
+npm start
+npm run build
+npm test -- --watch=false
+```
+
+public/config.json contiene únicamente la URL pública API. Desarrollo: http://localhost:8080; producción: HTTPS propuesto api.bastion.castilloit.net. Sin tokens en storage; CSRF solo memoria; HttpOnly cookies. [Runbook](../docs/development/core-runbook.md) y [prueba de navegador](../docs/development/core-runbook.md#prueba-de-navegador).
+
+Desplegar solo dist/bastion-ui/browser a Bluehost; nunca node_modules, fuentes privadas ni secretos. [Arquitectura](../docs/architecture/README.md), [idioma](../docs/idioma.md).

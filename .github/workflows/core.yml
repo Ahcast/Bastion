@@ -1,0 +1,110 @@
+name: Core checks
+on:
+  push:
+    branches: [main]
+    paths: ['backend/**', 'frontend/**', 'docs/contracts/core-openapi.json', '.github/workflows/core.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:5.7.44
+        env:
+          MYSQL_ROOT_PASSWORD: synthetic-ci-only
+          MYSQL_DATABASE: bastion_test
+        ports: ['3306:3306']
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -psynthetic-ci-only"
+          --health-interval=10s --health-timeout=5s --health-retries=10
+    env:
+      BASTION_TEST_MYSQL_DSN: 'root:synthetic-ci-only@tcp(127.0.0.1:3306)/bastion_test?parseTime=true&loc=UTC'
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.27.2'
+          cache-dependency-path: backend/go.sum
+      - run: go mod download
+      - run: go vet ./...
+      - run: test -z "$(gofmt -l cmd internal database tests)"
+      - run: go test -race -count=1 ./...
+      - run: make build
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - run: npm run build
+      - run: npm test -- --watch=false
+  browser:
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:5.7.44
+        env:
+          MYSQL_ROOT_PASSWORD: synthetic-ci-only
+        ports: ['3306:3306']
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -psynthetic-ci-only"
+          --health-interval=10s --health-timeout=5s --health-retries=10
+    env:
+      BASTION_TEST_MYSQL_DSN: 'root:synthetic-ci-only@tcp(127.0.0.1:3306)/bastion_browser_test?parseTime=true&loc=UTC'
+      BASTION_MYSQL_DSN: 'root:synthetic-ci-only@tcp(127.0.0.1:3306)/bastion_browser_test?parseTime=true&loc=UTC'
+      BASTION_ENCRYPTION_KEY: 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA='
+      BASTION_FRONTEND_ORIGIN: 'http://localhost:4200'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.27.2'
+          cache-dependency-path: backend/go.sum
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: go run ./tests/browserseed
+        working-directory: backend
+      - run: mkdir -p bin && go build -o bin/server ./cmd/server
+        working-directory: backend
+      - run: npm ci
+        working-directory: frontend
+      - run: npx playwright install --with-deps chromium
+        working-directory: frontend
+      - name: Browser against real API and Angular
+        shell: bash
+        run: |
+          set -euo pipefail
+          backend/bin/server > /tmp/bastion-api.log 2>&1 &
+          API_PID=$!
+          (cd frontend && npm start -- --host 127.0.0.1) > /tmp/bastion-ui.log 2>&1 &
+          UI_PID=$!
+          trap 'kill "$API_PID" "$UI_PID" 2>/dev/null || true' EXIT
+          python - <<'PYTHON'
+          import time, urllib.request
+          for _ in range(150):
+              try:
+                  urllib.request.urlopen('http://localhost:4200').read()
+                  urllib.request.urlopen('http://localhost:8080/readyz').read()
+                  break
+              except OSError:
+                  time.sleep(.2)
+          else:
+              raise SystemExit('Test services unavailable')
+          PYTHON
+          cd frontend
+          npx playwright test

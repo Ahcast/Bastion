@@ -1,0 +1,20 @@
+[Unit]
+Description=Bastion Core API
+After=network-online.target
+Wants=network-online.target
+[Service]
+User=bastion
+Group=bastion
+WorkingDirectory=/opt/bastion
+EnvironmentFile=/etc/bastion/core.env
+ExecStart=/opt/bastion/bin/server
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+MemoryMax=512M
+UMask=0077
+[Install]
+WantedBy=multi-user.target

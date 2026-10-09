@@ -22,3 +22,7 @@ Las migraciones mantendrán un orden global inequívoco. La habilitación no equ
 Pruebas Go junto a cada paquete separan escenarios comunes y de negocio; integración en backend/tests/integration. Las pruebas de integración cubren permisos, duplicados, auditoría y coherencia REST/MCP. Se usan los contratos del Core sin duplicar seguridad.
 
 
+
+## Composición ejecutable del Core
+
+registry.Module declara versión, dependencias, permisos y callbacks Routes/Tools. Composición cmd/server registra módulos implementados; Validate rechaza dependencias ausentes/deshabilitadas y ciclos. Routes recibe ServeMux; envolver handlers con api.Operation(service, logger, action) para obtener Actor validado y respuestas uniformes. El servicio del módulo vuelve a autorizar permiso/recurso/estado con Core.Authorize y persiste cambios/auditoría/outbox en la misma transacción. No confiar en el contexto de UI como permiso. Registrar permisos nuevos mediante migración global y ampliar el catálogo permitido explícitamente antes de asignarlos. Tools usa SDK oficial y el mismo servicio de aplicación; no HTTP a sí mismo.

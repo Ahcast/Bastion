@@ -1,7 +1,15 @@
-# Backend Go en AWS Lightsail
+# Backend Bastion — Go
 
-Leer [AGENTS](../AGENTS.md), [estructura](../docs/architecture/README.md), [Core](../docs/architecture/core.md) y [módulos](../docs/modules/README.md). API/MCP son adaptadores del mismo monolito. Backend Go aún no implementado.
+Core implementado en internal/core; composición cmd/server, worker y admin; migraciones SQL en database/migrations. [Cómo ejecutar](../docs/development/core-runbook.md), [contrato OpenAPI](../docs/contracts/core-openapi.json), [estado real](../docs/development/status.md).
 
-Paquetes futuros backend/internal/core y backend/internal/modules; composición backend/cmd/server y worker; migraciones backend/database/migrations. Paquetes Go minúsculos, pruebas junto al paquete. Crear carpetas cuando contengan código, no README por cada paquete vacío.
+```bash
+cd backend
+go mod download
+go vet ./...
+go test -race ./...
+make build
+```
 
-[El crawler Python](crawler/README.md) ya existe y permanece aquí. MySQL remoto en Bluehost; archivos S3; SMTP/IMAP Bluehost. Workers/scheduler en Lightsail. Sin OCR ni modelos locales. [Plan](../docs/development/plan.md) define orden y aceptación.
+Pruebas de integración requieren MySQL 5.7 dedicado: BASTION_TEST_MYSQL_DSN debe seleccionar bastion_test. Sin esa variable, las pruebas MySQL se omiten explícitamente; no contar ese resultado como validación de persistencia. CI exige el servicio MySQL 5.7.
+
+Frontend Angular/MySQL/correo permanecen en Bluehost. Core/API/MCP/crawler/workers en Lightsail; archivos S3. No se incluye MySQL de producción en AWS. [Crawler Python existente](crawler/README.md) se conserva sin cambios. Módulos comerciales aún pendientes según el plan.

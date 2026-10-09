@@ -44,3 +44,7 @@ Ruta /mcp del mismo backend. Tools/resources/prompts con esquemas y límites. La
 Herramientas IA vigentes en [ai-pipeline](ai-pipeline.md); nombres search_clients se normalizan a search_customers. Catálogo inicialmente mínimo de lectura/claim/save, ampliación por fase. No herramientas SQL/shell/S3 global ni email arbitrario. Cada escritura sensible registra actor, delegación, correlación, entrada/salida validada y resultado, sin secretos.
 
 Pruebas: denegación anónima, MFA incompleto, acceso a registro ajeno, revoke/expiry, payload inválido, idempotencia concurrente, conflicto de versión y mismo resultado/reglas REST–MCP.
+
+## Contrato implementado del Core
+
+[OpenAPI 3.1](core-openapi.json) contiene DTO/rutas de esta versión. Core ofrece perfil/preferencias y regeneración recovery/password, usuarios/invitaciones/roles/equipos/settings/integraciones, auditoría/jobs/notificaciones, SMTP de prueba/conciliación, archivos versionados y lectura MCP técnica. Las rutas de módulos/crawler/AI listadas arriba siguen siendo objetivo de sus fases, no endpoints ya implementados. OAuth Work permanece deshabilitado hasta validar proveedor.

@@ -1,6 +1,6 @@
 # Bastion
 
-Aplicación operativa de Castillo IT. Este repositorio contiene especificaciones para desarrollar todo el proyecto y un crawler Python existente; backend Go y frontend Angular aún no están implementados.
+Aplicación operativa de Castillo IT. Core Go y Core Angular implementados y verificados localmente, con crawler Python existente. Módulos comerciales e integraciones productivas se desarrollan por fases. [Ejecutar Core](docs/development/core-runbook.md).
 
 **Entrada del agente:** [AGENTS.md](AGENTS.md) → [maestro](docs/Proyecto_Bastion_Documento_Maestro.md) → [plan](docs/development/plan.md).
 

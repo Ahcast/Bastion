@@ -1,6 +1,6 @@
 # Core de Bastion
 
-Especificación técnica vigente. [Arquitectura](core.md), [stack](../development/stack.md) y [plan](../development/plan.md). El Core aún requiere implementación.
+Especificación técnica vigente. [Arquitectura](README.md), [stack](../development/stack.md) y [plan](../development/plan.md). Core de plataforma implementado y verificado localmente; [estado real](../development/status.md) y [runbook](../development/core-runbook.md) distinguen integraciones pendientes.
 
 ## 2. Base que se conserva
 
@@ -238,7 +238,7 @@ Si la transacción falla, no se envía el evento. Si el proceso cae después de 
 
 ## 11. Trabajos en segundo plano en Lightsail
 
-Diseño objetivo (aún no implementado): cola durable MySQL con workers en Lightsail; alternativa de ejecución mediante cron cuando no haya workers persistentes. La disponibilidad concreta del plan está por validar.
+Cola durable MySQL y worker Go implementados; ejecución acotada mediante timer systemd en Lightsail. Disponibilidad y consumo reales del hosting por validar.
 
 **Propuesta inicial:** scheduler y workers acotados mediante cron, con bloqueo contra solapamientos, límite de duración, memoria, cantidad de jobs e intentos. Los workers Go deben detenerse al agotar su presupuesto incluso si siguen entrando tareas.
 
@@ -291,7 +291,7 @@ S3 privado conserva los bytes; MySQL conserva identificador, nombre original, ti
 - Un módulo vincula documentos mediante identificadores; no construye rutas arbitrarias ni manipula credenciales de S3.
 - Cambiar contenido crea versión cuando se necesite historial; no sobrescribir evidencia silenciosamente.
 
-Como MySQL y S3 no comparten transacción, se propone un flujo `pending` → `available` o `failed`, con verificación del objeto y limpieza de huérfanos. Una carga incompleta no se muestra como documento disponible.
+Como MySQL y S3 no comparten transacción, se propone un flujo `pending` → `quarantined` → `available` o `rejected`, con verificación del objeto y limpieza de huérfanos. Una carga incompleta no se muestra como documento disponible.
 
 El bucket actual del crawler está confirmado en el diseño. Los buckets adicionales de documentos y backups son propuestas del maestro, no recursos cuya creación se haya verificado.
 
@@ -369,7 +369,7 @@ Objetivo: Go en Lightsail, Angular en Bluehost y Percona/MySQL 5.7 en Bluehost. 
 - En Bluehost exponer únicamente activos compilados de Angular; en Lightsail publicar HTTPS del proxy hacia Go. Mantener secretos, backups y logs fuera del document root.
 - Desactivar debug en producción; HTTPS y protección WAF con reglas compatibles con API, autenticación y cargas autorizadas. Proveedor/configuración final por validar.
 - Construir y comprobar dependencias fuera del hosting cuando sea posible; desplegar un artefacto reproducible asociado a un commit.
-- Respetar el flujo de ramas, PR y revisión del maestro. La protección de `main` no se considera activada por estar documentada; debe verificarse antes de establecer el flujo de despliegue.
+- Usar exclusivamente main y commits directos conforme a la política Git; sin ramas ni PR. CI revisa cada publicación. La restricción preventiva de creación requiere GitHub Pro en este repositorio privado.
 - Aplicar migraciones compatibles, comprobar sesión, API y procesamiento de jobs, y disponer de rollback del código.
 - Un rollback de código no implica revertir automáticamente la base de datos. Cambios destructivos requieren respaldo y plan específico.
 
@@ -460,5 +460,5 @@ Además de los criterios de la sección 19, comprobar:
 9. Dependencias y migraciones funcionan en Go/Percona realmente disponibles.
 10. Backups, claves y rollback permiten una recuperación ensayada.
 
-La estructura del repositorio ya fue reorganizada; el Core aún debe implementarse. La validación de este documento no acredita controles instalados ni una auditoría de seguridad del hosting.
+La estructura y el Core ya tienen implementación local y pruebas; las integraciones/despliegue reales están sujetos a validación. La validación de este documento no acredita controles instalados ni una auditoría de seguridad del hosting.
 

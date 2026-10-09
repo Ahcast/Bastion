@@ -1,41 +1,39 @@
 # Estado del proyecto
 
-Fecha de referencia: 9 de octubre de 2026.
+Actualizado el 9 de octubre de 2026. Core 0.1.0 implementado localmente; producción no desplegada.
 
 | Área | Estado real |
 | --- | --- |
-| Documentación/plan | Consolidación para desarrollo por agente |
-| Crawler Python | Implementación y pruebas offline existentes; no prueba en vivo en esta revisión |
-| Backend/Core/API/MCP Go | Pendiente de implementación |
-| Frontend Angular | Pendiente de implementación |
-| MySQL Bluehost | Motor reportado; acceso remoto cifrado no validado |
-| S3 | Bucket crawler reportado; integración/despliegue no verificados |
-| Work/Grokbot/SMTP real | Conexión y capacidad no validadas; sin envíos activados |
-| Política Git | Solo main; workflow elimina ramas ancestro de main y falla ante ramas con cambios no incorporados. No equivale a ruleset preventivo |
+| Backend Go | Core/API y comandos server/admin/worker implementados; builds reproducibles |
+| Identidad | Usuarios/invitaciones, Argon2id, sesiones, CSRF entre orígenes, TOTP/recovery, reauth, revocación y denylist configurable |
+| Autorización | Roles/permisos all/self/team, equipos, denegación por defecto y reevaluación en operaciones/jobs |
+| Administración | Empresa/SMTP/integraciones tipadas/versionadas, auditoría, tokens técnicos y notificaciones |
+| Persistencia | Migración Core y runner con lock/checksum/dirty; probado en MySQL Community 5.7.44, no en Percona Bluehost real |
+| Ejecución | Idempotencia, outbox, leases/retries/jobs y conciliación SMTP implementados |
+| Archivos | Metadatos/versiones, adapter AWS SDK, upload/checksum/cuarentena/descarga y registro de análisis; S3 real y scanner externo no validados |
+| MCP | SDK oficial Streamable HTTP, bearer técnico limitado y conformance por SDK cliente; OAuth/Work pendientes |
+| Frontend Angular | Core de sesión, shell, Inicio y Configuración implementados; UI española; build y tests |
+| Crawler Python | Conservado sin cambios; 17 pruebas offline satisfactorias; receptor Processes aún pendiente |
+| Módulos comerciales | Pendientes; su existencia documental no equivale a código implementado |
+| Despliegue | Templates systemd/nginx/Bluehost preparados; no instalados ni desplegados |
+| Infraestructura real | MySQL TLS/túnel/hosting, DNS/HTTPS, S3/IAM, SMTP y memoria conjunta con crawler pendientes |
+| Git | Solo main; limpieza reactiva vigente; prevención GitHub requiere plan Pro |
 
-## Próxima unidad
+## Verificación local de esta unidad
 
-Fase 0 del plan, seguida de Core. No declarar módulos implementados por existir sus especificaciones.
+- gofmt, go vet y build server/worker/admin satisfactorios.
+- 16 tests Go con race detector, incluidos 11 casos de integración en MySQL 5.7 real. Doce solicitudes concurrentes ejecutan un único efecto; mismatch de payload, rollback, permisos/IDOR, leases, MFA/recovery reutilizados, revocación, cuarentena y correo incierto verificados.
+- npm ci, build Angular y 4 pruebas del cliente/interceptor satisfactorios.
+- Un flujo Playwright contra Angular y API reales en dos orígenes: login→enrolamiento TOTP→recovery→configuración persistida tras recarga→logout. Sin mocks HTTP ni envíos reales.
+- 17 pruebas del crawler Python satisfactorias. Enlaces internos verificados.
+- CI Core configurado para MySQL 5.7, Go/Angular y navegador; resultado remoto se comprueba tras publicación.
 
-## Registro que mantiene el agente
+## Alcance pendiente antes de producción
 
-Por unidad: fase/alcance, archivos, migraciones/contratos cambiados, comandos/pruebas y resultados, bloqueos/evidencia, próximo paso. Estados: pendiente / en curso / implementado localmente / integrado en entorno validado / desplegado autorizado. Nunca usar completado para una conexión aún simulada.
+Acceso Bluehost cifrado/restringido, soporte/parches Percona, cuentas DB de mínimo privilegio, backup/restore, clave de cifrado/custodia, corpus curado de contraseñas comprometidas, DNS/HTTPS/CORS/CSP, bucket privado/cifrado/CORS S3/IAM, ejecutor de análisis de archivos y evidencia, SMTP/IMAP autorizado, OAuth delegado Work, medición 2 GB/crawler/jobs y protección perimetral real. Los adapters compilados y sus tests no acreditan esos servicios.
 
-## Bloqueos que requieren datos del entorno
+No habilitar integraciones productivas ni migrar BD real mediante tests. No existen aún receptor crawler, tools/pipeline AI, workflows comerciales ni módulos de ventas. El Core rechaza accesos a archivos vinculados a entidades cuya política de módulo no se haya implementado.
 
-- Host/MySQL remoto, allowlist IP Lightsail, certificado/TLS o túnel verificado, límites y soporte Percona.
-- Instancia, distribución Linux, DNS/certificado API y acceso de despliegue.
-- Buckets de documentos/backups, IAM y política de retención/restauración.
-- SMTP/IMAP y cuentas; autorización para envíos reales.
-- Series/fiscalidad y plantillas de documentos oficiales.
-- Work/MCP y ejecutor RFQ; criterios comerciales/hora/lotes.
+## Continuidad
 
-## Verificación de consolidación
-
-9 de octubre de 2026: 17 pruebas offline del crawler satisfactorias; enlaces internos verificados. Commit cbe7a5ac5168f17dea9fc5430339eaad828b34b3 publicado en main; CI Documentation checks, Crawler tests y Single branch policy satisfactorio. API GitHub verificó exactamente una rama: main; tres refs anteriores eliminadas, commits preservados en historial.
-
-GitHub devolvió 403 al consultar rulesets: exige GitHub Pro o repositorio público para habilitarlos en este repositorio. Mantener privado. No se habilitó bloqueo preventivo de creación; regla obligatoria y limpieza reactiva activas. Esta limitación requiere cambio de plan para garantía preventiva, no otro workflow.
-
-## Guía de ejecución local
-
-9 de octubre de 2026: se añadió `backend/crawler/USO.md` y se enlazó desde su README. Explica instalación Python 3.12, una corrida completa con S3/API deshabilitados, inspección de lotes, estados de salida y recuperación de pendientes. No cambia código ni contratos. Validación: 17 pruebas offline satisfactorias con Python 3.12.14; CLI `--help` verificada. Ejecución real de HonduCompras e integración externa aún pendientes.
+Siguiente unidad: datos base/Procesos y receptor crawler según plan. Registrar fase, archivos/migraciones/contratos, comandos y resultados, bloqueos y próximo paso. Estados: pendiente / en curso / implementado localmente / integrado en entorno validado / desplegado autorizado.

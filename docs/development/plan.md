@@ -1,5 +1,7 @@
 # Plan ejecutable del proyecto
 
+Core de plataforma y base implementados: ver [estado](status.md) y [runbook](core-runbook.md). Los criterios de infraestructura externa permanecen pendientes aunque las pruebas locales pasen. Próxima fase de módulos: datos base/Procesos y receptor crawler.
+
 El agente implementa cada fase hasta su aceptación, actualiza status.md y continúa. No sustituir implementación por plan nuevo. Las fases pueden desarrollarse con datos sintéticos y MySQL 5.7 local de prueba; los bloqueos de infraestructura se verifican antes de producción, sin migrar la BD a AWS.
 
 | Fase | Trabajo y entregables | Criterio de aceptación |

@@ -1,6 +1,6 @@
 # Stack y selección de dependencias
 
-Esta es la selección de implementación; no acreditar paquetes instalados antes de escribir código.
+Core implementado con Go 1.27.2, Angular 22.2.2, TypeScript 6.0.3 y Node 24.19.0. Dependencias exactas en go.mod/go.sum y package-lock.json; la matriz vigente fue validada mediante instalación/build/pruebas.
 
 | Área | Base |
 | --- | --- |

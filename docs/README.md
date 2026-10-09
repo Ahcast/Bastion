@@ -25,3 +25,5 @@ Cada tema tiene una fuente única. No se reproducen capítulos del maestro en ca
 | Idioma | [Español](idioma.md) |
 
 Documentos eliminados por duplicación siguen en el historial Git; no son instrucciones vigentes. No se pierde el alcance comercial por consolidar archivos.
+
+Core implementado: [ejecución y pruebas](development/core-runbook.md), [OpenAPI](contracts/core-openapi.json), [estado](development/status.md).
