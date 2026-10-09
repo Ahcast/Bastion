@@ -1,17 +1,19 @@
-# Crawler HonduCompras existente
+# Crawler HonduCompras
 
-Implementación Python en bastion_crawler, con SQLite técnico, exportación y entrega recuperable. Se ejecuta en Lightsail junto al backend, en servicio separado. No convertir a Go ni aumentar agresividad por esta reorganización.
+Crawler Python de Bastion, ubicado en `backend/crawler` y destinado a ejecutarse como servicio separado en Lightsail. Extrae con pausas conservadoras, guarda estado técnico en SQLite y genera lotes recuperables. El receptor Go/MySQL es responsable de consolidar procesos y versiones; todavía no está implementado.
 
-[Operaciones](OPERATIONS.md), [instalación](deploy/INSTALL.md) y [contrato API/ACK](docs/IMPORT_CONTRACT.md) son fuentes únicas. Destino objetivo: API Go en Lightsail; MySQL permanece en Bluehost. El target interno bluehost y FTPS se conservan para compatibilidad histórica; FTPS deshabilitado en objetivo inicial.
+**Para correr una ejecución completa en tu propia máquina:** [guía paso a paso](USO.md).
 
-## Desarrollo y pruebas offline
+**Para operación en Lightsail:** [detalles y límites](OPERATIONS.md), [instalación](deploy/INSTALL.md) y [contrato API/ACK](docs/IMPORT_CONTRACT.md).
+
+## Pruebas offline
 
 ```bash
 cd backend/crawler
-python -m venv .venv
+python3.12 -m venv .venv
 .venv/bin/python -m pip install -r requirements.lock
 .venv/bin/python -m unittest discover -s tests -v
 .venv/bin/python -m bastion_crawler --help
 ```
 
-La ayuda del código define CLI real; no documentar comandos conceptuales como disponibles. Tests offline no acreditan extracción en vivo, ACK receptor implementado ni integración S3/MySQL. Credenciales en entorno privado, nunca Git. No publicar estado SQLite, CSV reales, logs o documentos comerciales.
+Estas pruebas no acreditan extracción en vivo, ACK del receptor ni integración S3/MySQL. Credenciales y datos reales permanecen fuera de Git.
