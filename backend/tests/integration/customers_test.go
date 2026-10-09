@@ -338,6 +338,11 @@ func TestCustomersSelfTeamIDORAndImmediateRevocation(t *testing.T) {
 	if _, e := s.Core.DB.Exec(`INSERT INTO team_members VALUES(1,?)`, teamActor.UserID); e != nil {
 		t.Fatal(e)
 	}
+	foreignTeam := customerInput("Equipo ajeno")
+	foreignTeam.TeamID = "1"
+	if _, e := s.Save(ctx, owner, "", "foreign-team-create", foreignTeam); e != core.Forbidden {
+		t.Fatal("self scope assigned a foreign team", e)
+	}
 	ownID := makeCustomer(t, s, owner, "own-customer", customerInput("Propio"))
 	p := customerInput("Equipo")
 	p.TeamID = "1"

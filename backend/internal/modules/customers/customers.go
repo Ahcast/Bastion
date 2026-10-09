@@ -351,6 +351,17 @@ func (s *Service) Save(ctx context.Context, a core.Actor, id, key string, p Inpu
 		if e := s.Core.Authorize(ctx, tx, a, permission, a.UserID, p.TeamID, false); id == "" && e != nil {
 			return e
 		}
+		if id == "" && p.TeamID != "" {
+			var member int
+			if e := tx.QueryRowContext(ctx, `SELECT COUNT(*) FROM team_members WHERE team_id=? AND user_id=?`, p.TeamID, a.UserID).Scan(&member); e != nil {
+				return e
+			}
+			if member == 0 {
+				if e := s.Core.Authorize(ctx, tx, a, permission, "", "", false); e != nil {
+					return e
+				}
+			}
+		}
 		if id != "" && p.TeamID != old.TeamID {
 			if e := s.Core.Authorize(ctx, tx, a, permission, "", "", true); e != nil {
 				return e
