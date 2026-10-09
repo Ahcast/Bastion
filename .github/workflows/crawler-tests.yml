@@ -1,8 +1,7 @@
 name: Crawler tests
 on:
   push:
-    paths: ['backend/crawler/**', '.github/workflows/crawler-tests.yml']
-  pull_request:
+    branches: [main]
     paths: ['backend/crawler/**', '.github/workflows/crawler-tests.yml']
 permissions:
   contents: read
@@ -19,4 +18,5 @@ jobs:
           python-version: '3.12'
       - run: pip install -r requirements.lock
       - run: python -m unittest discover -s tests -v
+
 

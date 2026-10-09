@@ -1,21 +1,17 @@
-# Proyecto Bastion
+# Bastion
 
-Plataforma modular de Castillo IT. Frontend en español; nombres técnicos en inglés.
+Aplicación operativa de Castillo IT. Este repositorio contiene especificaciones para desarrollar todo el proyecto y un crawler Python existente; backend Go y frontend Angular aún no están implementados.
 
-| Ruta | Responsabilidad | Alojamiento |
+**Entrada del agente:** [AGENTS.md](AGENTS.md) → [maestro](docs/Proyecto_Bastion_Documento_Maestro.md) → [plan](docs/development/plan.md).
+
+| Ruta | Contenido | Alojamiento |
 | --- | --- | --- |
-| [frontend](frontend/README.md) | Angular, shell, Core visual y módulos | Bluehost |
-| [backend](backend/README.md) | Go: Core, módulos, API, MCP, crawler Python y workers | AWS Lightsail |
-| [BD](backend/database/README.md) | Esquema, migraciones y propiedad de datos | Percona/MySQL en Bluehost |
-| [Archivos](backend/storage/s3/README.md) | Binarios, documentos y respaldos | Amazon S3 |
-| [docs](docs/README.md) | Maestro, arquitectura, contratos y seguridad | GitHub |
+| [frontend](frontend/README.md) | Angular; Core visual, módulos y componentes compartidos | Bluehost |
+| [backend](backend/README.md) | Go/Core/API/MCP, crawler Python y workers | AWS Lightsail |
+| [docs](docs/README.md) | Especificaciones únicas, contratos y plan de implementación | GitHub |
+| backend/database (al implementar) | Migraciones SQL y acceso a datos | MySQL alojado en Bluehost |
+| S3 | Archivos privados, evidencia y backups | AWS |
 
-La ubicación del código no determina dónde se aloja la BD: su esquema pertenece al backend y el servidor permanece en Bluehost. El correo también permanece en Bluehost.
+Solo main está permitida. Los commits conservan versiones; no crear ramas adicionales. Ver [regla Git](docs/development/git-policy.md).
 
-Frontend: https://bastion.castilloit.net. API/MCP: https://api.bastion.castilloit.net (subdominio propuesto, DNS por validar).
-
-## Estado
-
-Core Go y Angular siguen siendo estructura documental; el crawler Python contiene implementación y pruebas. Reorganizar el repositorio no despliega ni migra servicios. No se agregan módulos de negocio.
-
-Leer el [maestro](docs/Proyecto_Bastion_Documento_Maestro.md), [Core](docs/architecture/core.md), [estructura](docs/architecture/core-modules.md) e [integración IA](docs/architecture/ai-integration.md). La IA se ejecuta externamente; Lightsail no ejecuta OCR ni modelos locales.
+No se despliega software ni se activa correo por actualizar documentación. Las capacidades externas sin verificar se registran en [estado](docs/development/status.md).

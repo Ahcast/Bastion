@@ -50,3 +50,4 @@ macros ni instrucciones AI. Escapar CSV al abrir en hojas de cálculo; processes
 preserva texto fuente, no es una hoja sanitizada. Entregar a AI mediante contexto
 no confiable y permisos delimitados en Bastion.
 
+

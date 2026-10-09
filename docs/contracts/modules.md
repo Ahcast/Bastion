@@ -19,5 +19,6 @@ Las migraciones mantendrán un orden global inequívoco. La habilitación no equ
 
 ## Pruebas
 
-`backend/tests/Core` y `tests/Modules` separan escenarios comunes y de negocio. Las pruebas de integración cubren permisos, duplicados, auditoría y coherencia REST/MCP. Se usan los contratos del Core sin duplicar seguridad.
+Pruebas Go junto a cada paquete separan escenarios comunes y de negocio; integración en backend/tests/integration. Las pruebas de integración cubren permisos, duplicados, auditoría y coherencia REST/MCP. Se usan los contratos del Core sin duplicar seguridad.
+
 

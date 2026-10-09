@@ -1,0 +1,45 @@
+name: Single branch policy
+on:
+  push:
+    branches: [main]
+  create:
+  delete:
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: single-branch-policy
+  cancel-in-progress: false
+jobs:
+  enforce:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            const {owner, repo} = context.repo;
+            const metadata = await github.rest.repos.get({owner, repo});
+            if (metadata.data.default_branch !== 'main') {
+              core.setFailed('Default branch must be main');
+              return;
+            }
+            const main = await github.rest.git.getRef({owner, repo, ref: 'heads/main'});
+            const branches = await github.paginate(github.rest.repos.listBranches, {owner, repo, per_page: 100});
+            for (const branch of branches.filter(b => b.name !== 'main')) {
+              const compare = await github.rest.repos.compareCommitsWithBasehead({owner, repo, basehead: `${branch.commit.sha}...${main.data.object.sha}`});
+              if (!['ahead', 'identical'].includes(compare.data.status) || compare.data.behind_by !== 0) {
+                core.setFailed(`Unexpected divergent branch: ${branch.name}; preserve its work before removal`);
+                continue;
+              }
+              const current = await github.rest.git.getRef({owner, repo, ref: `heads/${branch.name}`});
+              if (current.data.object.sha !== branch.commit.sha) {
+                core.setFailed(`Branch changed during check: ${branch.name}`);
+                continue;
+              }
+              await github.rest.git.deleteRef({owner, repo, ref: `heads/${branch.name}`});
+              core.info(`Removed merged branch ${branch.name}`);
+            }
+            const remaining = await github.paginate(github.rest.repos.listBranches, {owner, repo, per_page: 100});
+            if (remaining.length !== 1 || remaining[0].name !== 'main') {
+              core.setFailed('Repository must contain only main');
+            }

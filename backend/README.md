@@ -1,11 +1,7 @@
-# Backend Go — AWS Lightsail
+# Backend Go en AWS Lightsail
 
-Monolito modular Go con Core en `internal/core` y módulos en `internal/modules`. API REST y MCP llaman los mismos servicios de aplicación, validación y autorización. El crawler conserva Python en `crawler`.
+Leer [AGENTS](../AGENTS.md), [estructura](../docs/architecture/README.md), [Core](../docs/architecture/core.md) y [módulos](../docs/modules/README.md). API/MCP son adaptadores del mismo monolito. Backend Go aún no implementado.
 
-La BD permanece en Bluehost (Percona/MySQL 5.7.44-48 reportado); `database` contiene su esquema y contratos, no un servidor local. Archivos en S3; correo por SMTP Bluehost.
+Paquetes futuros backend/internal/core y backend/internal/modules; composición backend/cmd/server y worker; migraciones backend/database/migrations. Paquetes Go minúsculos, pruebas junto al paquete. Crear carpetas cuando contengan código, no README por cada paquete vacío.
 
-Workers y scheduler se ejecutan en Lightsail con límites, idempotencia y outbox durable. No OCR ni modelos locales. Objetivo inicial: 2 GB RAM, 2 vCPU, 60 GB SSD; requiere medir crawler y workers juntos.
-
-API/MCP en `api.bastion.castilloit.net` propuesto. Sesiones opacas, TOTP, RBAC y CSRF; CORS con origen exacto del frontend. OAuth delegado y librerías Go pendientes de selección y prueba, sin implementar criptografía o protocolo OAuth desde cero.
-
-Versión Go, dependencias y lockfiles se fijarán al implementar. Ver [Core](../docs/architecture/core.md) y [estructura](../docs/architecture/core-modules.md).
+[El crawler Python](crawler/README.md) ya existe y permanece aquí. MySQL remoto en Bluehost; archivos S3; SMTP/IMAP Bluehost. Workers/scheduler en Lightsail. Sin OCR ni modelos locales. [Plan](../docs/development/plan.md) define orden y aceptación.

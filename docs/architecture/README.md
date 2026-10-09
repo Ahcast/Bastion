@@ -1,161 +1,56 @@
-# Arquitectura y responsabilidades
+# Arquitectura y estructura
 
-Organización vigente: [Core y módulos](core-modules.md). El maestro vigente y el detalle del Core definen las rutas de implementación.
-
-Fuente: [Documento maestro vigente](../Proyecto_Bastion_Documento_Maestro.md). Alcance conceptual; implementación y validación técnica pendientes.
-
-# 4. Principios de arquitectura
-
-Las reglas base del proyecto son:
-
-1. **MySQL es la fuente de verdad de datos estructurados y transaccionales.**
-2. **S3 es almacenamiento histórico, documental, raw y de backups.**
-3. **GitHub es la fuente de verdad del código.**
-4. **Go controla la lógica empresarial.**
-5. **Angular es la interfaz principal para usuarios.**
-6. **Lightsail ejecuta extracción y tareas técnicas, no la lógica principal de negocio.**
-7. **Los agentes AI nunca acceden directamente a MySQL.**
-8. **AI utiliza API/MCP con permisos limitados.**
-9. **Las acciones críticas requieren autorización humana.**
-10. **Todo cambio importante queda auditado.**
-11. **El sistema debe operar aunque ChatGPT o Grok no estén disponibles temporalmente.**
-12. **El crawler nunca reemplaza el histórico: observa, acumula, compara, versiona y reporta.**
-13. **El sistema debe permitir agregar módulos futuros sin rediseñar el núcleo.**
-14. **No se implementarán microservicios prematuramente.**
-15. **La arquitectura inicial será un modular monolith.**
-
----
-
-
-# 6. Arquitectura general
+## Topología aprobada
 
 ```mermaid
 flowchart TB
-    U["Usuarios Angular"] --> API["Go API y políticas de autorización"]
-    WORK["ChatGPT Work y skills"] <-->|Herramientas| MCP["MCP Core"]
-    MCP --> API
-    API --> AI["AI y Workflow"]
-    AI --> DB["MySQL: tareas y resultados"]
-    API --> S3["S3 privado"]
-    API --> RAG["Recuperación de antecedentes"]
-    RAG --> DB
-    RAG --> S3
-    HC["HonduCompras"] --> CR["Crawler Lightsail"]
-    CR --> API
-    CR --> S3
-    BW["Backup worker Lightsail"] --> S3
-    GB["Grokbot RFQ"] <-->|API autorizada| API
-    API --> MAIL["Correo Bluehost"]
+  subgraph BH["Bluehost"]
+    FE["Angular estático"]
+    DB["Percona MySQL"]
+    MAIL["Correo SMTP e IMAP"]
+  end
+  subgraph LS["AWS Lightsail"]
+    CORE["Go Core y módulos"]
+    REST["REST API"]
+    MCP["MCP"]
+    CR["Crawler Python"]
+    WK["Workers y scheduler"]
+  end
+  FE -->|"HTTPS y sesión"| REST
+  REST --> CORE
+  MCP --> CORE
+  CORE -->|"Canal cifrado restringido"| DB
+  WK --> CORE
+  WK --> MAIL
+  CR -->|"Lotes y ACK"| REST
+  CORE --> S3["S3 privado"]
+  CR --> S3
+  WK -->|"Backups"| S3
+  WORK["Work y skills externos"] <-->|"Herramientas autorizadas"| MCP
+  CR --> HC["HonduCompras"]
 ```
 
-Core/API/MCP y módulos backend se ejecutan en AWS Lightsail; Angular y MySQL permanecen en Bluehost. Work ejecuta IA externamente; Grokbot y recepción de respuestas requieren conexión y runtime validados. No existe acceso directo de agentes a MySQL. [Detalle de conexiones](ai-integration.md).
+API propuesta api.bastion.castilloit.net; frontend bastion.castilloit.net. API/MCP rutas /api/v1, /api/internal/v1 y /mcp. Son orígenes diferentes: CORS exacto, credentials y CSRF explícito. Cookie __Host-bastion_session pertenece al host API, sin Domain. No asumir que Angular agrega automáticamente XSRF a otro origen.
 
----
+## Estructura de implementación
 
+| Ruta | Contenido |
+| --- | --- |
+| backend/cmd/server | Composición raíz de REST/MCP y registro de módulos |
+| backend/cmd/worker | Ejecución de jobs y outbox |
+| backend/internal/core | identity, access, settings, api, mcp, audit, messaging, files, execution, contracts y registro modular |
+| backend/internal/modules | customers, suppliers, processes, quotes, purchaseorders, invoices, expenses, reports, collaboration, workflow, ai |
+| backend/database/migrations | Migraciones SQL globalmente ordenadas |
+| backend/crawler | Python existente; no convertir a Go por defecto |
+| backend/deploy | Configuración Go/systemd y despliegue backend al implementarlo |
+| frontend/src/app/core | Sesión/API, shell, guards, Inicio y Configuración |
+| frontend/src/app/modules | Módulos funcionales; carpetas purchase-orders y demás nombres técnicos |
+| frontend/src/app/shared | Componentes/pipes/directivas reutilizables, sin negocio |
+| docs/modules | Una especificación por módulo |
+| scripts | Verificaciones del repositorio |
 
-# 7. Responsabilidad por ubicación
+No crear carpetas vacías por cada concepto. Paquetes Go en minúsculas; estructura interna solo cuando tenga código. Mantener pruebas *_test.go junto al paquete y pruebas de integración acotadas.
 
-## 7.1 Bluehost — frontend, BD y correo
+Core no importa módulos concretos. Composición raíz inyecta contratos; módulos no escriben tablas de otros propietarios. REST y MCP llaman servicios internamente, sin HTTP a la propia API. Listados/agregados autorizados; integración entre módulos por servicios públicos/eventos. Eventos y auditoría de efectos relevantes en transacción con outbox.
 
-Aloja Angular estático, Percona/MySQL y correo. MySQL conserva usuarios, permisos, datos comerciales, versiones, tareas, resultados IA, auditoría y metadatos. El navegador nunca conecta directamente a MySQL.
-
-## 7.2 AWS Lightsail — backend y ejecución
-
-Ejecuta el monolito Go (Core, módulos, REST API, MCP, autenticación, RBAC, aprobaciones, auditoría e importador), crawler Python, scheduler y workers de correo, outbox y backup. Go accede a MySQL remoto en Bluehost mediante canal cifrado verificado y pool limitado. Crawler entrega a la API en Lightsail; conserva estado técnico SQLite y raw en S3. No hay OCR ni inferencia local en Lightsail.
-
-## 7.3 Amazon S3
-
-Almacena:
-
-- raw del crawler;
-- CSV;
-- JSON;
-- run manifests;
-- error manifests;
-- documentos históricos;
-- PDFs;
-- datasheets;
-- snapshots;
-- backups MySQL;
-- backups de archivos;
-- documentos generados;
-- archivos de colaboración.
-
-No reemplaza MySQL.
-
-## 7.4 GitHub
-
-Almacena:
-
-- código;
-- migrations;
-- tests;
-- documentación;
-- configuración no secreta;
-- scripts;
-- workflows CI/CD;
-- infraestructura declarativa.
-
-Nunca almacenar:
-
-- `.env`;
-- contraseñas;
-- API keys;
-- AWS keys;
-- dumps SQL;
-- CSV empresariales;
-- documentos sensibles.
-
----
-
-
-# 42. Data ownership
-
-| Tipo de dato | Fuente de verdad |
-|---|---|
-| usuarios | MySQL |
-| roles/permisos | MySQL |
-| clientes | MySQL |
-| proveedores | MySQL |
-| procesos actuales | MySQL |
-| versiones de procesos | MySQL |
-| raw crawler | S3 |
-| crawler technical state | SQLite Lightsail |
-| cotizaciones | MySQL |
-| OC | MySQL |
-| facturas | MySQL |
-| gastos | MySQL |
-| documentos físicos | S3 |
-| metadata documentos | MySQL |
-| código | GitHub |
-| backups | S3 |
-| prompts/config AI | GitHub/MySQL según uso |
-| Recuperación RAG | MySQL para índices/metadatos y S3 para fuentes/texto; vector search opcional |
-
----
-
-
-# 43. Conexiones entre componentes
-
-| Origen | Destino | Mecanismo |
-|---|---|---|
-| Angular | Go | HTTPS REST JSON |
-| Go | MySQL | conexión remota cifrada AWS → Bluehost |
-| Go | S3 | AWS SDK/HTTPS |
-| Lightsail | HonduCompras | HTTP(S) |
-| Lightsail | S3 | boto3/AWS CLI HTTPS |
-| Crawler Lightsail | Backend Go Lightsail | HTTPS API con token, idempotencia y ACK de importación |
-| Lightsail backup worker | Bluehost | SSH/SFTP/rsync |
-| GitHub Actions | Lightsail | SSH |
-| GitHub Actions | Bluehost | SSH/SFTP/nativo pendiente |
-| ChatGPT | Bastion | MCP/API HTTPS |
-| Grok | Bastion | MCP/API HTTPS |
-| Office Assistant | Bastion | MCP + OAuth delegated identity |
-| Bastion | Email | connector/API/SMTP según diseño final |
-
----
-
-## Integración IA vigente
-
-Ver [pipeline IA](ai-integration.md), [contrato](../contracts/ai-pipeline.md) y [presentación](../modules/ai-results.md). ChatGPT Work consulta pendientes y guarda resultados mediante MCP; Go no invoca Plus como API. Recuperación inicial en Go/MySQL sobre documentos S3; no requiere servidor vectorial dedicado. Grokbot y recepción de respuestas usan contratos autorizados pendientes de implementación.
-
+MySQL Bluehost es fuente maestra; SQLite crawler solo estado técnico. S3 no reemplaza transacciones. No incluir servidor MySQL en deploy AWS. Lectura de buzón por worker Lightsail con límites; OCR futuro externo.

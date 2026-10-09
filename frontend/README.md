@@ -1,32 +1,5 @@
-# Frontend y menú aprobado
+# Angular en Bluehost
 
-Organización vigente: [Core y módulos](../docs/architecture/core-modules.md). El maestro vigente y el detalle del Core definen las rutas de implementación.
+Código pendiente de implementación. Leer [frontend](../docs/frontend.md), [módulos](../docs/modules/README.md), [idioma](../docs/idioma.md) y [stack](../docs/development/stack.md).
 
-Fuente: [Documento maestro vigente](../docs/Proyecto_Bastion_Documento_Maestro.md). Alcance conceptual; implementación y validación técnica pendientes.
-
-# 10. Módulos de la aplicación
-
-Menú aprobado:
-
-```text
-Inicio
-Clientes
-Proveedores
-Órdenes de Compra
-Cotizaciones
-Facturas
-Gastos
-Reportes
-Procesos
-Colaboración
-Configuración
-```
-
----
-
-
-Baseline propuesto en sección 8.1: Angular 22.x, TypeScript 6.x, RxJS 7.x y Node.js 24 LTS para build; sujeto a revisión senior.
-
-## Idioma obligatorio
-Todas las vistas y textos visibles para usuarios están en español. Los nombres técnicos de carpetas y componentes pueden conservarse en inglés. Ver [política de idioma](../docs/idioma.md).
-
+Core visual en src/app/core, módulos en src/app/modules, shared reutilizable. Angular se compila fuera del hosting; solo assets públicos en ~/public_html/website_091cdca8. Backend en AWS; configuración pública API sin secretos. CORS/credenciales/CSRF deben probarse en navegador con dos orígenes. Cálculo financiero definitivo en Go.

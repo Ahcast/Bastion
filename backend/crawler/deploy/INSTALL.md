@@ -43,3 +43,4 @@ Logs: journalctl -u bastion-crawler -u bastion-retry. Configurar límite journal
 monitor externo que consulte status y espacio libre. El límite MemoryMax=600M es
 un techo de protección, no una medida de consumo observada.
 
+

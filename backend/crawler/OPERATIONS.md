@@ -101,3 +101,4 @@ importación. `retry` procesa pendientes y registra el resultado en runs y deliv
 ## Destino actualizado
 
 El receptor objetivo es la API Go en Lightsail; MySQL permanece en Bluehost. Configurar la URL API para ese receptor una vez implementado y validado. El identificador interno `bluehost` y el modo FTPS del cliente existente se conservan por compatibilidad con su estado SQLite y pruebas: no significan que el backend se ejecute allí. FTPS es legado, no transporte objetivo. No cambiar nombres persistidos sin migración ni activar entregas sin ACK de importación validado.
+

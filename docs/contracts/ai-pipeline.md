@@ -66,3 +66,4 @@ Costos, proveedores, márgenes y notas son internos; no se exportan al cliente a
 ## Aceptación al implementar
 Duplicados concurrentes; caída tras guardar; lease vencido; resultado tardío; revocación; entrada parcial; incompatibilidad técnica; RFQ duplicada/ambigua; timeout SMTP; documentos no autorizados; cotización existente editada; límite de Work alcanzado conservando pendientes.
 
+

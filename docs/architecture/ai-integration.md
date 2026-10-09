@@ -144,3 +144,4 @@ KPIs: oportunidades sin puntuar, antigüedad de pendientes, cierre cercano, RFQ 
 - [S3 Vectors](https://docs.aws.amazon.com/AmazonS3/latest/userguide/s3-vectors.html).
 Consultadas en la conversación el 7 de octubre de 2026; validar capacidades y condiciones de cuenta antes de implementación.
 
+

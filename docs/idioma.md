@@ -1,6 +1,6 @@
 # Idioma de la interfaz y nomenclatura técnica
 
-Organización vigente: [Core y módulos](architecture/core-modules.md). El maestro vigente y el detalle del Core definen las rutas de implementación.
+Organización vigente: [Core y módulos](architecture/README.md). El maestro vigente y el detalle del Core definen las rutas de implementación.
 
 ## Interfaz en español — obligatorio
 La interfaz de Bastion y sus vistas deben estar en español.
@@ -28,5 +28,6 @@ Las secciones técnicas del frontend pueden llamarse dashboard, customers, suppl
 | collaboration | Colaboración |
 | settings | Configuración |
 
-Esta instrucción sustituye el requisito anterior de traducir carpetas y módulos técnicos. El documento maestro original se conserva íntegro.
+Esta instrucción sustituye el requisito anterior de traducir carpetas y módulos técnicos. Las especificaciones vigentes están consolidadas en el índice de documentación.
+
 

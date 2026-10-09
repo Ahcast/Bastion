@@ -1,30 +1,27 @@
-# Documentación
+# Mapa de documentación
 
-El [documento maestro vigente v0.7](Proyecto_Bastion_Documento_Maestro.md) consolida alcance y decisiones transversales. Leerlo antes del detalle del área. Las versiones anteriores se consultan en Git, no son instrucciones alternativas de implementación.
+Cada tema tiene una fuente única. No se reproducen capítulos del maestro en cada carpeta.
 
-## Referencias vigentes
+| Tema | Documento |
+| --- | --- |
+| Alcance y hosting aprobados | [Maestro](Proyecto_Bastion_Documento_Maestro.md) |
+| Instrucciones del agente | [AGENTS](../AGENTS.md) |
+| Topología y estructura | [Arquitectura](architecture/README.md) |
+| Tecnologías | [Stack](development/stack.md) |
+| Secuencia y aceptación | [Plan](development/plan.md) |
+| Trabajo hecho y bloqueos | [Estado](development/status.md) |
+| Decisiones y contradicciones resueltas | [Decisiones](development/decisions.md) |
+| Una sola rama | [Política Git](development/git-policy.md) |
+| Identidad, permisos, seguridad y servicios compartidos | [Core](architecture/core.md) |
+| Datos y nomenclatura | [Modelo](data-model.md) |
+| API/MCP | [Contrato](contracts/api-mcp.md) |
+| Registro modular | [Módulos](contracts/modules.md) |
+| Funcionalidades por módulo | [Índice](modules/README.md) |
+| Interfaz e Inicio/Configuración | [Frontend](frontend.md) |
+| Pipeline IA | [Integración](architecture/ai-integration.md), [contrato](contracts/ai-pipeline.md) |
+| RAG y resultados | [RAG](knowledge-rag/README.md), [UX IA](modules/ai-results.md) |
+| Crawler existente y ACK | [Operación](../backend/crawler/OPERATIONS.md), [contrato](../backend/crawler/docs/IMPORT_CONTRACT.md) |
+| Deploy, backup, monitorización | [Operaciones](operations.md) |
+| Idioma | [Español](idioma.md) |
 
-- [Arquitectura objetivo Oficina AI v2](architecture/oficina-ai-v2.md)
-- [Lineamientos por módulo](modules/README.md)
-- [Core](architecture/core.md)
-- [Separación Core y módulos](architecture/core-modules.md)
-- [Contrato modular](contracts/modules.md)
-- [Seguridad](security/README.md)
-- [Crawler](contracts/crawler-import.md)
-- [API/MCP](contracts/api-mcp.md)
-- [Observabilidad](observability/README.md)
-- [Roadmap](roadmap/README.md)
-- [RAG de precios: S3 y MySQL](knowledge-rag/README.md)
-- [Integración y pipeline IA](architecture/ai-integration.md)
-- [Contrato de tareas IA](contracts/ai-pipeline.md)
-- [Presentación de resultados](modules/ai-results.md)
-- [Despliegue](deployment/README.md)
-
-[Política de idioma](idioma.md): interfaz y contenido visible en español; nombres técnicos en inglés permitidos.
-
-## Precedencia de arquitectura
-
-`architecture/oficina-ai-v2.md` recoge la arquitectura general. `architecture/ai-integration.md` desarrolla y actualiza la ejecución de IA: ChatGPT Work/Plus y skills mediante MCP, tareas/resultados en Bastion y RAG inicial S3/MySQL. Bluehost aloja Angular, MySQL y email. AWS Lightsail aloja backend Go, API, MCP, crawler y workers. Crawler y backup workers permanecen en AWS Lightsail; GitHub Actions se limita a CI/CD. Core mantiene identidad, API/MCP y seguridad. Los documentos describen objetivos, no conexiones o despliegues verificados.
-
-Los documentos de módulos preservan las funcionalidades legacy verificadas, pero aplican seguridad server-side, persistencia transaccional en MySQL, archivos privados en S3, idempotencia, auditoría, eventos y conexión controlada con IA.
-
+Documentos eliminados por duplicación siguen en el historial Git; no son instrucciones vigentes. No se pierde el alcance comercial por consolidar archivos.
