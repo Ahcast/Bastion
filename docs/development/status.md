@@ -1,6 +1,6 @@
 # Estado del proyecto
 
-Actualizado el 9 de octubre de 2026. Core 0.1.0 publicado y validado en CI; Clientes 0.1.0 implementado localmente, pendiente de cierre de CI. Producción no desplegada.
+Actualizado el 9 de octubre de 2026. Core 0.1.0 publicado y validado en CI; Clientes 0.1.0 publicado y validado en pruebas locales y CI; unidad 1 cerrada. Producción no desplegada.
 
 | Área | Estado real |
 | --- | --- |
@@ -14,7 +14,7 @@ Actualizado el 9 de octubre de 2026. Core 0.1.0 publicado y validado en CI; Clie
 | MCP | SDK oficial Streamable HTTP, bearer técnico limitado y conformance por SDK cliente; OAuth/Work pendientes |
 | Frontend Angular | Core de sesión, shell, Inicio y Configuración implementados; UI española; build y tests |
 | Crawler Python | Conservado sin cambios; 17 pruebas offline satisfactorias; receptor Processes aún pendiente |
-| Clientes | Ficha/catálogo Go y Angular, contactos/direcciones/notas, historial, snapshots/resolución exacta, permisos y documentos implementados; CI por cerrar |
+| Clientes | Ficha/catálogo Go y Angular, contactos/direcciones/notas, historial, snapshots/resolución exacta, permisos y documentos implementados; pruebas locales y CI aprobados |
 | Demás módulos comerciales | Pendientes; se implementan de uno en uno tras cerrar pruebas y CI del anterior |
 | Despliegue | Templates systemd/nginx/Bluehost preparados; no instalados ni desplegados |
 | Infraestructura real | MySQL TLS/túnel/hosting, DNS/HTTPS, S3/IAM, SMTP y memoria conjunta con crawler pendientes |
@@ -45,8 +45,8 @@ Código: backend/internal/modules/customers, internal/composition, migración 00
 - SDK oficial MCP verifica search_customers/get_customer, identidad contextual y revocación; no habilita OAuth Work ni escritura de agentes.
 - npm ci, build y 8 pruebas Angular satisfactorios (4 Core y 4 Clientes). Ficha mantiene edición y clave ante fallo, no envía campos protegidos, respeta lector y paginación del backend. UI usa locale es-HN.
 - Dos flujos de navegador contra MySQL/API/Angular reales satisfactorios: Core y Clientes. Clientes verifica alta/contacto/nota/edición persistida/duplicado/inactivación y filtros.
-- 17 pruebas crawler satisfactorias; gofmt, vet, builds y documentación verificados. Primer CI remoto 37992217291 bloqueó backend/browser antes de ejecutar pruebas por toomanyrequests al descargar MySQL de Docker Hub; frontend/documentación/rama única pasaron. Se cambió solo CI al mirror oficial ECR Public, con MySQL 5.7.44 y digest verificado. La repetición [37992513329](https://github.com/Ahcast/Bastion/actions/runs/37992513329) pasó backend/frontend/browser. El ajuste de DTO de resumen y conexión de lectura team/revocación pasó [37993337101](https://github.com/Ahcast/Bastion/actions/runs/37993337101). La última revisión bloquea create self hacia equipos ajenos y lo comprueba en MySQL; CI de este último control pendiente. No comenzar Proveedores hasta cerrarlo.
+- 17 pruebas crawler satisfactorias; gofmt, vet, builds y documentación verificados. Código final [ee296bd](https://github.com/Ahcast/Bastion/commit/ee296bd8a433701c028f625d45f7ba919d8a3950): [Core checks 37994052282](https://github.com/Ahcast/Bastion/actions/runs/37994052282) pasó backend con race detector/MySQL 5.7/builds, Angular y navegador real. También pasaron [documentación](https://github.com/Ahcast/Bastion/actions/runs/37994052191) y [rama única](https://github.com/Ahcast/Bastion/actions/runs/37994052247). Incluye DTO de resumen separado de ficha, conexión de lectura team/revocación y rechazo de create self hacia equipos ajenos. La incidencia inicial de descarga del contenedor y su solución están registradas en decisions.md. Todas las pruebas de aceptación de esta unidad cerradas; conexiones productivas externas mantienen los límites indicados arriba.
 
 ## Continuidad
 
-Orden: Clientes → Proveedores → Procesos/receptor crawler → Cotizaciones → OC de clientes → Facturas/pagos → Gastos → Reportes → Colaboración; Workflow/AI según dependencias. Proveedores no iniciado. Cerrar CI de Clientes y registrar evidencia antes de pasar al siguiente. Mantener all/self/team, snapshots, transacciones y permisos mínimos en cada unidad. No se han desplegado servicios ni migrado datos productivos.
+Orden: Clientes → Proveedores → Procesos/receptor crawler → Cotizaciones → OC de clientes → Facturas/pagos → Gastos → Reportes → Colaboración; Workflow/AI según dependencias. Clientes cerrado con evidencia local y CI satisfactoria; Proveedores es la siguiente unidad y todavía no se ha iniciado. Antes de cualquier código de Proveedores, leer su especificación y definir contrato/migración/DTO/permisos/aceptación; aplicar el mismo cierre de pruebas y CI. Mantener all/self/team, snapshots, transacciones y permisos mínimos en cada unidad. No se han desplegado servicios ni migrado datos productivos.
