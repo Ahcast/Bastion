@@ -29,3 +29,9 @@ Por unidad: fase/alcance, archivos, migraciones/contratos cambiados, comandos/pr
 - SMTP/IMAP y cuentas; autorización para envíos reales.
 - Series/fiscalidad y plantillas de documentos oficiales.
 - Work/MCP y ejecutor RFQ; criterios comerciales/hora/lotes.
+
+## Verificación de consolidación
+
+9 de octubre de 2026: 17 pruebas offline del crawler satisfactorias; enlaces internos verificados. Commit cbe7a5ac5168f17dea9fc5430339eaad828b34b3 publicado en main; CI Documentation checks, Crawler tests y Single branch policy satisfactorio. API GitHub verificó exactamente una rama: main; tres refs anteriores eliminadas, commits preservados en historial.
+
+GitHub devolvió 403 al consultar rulesets: exige GitHub Pro o repositorio público para habilitarlos en este repositorio. Mantener privado. No se habilitó bloqueo preventivo de creación; regla obligatoria y limpieza reactiva activas. Esta limitación requiere cambio de plan para garantía preventiva, no otro workflow.

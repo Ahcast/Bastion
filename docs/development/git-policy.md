@@ -13,3 +13,7 @@ Workflow single-branch corre al publicar en main y al crear/borrar refs. Lista t
 Este control es reactivo: puede existir una rama durante el intervalo entre creación y limpieza. Para prohibir su creación en todo momento se requiere ruleset GitHub activo para todas las ramas salvo main, con Restrict creations y sin bypass de bots, más reglas de main compatibles con commits directos. Su disponibilidad depende del plan/permisos y no se acredita mediante un Markdown o un check CI.
 
 La limpieza actual conserva los SHA de las ramas antiguas como padres del commit consolidado; no crea ramas de backup ni tags adicionales. El historial queda accesible desde main. Verificar después que la API lista exactamente main.
+
+## Resultado verificado
+
+Las tres ramas anteriores se eliminaron y solo main permanece. CI de limpieza pasó. GitHub devolvió 403: rulesets requieren GitHub Pro o repositorio público; mantener la privacidad actual. No afirmar que creación esté bloqueada preventivamente con el plan actual.
