@@ -435,8 +435,12 @@ func (s *Service) CreateService(ctx context.Context, a Actor, name string, scope
 		if e := s.Authorize(ctx, tx, a, "core.services.manage", "", "", true); e != nil {
 			return e
 		}
+		var team string
+		if e := tx.QueryRowContext(ctx, `SELECT team_id FROM team_members WHERE user_id=? ORDER BY team_id LIMIT 1`, a.UserID).Scan(&team); e != nil && e != sql.ErrNoRows {
+			return e
+		}
 		for _, p := range scopes {
-			if e := s.Authorize(ctx, tx, a, p, a.UserID, "", false); e != nil {
+			if e := s.Authorize(ctx, tx, a, p, a.UserID, team, false); e != nil {
 				return e
 			}
 		}

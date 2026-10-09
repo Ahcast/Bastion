@@ -6,6 +6,7 @@ import { Client } from "../../core/api/client";
 export interface Contact { name:string;role:string;phone:string;email:string }
 export interface Address { label:string;address:string }
 export interface Customer { id:string;name:string;rtn:string;contact_name:string;phone:string;email:string;address:string;institution_type:string;is_active:boolean;team_id:string;version:string;contacts:Contact[];addresses:Address[] }
+type CustomerSummary=Pick<Customer,"id"|"name"|"rtn"|"email"|"is_active"|"version">;
 interface Page<T> {data:T[];total:number;page:number;per_page:number}
 interface Note {id:string;body:string;user_name:string;created_at:string}
 interface History {id:string;action:string;actor_name:string;created_at:string;details:{version?:string}}
@@ -14,12 +15,12 @@ const empty=():Customer=>({id:"",name:"",rtn:"",contact_name:"",phone:"",email:"
 
 @Component({imports:[FormsModule,DatePipe],templateUrl:"./customers.html",styles:[`fieldset { display:grid; gap:.9rem; border:1px solid #d6e1e8; margin:.5rem 0; padding:1rem; min-width:0 } legend {padding:0 .4rem;font-weight:600}`]})
 export class Customers implements OnInit {
- api=inject(Client);rows=signal<Customer[]>([]);total=signal(0);loading=signal(false);busy=signal(false);error=signal("");message=signal("");editor=signal<Customer|null>(null);
+ api=inject(Client);rows=signal<CustomerSummary[]>([]);total=signal(0);loading=signal(false);busy=signal(false);error=signal("");message=signal("");editor=signal<Customer|null>(null);
  teams=signal<{id:string;name:string}[]>([]);notes=signal<Note[]>([]);history=signal<History[]>([]);documents=signal<Document[]>([]);personalFiles=signal<Document[]>([]);
  search="";rtn="";active="true";page=1;perPage=25;note="";notePage=1;noteTotal=signal(0);historyPage=1;historyTotal=signal(0);documentPage=1;documentTotal=signal(0);personalPage=1;selectedDocument="";
  password="";factor="";private pending=new Map<string,{body:string,key:string}>();
  async ngOnInit(){await this.load();try{this.teams.set((await this.api.get<{data:{id:string;name:string}[]}>("/customers/teams")).data)}catch(e){this.error.set(this.api.message(e))}}
- async load(reset=false){if(reset)this.page=1;this.loading.set(true);this.error.set("");try{const q=new URLSearchParams({search:this.search,rtn:this.rtn,page:String(this.page),per_page:String(this.perPage)});if(this.active!=="")q.set("is_active",this.active);const p=await this.api.get<Page<Customer>>("/customers?"+q);this.rows.set(p.data);this.total.set(p.total)}catch(e){this.error.set(this.api.message(e));this.rows.set([]);this.total.set(0)}finally{this.loading.set(false)}}
+ async load(reset=false){if(reset)this.page=1;this.loading.set(true);this.error.set("");try{const q=new URLSearchParams({search:this.search,rtn:this.rtn,page:String(this.page),per_page:String(this.perPage)});if(this.active!=="")q.set("is_active",this.active);const p=await this.api.get<Page<CustomerSummary>>("/customers?"+q);this.rows.set(p.data);this.total.set(p.total)}catch(e){this.error.set(this.api.message(e));this.rows.set([]);this.total.set(0)}finally{this.loading.set(false)}}
  create(){this.editor.set(empty());this.clearDetails();this.error.set("");this.message.set("")}
  clearDetails(){this.notes.set([]);this.history.set([]);this.documents.set([]);this.note="";this.notePage=1;this.historyPage=1;this.documentPage=1;this.selectedDocument="";this.personalFiles.set([]);this.personalPage=1;this.noteTotal.set(0);this.historyTotal.set(0);this.documentTotal.set(0)}
  async open(id:string){this.busy.set(true);this.error.set("");try{this.editor.set(await this.api.get<Customer>("/customers/"+id));this.clearDetails();await this.loadNotes();await this.loadHistory()}catch(e){this.editor.set(null);this.error.set(this.api.message(e))}finally{this.busy.set(false)}}

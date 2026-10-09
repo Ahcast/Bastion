@@ -179,6 +179,12 @@ func TestCustomersCRUDSnapshotFiltersNotesHistoryAndVersions(t *testing.T) {
 	if e != nil || list.Total != 4 || len(list.Data) != 2 {
 		t.Fatal(list, e)
 	}
+	encoded, _ := json.Marshal(list.Data[0])
+	var summary map[string]any
+	_ = json.Unmarshal(encoded, &summary)
+	if _, ok := summary["contacts"]; ok {
+		t.Fatal("list misrepresented unloaded contacts as empty")
+	}
 	list, e = s.List(ctx, a, customers.Filter{Page: 1, PerPage: 5, Search: "institucion editada"})
 	if e != nil || list.Total != 1 {
 		t.Fatal(list, e)
@@ -349,6 +355,33 @@ func TestCustomersSelfTeamIDORAndImmediateRevocation(t *testing.T) {
 	if e != nil || list.Total != 1 || list.Data[0].ID != teamID {
 		t.Fatal("team list", list, e)
 	}
+	// A narrowly granted operator can create a read-only connection for its own team.
+	r, e := s.Core.DB.Exec(`INSERT INTO roles(name) VALUES('Conexiones técnicas de prueba')`)
+	if e != nil {
+		t.Fatal(e)
+	}
+	rid, e := r.LastInsertId()
+	if e != nil {
+		t.Fatal(e)
+	}
+	if _, e = s.Core.DB.Exec(`INSERT INTO role_permissions VALUES(?,'core.services.manage','all')`, rid); e != nil {
+		t.Fatal(e)
+	}
+	if _, e = s.Core.DB.Exec(`INSERT INTO user_roles VALUES(?,?)`, teamActor.UserID, rid); e != nil {
+		t.Fatal(e)
+	}
+	tokenResult, e := s.Core.CreateService(ctx, teamActor, "Equipo lectura", []string{"clientes.view"}, time.Now().Add(time.Hour))
+	if e != nil {
+		t.Fatal("team token creation", e)
+	}
+	serviceActor, e := s.Core.AuthenticateService(ctx, tokenResult.(map[string]any)["token"].(string))
+	if e != nil {
+		t.Fatal(e)
+	}
+	serviceList, e := s.List(ctx, serviceActor, customers.Filter{Page: 1, PerPage: 10})
+	if e != nil || serviceList.Total != 1 || serviceList.Data[0].ID != teamID {
+		t.Fatal("MCP team scope", serviceList, e)
+	}
 	c, e := s.Get(ctx, teamActor, teamID)
 	if e != nil {
 		t.Fatal(e)
@@ -375,6 +408,9 @@ func TestCustomersSelfTeamIDORAndImmediateRevocation(t *testing.T) {
 	}
 	if _, e = s.Get(ctx, teamActor, teamID); e != core.Forbidden {
 		t.Fatal("membership revocation", e)
+	}
+	if _, e = s.List(ctx, serviceActor, customers.Filter{Page: 1, PerPage: 10}); e != core.Forbidden {
+		t.Fatal("service retained revoked team access", e)
 	}
 	if _, e := s.Core.DB.Exec(`DELETE FROM user_roles WHERE user_id=?`, owner.UserID); e != nil {
 		t.Fatal(e)

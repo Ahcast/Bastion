@@ -160,128 +160,25 @@
               "type": "string",
               "maxLength": 30
             },
-            "contact_name": {
-              "type": "string",
-              "maxLength": 120
-            },
-            "phone": {
-              "type": "string",
-              "maxLength": 50
-            },
             "email": {
               "type": "string",
               "maxLength": 254
             },
-            "address": {
-              "type": "string",
-              "maxLength": 1000
-            },
-            "institution_type": {
-              "type": "string",
-              "maxLength": 12,
-              "enum": [
-                "public",
-                "private",
-                "other"
-              ]
-            },
-            "team_id": {
-              "type": "string"
+            "is_active": {
+              "type": "boolean"
             },
             "version": {
               "type": "string",
               "pattern": "^[1-9][0-9]*$"
-            },
-            "created_by": {
-              "type": "string",
-              "pattern": "^[1-9][0-9]*$"
-            },
-            "updated_by": {
-              "type": "string",
-              "pattern": "^[1-9][0-9]*$"
-            },
-            "created_at": {
-              "type": "string"
-            },
-            "updated_at": {
-              "type": "string"
-            },
-            "is_active": {
-              "type": "boolean"
-            },
-            "contacts": {
-              "type": "array",
-              "maxItems": 20,
-              "items": {
-                "type": "object",
-                "properties": {
-                  "name": {
-                    "type": "string",
-                    "maxLength": 120
-                  },
-                  "role": {
-                    "type": "string",
-                    "maxLength": 100
-                  },
-                  "phone": {
-                    "type": "string",
-                    "maxLength": 50
-                  },
-                  "email": {
-                    "type": "string",
-                    "maxLength": 254
-                  }
-                },
-                "required": [
-                  "name",
-                  "role",
-                  "phone",
-                  "email"
-                ],
-                "additionalProperties": false
-              }
-            },
-            "addresses": {
-              "type": "array",
-              "maxItems": 20,
-              "items": {
-                "type": "object",
-                "properties": {
-                  "label": {
-                    "type": "string",
-                    "maxLength": 80
-                  },
-                  "address": {
-                    "type": "string",
-                    "maxLength": 1000
-                  }
-                },
-                "required": [
-                  "label",
-                  "address"
-                ],
-                "additionalProperties": false
-              }
             }
           },
           "required": [
             "id",
             "name",
             "rtn",
-            "contact_name",
-            "phone",
             "email",
-            "address",
-            "institution_type",
-            "team_id",
-            "version",
-            "created_by",
-            "updated_by",
-            "created_at",
-            "updated_at",
             "is_active",
-            "contacts",
-            "addresses"
+            "version"
           ],
           "additionalProperties": false
         }
@@ -305,6 +202,43 @@
       "total",
       "page",
       "per_page"
+    ],
+    "additionalProperties": false
+  },
+  "summary": {
+    "type": "object",
+    "properties": {
+      "id": {
+        "type": "string",
+        "pattern": "^[1-9][0-9]*$"
+      },
+      "name": {
+        "type": "string",
+        "maxLength": 180
+      },
+      "rtn": {
+        "type": "string",
+        "maxLength": 30
+      },
+      "email": {
+        "type": "string",
+        "maxLength": 254
+      },
+      "is_active": {
+        "type": "boolean"
+      },
+      "version": {
+        "type": "string",
+        "pattern": "^[1-9][0-9]*$"
+      }
+    },
+    "required": [
+      "id",
+      "name",
+      "rtn",
+      "email",
+      "is_active",
+      "version"
     ],
     "additionalProperties": false
   }

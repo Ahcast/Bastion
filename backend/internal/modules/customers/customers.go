@@ -68,10 +68,21 @@ type Filter struct {
 	PerPage int    `json:"per_page"`
 }
 type List struct {
-	Data    []Customer `json:"data"`
-	Total   int64      `json:"total"`
-	Page    int        `json:"page"`
-	PerPage int        `json:"per_page"`
+	Data    []Summary `json:"data"`
+	Total   int64     `json:"total"`
+	Page    int       `json:"page"`
+	PerPage int       `json:"per_page"`
+}
+
+// List results are summaries; only Get returns a complete editable aggregate.
+// Omitted collections must never be confused with empty persisted collections.
+type Summary struct {
+	ID      string `json:"id"`
+	Name    string `json:"name"`
+	RTN     string `json:"rtn"`
+	Email   string `json:"email"`
+	Active  bool   `json:"is_active"`
+	Version uint64 `json:"version,string"`
 }
 type Note struct {
 	ID        string    `json:"id"`
@@ -266,7 +277,7 @@ func (s *Service) Get(ctx context.Context, a core.Actor, id string) (Customer, e
 	return c, e
 }
 func (s *Service) List(ctx context.Context, a core.Actor, f Filter) (List, error) {
-	out := List{Data: []Customer{}, Page: f.Page, PerPage: f.PerPage}
+	out := List{Data: []Summary{}, Page: f.Page, PerPage: f.PerPage}
 	if f.Page < 1 || f.Page > 100000 || f.PerPage < 1 || f.PerPage > 100 || !text(f.Search, 180, true) {
 		return out, core.Invalid
 	}
@@ -303,7 +314,7 @@ func (s *Service) List(ctx context.Context, a core.Actor, f Filter) (List, error
 		if e != nil {
 			return out, e
 		}
-		out.Data = append(out.Data, c)
+		out.Data = append(out.Data, Summary{c.ID, c.Name, c.RTN, c.Email, c.Active, c.Version})
 	}
 	return out, rows.Err()
 }
