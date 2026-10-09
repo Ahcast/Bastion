@@ -1,0 +1,49 @@
+package core
+
+import (
+	"context"
+	"database/sql"
+	"github.com/Ahcast/Bastion/backend/internal/core/security"
+)
+
+// EmitEvent records business facts in the same transaction as their aggregate.
+// Events have no implicit job, email or AI consumer.
+func (s *Service) EmitEvent(ctx context.Context, tx *sql.Tx, a Actor, topic, entity, id string, version uint64) error {
+	_, e := tx.ExecContext(ctx, `INSERT INTO domain_events VALUES(?,?,1,?,?,?,?,?,UTC_TIMESTAMP(6))`, security.ID(), topic, entity, id, version, a.UserID, a.CorrelationID)
+	return e
+}
+
+type DocumentPolicy func(context.Context, Querier, Actor, string, bool) error
+
+// BindDocument is the only public cross-module write to document ownership links.
+func (s *Service) BindDocument(ctx context.Context, tx *sql.Tx, a Actor, id, entity, entityID string, version uint64) error {
+	policy, ok := s.DocumentPolicies[entity]
+	if !ok {
+		return Forbidden
+	}
+	if ID(id) != nil || ID(entityID) != nil || version == 0 {
+		return Invalid
+	}
+	if e := policy(ctx, tx, a, entityID, true); e != nil {
+		return e
+	}
+	var owner string
+	var team, kind sql.NullString
+	var old uint64
+	if e := tx.QueryRowContext(ctx, `SELECT owner_id,team_id,entity_type,version FROM documents WHERE id=? FOR UPDATE`, id).Scan(&owner, &team, &kind, &old); e != nil {
+		if e == sql.ErrNoRows {
+			return Missing
+		}
+		return e
+	}
+	if e := s.Authorize(ctx, tx, a, "core.documents.write", owner, team.String, true); e != nil {
+		return Missing
+	}
+	if kind.Valid || old != version {
+		return Conflict
+	}
+	if e := Changed(tx.ExecContext(ctx, `UPDATE documents SET entity_type=?,entity_id=?,version=version+1 WHERE id=? AND version=?`, entity, entityID, id, version)); e != nil {
+		return e
+	}
+	return s.Audit(ctx, tx, a, "documents.link", "document", id, "success", map[string]string{"entity_type": entity, "entity_id": entityID})
+}

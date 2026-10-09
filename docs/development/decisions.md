@@ -26,3 +26,9 @@ No hubo despliegue productivo, migración real ni envío. Las verificaciones loc
 ## Implementación Core
 
 Go 1.27.2 y dependencias fijadas; Angular 22.2.2/TypeScript compatible fijados tras build. Argon2id 32 MiB/3 iteraciones/paralelismo 1, máximo dos cálculos por proceso; calibrar en Lightsail. Sesiones simultáneas permitidas dentro de vencimientos, sin imponer una sesión única. Bootstrap técnico protegido, sin conceder permisos financieros. Cookies de desarrollo separadas de producción. Scope all/self/team, global administrativo all. Archivos comerciales sin política de módulo fallan cerrados. Entrega SMTP incierta exige conciliación. MCP inicial bearer técnico limitado, separado de OAuth delegado pendiente. No se amplió el menú ni se implementaron módulos comerciales ficticios.
+
+## 2026-10-09 — Clientes y desarrollo secuencial
+
+Clientes primero, luego Proveedores y demás propietarios según plan. Cada unidad cierra sus pruebas y CI antes de comenzar la siguiente, según instrucción explícita del usuario. Normalización canónica Unicode NFKD/diacríticos/espacios, RTN opcional con 14 dígitos; UNIQUE conserva deduplicación incluso en inactivos. Ficha con versión, contactos/direcciones relacionales y notas append-only; no merge/borrado automático. Scopes all/self/team con propietario inmutable; cambios de equipo exigen all y reauth. RegisterPermissions añade capacidades asignables, no permisos automáticos a administradores.
+
+Hechos comerciales en domain_events, sin transformarlos en trabajos desconocidos; outbox queda para jobs registrados. DocumentPolicies permite a Core combinar permisos del archivo y la entidad sin importar módulos. MCP usa contexto autenticado y schemas explícitos para mantener IDs/versiones como strings. OAuth/Work y servicios externos siguen pendientes. Vista 360° se integra por propietario disponible, sin fabricar actividad futura.

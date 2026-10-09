@@ -291,7 +291,7 @@ S3 privado conserva los bytes; MySQL conserva identificador, nombre original, ti
 - Un módulo vincula documentos mediante identificadores; no construye rutas arbitrarias ni manipula credenciales de S3.
 - Cambiar contenido crea versión cuando se necesite historial; no sobrescribir evidencia silenciosamente.
 
-Como MySQL y S3 no comparten transacción, se propone un flujo `pending` → `quarantined` → `available` o `rejected`, con verificación del objeto y limpieza de huérfanos. Una carga incompleta no se muestra como documento disponible.
+Como MySQL y S3 no comparten transacción, se usa el flujo `pending` → `quarantined` → `available` o `rejected`, con verificación del objeto. La limpieza de huérfanos requiere política operativa pendiente. Una carga incompleta no se muestra como documento disponible. DocumentPolicies y BindDocument conectan políticas de módulos implementados sin importar negocio en Core; el acceso requiere tanto el permiso del archivo como el de la entidad.
 
 El bucket actual del crawler está confirmado en el diseño. Los buckets adicionales de documentos y backups son propuestas del maestro, no recursos cuya creación se haya verificado.
 

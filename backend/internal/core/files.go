@@ -63,7 +63,13 @@ func (s *Service) DocumentAccess(ctx context.Context, q Querier, a Actor, id, pe
 		return 0, 0, Missing
 	}
 	if entity.Valid {
-		return 0, 0, Forbidden
+		policy, ok := s.DocumentPolicies[entity.String]
+		if !ok {
+			return 0, 0, Forbidden
+		}
+		if e := policy(ctx, q, a, eid.String, permission == "core.documents.write"); e != nil {
+			return 0, 0, Missing
+		}
 	}
 	return number, version, nil
 }

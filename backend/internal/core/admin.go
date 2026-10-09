@@ -190,17 +190,17 @@ func (s *Service) Roles(ctx context.Context, a Actor) (any, error) {
 			return nil, e
 		}
 	}
-	return map[string]any{"data": out, "permissions": Permissions}, nil
+	return map[string]any{"data": out, "permissions": s.PermissionCatalog()}, nil
 }
 func (s *Service) SaveRole(ctx context.Context, a Actor, id string, c Role) (any, error) {
 	if len(c.Name) < 1 || len(c.Name) > 80 || len(c.Grants) > 100 || id == "1" {
 		return nil, Invalid
 	}
 	for _, g := range c.Grants {
-		if !contains(Permissions, g.Permission) || (g.Scope != "all" && g.Scope != "self" && g.Scope != "team") {
+		if !contains(s.PermissionCatalog(), g.Permission) || (g.Scope != "all" && g.Scope != "self" && g.Scope != "team") {
 			return nil, Invalid
 		}
-		if g.Scope != "all" && !strings.HasPrefix(g.Permission, "core.documents.") && g.Permission != "core.notifications.read" {
+		if g.Scope != "all" && strings.HasPrefix(g.Permission, "core.") && !strings.HasPrefix(g.Permission, "core.documents.") && g.Permission != "core.notifications.read" {
 			return nil, Invalid
 		}
 	}
@@ -422,10 +422,10 @@ func (s *Service) CreateService(ctx context.Context, a Actor, name string, scope
 		return nil, Invalid
 	}
 	for _, p := range scopes {
-		if !contains(Permissions, p) {
+		if !contains(s.PermissionCatalog(), p) {
 			return nil, Invalid
 		}
-		if p != "core.modules.read" && p != "core.documents.read" && p != "core.jobs.read" {
+		if p != "core.modules.read" && p != "core.documents.read" && p != "core.jobs.read" && !contains(s.ServiceReadPermissions, p) {
 			return nil, Forbidden
 		}
 	}
@@ -436,7 +436,7 @@ func (s *Service) CreateService(ctx context.Context, a Actor, name string, scope
 			return e
 		}
 		for _, p := range scopes {
-			if e := s.Authorize(ctx, tx, a, p, "", "", false); e != nil {
+			if e := s.Authorize(ctx, tx, a, p, a.UserID, "", false); e != nil {
 				return e
 			}
 		}

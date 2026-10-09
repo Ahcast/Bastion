@@ -1,5 +1,5 @@
 import { Routes } from "@angular/router";
-import { authenticated } from "./core/auth/guards";
+import { authenticated, permitted } from "./core/auth/guards";
 export const routes: Routes = [
   {
     path: "login",
@@ -14,6 +14,7 @@ export const routes: Routes = [
     canActivate: [authenticated],
     loadComponent: () => import("./core/shell/shell").then((m) => m.Shell),
     children: [
+      { path:"customers", canActivate:[permitted],data:{permission:"clientes.view",module:"customers"},loadComponent:()=>import("./modules/customers/customers").then(m=>m.Customers) },
       {
         path: "",
         loadComponent: () =>

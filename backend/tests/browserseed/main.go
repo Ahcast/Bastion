@@ -7,6 +7,7 @@ import (
 	"github.com/Ahcast/Bastion/backend/database"
 	"github.com/Ahcast/Bastion/backend/internal/core"
 	"github.com/Ahcast/Bastion/backend/internal/core/config"
+	"github.com/Ahcast/Bastion/backend/internal/core/security"
 	"github.com/go-sql-driver/mysql"
 	"log"
 	"os"
@@ -41,6 +42,23 @@ func main() {
 	}
 	s := core.New(db, config.Config{Key: make([]byte, 32)})
 	if e = s.Bootstrap(context.Background(), "browser@example.test", "Administrador sintético", "synthetic browser password 42"); e != nil {
+		log.Fatal(e)
+	}
+	// This synthetic employee has explicitly seeded customer permissions. Production bootstrap grants none.
+	secret, e := security.Encrypt(s.Config.Key, "JBSWY3DPEHPK3PXP")
+	if e != nil {
+		log.Fatal(e)
+	}
+	if _, e = db.Exec(`INSERT INTO users(email,name,password_hash,totp_secret,active,created_at,updated_at) SELECT 'customers@example.test','Operador Clientes sintético',password_hash,?,TRUE,UTC_TIMESTAMP(6),UTC_TIMESTAMP(6) FROM users WHERE id=1`, secret); e != nil {
+		log.Fatal(e)
+	}
+	if _, e = db.Exec(`INSERT INTO roles(id,name) VALUES(2,'Clientes sintético')`); e != nil {
+		log.Fatal(e)
+	}
+	if _, e = db.Exec(`INSERT INTO role_permissions SELECT 2,name,'all' FROM permissions WHERE name IN ('clientes.view','clientes.create','clientes.update')`); e != nil {
+		log.Fatal(e)
+	}
+	if _, e = db.Exec(`INSERT INTO user_roles VALUES(2,2)`); e != nil {
 		log.Fatal(e)
 	}
 }

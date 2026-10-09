@@ -17,6 +17,7 @@ export interface User {
 export interface Profile {
   user: User;
   grants: Grant[];
+  enabled_modules?: string[];
 }
 @Injectable({ providedIn: "root" })
 export class Client {
@@ -129,6 +130,7 @@ export class Client {
       this.profile()?.grants.some((g) => g.permission === permission) || false
     );
   }
+  moduleEnabled(id: string) { return this.profile()?.enabled_modules?.includes(id) || false; }
   message(error: unknown): string {
     if (error instanceof HttpErrorResponse) {
       if (error.status === 401) {

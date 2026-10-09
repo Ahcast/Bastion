@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"github.com/Ahcast/Bastion/backend/database"
+	"github.com/Ahcast/Bastion/backend/internal/composition"
 	"github.com/Ahcast/Bastion/backend/internal/core"
 	"github.com/Ahcast/Bastion/backend/internal/core/adapters"
 	"github.com/Ahcast/Bastion/backend/internal/core/api"
@@ -25,6 +26,10 @@ func main() {
 		os.Exit(1)
 	}
 	defer s.DB.Close()
+	if e = composition.Register(s, r, logger); e != nil {
+		logger.Error("module configuration unavailable")
+		os.Exit(1)
+	}
 	ctx, cancel = context.WithTimeout(context.Background(), 5*time.Second)
 	e = database.Ready(ctx, s.DB)
 	cancel()

@@ -1,5 +1,7 @@
 # Módulo Clientes
 
+Catálogo/ficha implementados en Go y Angular: [contrato ejecutable](../contracts/customers.md), [OpenAPI](../contracts/customers-openapi.json), [runbook](../development/customers-runbook.md) y [estado](../development/status.md). La vista 360° incorpora vínculos comerciales al implementarse sus propietarios; no presupone cotizaciones/facturas todavía existentes.
+
 ## Objetivo
 
 Mantener el catálogo de clientes utilizado por cotizaciones, órdenes y facturas, preservando la posibilidad de trabajar con cliente manual cuando corresponda.
@@ -108,7 +110,7 @@ Tools:
 
 ```text
 search_customers()
-get_client()
+get_customer()
 suggest_client_match()
 detect_client_duplicates()
 summarize_client_activity()
@@ -215,36 +217,3 @@ Información:
 - actividad.
 
 ---
-
-
-
-## Presentación del módulo
-
-# customers
-
-
-# 12. Módulo Clientes
-
-Vista 360°.
-
-Información:
-
-- datos legales;
-- RTN;
-- contactos;
-- direcciones;
-- instituciones;
-- procesos;
-- cotizaciones;
-- órdenes de compra;
-- facturas;
-- pagos;
-- documentos;
-- notas;
-- historial;
-- actividad.
-
----
-
-
-

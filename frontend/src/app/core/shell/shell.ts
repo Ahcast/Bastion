@@ -20,7 +20,9 @@ import { Client } from "../api/client";
           routerLinkActive="active"
           [routerLinkActiveOptions]="{ exact: true }"
           >Inicio</a
-        ><a routerLink="/settings" routerLinkActive="active">Configuración</a>
+        >
+        @if(api.has("clientes.view") && api.moduleEnabled("customers")){<a routerLink="/customers" routerLinkActive="active">Clientes</a>}
+        <a routerLink="/settings" routerLinkActive="active">Configuración</a>
       </nav>
       <main>
         @if (api.has("core.notifications.read")) {

@@ -68,5 +68,5 @@ func (s *Server) serveMCP(w http.ResponseWriter, r *http.Request, id string) {
 		s.Registry.Tools(server)
 		return server
 	}, &mcp.StreamableHTTPOptions{Stateless: true, JSONResponse: true})
-	handler.ServeHTTP(w, r)
+	handler.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), contextKey{}, request{Actor: a, Session: core.Session{MFA: true}})))
 }

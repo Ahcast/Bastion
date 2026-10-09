@@ -30,6 +30,9 @@ func Operation(s *core.Service, logger *slog.Logger, action Action) http.Handler
 		}
 		v, e := action(r.Context(), a, r)
 		if e != nil {
+			if e == core.Forbidden {
+				_ = s.Audit(r.Context(), s.DB, a, "api.denied", "route", r.Pattern, "denied", map[string]string{})
+			}
 			server.error(w, r, e)
 			return
 		}

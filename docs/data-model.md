@@ -112,3 +112,5 @@ Importes y cantidades DECIMAL; DTO JSON con cadenas decimales. Precisiones inici
 Consecutivos mediante document_counters y bloqueo transaccional, nunca MAX+1. Restricciones únicas y claves de idempotencia. Migraciones SQL numeradas globalmente en backend/database/migrations; registrar versión aplicada; no generar migraciones duplicadas por módulo. Probar en MySQL 5.7, sin CTE/window functions/SKIP LOCKED ni asumir índices JSON de MySQL 8.
 
 El agente debe definir columnas/índices/DTO exactos de cada módulo antes de implementarlo, respetar este vocabulario y actualizar contrato y migraciones juntos. Las tablas de fases futuras no se crean hasta su fase. No migrar datos legacy con estas sustituciones nominales sin mapa y prueba de migración.
+
+Clientes incorpora customer_addresses y customer_notes además de customers/customer_contacts. Core conserva hechos comerciales mínimos en domain_events (ID, topic, entidad/versión, actor y correlación); la intención de trabajo ejecutable sigue en outbox_events/jobs. Ningún hecho comercial crea un job/correo/AI por defecto. Ver [contrato de Clientes](contracts/customers.md).

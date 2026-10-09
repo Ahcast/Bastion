@@ -1,6 +1,6 @@
 # Plan ejecutable del proyecto
 
-Core de plataforma y base implementados: ver [estado](status.md) y [runbook](core-runbook.md). Los criterios de infraestructura externa permanecen pendientes aunque las pruebas locales pasen. Próxima fase de módulos: datos base/Procesos y receptor crawler.
+Core de plataforma y base implementados: ver [estado](status.md) y [runbook](core-runbook.md). Los criterios de infraestructura externa permanecen pendientes aunque las pruebas locales pasen. Clientes es la primera unidad de datos base; las siguientes unidades se ejecutan una por una.
 
 El agente implementa cada fase hasta su aceptación, actualiza status.md y continúa. No sustituir implementación por plan nuevo. Las fases pueden desarrollarse con datos sintéticos y MySQL 5.7 local de prueba; los bloqueos de infraestructura se verifican antes de producción, sin migrar la BD a AWS.
 
@@ -15,6 +15,10 @@ El agente implementa cada fase hasta su aceptación, actualiza status.md y conti
 | 6. API/MCP IA | SDK MCP, autenticación limitada/delegación conforme, tools mínimo, AI tasks/runs/leases y score/research/RFQ/pricing/artifacts | Mismas reglas REST/MCP; lease vencido/resultado tardío rechazado; schema/permissions; prueba cliente local; Work real solo si disponible, no invocar Plus como API |
 | 7. IA y UI | Pipeline/skills versionadas, progresos por ítem, RAG S3/MySQL, revisión humana y selección hacia Quotes | No repetir score completado; rezagados recuperables; evidencia/ausentes explícitos; cotización humana no sobrescrita; casos de evaluación sintéticos; umbrales no aprobados permanecen configurables y automatización off |
 | 8. Operación | Backup/restore, deploy scripts frontend/backend, observabilidad, incidentes, límites y smoke tests | Restore probado; rollback código/esquema documentado; memoria crawler+backend medida; MySQL TLS/DNS/SMTP/S3 validados en entorno autorizado; no claims de producción por tests locales |
+
+## Secuencia obligatoria de módulos
+
+Clientes → Proveedores → Procesos/receptor crawler → Cotizaciones → Órdenes de Compra de clientes → Facturas/pagos → Gastos → Reportes → Colaboración. Workflow/aprobaciones e IA se integran según dependencias, sin entradas adicionales de menú. Antes de avanzar, cerrar pruebas unitarias, MySQL/integridad, autorización, UI/navegador, regresión y CI de la unidad actual; registrar evidencia y límites externos en status.md. No escribir el siguiente módulo mientras haya pruebas pendientes o fallidas. Las vistas cruzadas se incorporan cuando ambos propietarios existan, sin inventar datos ni declarar integración anticipada.
 
 ## Antes de implementar cada módulo
 

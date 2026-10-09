@@ -351,7 +351,13 @@ func (s *Server) routes() {
 			return nil, e
 		}
 		g, e := s.Service.Grants(r.Context(), s.Service.DB, x.Actor.UserID)
-		return map[string]any{"user": u, "grants": g}, e
+		modules := []string{}
+		for _, m := range s.Registry.List() {
+			if m.Enabled {
+				modules = append(modules, m.ID)
+			}
+		}
+		return map[string]any{"user": u, "grants": g, "enabled_modules": modules}, e
 	})
 	s.handle("POST /api/v1/auth/accept", false, func(w http.ResponseWriter, r *http.Request, x request) (any, error) {
 		var p struct {

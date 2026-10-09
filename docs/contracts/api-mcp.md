@@ -6,7 +6,7 @@ Origin API propuesto https://api.bastion.castilloit.net. Usuario SPA autenticado
 
 JSON tipado: IDs y decimales como strings; fechas ISO, timestamps UTC. Errores: code, message en español, field_errors si corresponde, request_id. HTTP 401/403/404/409/422/429 según causa, sin revelar registros ajenos. Listados paginados page/per_page (máximo inicial 100), filtros/orden permitidos, total cuando calculable. Operación sensible requiere permiso, estado, aprobación/reautenticación cuando aplique.
 
-Escrituras reintentables admiten Idempotency-Key y hash normalizado de solicitud. Igual clave/cuerpo devuelve resultado autorizado previo; distinto cuerpo 409. Cambios sobre registro incluyen version esperado; conflicto 409. Estado + auditoría + outbox en transacción. POST largo puede devolver 202 + job_id salvo el contrato crawler, que exige ACK de importación 200/201.
+Escrituras reintentables admiten Idempotency-Key y hash normalizado de solicitud. Igual clave/cuerpo devuelve resultado autorizado previo; distinto cuerpo 409. Cambios sobre registro incluyen version esperado; conflicto 409. Estado, auditoría y eventos durables en transacción: domain_events conserva hechos comerciales sin consumidores implícitos; outbox_events conserva intenciones de jobs registrados. POST largo puede devolver 202 + job_id salvo el contrato crawler, que exige ACK de importación 200/201.
 
 ## Recursos canónicos
 
@@ -47,4 +47,4 @@ Pruebas: denegación anónima, MFA incompleto, acceso a registro ajeno, revoke/e
 
 ## Contrato implementado del Core
 
-[OpenAPI 3.1](core-openapi.json) contiene DTO/rutas de esta versión. Core ofrece perfil/preferencias y regeneración recovery/password, usuarios/invitaciones/roles/equipos/settings/integraciones, auditoría/jobs/notificaciones, SMTP de prueba/conciliación, archivos versionados y lectura MCP técnica. Las rutas de módulos/crawler/AI listadas arriba siguen siendo objetivo de sus fases, no endpoints ya implementados. OAuth Work permanece deshabilitado hasta validar proveedor.
+[OpenAPI Core](core-openapi.json) contiene DTO/rutas de plataforma. Core ofrece perfil/preferencias y regeneración recovery/password, usuarios/invitaciones/roles/equipos/settings/integraciones, auditoría/jobs/notificaciones, SMTP de prueba/conciliación, archivos versionados y lectura MCP técnica. Clientes tiene [contrato](customers.md) y [OpenAPI](customers-openapi.json) implementados; los demás módulos/crawler/AI siguen pendientes. OAuth Work permanece deshabilitado hasta validar proveedor.

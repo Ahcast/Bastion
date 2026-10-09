@@ -1,0 +1,50 @@
+<h1>Clientes</h1>
+<p>Catálogo y ficha de clientes. Los cambios del catálogo conservan los datos históricos de los documentos.</p>
+<p class="error" role="alert">{{error()}}</p><p role="status">{{message()}}</p>
+<section class="card" aria-label="Buscar clientes">
+ <form (ngSubmit)="load(true)">
+  <label>Buscar cliente<input name="search" [(ngModel)]="search" maxlength="180" /></label>
+  <label>Filtrar por RTN<input name="rtn_filter" [(ngModel)]="rtn" maxlength="30" /></label>
+  <label>Estado del cliente<select name="active_filter" [(ngModel)]="active"><option value="true">Activos</option><option value="false">Inactivos</option><option value="">Todos</option></select></label>
+  <button [disabled]="loading()">Buscar</button>
+ </form>
+ @if(api.has('clientes.create')){<button (click)="create()" [disabled]="busy()">Nuevo cliente</button>}
+ @if(loading()){<p role="status">Cargando clientes…</p>}@else{
+ <p>{{total()}} clientes encontrados · Página {{page}}</p>
+ <div class="table-scroll"><table><thead><tr><th>Nombre</th><th>RTN</th><th>Correo</th><th>Estado</th><th>Ficha</th></tr></thead><tbody>
+ @for(c of rows();track c.id){<tr><td>{{c.name}}</td><td>{{c.rtn || 'Sin RTN'}}</td><td>{{c.email}}</td><td>{{c.is_active?'Activo':'Inactivo'}}</td><td><button (click)="open(c.id)" [disabled]="busy()" [attr.aria-label]="'Abrir cliente '+c.name">Abrir</button></td></tr>}@empty{<tr><td colspan="5">No se encontraron clientes.</td></tr>}
+ </tbody></table></div>
+ <button (click)="page=page-1;load()" [disabled]="page<=1||loading()">Anterior</button><button (click)="page=page+1;load()" [disabled]="page*perPage>=total()||loading()">Siguiente</button>}
+</section>
+@if(editor();as c){
+<section class="card" aria-label="Ficha del cliente"><h2>{{c.id?'Ficha del cliente':'Nuevo cliente'}}</h2>
+ @if(c.id){<p>Versión {{c.version}}. Si otro usuario modifica la ficha, vuelva a abrirla antes de guardar.</p>}
+ <form (ngSubmit)="save()"><fieldset [disabled]="busy() || (c.id ? !api.has('clientes.update') : !api.has('clientes.create'))">
+ <label>Nombre del cliente<input name="name" [(ngModel)]="c.name" required maxlength="180" /></label>
+ <label>RTN del cliente<input name="rtn" [(ngModel)]="c.rtn" maxlength="30" placeholder="Opcional" /></label>
+ <label>Tipo de institución<select name="type" [(ngModel)]="c.institution_type"><option value="private">Privada</option><option value="public">Pública</option><option value="other">Otra</option></select></label>
+ <label>Contacto principal<input name="contact" [(ngModel)]="c.contact_name" maxlength="120" /></label>
+ <label>Teléfono del cliente<input name="phone" [(ngModel)]="c.phone" maxlength="50" /></label>
+ <label>Correo del cliente<input name="email" [(ngModel)]="c.email" type="email" maxlength="254" /></label>
+ <label>Dirección principal<textarea name="address" [(ngModel)]="c.address" maxlength="1000"></textarea></label>
+ <label>Equipo responsable<select name="team" [(ngModel)]="c.team_id"><option value="">Sin equipo</option>@for(t of teams();track t.id){<option [value]="t.id">{{t.name}}</option>}</select></label>
+ <label><span><input type="checkbox" name="active" [(ngModel)]="c.is_active" /> Cliente activo</span></label>
+ <h3>Contactos adicionales</h3>
+ @for(x of c.contacts;track $index;let i=$index){<fieldset><legend>Contacto {{i+1}}</legend><label>Nombre del contacto<input [name]="'cn'+i" [(ngModel)]="x.name" required maxlength="120" /></label><label>Cargo<input [name]="'cr'+i" [(ngModel)]="x.role" maxlength="100" /></label><label>Teléfono del contacto<input [name]="'cp'+i" [(ngModel)]="x.phone" maxlength="50" /></label><label>Correo del contacto<input [name]="'ce'+i" [(ngModel)]="x.email" type="email" maxlength="254" /></label><button type="button" class="secondary" (click)="c.contacts.splice(i,1)">Quitar contacto {{i+1}}</button></fieldset>}
+ <button type="button" (click)="contact()" [disabled]="c.contacts.length>=20">Agregar contacto</button>
+ <h3>Direcciones adicionales</h3>
+ @for(x of c.addresses;track $index;let i=$index){<fieldset><legend>Dirección {{i+1}}</legend><label>Nombre de la dirección<input [name]="'al'+i" [(ngModel)]="x.label" required maxlength="80" /></label><label>Dirección del cliente<textarea [name]="'aa'+i" [(ngModel)]="x.address" required maxlength="1000"></textarea></label><button type="button" class="secondary" (click)="c.addresses.splice(i,1)">Quitar dirección {{i+1}}</button></fieldset>}
+ <button type="button" (click)="address()" [disabled]="c.addresses.length>=20">Agregar dirección</button>
+ <button type="submit">Guardar cliente</button></fieldset></form>
+ <button class="secondary" (click)="editor.set(null)" [disabled]="busy()">Cerrar ficha</button>
+ <details><summary>Confirmar identidad para cambiar equipo, estado o vincular documentos</summary><form (ngSubmit)="reauthenticate()"><label>Contraseña de confirmación<input name="confirm_password" [(ngModel)]="password" type="password" autocomplete="current-password" required /></label><label>Código de confirmación<input name="confirm_factor" [(ngModel)]="factor" autocomplete="one-time-code" required /></label><button [disabled]="busy()">Confirmar identidad</button></form></details>
+</section>
+@if(c.id){
+<section class="card"><h2>Notas del cliente</h2>@if(api.has('clientes.update')){<form (ngSubmit)="addNote()"><label>Nueva nota<textarea name="note" [(ngModel)]="note" required maxlength="4000"></textarea></label><button [disabled]="busy()">Registrar nota</button></form>}
+@for(n of notes();track n.id){<article><p class="message">{{n.body}}</p><p>{{n.user_name}} · {{n.created_at|date:'short'}}</p></article>}@empty{<p>No hay notas registradas.</p>}
+<button (click)="notePage=notePage-1;loadNotes()" [disabled]="notePage<=1">Notas anteriores</button><button (click)="notePage=notePage+1;loadNotes()" [disabled]="notePage*25>=noteTotal()">Más notas</button></section>
+<section class="card"><h2>Historial del cliente</h2><button (click)="loadHistory()">Actualizar historial</button>@for(h of history();track h.id){<p>{{historyLabel(h.action)}} · {{h.actor_name}} · {{h.created_at|date:'short'}} @if(h.details.version){· Versión {{h.details.version}}}</p>}@empty{<p>No hay actividad cargada.</p>}<button (click)="historyPage=historyPage-1;loadHistory()" [disabled]="historyPage<=1">Historial anterior</button><button (click)="historyPage=historyPage+1;loadHistory()" [disabled]="historyPage*25>=historyTotal()">Más historial</button></section>
+@if(api.has('core.documents.read')){<section class="card"><h2>Documentos del cliente</h2><button (click)="loadDocuments()">Actualizar documentos</button>@for(d of documents();track d.id){<p>{{d.filename}} · {{state(d.status)}} <button (click)="download(d.id)" [disabled]="d.status!=='available'">Descargar</button></p>}@empty{<p>No hay documentos cargados. Suba el archivo desde Configuración y vincúlelo aquí.</p>}<button (click)="documentPage=documentPage-1;loadDocuments()" [disabled]="documentPage<=1">Documentos anteriores</button><button (click)="documentPage=documentPage+1;loadDocuments()" [disabled]="documentPage*25>=documentTotal()">Más documentos</button>
+@if(api.has('clientes.update')&&api.has('core.documents.write')){<button (click)="loadPersonalFiles()">Cargar archivos sin vínculo</button><button (click)="personalPage=personalPage-1;loadPersonalFiles()" [disabled]="personalPage<=1">Archivos anteriores</button><button (click)="personalPage=personalPage+1;loadPersonalFiles()" [disabled]="personalFiles().length<25">Más archivos</button><form (ngSubmit)="linkDocument()"><label>Archivo para vincular<select name="document" [(ngModel)]="selectedDocument" required><option value="">Seleccione un archivo</option>@for(d of personalFiles();track d.id){<option [value]="d.id">{{d.filename}} · {{state(d.status)}}</option>}</select></label><button [disabled]="busy()">Vincular documento</button></form>}
+</section>}
+}}

@@ -5378,11 +5378,19 @@
             "items": {
               "$ref": "#/components/schemas/Grant"
             }
+          },
+          "enabled_modules": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Módulos habilitados por composición; los permisos del usuario siguen siendo necesarios."
           }
         },
         "required": [
           "user",
-          "grants"
+          "grants",
+          "enabled_modules"
         ]
       },
       "Login": {
