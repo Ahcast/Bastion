@@ -87,3 +87,7 @@ Presentar ofertas, emitir órdenes a proveedores, comprometer dinero y autorizar
 Este módulo conserva su alcance funcional. Consume [Core](../architecture/core.md) y cumple el [contrato modular](../contracts/modules.md). Sus endpoints REST y herramientas MCP reutilizan los mismos servicios de aplicación/Services y políticas de autorización.
 
 
+
+## Base implementada
+
+internal/modules/workflow evalúa grafos explícitos con denegación por defecto. Quotes define su grafo preliminar y aplica versión, permisos, auditoría/historial/idempotencia en su propia TX. Es una base de transiciones; solicitudes/decisiones/vigencia de aprobación y definiciones editables todavía no están implementadas. No se acredita el Approval Engine ni se habilitan envíos por alcanzar review.

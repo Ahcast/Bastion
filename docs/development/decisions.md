@@ -66,3 +66,7 @@ Snapshots de servicios públicos dentro de TX del agregado evitan transacciones 
 ## PDF de Cotizaciones (unidad 4b)
 
 Renderer github.com/signintech/gopdf v0.38.1 y golang.org/x/image v0.47.0 fijados en go.mod/go.sum. Font goregular integrado y validación sfnt evita omisiones silenciosas; sin Chrome/headless en Lightsail. Coordenadas PDF usan float64 de la librería, importes siguen siendo cadenas del calculador exacto. Fuentes primarias: https://github.com/signintech/gopdf y https://pkg.go.dev/golang.org/x/image/font/gofont/goregular. Reserva SQL + subida condicional fuera del lock + registro final transaccional permite recuperar fallos sin cola sin consumidor, duplicación ni reescritura del objeto. Render determinista de proyección pública, sin costos/margen/notas. PDF se etiqueta BORRADOR; emisión/aprobación/correo conserva su próxima unidad.
+
+## Estados preliminares de Quotes
+
+Workflow aporta evaluación de grafos; Quotes conserva reglas, persistencia y TX. Implementar costeo/revisión antes de aprobación/emisión sin rutas que simulen esos efectos. cotizaciones.transition es independiente de edición y no se asigna por defecto. Revisar exige ítems, sin inventar umbrales de margen/precio. Guardar ediciones desde costeo/revisión regresa a borrador y mantiene historial; escritura documental bloqueada en revisión con lock del agregado durante políticas transaccionales. PDF permanece BORRADOR hasta implementar aprobación y emisión. Definiciones editables y decisiones/vigencia siguen pendientes.

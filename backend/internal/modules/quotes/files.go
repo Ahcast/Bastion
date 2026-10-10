@@ -18,11 +18,11 @@ func (s *Service) DocumentPolicy(ctx context.Context, q core.Querier, a core.Act
 	if write {
 		perm = "cotizaciones.update"
 	}
-	v, e := s.access(ctx, q, a, id, perm, false, false)
+	v, e := s.access(ctx, q, a, id, perm, write, false)
 	if e != nil {
 		return e
 	}
-	if v.Deleted != nil || (write && v.Status != "draft") {
+	if v.Deleted != nil || (write && (v.Status != "draft" && v.Status != "costing")) {
 		return core.Missing
 	}
 	return nil
@@ -41,7 +41,7 @@ func (s *Service) LinkDocument(ctx context.Context, a core.Actor, id, key, docum
 			return e
 		}
 		out, e = s.Core.Idempotent(ctx, tx, a, "quotes.document:"+id, key, map[string]any{"document_id": document, "version": fmt.Sprint(version), "document_version": fmt.Sprint(documentVersion)}, func() (any, error) {
-			if q.Deleted != nil || q.Status != "draft" || q.Version != version {
+			if q.Deleted != nil || (q.Status != "draft" && q.Status != "costing") || q.Version != version {
 				return nil, core.Conflict
 			}
 			if e := s.Core.BindDocument(ctx, tx, a, document, "quotes", id, documentVersion); e != nil {

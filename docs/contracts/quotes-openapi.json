@@ -1,9 +1,9 @@
 {
   "openapi": "3.0.3",
   "info": {
-    "title": "Bastion Cotizaciones: borradores, archivos y PDF",
-    "version": "0.2.0",
-    "description": "Borradores/cálculo/adjuntos/PDF de borrador implementados. Emisión/envío/bulk/estados y conversiones OC/Factura pendientes. Ver quotes.md."
+    "title": "Bastion Cotizaciones: borradores, archivos, PDF y estados preliminares",
+    "version": "0.3.0",
+    "description": "Borradores/cálculo/archivos/PDF y draft/costing/review implementados. Aprobación/emisión/envío/bulk y conversiones OC/Factura pendientes. Ver quotes.md."
   },
   "paths": {
     "/api/v1/quotes": {
@@ -874,6 +874,63 @@
           }
         }
       }
+    },
+    "/api/v1/quotes/{id}/status": {
+      "patch": {
+        "summary": "Transición preliminar autorizada y versionada",
+        "description": "cotizaciones.view + cotizaciones.transition; draft→costing; costing→draft/review; review→draft/costing. Revisar exige ítems. No aprobación ni envío.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]*$"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 100
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Transition"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Resultado autorizado"
+          },
+          "401": {
+            "description": "Sesión requerida"
+          },
+          "403": {
+            "description": "Acceso denegado"
+          },
+          "404": {
+            "description": "No visible"
+          },
+          "409": {
+            "description": "Versión o intención conflictiva"
+          },
+          "422": {
+            "description": "Entrada inválida"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -1098,6 +1155,28 @@
           "date",
           "version"
         ]
+      },
+      "Transition": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "status",
+          "version"
+        ],
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "draft",
+              "costing",
+              "review"
+            ]
+          },
+          "version": {
+            "type": "string",
+            "pattern": "^[1-9][0-9]*$"
+          }
+        }
       }
     },
     "securitySchemes": {

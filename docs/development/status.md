@@ -76,7 +76,7 @@ Código final [bab3790](https://github.com/Ahcast/Bastion/commit/bab37902f1ef250
 
 ## Continuidad
 
-Orden: Clientes → Proveedores → Procesos/receptor crawler → Cotizaciones → OC de clientes → Facturas/pagos → Gastos → Reportes → Colaboración; Workflow/AI según dependencias. Clientes y Proveedores cerrados con evidencia local y CI satisfactoria. Unidad de base Procesos/receptor crawler cerrada con pruebas y CI satisfactorios. Cotizaciones en desarrollo: borradores/cálculo y conversión desde Procesos implementados; PDF/adjuntos cerrados; continuar emisión/correo/estados/bulk y pruebas del módulo antes de avanzar a OC. Leer contrato/runbook de Quotes. Mantener all/self/team, snapshots, transacciones y permisos mínimos en cada unidad. No se han desplegado servicios ni migrado datos productivos.
+Orden: Clientes → Proveedores → Procesos/receptor crawler → Cotizaciones → OC de clientes → Facturas/pagos → Gastos → Reportes → Colaboración; Workflow/AI según dependencias. Clientes y Proveedores cerrados con evidencia local y CI satisfactoria. Unidad de base Procesos/receptor crawler cerrada con pruebas y CI satisfactorios. Cotizaciones en desarrollo: borradores/cálculo y conversión desde Procesos implementados; PDF/adjuntos cerrados; estados preliminares/revisiones incorporados; continuar aprobación/emisión/correo/bulk y pruebas del módulo antes de avanzar a OC. Leer contrato/runbook de Quotes. Mantener all/self/team, snapshots, transacciones y permisos mínimos en cada unidad. No se han desplegado servicios ni migrado datos productivos.
 
 ## Unidad 4a — Cotizaciones: borradores y cálculo
 
@@ -99,3 +99,11 @@ Validación local: 27 pruebas Angular y build; 71 pruebas Go/race/MySQL5.7 (64 a
 Cotizaciones completo continúa pendiente: emisión/estados/aprobaciones/revisiones, SMTP inmediato/programado y ledger, bulk/FX y conversiones OC/Factura por sus propietarios. No avanzar a OC. S3/SMTP/Bluehost productivos no activados ni validados; no despliegue/migración productiva.
 
 Código final de esta unidad [9c85ac9](https://github.com/Ahcast/Bastion/commit/9c85ac91ad2323c3ac758be722ae9f5c8ae6471c): [Core checks 38021574460](https://github.com/Ahcast/Bastion/actions/runs/38021574460), [documentación 38021574512](https://github.com/Ahcast/Bastion/actions/runs/38021574512) y [rama única 38021574458](https://github.com/Ahcast/Bastion/actions/runs/38021574458) satisfactorios. Unidad 4b cerrada; Cotizaciones completo sigue pendiente. CI intermedio detectó navegación de filtros competidora y un fallo del registro diagnóstico de pruebas tras abandonar página; ambos corregidos y recorrido completo revalidado. No se ignoran ni se atribuyen esos fallos a servicios productivos. Crawler y migraciones 0001..0006 conservados byte a byte.
+
+## Unidad 4c.1 — Cotizaciones: estados preliminares y revisiones
+
+Migración 0008 registra cotizaciones.transition sin grants automáticos. Workflow evalúa grafo explícito; Quotes aplica draft→costing→review y retornos autorizados, control de versión, idempotencia y snapshot/auditoría/hecho en TX. Edición desde costeo/revisión genera nueva versión en borrador, sin cambiar número ni origen. Adjuntos editables solo borrador/costeo; revisión bloquea escritura documental. Papelera comercial solo borrador. PDF continúa BORRADOR. UI muestra estado real, pasos permitidos y bloqueo ante cambios sin guardar; conserva intención ante timeout y versión/estado confirmados aunque falle la recarga.
+
+Validación local: build/30 pruebas Angular y 74 Go/race/MySQL5.7 aprobadas sin integración omitida; formato/vet/build y documentación aprobados. Navegador y CI pendientes. Pruebas nuevas cubren secuencia, revisiones, replay, saltos/emisión rechazados, ocho actores concurrentes, rollback, scopes/revocación y DTO estricto. No declarar esta unidad cerrada hasta aprobar CI.
+
+Aprobaciones vinculadas a acción/hash/version/vigencia y reauth, emisión/PDF aprobado, SMTP inmediato/programado y ledger, bulk/FX y conversiones por propietarios siguen pendientes. Definiciones Workflow editables no implementadas por esta base. Permanecer en Cotizaciones antes de OC; ninguna integración productiva activada.

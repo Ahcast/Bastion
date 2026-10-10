@@ -1,6 +1,6 @@
 # Plan ejecutable del proyecto
 
-Core de plataforma y base implementados: ver [estado](status.md) y [runbook](core-runbook.md). Los criterios de infraestructura externa permanecen pendientes aunque las pruebas locales pasen. Clientes cerró la primera unidad de datos base. Proveedores cerró la segunda unidad con pruebas locales y CI satisfactorias; la base de Procesos/receptor crawler cerró pruebas y CI; Cotizaciones tiene aprobada la unidad de borradores/cálculo/conversión y incorpora PDF de borrador/adjuntos y conserva emisión/correo/estados/bulk pendientes. Consultar status para evidencia vigente y continuar una unidad por vez.
+Core de plataforma y base implementados: ver [estado](status.md) y [runbook](core-runbook.md). Los criterios de infraestructura externa permanecen pendientes aunque las pruebas locales pasen. Clientes cerró la primera unidad de datos base. Proveedores cerró la segunda unidad con pruebas locales y CI satisfactorias; la base de Procesos/receptor crawler cerró pruebas y CI; Cotizaciones tiene aprobada la unidad de borradores/cálculo/conversión y incorpora PDF de borrador/adjuntos y estados preliminares/revisiones; conserva aprobación/emisión/correo/bulk pendientes. Consultar status para evidencia vigente y continuar una unidad por vez.
 
 El agente implementa cada fase hasta su aceptación, actualiza status.md y continúa. No sustituir implementación por plan nuevo. Las fases pueden desarrollarse con datos sintéticos y MySQL 5.7 local de prueba; los bloqueos de infraestructura se verifican antes de producción, sin migrar la BD a AWS.
 
@@ -38,4 +38,4 @@ MySQL remoto TLS o túnel SSH verificado, acceso y soporte Percona; DNS/certific
 
 No implementar integración pagada de inferencia como solución automática a un bloqueo Work. RPO/RTO, retención y reglas de scoring/envío se configuran sin inventar valores aprobados.
 
-Cotizaciones en desarrollo: borradores/cálculo/conversión y PDF de borrador/adjuntos cerrados con pruebas y CI. Continuar emisión/correo/estados/aprobaciones/bulk y aceptación completa antes de pasar a OC; ver contrato/runbook de Quotes y status.md.
+Cotizaciones en desarrollo: borradores/cálculo/conversión y PDF de borrador/adjuntos cerrados con pruebas y CI. Continuar aprobación/emisión/correo/bulk y aceptación completa antes de pasar a OC; ver contrato/runbook de Quotes y status.md.

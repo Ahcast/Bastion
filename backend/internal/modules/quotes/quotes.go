@@ -14,7 +14,7 @@ import (
 	"time"
 )
 
-var Permissions = []string{"cotizaciones.view", "cotizaciones.create", "cotizaciones.update", "cotizaciones.delete", "cotizaciones.pdf"}
+var Permissions = []string{"cotizaciones.view", "cotizaciones.create", "cotizaciones.update", "cotizaciones.delete", "cotizaciones.pdf", "cotizaciones.transition"}
 
 type CustomerInput struct {
 	ID      string `json:"id"`
@@ -249,7 +249,7 @@ func (s *Service) Save(ctx context.Context, a core.Actor, id, key string, p Inpu
 		}
 		var e error
 		out, e = s.Core.Idempotent(ctx, tx, a, "quotes.save:"+id, key, p, func() (any, error) {
-			if id != "" && (old.Deleted != nil || old.Status != "draft" || old.Version != p.Version) {
+			if id != "" && (old.Deleted != nil || !editableStatus(old.Status) || old.Version != p.Version) {
 				return nil, core.Conflict
 			}
 			c, cv, e := s.customer(ctx, tx, a, p, old)
@@ -262,6 +262,9 @@ func (s *Service) Save(ctx context.Context, a core.Actor, id, key string, p Inpu
 			}
 			q := Quote{ID: id, Number: old.Number, Status: "draft", Source: old.Source, CustomerVersion: cv, Customer: c, Reference: p.Reference, Date: p.Date, ValidityDays: p.ValidityDays, Currency: p.Currency, Terms: p.Terms, Notes: p.Notes, AuthorContact: p.AuthorContact, Exoneration: p.Exoneration, DiscountType: p.DiscountType, Discount: p.Discount, Result: r, Version: old.Version + 1, Owner: old.Owner, Team: old.Team}
 			topic := "quote.updated"
+			if id != "" && old.Status != "draft" {
+				topic = "quote.revised"
+			}
 			if id == "" {
 				q.Owner = a.UserID
 				topic = "quote.created"
@@ -297,7 +300,7 @@ func (s *Service) persist(ctx context.Context, tx *sql.Tx, a core.Actor, q *Quot
 		}
 		q.ID = core.WrapID(insertID)
 	} else {
-		if e := core.Changed(tx.ExecContext(ctx, `UPDATE quotes SET customer_id=?,customer_version=?,customer_name_snapshot=?,customer_rtn_snapshot=?,customer_contact_snapshot=?,customer_phone_snapshot=?,customer_email_snapshot=?,customer_address_snapshot=?,process_reference_snapshot=?,date=?,validity_days=?,currency=?,terms=?,private_notes=?,author_contact=?,exoneration_reference=?,general_discount_type=?,general_discount=?,gross=?,item_discount=?,allocated_discount=?,base_15=?,base_18=?,exempt=?,exonerated=?,isv_15=?,isv_18=?,total=?,cost=?,margin=?,calculator_version=?,version=version+1,updated_by=?,updated_at=UTC_TIMESTAMP(6) WHERE id=? AND version=?`, nullable(q.Customer.ID), q.CustomerVersion, q.Customer.Name, q.Customer.RTN, q.Customer.Contact, q.Customer.Phone, q.Customer.Email, q.Customer.Address, q.Reference, q.Date, q.ValidityDays, q.Currency, q.Terms, q.Notes, q.AuthorContact, q.Exoneration, q.DiscountType, q.Discount, c.Gross, c.ItemDiscount, c.GeneralDiscount, c.Base15, c.Base18, c.Exempt, c.Exonerated, c.ISV15, c.ISV18, c.Total, c.Cost, c.Margin, c.CalculatorVersion, a.UserID, q.ID, q.Version-1)); e != nil {
+		if e := core.Changed(tx.ExecContext(ctx, `UPDATE quotes SET status=?,customer_id=?,customer_version=?,customer_name_snapshot=?,customer_rtn_snapshot=?,customer_contact_snapshot=?,customer_phone_snapshot=?,customer_email_snapshot=?,customer_address_snapshot=?,process_reference_snapshot=?,date=?,validity_days=?,currency=?,terms=?,private_notes=?,author_contact=?,exoneration_reference=?,general_discount_type=?,general_discount=?,gross=?,item_discount=?,allocated_discount=?,base_15=?,base_18=?,exempt=?,exonerated=?,isv_15=?,isv_18=?,total=?,cost=?,margin=?,calculator_version=?,version=version+1,updated_by=?,updated_at=UTC_TIMESTAMP(6) WHERE id=? AND version=?`, q.Status, nullable(q.Customer.ID), q.CustomerVersion, q.Customer.Name, q.Customer.RTN, q.Customer.Contact, q.Customer.Phone, q.Customer.Email, q.Customer.Address, q.Reference, q.Date, q.ValidityDays, q.Currency, q.Terms, q.Notes, q.AuthorContact, q.Exoneration, q.DiscountType, q.Discount, c.Gross, c.ItemDiscount, c.GeneralDiscount, c.Base15, c.Base18, c.Exempt, c.Exonerated, c.ISV15, c.ISV18, c.Total, c.Cost, c.Margin, c.CalculatorVersion, a.UserID, q.ID, q.Version-1)); e != nil {
 			return nil, e
 		}
 		if _, e := tx.ExecContext(ctx, `DELETE FROM quote_items WHERE quote_id=?`, q.ID); e != nil {

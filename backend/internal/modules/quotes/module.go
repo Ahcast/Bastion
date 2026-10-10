@@ -127,6 +127,13 @@ func (s *Service) ModuleFiles(logger *slog.Logger, enabled bool, objects core.Ob
 			}
 			return Calculate(p)
 		})
+		register("PATCH /api/v1/quotes/{id}/status", func(ctx context.Context, a core.Actor, r *http.Request) (any, error) {
+			var p TransitionInput
+			if e := required(r, &p, "status", "version"); e != nil {
+				return nil, e
+			}
+			return s.Transition(ctx, a, r.PathValue("id"), r.Header.Get("Idempotency-Key"), p)
+		})
 		register("GET /api/v1/quotes/{id}/versions", func(ctx context.Context, a core.Actor, r *http.Request) (any, error) {
 			f, e := filter(r)
 			if e != nil {
