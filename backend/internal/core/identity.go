@@ -54,7 +54,10 @@ func (s *Service) Touch(ctx context.Context, x Session) error {
 func (s *Service) Limit(ctx context.Context, bucket string, max int) error {
 	return s.Transact(ctx, func(tx *sql.Tx) error {
 		hash := security.Hash(bucket)
-		if _, e := tx.ExecContext(ctx, "INSERT IGNORE INTO auth_limits VALUES(?,0,UTC_TIMESTAMP(6))", hash); e != nil {
+		// Reserve the bucket with an exclusive lock. INSERT IGNORE would let
+		// concurrent callers hold shared duplicate-key locks, then deadlock when
+		// both try to promote them at SELECT FOR UPDATE.
+		if _, e := tx.ExecContext(ctx, "INSERT INTO auth_limits VALUES(?,0,UTC_TIMESTAMP(6)) ON DUPLICATE KEY UPDATE bucket=VALUES(bucket)", hash); e != nil {
 			return e
 		}
 		var count int

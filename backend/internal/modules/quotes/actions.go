@@ -190,7 +190,9 @@ func (s *Service) List(ctx context.Context, a core.Actor, f Filter) (List, error
 		args = append(args, f.Process)
 	}
 	if f.Search != "" {
-		where += ` AND (LOCATE(?,c.number)>0 OR LOCATE(?,c.process_reference_snapshot)>0 OR LOCATE(?,c.customer_name_snapshot)>0 OR EXISTS(SELECT 1 FROM quote_items i WHERE i.quote_id=c.id AND LOCATE(?,i.description)>0))`
+		// The consecutive uses ascii_bin; compare it in the same Unicode
+		// collation as the bound search so non-ASCII customer queries stay valid.
+		where += ` AND (LOCATE(CONVERT(? USING utf8mb4) COLLATE utf8mb4_unicode_ci,CONVERT(c.number USING utf8mb4) COLLATE utf8mb4_unicode_ci)>0 OR LOCATE(?,c.process_reference_snapshot)>0 OR LOCATE(?,c.customer_name_snapshot)>0 OR EXISTS(SELECT 1 FROM quote_items i WHERE i.quote_id=c.id AND LOCATE(?,i.description)>0))`
 		args = append(args, f.Search, f.Search, f.Search, f.Search)
 	}
 	if e := s.Core.DB.QueryRowContext(ctx, `SELECT COUNT(*) FROM quotes c WHERE `+where, args...).Scan(&out.Total); e != nil {

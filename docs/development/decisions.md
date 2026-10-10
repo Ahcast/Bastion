@@ -70,3 +70,9 @@ Renderer github.com/signintech/gopdf v0.38.1 y golang.org/x/image v0.47.0 fijado
 ## Estados preliminares de Quotes
 
 Workflow aporta evaluación de grafos; Quotes conserva reglas, persistencia y TX. Implementar costeo/revisión antes de aprobación/emisión sin rutas que simulen esos efectos. cotizaciones.transition es independiente de edición y no se asigna por defecto. Revisar exige ítems, sin inventar umbrales de margen/precio. Guardar ediciones desde costeo/revisión regresa a borrador y mantiene historial; escritura documental bloqueada en revisión con lock del agregado durante políticas transaccionales. PDF permanece BORRADOR hasta implementar aprobación y emisión. Definiciones editables y decisiones/vigencia siguen pendientes.
+
+## 2026-10-10 — Reservas de límite HTTP y búsqueda Unicode
+
+El recorrido de aprobación de dos personas reveló MySQL 1213 durante lecturas HTTP: middleware Limit usaba INSERT IGNORE seguido de SELECT FOR UPDATE sobre un bucket compartido. Sustituido por ON DUPLICATE KEY UPDATE de la misma clave, que reserva bloqueo exclusivo antes de leer/incrementar; sin reintentos automáticos de escrituras. Prueba con 64 llamadas y límite 24 comprueba 24 aceptadas, rechazo explícito de las demás y reinicio de ventana.
+
+Buscar aprobación/Revisión/conexión reveló MySQL 1267 al comparar parámetro Unicode contra quotes.number (ascii_bin). El término y el consecutivo se convierten explícitamente a utf8mb4_unicode_ci para LOCATE, conservando búsqueda literal parametrizada y sin alterar migraciones publicadas. Prueba de búsqueda en número, cliente, expediente e ítem. Diagnóstico API registra códigos numéricos/contexto sin mensajes SQL o datos privados. El navegador no puede cerrar una unidad con estos fallos.
