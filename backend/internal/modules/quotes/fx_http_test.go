@@ -23,7 +23,7 @@ func TestFXObservationDTOIsStrictAndComplete(t *testing.T) {
 	names := []string{"rate_kind", "rate", "valid_from", "valid_to", "source", "source_reference", "source_published_at", "evidence_hash", "supersedes_id", "reason"}
 	decode := func(m map[string]any) error {
 		b, _ := json.Marshal(m)
-		r := httptest.NewRequest("POST", "/api/v1/quotes/fx-observations", bytes.NewReader(b))
+		r := httptest.NewRequest("POST", "/api/v1/quote-fx/observations", bytes.NewReader(b))
 		r.Header.Set("Content-Type", "application/json")
 		var input FXObservationInput
 		return required(r, &input, names...)
