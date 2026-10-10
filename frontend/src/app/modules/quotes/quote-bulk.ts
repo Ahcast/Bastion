@@ -6,23 +6,70 @@ export interface QuoteBulkRow{id:string;number:string;customer_name:string;refer
 interface BulkItemResult{position:number;id:string;version:string;status:string;error_code?:string}
 interface BulkResponse{batch_id:string;action:string;status:string;results:BulkItemResult[];filename?:string;content?:string}
 
-@Component({selector:'bastion-quote-bulk',imports:[FormsModule],template:`
-@if(rows.length&&(api.has('cotizaciones.transition')||api.has('cotizaciones.create')||api.has('cotizaciones.view'))){
-<section class="card" aria-labelledby="quote-bulk-title">
-<h2 id="quote-bulk-title">Acciones en lote</h2>
-<p>Seleccione cotizaciones visibles. Cada lote conserva identidad y resultado por cotización.</p>
-<label><input type="checkbox" [checked]="allSelected()" (change)="toggleAll($event)" [disabled]="busy()">Seleccionar todas las cotizaciones visibles</label>
-<details><summary>Elegir cotizaciones ({{count()}} seleccionadas)</summary>
-@for(q of rows;track q.id){<label><input type="checkbox" [checked]="selected().has(q.id)" (change)="toggle(q.id,$event)" [disabled]="busy()">{{q.number}} · {{q.customer_name}} · versión {{q.version}}</label>}
-</details>
-@if(api.has('cotizaciones.transition')){<label>Estado de destino<select [(ngModel)]="target" [disabled]="busy()"><option value="draft">Borrador</option><option value="costing">Costeo</option><option value="review">Revisión</option></select></label><button type="button" (click)="run('status')" [disabled]="busy()||count()===0">Cambiar estado de seleccionadas</button>}
-@if(api.has('cotizaciones.create')){<button type="button" (click)="run('clone')" [disabled]="busy()||count()===0">Clonar seleccionadas</button>}
-@if(api.has('cotizaciones.view')){<button type="button" (click)="run('export')" [disabled]="busy()||count()===0">Exportar seleccionadas a CSV</button>}
-@if(error()){<p role="alert">{{error()}}</p>}
-@if(notice()){<p role="status">{{notice()}}</p>}
-@if(result();as batch){<p>Lote {{batch.batch_id}} · {{batch.status}}</p>@if(failures().length){<ul>@for(item of failures();track item.position){<li>{{number(item.id)}}: {{errorLabel(item.error_code||'')}}</li>}</ul>}}
-</section>}
-}`})
+@Component({
+ selector:'bastion-quote-bulk',
+ imports:[FormsModule],
+ template:`
+@if (rows.length && (api.has('cotizaciones.transition') || api.has('cotizaciones.create') || api.has('cotizaciones.view'))) {
+  <section class="card" aria-labelledby="quote-bulk-title">
+    <h2 id="quote-bulk-title">Acciones en lote</h2>
+    <p>Seleccione cotizaciones visibles. Cada lote conserva identidad y resultado por cotización.</p>
+
+    <label>
+      <input type="checkbox" [checked]="allSelected()" (change)="toggleAll($event)" [disabled]="busy()">
+      Seleccionar todas las cotizaciones visibles
+    </label>
+
+    <details>
+      <summary>Elegir cotizaciones ({{count()}} seleccionadas)</summary>
+      @for (q of rows; track q.id) {
+        <label>
+          <input type="checkbox" [checked]="selected().has(q.id)" (change)="toggle(q.id,$event)" [disabled]="busy()">
+          {{q.number}} · {{q.customer_name}} · versión {{q.version}}
+        </label>
+      }
+    </details>
+
+    @if (api.has('cotizaciones.transition')) {
+      <label>
+        Estado de destino
+        <select [(ngModel)]="target" [disabled]="busy()">
+          <option value="draft">Borrador</option>
+          <option value="costing">Costeo</option>
+          <option value="review">Revisión</option>
+        </select>
+      </label>
+      <button type="button" (click)="run('status')" [disabled]="busy() || count() === 0">Cambiar estado de seleccionadas</button>
+    }
+
+    @if (api.has('cotizaciones.create')) {
+      <button type="button" (click)="run('clone')" [disabled]="busy() || count() === 0">Clonar seleccionadas</button>
+    }
+
+    @if (api.has('cotizaciones.view')) {
+      <button type="button" (click)="run('export')" [disabled]="busy() || count() === 0">Exportar seleccionadas a CSV</button>
+    }
+
+    @if (error()) {
+      <p role="alert">{{error()}}</p>
+    }
+    @if (notice()) {
+      <p role="status">{{notice()}}</p>
+    }
+    @if (result(); as batch) {
+      <p>Lote {{batch.batch_id}} · {{batch.status}}</p>
+      @if (failures().length) {
+        <ul>
+          @for (item of failures(); track item.position) {
+            <li>{{number(item.id)}}: {{errorLabel(item.error_code || '')}}</li>
+          }
+        </ul>
+      }
+    }
+  </section>
+}
+`
+})
 export class QuoteBulk implements OnChanges{
  api=inject(Client);
  @Input() rows:QuoteBulkRow[]=[];
