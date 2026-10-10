@@ -112,6 +112,21 @@ func main() {
 		log.Fatal(e)
 	}
 
+	// Dedicated FX operator prevents browser TOTP replay between independent quote scenarios.
+	// It has only the global FX grants required by the observation-ledger screen.
+	if _, e = db.Exec(`INSERT INTO users(email,name,password_hash,totp_secret,active,created_at,updated_at) SELECT 'fx@example.test','Operador FX sintético',password_hash,?,TRUE,UTC_TIMESTAMP(6),UTC_TIMESTAMP(6) FROM users WHERE id=1`, secret); e != nil {
+		log.Fatal(e)
+	}
+	if _, e = db.Exec(`INSERT INTO roles(id,name) VALUES(6,'FX sintético')`); e != nil {
+		log.Fatal(e)
+	}
+	if _, e = db.Exec(`INSERT INTO role_permissions SELECT 6,name,'all' FROM permissions WHERE name IN ('cotizaciones.fx.view','cotizaciones.fx.manage')`); e != nil {
+		log.Fatal(e)
+	}
+	if _, e = db.Exec(`INSERT INTO user_roles VALUES(6,6)`); e != nil {
+		log.Fatal(e)
+	}
+
 	// Synthetic quarantined metadata only: no S3 request, bytes or scanner bypass.
 	if _, e = db.Exec(`INSERT INTO documents(id,owner_id,created_at) VALUES(900,5,UTC_TIMESTAMP(6))`); e != nil {
 		log.Fatal(e)
