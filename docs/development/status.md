@@ -1,6 +1,6 @@
 # Estado del proyecto
 
-Actualizado el 9 de octubre de 2026. Core 0.1.0 publicado y validado en CI; Clientes 0.1.0 publicado y validado en pruebas locales y CI; unidad 1 cerrada. Proveedores 0.1.0 implementado y verificado localmente; CI pendiente de cierre. Producción no desplegada.
+Actualizado el 9 de octubre de 2026. Core 0.1.0 publicado y validado en CI; Clientes 0.1.0 publicado y validado en pruebas locales y CI; unidad 1 cerrada. Proveedores 0.1.0 publicado y validado en pruebas locales y CI; unidad 2 cerrada. Producción no desplegada.
 
 | Área | Estado real |
 | --- | --- |
@@ -15,7 +15,7 @@ Actualizado el 9 de octubre de 2026. Core 0.1.0 publicado y validado en CI; Clie
 | Frontend Angular | Core de sesión, shell, Inicio y Configuración implementados; UI española; build y tests |
 | Crawler Python | Conservado sin cambios; 17 pruebas offline satisfactorias; receptor Processes aún pendiente |
 | Clientes | Ficha/catálogo Go y Angular, contactos/direcciones/notas, historial, snapshots/resolución exacta, permisos y documentos implementados; pruebas locales y CI aprobados |
-| Proveedores | Catálogo, contactos/etiquetas/productos, condiciones/evaluación manual, evidencia de precios, historial/notas/documentos y REST/MCP implementados; CI pendiente |
+| Proveedores | Catálogo, contactos/etiquetas/productos, condiciones/evaluación manual, evidencia de precios, historial/notas/documentos y REST/MCP implementados; pruebas locales y CI aprobados |
 | Demás módulos comerciales | Pendientes; se implementan de uno en uno tras cerrar pruebas y CI del anterior |
 | Despliegue | Templates systemd/nginx/Bluehost preparados; no instalados ni desplegados |
 | Infraestructura real | MySQL TLS/túnel/hosting, DNS/HTTPS, S3/IAM, SMTP y memoria conjunta con crawler pendientes |
@@ -56,11 +56,13 @@ Código: backend/internal/modules/suppliers, composición, migración 0003_suppl
 - Rollback de agregado/evidencia/auditoría/hecho/intención ante fallo SQL; scopes/IDOR/equipos/revocación/reauth y BIGINT como cadena. Archivo vinculado exige ambas políticas y respeta cuarentena. Desactivar módulo bloquea transporte y retira su política.
 - Fuente/fecha/actor, precios y MOQ exactos, evidencias sin precio, filtro literal por referencia, paginación e historial redactado verificados. Web/catalog nunca se declara cotización oficial. SDK MCP verifica get/search/resolve/price-history y revocación, sin escritura de agentes ni OAuth Work.
 - npm ci/build y 14 pruebas Angular satisfactorios (8 anteriores, 6 Proveedores). DTO sin campos protegidos, claves/ediciones persistentes ante fallo, notas/precios conservan cambios pendientes, lector sin escritura; POST conserva ID/version confirmados si falla recarga. Fecha de fuente en Honduras convertida a UTC; presentación DatePipe fija UTC−06:00.
-- Navegador real: Core, Clientes y Proveedores; catálogo/contacto/producto/MOQ, nota, precio exacto, persistencia, duplicado, país e inactivación. Última regresión de los tres flujos con zona horaria corregida satisfactoria; CI por registrar.
+- Navegador real: Core, Clientes y Proveedores; catálogo/contacto/producto/MOQ, nota, precio exacto, persistencia, duplicado, país e inactivación. Última regresión de los tres flujos con zona horaria corregida satisfactoria, también aprobada en CI.
 - 17 pruebas crawler offline satisfactorias; gofmt/vet/build y documentación verificados. Primer intento local sobre datadir checkpointado falló al recrear tablas InnoDB; directorio temporal nuevo y pruebas completas aprobadas. No se atribuye ese fallo al código productivo ni se utiliza una BD productiva para las pruebas.
+
+Código final [8e9add2](https://github.com/Ahcast/Bastion/commit/8e9add2b2a66341d78c4b3480fac6adbdc6a95f1): [Core checks 38010479366](https://github.com/Ahcast/Bastion/actions/runs/38010479366) aprobó backend (vet, formato, race detector/MySQL 5.7 y builds), frontend (build y 14 pruebas) y los tres flujos de navegador reales. También aprobaron [documentación](https://github.com/Ahcast/Bastion/actions/runs/38010479382) y [rama única](https://github.com/Ahcast/Bastion/actions/runs/38010479365). Todas las pruebas de aceptación de esta unidad cerradas; conexiones externas mantienen los límites indicados arriba.
 
 RFQ/aprobación/envío, cotizaciones recibidas oficiales, métricas calculadas e investigación automática conservan sus requisitos, pendientes de AI/Workflow y sus propietarios. No se activó correo ni se consultó HonduCompras/S3/Bluehost real. Proveedores no declara esas conexiones finalizadas por aprobar su catálogo manual.
 
 ## Continuidad
 
-Orden: Clientes → Proveedores → Procesos/receptor crawler → Cotizaciones → OC de clientes → Facturas/pagos → Gastos → Reportes → Colaboración; Workflow/AI según dependencias. Clientes cerrado con evidencia local y CI satisfactoria; Proveedores implementado y en cierre de CI. Procesos/receptor crawler sigue sin iniciar; no comenzar hasta cerrar las pruebas y CI de Proveedores. Leer contrato/spec de Procesos y contrato único IMPORT_CONTRACT del crawler antes de su implementación. Mantener all/self/team, snapshots, transacciones y permisos mínimos en cada unidad. No se han desplegado servicios ni migrado datos productivos.
+Orden: Clientes → Proveedores → Procesos/receptor crawler → Cotizaciones → OC de clientes → Facturas/pagos → Gastos → Reportes → Colaboración; Workflow/AI según dependencias. Clientes y Proveedores cerrados con evidencia local y CI satisfactoria. Próxima unidad: Procesos/receptor crawler, aún sin iniciar. Leer contrato/spec de Procesos y contrato único IMPORT_CONTRACT del crawler antes de su implementación. Mantener all/self/team, snapshots, transacciones y permisos mínimos en cada unidad. No se han desplegado servicios ni migrado datos productivos.
