@@ -51,6 +51,121 @@ func (s *Service) emailFiles(ctx context.Context, tx *sql.Tx, intent quoteEmailI
 	return files, nil
 }
 
+// jobQuoteAuthorizes a durable user identity from its current grants. Jobs must
+// never depend on the browser session that happened to exist when they were queued.
+func (s *Service) jobQuote(ctx context.Context, tx *sql.Tx, user, id, permission string) (Quote, error) {
+	if core.ID(user) != nil || core.ID(id) != nil {
+		return Quote{}, core.Invalid
+	}
+	q, e := scan(tx.QueryRowContext(ctx, `SELECT `+columns+` FROM quotes WHERE id=? FOR UPDATE`, id))
+	if e == sql.ErrNoRows {
+		return q, core.Missing
+	}
+	if e != nil {
+		return q, e
+	}
+	if e = s.Core.AuthorizeGrantHolder(ctx, tx, user, permission, q.Owner, q.Team); e != nil {
+		if e == core.Forbidden {
+			return q, core.Missing
+		}
+		return q, e
+	}
+	return q, nil
+}
+
+func (s *Service) jobDocumentGrant(ctx context.Context, tx *sql.Tx, user, document, quote string) error {
+	var owner, team, entity, entityID string
+	var deleted sql.NullTime
+	e := tx.QueryRowContext(ctx, `SELECT CAST(owner_id AS CHAR),COALESCE(CAST(team_id AS CHAR),''),COALESCE(entity_type,''),COALESCE(entity_id,''),deleted_at FROM documents WHERE id=?`, document).Scan(&owner, &team, &entity, &entityID, &deleted)
+	if e == sql.ErrNoRows || deleted.Valid {
+		return core.Missing
+	}
+	if e != nil {
+		return e
+	}
+	if entity != "quotes" || entityID != quote {
+		return core.Conflict
+	}
+	if e = s.Core.AuthorizeGrantHolder(ctx, tx, user, "core.documents.read", owner, team); e != nil {
+		return core.Missing
+	}
+	return nil
+}
+
+func (s *Service) jobEmailEvidence(ctx context.Context, tx *sql.Tx, user string, q Quote, intent quoteEmailIntent) (map[string]any, error) {
+	var pdfDocument, pdfHash, pdfBinding string
+	var pdfSize int64
+	e := tx.QueryRowContext(ctx, `SELECT CAST(p.document_id AS CHAR),p.input_hash,COALESCE(p.binding_hash,''),v.size_bytes
+		FROM quote_pdf_snapshots p
+		JOIN documents d ON d.id=p.document_id
+		JOIN document_versions v ON v.document_id=d.id AND v.number=d.current_version
+		WHERE p.id=? AND p.quote_id=? AND p.quote_version=? AND p.kind='issued' AND p.status='available' AND d.deleted_at IS NULL AND v.status='available'`, intent.PDFSnapshotID, q.ID, q.Version).Scan(&pdfDocument, &pdfHash, &pdfBinding, &pdfSize)
+	if e == sql.ErrNoRows {
+		return nil, core.Conflict
+	}
+	if e != nil {
+		return nil, e
+	}
+	if e = s.jobDocumentGrant(ctx, tx, user, pdfDocument, q.ID); e != nil {
+		return nil, e
+	}
+	total := pdfSize
+	attachments := make([]map[string]any, 0, len(intent.AttachmentIDs))
+	for _, id := range intent.AttachmentIDs {
+		if e = s.jobDocumentGrant(ctx, tx, user, id, q.ID); e != nil {
+			return nil, e
+		}
+		var generated bool
+		var number int
+		var filename, media, checksum, status string
+		var size int64
+		e = tx.QueryRowContext(ctx, `SELECT d.is_generated,d.current_version,v.filename,v.media_type,v.size_bytes,v.checksum,v.status
+			FROM documents d JOIN document_versions v ON v.document_id=d.id AND v.number=d.current_version WHERE d.id=?`, id).Scan(&generated, &number, &filename, &media, &size, &checksum, &status)
+		if e != nil {
+			return nil, e
+		}
+		if generated || status != "available" {
+			return nil, core.Conflict
+		}
+		total += size
+		if total > core.MaxEmailAttachmentBytes {
+			return nil, core.Invalid
+		}
+		attachments = append(attachments, map[string]any{"document_id": id, "version": number, "filename": filename, "media_type": media, "size_bytes": size, "checksum": checksum})
+	}
+	return map[string]any{"pdf_snapshot_id": intent.PDFSnapshotID, "pdf_document_id": pdfDocument, "pdf_input_hash": pdfHash, "pdf_binding_hash": pdfBinding, "pdf_size_bytes": pdfSize, "attachments": attachments}, nil
+}
+
+func (s *Service) jobEmailBindingHash(ctx context.Context, tx *sql.Tx, user string, q Quote, intent quoteEmailIntent) (string, error) {
+	if q.Deleted != nil || q.Status != "approved" || q.Version != intent.QuoteVersion {
+		return "", core.Conflict
+	}
+	if e := s.Core.AuthorizeGrantHolder(ctx, tx, user, "cotizaciones.view", q.Owner, q.Team); e != nil {
+		return "", e
+	}
+	evidence, e := s.jobEmailEvidence(ctx, tx, user, q, intent)
+	if e != nil {
+		return "", e
+	}
+	input := struct {
+		Schema       int            `json:"schema"`
+		QuoteID      string         `json:"quote_id"`
+		QuoteVersion uint64         `json:"quote_version,string"`
+		To           []string       `json:"to"`
+		CC           []string       `json:"cc"`
+		BCC          []string       `json:"bcc"`
+		Subject      string         `json:"subject"`
+		Message      string         `json:"message"`
+		ScheduledAt  string         `json:"scheduled_at"`
+		Evidence     map[string]any `json:"evidence"`
+	}{quoteEmailBindingSchema, q.ID, q.Version, intent.To, intent.CC, intent.BCC, intent.Subject, intent.Message, intent.ScheduledAt.UTC().Format(time.RFC3339Nano), evidence}
+	raw, e := json.Marshal(input)
+	if e != nil {
+		return "", e
+	}
+	return security.Hash(string(raw)), nil
+}
+
 func smtpHostAllowed(host string, allowed []string) bool {
 	for _, v := range allowed {
 		if strings.EqualFold(strings.TrimSpace(v), host) {
@@ -120,12 +235,12 @@ func (s *Service) CommercialEmailHandler(reader EmailObjectReader, mailer core.M
 			default:
 				return core.Conflict
 			}
-			q, e := s.access(ctx, tx, a, payload.QuoteID, "cotizaciones.view", false, false)
+			q, e := s.jobQuote(ctx, tx, j.UserID, payload.QuoteID, "cotizaciones.view")
 			if e != nil {
 				return e
 			}
-			binding, e := s.emailBinding(ctx, tx, a, q, intent)
-			if e != nil || binding.Hash != intent.BindingHash {
+			hash, e := s.jobEmailBindingHash(ctx, tx, j.UserID, q, intent)
+			if e != nil || hash != intent.BindingHash {
 				if e != nil {
 					return e
 				}
@@ -182,7 +297,7 @@ func (s *Service) CommercialEmailHandler(reader EmailObjectReader, mailer core.M
 			if e := tx.QueryRowContext(ctx, `SELECT j.lease_token,i.status,i.binding_hash FROM jobs j JOIN quote_email_intents i ON i.job_id=j.id WHERE j.id=? AND i.id=? AND j.lease_until>UTC_TIMESTAMP(6) FOR UPDATE`, j.ID, intent.ID).Scan(&lease, &status, &bindingHash); e != nil || lease != j.Lease || status != "preparing" || bindingHash != intent.BindingHash {
 				return core.Conflict
 			}
-			q, e := s.access(ctx, tx, a, payload.QuoteID, "cotizaciones.view", false, false)
+			q, e := s.jobQuote(ctx, tx, j.UserID, payload.QuoteID, "cotizaciones.view")
 			if e != nil {
 				return e
 			}
@@ -191,8 +306,8 @@ func (s *Service) CommercialEmailHandler(reader EmailObjectReader, mailer core.M
 				return e
 			}
 			current.Status = "queued"
-			binding, e := s.emailBinding(ctx, tx, a, q, current)
-			if e != nil || binding.Hash != intent.BindingHash {
+			hash, e := s.jobEmailBindingHash(ctx, tx, j.UserID, q, current)
+			if e != nil || hash != intent.BindingHash {
 				if e != nil {
 					return e
 				}
