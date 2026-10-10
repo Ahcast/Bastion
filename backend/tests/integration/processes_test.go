@@ -3,6 +3,7 @@ package integration
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"github.com/Ahcast/Bastion/backend/internal/composition"
 	"github.com/Ahcast/Bastion/backend/internal/core"
 	"github.com/Ahcast/Bastion/backend/internal/core/api"
@@ -255,5 +256,34 @@ func TestProcessesHTTPMCPAndScopedReadRevocation(t *testing.T) {
 	result, e = session.CallTool(ctx, &mcp.CallToolParams{Name: "get_process", Arguments: map[string]any{"id": id}})
 	if e == nil && !result.IsError {
 		t.Fatal("MCP revoke")
+	}
+}
+func TestProcessesLargeBatchWithoutGlobalPacketChanges(t *testing.T) {
+	s, a := processFixture(t)
+	p := processes.Batch{ID: "large-snapshot-0", Schema: "1.0", Processes: []processes.Observation{}}
+	for i := 0; i < 30; i++ {
+		o := obs(time.Now().UTC().Add(-time.Minute), "Entidad")
+		o.ExternalID = fmt.Sprintf("synthetic-large-%d", i)
+		b, _ := json.Marshal(strings.Repeat("a", 180000))
+		o.Data["description"] = b
+		d, _ := json.Marshal(o.Data)
+		o.ContentHash = security.Hash(string(d))
+		p.Processes = append(p.Processes, o)
+	}
+	raw, _ := json.Marshal(p)
+	if len(raw) < 4*1024*1024 {
+		t.Fatal("fixture must exceed default packet")
+	}
+	v, e := s.Import(ctx, a, "HC-synthetic-test", p.ID, p)
+	if e != nil || v.(processes.ACK).New != 30 {
+		t.Fatal(v, e)
+	}
+	var size, count int
+	if e = s.Core.DB.QueryRow(`SELECT LENGTH(payload) FROM crawler_deliveries WHERE batch_id=?`, p.ID).Scan(&size); e != nil {
+		t.Fatal(e)
+	}
+	s.Core.DB.QueryRow(`SELECT COUNT(*) FROM process_observations`).Scan(&count)
+	if size > 1024 || count != 30 {
+		t.Fatal(size, count)
 	}
 }

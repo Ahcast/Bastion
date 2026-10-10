@@ -15,3 +15,5 @@ public/config.json contiene únicamente la URL pública API. Desarrollo: http://
 Desplegar solo dist/bastion-ui/browser a Bluehost; nunca node_modules, fuentes privadas ni secretos. [Arquitectura](../docs/architecture/README.md), [idioma](../docs/idioma.md).
 
 Proveedores: src/app/modules/suppliers, ruta /suppliers y navegación según proveedores.view/módulo habilitado. Evidencia y ficha consumen el mismo contrato Go; valores decimales se transportan como cadenas.
+
+Procesos incorpora ruta /processes con filtros, interés/nota personal, versiones/diffs, CSV y estado protegido. Conversión a cotización y resultados AI se incorporan en sus fases.

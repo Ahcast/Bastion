@@ -13,3 +13,5 @@ UI /processes: filtros paginados SQL, detalle, marcas/notas personales y version
 Pruebas: gofmt/vet/build y go test -race con BASTION_TEST_MYSQL_DSN exclusivamente bastion_test/MySQL5.7; npm ci/build/test; Playwright con browserseed exclusivamente bastion_browser_test. Regresión Python unittest sin red. CI realiza MySQL/API/Angular reales con datos sintéticos.
 
 Cotizaciones, AI/Workflow, asignación/comentarios/tareas de colaboración y descarga del repositorio raw S3 mantienen sus fases y propietarios. No se ofrecen botones/rutas ficticios para esas dependencias; consultas no activan investigación ni envíos. Docs/status registra lo implementado y lo pendiente; pruebas no acreditan infraestructura productiva.
+
+Presupuesto del receptor 75 s; deadline de respuesta y proxy 85 s; cliente existente read timeout 90 s. El template nginx amplía cuerpo a 24 MiB solamente en /api/internal/v1/crawler/. Los demás endpoints mantienen 25 s/1 MiB. No instalar el template sin entorno autorizado.

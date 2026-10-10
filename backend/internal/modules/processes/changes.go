@@ -59,13 +59,19 @@ func differences(old, next State, fields []string) []Change {
 	return out
 }
 func saveChanges(ctx context.Context, tx *sql.Tx, id string, version uint64, changes []Change) error {
-	for _, c := range changes {
-		if _, e := tx.ExecContext(ctx, `INSERT INTO process_changes(process_id,version,kind,field,before_data,after_data) VALUES(?,?,?,?,?,?)`, id, version, c.Kind, c.Field, string(c.Before), string(c.After)); e != nil {
-			return e
-		}
+	if len(changes) == 0 {
+		return nil
 	}
-	return nil
+	marks := make([]string, len(changes))
+	args := make([]any, 0, len(changes)*6)
+	for i, c := range changes {
+		marks[i] = "(?,?,?,?,?,?)"
+		args = append(args, id, version, c.Kind, c.Field, string(c.Before), string(c.After))
+	}
+	_, e := tx.ExecContext(ctx, `INSERT INTO process_changes(process_id,version,kind,field,before_data,after_data) VALUES `+strings.Join(marks, ","), args...)
+	return e
 }
+
 func changes(ctx context.Context, q core.Querier, id, v string) ([]Change, error) {
 	rows, e := q.QueryContext(ctx, `SELECT kind,field,before_data,after_data FROM process_changes WHERE process_id=? AND version=? ORDER BY id`, id, v)
 	if e != nil {

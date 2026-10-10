@@ -111,7 +111,11 @@ func (s *Server) middleware(next http.Handler) http.Handler {
 	slots := make(chan struct{}, 32)
 	crawlerSlots := make(chan struct{}, 4)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		ctx, cancel := context.WithTimeout(r.Context(), 25*time.Second)
+		budget := 25 * time.Second
+		if strings.HasPrefix(r.URL.Path, "/api/internal/v1/crawler/") {
+			budget = 75 * time.Second
+		}
+		ctx, cancel := context.WithTimeout(r.Context(), budget)
 		defer cancel()
 		r = r.WithContext(ctx)
 		id := security.ID()
@@ -199,6 +203,10 @@ func (s *Server) middleware(next http.Handler) http.Handler {
 			}
 			a, e := s.Service.AuthenticateService(r.Context(), strings.TrimPrefix(header, "Bearer "))
 			if e != nil {
+				s.error(w, r, e)
+				return
+			}
+			if e := http.NewResponseController(w).SetWriteDeadline(time.Now().Add(85 * time.Second)); e != nil {
 				s.error(w, r, e)
 				return
 			}

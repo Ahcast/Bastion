@@ -99,7 +99,11 @@ func (s *Service) delivery(ctx context.Context, a core.Actor, run, id, kind, per
 			return e
 		}
 		// Placeholder is private to the transaction and cannot be acknowledged before commit.
-		_, e = tx.ExecContext(ctx, `INSERT INTO crawler_deliveries VALUES(?,?,?,?,?,?,UTC_TIMESTAMP(6))`, run, id, kind, hash(p), string(canonical(p)), "{}")
+		payload := p
+		if b, ok := p.(Batch); ok {
+			payload = map[string]any{"schema_version": b.Schema, "received": len(b.Processes)}
+		}
+		_, e = tx.ExecContext(ctx, `INSERT INTO crawler_deliveries VALUES(?,?,?,?,?,?,UTC_TIMESTAMP(6))`, run, id, kind, hash(p), string(canonical(payload)), "{}")
 		if e != nil {
 			return e
 		}
@@ -215,7 +219,7 @@ type Complete struct {
 }
 
 func (s *Service) Complete(ctx context.Context, a core.Actor, run, k string, p Complete) (any, error) {
-	if k != p.ID+"-complete" || p.Extraction == nil {
+	if k != p.ID+"-complete" || p.Extraction == nil || len(canonical(p.Extraction)) > 64*1024 {
 		return nil, core.Invalid
 	}
 	var runID, status string

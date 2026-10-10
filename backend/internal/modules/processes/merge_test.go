@@ -81,3 +81,14 @@ func TestEquivalentDeadlineOffsetsDoNotCreateChanges(t *testing.T) {
 		t.Fatal(changes, e)
 	}
 }
+func TestCanonicalPreservesLargeMetadataNumbersForIdempotency(t *testing.T) {
+	a := json.RawMessage(`{"metadata":9007199254740992}`)
+	b := json.RawMessage(`{"metadata":9007199254740993}`)
+	if hash(a) == hash(b) {
+		t.Fatal("metadata precision collision")
+	}
+	v := json.RawMessage(`{"metadata":1e309}`)
+	if string(canonical(v)) != string(v) {
+		t.Fatal("valid JSON number lost", string(canonical(v)))
+	}
+}

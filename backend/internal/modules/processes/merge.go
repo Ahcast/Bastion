@@ -24,7 +24,9 @@ func digest(b []byte) string   { h := sha256.Sum256(b); return hex.EncodeToStrin
 func canonical(v any) []byte {
 	raw, _ := json.Marshal(v)
 	var normalized any
-	_ = json.Unmarshal(raw, &normalized)
+	decoder := json.NewDecoder(bytes.NewReader(raw))
+	decoder.UseNumber()
+	_ = decoder.Decode(&normalized)
 	var b bytes.Buffer
 	e := json.NewEncoder(&b)
 	e.SetEscapeHTML(false)

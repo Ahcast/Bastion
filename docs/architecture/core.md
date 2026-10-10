@@ -327,7 +327,7 @@ Reglas obligatorias al implementarlo:
 8. Fallar Bluehost no obliga a repetir el scraping: se reentrega desde artefactos existentes.
 9. La importación permite replay sin consultar HonduCompras.
 
-El mecanismo actual de push CSV todavía requiere documentación. Este borrador no supone que esos endpoints ya existan ni cambia el crawler actual.
+El cliente API y su ACK están documentados en IMPORT_CONTRACT del crawler. Processes implementa los tres endpoints según [contrato](../contracts/processes.md); se conserva el código Python. El ACK de esta versión confirma aplicación durable, no solo recepción. Pruebas/CI y límites externos en [status](../development/status.md).
 
 ## 15. Integración de IA y MCP
 
