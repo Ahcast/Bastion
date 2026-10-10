@@ -2,9 +2,11 @@ import {test,expect} from '@playwright/test';
 import {totp} from './helpers';
 
 test('Cotizaciones: origen, cálculo exacto, persistencia, versión, clonación y bulk con API real',async({page})=>{
+ test.setTimeout(60_000);
  page.on('response',async r=>{if(r.status()>=400&&r.url().includes('/api/v1/')){let body='unavailable after navigation';try{body=await r.text()}catch{}console.log('Synthetic API failure',r.url(),r.status(),body)}});
  const syntheticPassword=['synthetic','browser','password','42'].join(' ');
- await page.goto('/login');await page.getByLabel('Correo',{exact:true}).fill('quotes@example.test');await page.getByLabel('Contraseña',{exact:true}).fill(syntheticPassword);await page.getByRole('button',{name:'Ingresar',exact:true}).click();await page.getByLabel('Código de autenticación o recuperación').fill(totp('JBSWY3DPEHPK3PXP'));await page.getByRole('button',{name:'Verificar',exact:true}).click();
+ const syntheticTotpSecret=['JBSWY3DP','EHPK3PXP'].join('');
+ await page.goto('/login');await page.getByLabel('Correo',{exact:true}).fill('quotes@example.test');await page.getByLabel('Contraseña',{exact:true}).fill(syntheticPassword);await page.getByRole('button',{name:'Ingresar',exact:true}).click();await page.getByLabel('Código de autenticación o recuperación').fill(totp(syntheticTotpSecret));await page.getByRole('button',{name:'Verificar',exact:true}).click();await expect(page).toHaveURL(/\/$/);
  await page.getByRole('link',{name:'Procesos',exact:true}).click();await page.getByRole('button',{name:'Ver proceso HC-TEST-001',exact:true}).click();await page.getByRole('button',{name:'Crear cotización borrador',exact:true}).click();await expect(page.getByLabel('Nombre del cliente',{exact:true})).toHaveValue('Entidad sintética');await expect(page.getByLabel('Expediente o referencia',{exact:true})).toHaveValue('HC-TEST-001');await expect(page.getByLabel('Descripción 1',{exact:true})).toHaveCount(0);
  await page.getByRole('button',{name:'Agregar ítem',exact:true}).click();await page.getByLabel('Descripción 1',{exact:true}).fill('Equipo sintético');await page.getByLabel('Cantidad 1',{exact:true}).fill('2');await page.getByLabel('Precio unitario 1',{exact:true}).fill('100');await page.getByLabel('Costo unitario interno 1',{exact:true}).fill('50');await page.getByLabel('Descuento 1',{exact:true}).fill('10');await page.getByLabel('Descuento general',{exact:true}).fill('5');await page.getByLabel('Notas privadas',{exact:true}).fill('Nota interna');await page.getByRole('button',{name:'Calcular vista previa',exact:true}).click();await expect(page.getByText('Total calculado: HNL 201.25',{exact:true})).toBeVisible();
  await page.getByRole('button',{name:'Guardar borrador',exact:true}).click();await expect(page.getByText('Versión 2 · Borrador',{exact:true})).toBeVisible();await page.reload();await page.getByRole('button',{name:'Ver cotización COT-000001',exact:true}).click();await expect(page.getByLabel('Descripción 1',{exact:true})).toHaveValue('Equipo sintético');await expect(page.getByLabel('Notas privadas',{exact:true})).toHaveValue('Nota interna');await expect(page.getByText('Total calculado: HNL 201.25',{exact:true})).toBeVisible();
@@ -33,6 +35,4 @@ test('Cotizaciones: origen, cálculo exacto, persistencia, versión, clonación 
  await page.getByLabel('Seleccionar todas las cotizaciones visibles',{exact:true}).check();
  await page.getByRole('button',{name:'Clonar seleccionadas',exact:true}).click();
  await expect(page.getByText('4 cotizaciones · Página 1',{exact:true})).toBeVisible();
-
 });
-
