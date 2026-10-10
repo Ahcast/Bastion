@@ -107,4 +107,7 @@ jobs:
               raise SystemExit('Test services unavailable')
           PYTHON
           cd frontend
-          npx playwright test
+          if ! npx playwright test; then
+            cat /tmp/bastion-api.log
+            exit 1
+          fi
