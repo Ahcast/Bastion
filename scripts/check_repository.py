@@ -42,8 +42,8 @@ for file in sorted((ROOT / 'docs' / 'contracts').glob('*-openapi.json')):
 # exposed REST operations. Keep the machine-readable contract synchronized in
 # both directions: every registered route must be documented and every documented
 # REST operation must still exist. Static register("METHOD /path", ...) calls are
-# found automatically; three legacy routes are assembled by a small loop in
-# module.go and are declared explicitly here until that registration is static.
+# found automatically. Five legacy routes are assembled by loops in module.go and
+# are declared explicitly here until their registration becomes static.
 quotes_contract = openapi_docs.get('quotes-openapi.json')
 quotes_dir = ROOT / 'backend' / 'internal' / 'modules' / 'quotes'
 if quotes_contract is not None and quotes_dir.is_dir():
@@ -55,6 +55,8 @@ if quotes_contract is not None and quotes_dir.is_dir():
         text = source.read_text()
         registered.update((method.lower(), path) for method, path in route_pattern.findall(text))
     registered.update({
+        ('post', '/api/v1/quotes'),
+        ('patch', '/api/v1/quotes/{id}'),
         ('post', '/api/v1/quotes/{id}/clone'),
         ('delete', '/api/v1/quotes/{id}'),
         ('post', '/api/v1/quotes/{id}/restore'),
