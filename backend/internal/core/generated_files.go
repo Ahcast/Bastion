@@ -13,7 +13,11 @@ func (s *Service) PublicCompany(ctx context.Context, q Querier) (CompanySettings
 	var raw string
 	var version uint64
 	var c CompanySettings
-	e := q.QueryRowContext(ctx, `SELECT value,version FROM settings WHERE name='company'`).Scan(&raw, &version)
+	suffix := ""
+	if _, ok := q.(*sql.Tx); ok {
+		suffix = " FOR UPDATE"
+	}
+	e := q.QueryRowContext(ctx, `SELECT value,version FROM settings WHERE name='company'`+suffix).Scan(&raw, &version)
 	if e == sql.ErrNoRows {
 		return c, 0, Disabled
 	}

@@ -1,6 +1,6 @@
 # Bastion
 
-Aplicación operativa de Castillo IT. Core Go/Angular y catálogos de Clientes y Proveedores y catálogo/ingestión de Procesos implementados; Cotizaciones en desarrollo con borradores, cálculo, PDF/adjuntos y estados preliminares/revisiones, con crawler Python existente. Los demás módulos comerciales e integraciones productivas se desarrollan por fases. [Ejecutar Core](docs/development/core-runbook.md) · [Ejecutar Clientes](docs/development/customers-runbook.md) · [Ejecutar Proveedores](docs/development/suppliers-runbook.md).
+Aplicación operativa de Castillo IT. Core Go/Angular y catálogos de Clientes y Proveedores y catálogo/ingestión de Procesos implementados; Cotizaciones en desarrollo con borradores, cálculo, PDF/adjuntos y estados preliminares/revisiones y aprobación humana vinculada, con crawler Python existente. Los demás módulos comerciales e integraciones productivas se desarrollan por fases. [Ejecutar Core](docs/development/core-runbook.md) · [Ejecutar Clientes](docs/development/customers-runbook.md) · [Ejecutar Proveedores](docs/development/suppliers-runbook.md).
 
 **Entrada del agente:** [AGENTS.md](AGENTS.md) → [maestro](docs/Proyecto_Bastion_Documento_Maestro.md) → [plan](docs/development/plan.md).
 

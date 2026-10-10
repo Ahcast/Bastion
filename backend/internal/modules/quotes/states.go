@@ -13,6 +13,7 @@ type TransitionInput struct {
 }
 
 var preliminaryFlow = []workflow.Edge{
+	{From: "approved", To: "draft"},
 	{From: "draft", To: "costing"},
 	{From: "costing", To: "draft"},
 	{From: "costing", To: "review"},

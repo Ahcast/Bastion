@@ -9,6 +9,7 @@ import (
 	"github.com/Ahcast/Bastion/backend/internal/modules/processes"
 	"github.com/Ahcast/Bastion/backend/internal/modules/quotes"
 	"github.com/Ahcast/Bastion/backend/internal/modules/suppliers"
+	"github.com/Ahcast/Bastion/backend/internal/modules/workflow"
 	"io"
 	"log/slog"
 	"os"
@@ -68,6 +69,17 @@ func RegisterFiles(s *core.Service, r *registry.Registry, logger *slog.Logger, o
 		return e
 	}
 
+	workflowEnabled := true
+	if v := os.Getenv("BASTION_WORKFLOW_ENABLED"); v != "" {
+		if v != "true" && v != "false" {
+			return fmt.Errorf("invalid workflow enable flag")
+		}
+		workflowEnabled = v == "true"
+	}
+	approvalService := &workflow.Service{Core: s}
+	if e := r.Register(approvalService.Module(workflowEnabled)); e != nil {
+		return e
+	}
 	quoteEnabled := true
 	if v := os.Getenv("BASTION_QUOTES_ENABLED"); v != "" {
 		if v != "true" && v != "false" {
@@ -76,6 +88,9 @@ func RegisterFiles(s *core.Service, r *registry.Registry, logger *slog.Logger, o
 		quoteEnabled = v == "true"
 	}
 	quoteService := &quotes.Service{Core: s}
+	if workflowEnabled {
+		quoteService.Approvals = approvalService
+	}
 	if quoteEnabled && objects != nil {
 		store, ok := objects.(quotes.PDFStore)
 		if !ok {

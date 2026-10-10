@@ -175,7 +175,32 @@ func (s *Service) Authorize(ctx context.Context, q Querier, a Actor, permission,
 	if permission == "core.identity.self" && a.Type == "user" {
 		return nil
 	}
-	grants, e := s.Grants(ctx, q, a.UserID)
+	return s.authorizeScope(ctx, q, a.UserID, permission, owner, team)
+}
+
+// AuthorizeGrantHolder verifies a durable decision holder without treating an
+// old session as current authentication. This is not an HTTP execution identity.
+func (s *Service) AuthorizeGrantHolder(ctx context.Context, q Querier, user, permission, owner, team string) error {
+	if ID(user) != nil {
+		return Forbidden
+	}
+	var active bool
+	var secret sql.NullString
+	e := q.QueryRowContext(ctx, "SELECT active,totp_secret FROM users WHERE id=?", user).Scan(&active, &secret)
+	if e == sql.ErrNoRows {
+		return Forbidden
+	}
+	if e != nil {
+		return e
+	}
+	if !active || !secret.Valid {
+		return Forbidden
+	}
+	return s.authorizeScope(ctx, q, user, permission, owner, team)
+}
+
+func (s *Service) authorizeScope(ctx context.Context, q Querier, user, permission, owner, team string) error {
+	grants, e := s.Grants(ctx, q, user)
 	if e != nil {
 		return e
 	}
@@ -187,13 +212,13 @@ func (s *Service) Authorize(ctx context.Context, q Querier, a Actor, permission,
 		case "all":
 			return nil
 		case "self":
-			if owner != "" && owner == a.UserID {
+			if owner != "" && owner == user {
 				return nil
 			}
 		case "team":
 			if team != "" {
 				var n int
-				if e = q.QueryRowContext(ctx, "SELECT COUNT(*) FROM team_members WHERE team_id=? AND user_id=?", team, a.UserID).Scan(&n); e != nil {
+				if e = q.QueryRowContext(ctx, "SELECT COUNT(*) FROM team_members WHERE team_id=? AND user_id=?", team, user).Scan(&n); e != nil {
 					return e
 				}
 				if n > 0 {

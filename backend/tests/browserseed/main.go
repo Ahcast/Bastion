@@ -120,4 +120,22 @@ func main() {
 		log.Fatal(e)
 	}
 
+	// Two independent people exercise human approval; no production grants.
+	for _, email := range []string{"approval-requester@example.test", "approval-reviewer@example.test"} {
+		r, e := db.Exec(`INSERT INTO users(email,name,password_hash,totp_secret,active,created_at,updated_at) SELECT ?, 'Aprobación sintética',password_hash,?,TRUE,UTC_TIMESTAMP(6),UTC_TIMESTAMP(6) FROM users WHERE id=1`, email, secret)
+		if e != nil {
+			log.Fatal(e)
+		}
+		id, e := r.LastInsertId()
+		if e != nil {
+			log.Fatal(e)
+		}
+		if _, e = db.Exec(`INSERT INTO user_roles VALUES(?,5)`, id); e != nil {
+			log.Fatal(e)
+		}
+		if _, e = db.Exec(`INSERT INTO recovery_codes VALUES(?,?)`, id, security.Hash("synthetic-approval-recovery")); e != nil {
+			log.Fatal(e)
+		}
+	}
+
 }

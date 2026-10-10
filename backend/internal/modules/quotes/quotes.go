@@ -8,13 +8,14 @@ import (
 	"github.com/Ahcast/Bastion/backend/internal/core"
 	"github.com/Ahcast/Bastion/backend/internal/modules/customers"
 	"github.com/Ahcast/Bastion/backend/internal/modules/processes"
+	"github.com/Ahcast/Bastion/backend/internal/modules/workflow"
 	"github.com/shopspring/decimal"
 	"net/mail"
 	"strings"
 	"time"
 )
 
-var Permissions = []string{"cotizaciones.view", "cotizaciones.create", "cotizaciones.update", "cotizaciones.delete", "cotizaciones.pdf", "cotizaciones.transition"}
+var Permissions = []string{"cotizaciones.view", "cotizaciones.create", "cotizaciones.update", "cotizaciones.delete", "cotizaciones.pdf", "cotizaciones.transition", "cotizaciones.request_approval", "cotizaciones.approve", "cotizaciones.revoke_approval"}
 
 type CustomerInput struct {
 	ID      string `json:"id"`
@@ -69,6 +70,7 @@ type ProcessSource interface {
 }
 type Service struct {
 	Core        *core.Service
+	Approvals   *workflow.Service
 	Customers   CustomerSource
 	Processes   ProcessSource
 	Store       PDFStore
@@ -249,7 +251,7 @@ func (s *Service) Save(ctx context.Context, a core.Actor, id, key string, p Inpu
 		}
 		var e error
 		out, e = s.Core.Idempotent(ctx, tx, a, "quotes.save:"+id, key, p, func() (any, error) {
-			if id != "" && (old.Deleted != nil || !editableStatus(old.Status) || old.Version != p.Version) {
+			if id != "" && (old.Deleted != nil || (!editableStatus(old.Status) && old.Status != "approved") || old.Version != p.Version) {
 				return nil, core.Conflict
 			}
 			c, cv, e := s.customer(ctx, tx, a, p, old)
@@ -315,6 +317,11 @@ func (s *Service) persist(ctx context.Context, tx *sql.Tx, a core.Actor, q *Quot
 	return s.record(ctx, tx, a, *q, topic)
 }
 func (s *Service) record(ctx context.Context, tx *sql.Tx, a core.Actor, q Quote, topic string) (any, error) {
+	if s.Approvals != nil && topic != "quote.approved" {
+		if e := s.Approvals.Invalidate(ctx, tx, a, "quotes", q.ID, topic); e != nil {
+			return nil, e
+		}
+	}
 	data, e := json.Marshal(q)
 	if e != nil {
 		return nil, e

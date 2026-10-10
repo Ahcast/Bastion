@@ -127,6 +127,36 @@ func (s *Service) ModuleFiles(logger *slog.Logger, enabled bool, objects core.Ob
 			}
 			return Calculate(p)
 		})
+		if s.Approvals != nil {
+			register("GET /api/v1/quotes/{id}/approvals", func(ctx context.Context, a core.Actor, r *http.Request) (any, error) {
+				f, e := filter(r)
+				if e != nil {
+					return nil, e
+				}
+				return s.ApprovalList(ctx, a, r.PathValue("id"), f.Page, f.PerPage)
+			})
+			register("POST /api/v1/quotes/{id}/approvals", func(ctx context.Context, a core.Actor, r *http.Request) (any, error) {
+				var p ApprovalRequest
+				if e := required(r, &p, "quote_version", "expires_at", "reason"); e != nil {
+					return nil, e
+				}
+				return s.RequestApproval(ctx, a, r.PathValue("id"), r.Header.Get("Idempotency-Key"), p)
+			})
+			register("POST /api/v1/quotes/{id}/approvals/{approval}/decision", func(ctx context.Context, a core.Actor, r *http.Request) (any, error) {
+				var p ApprovalDecision
+				if e := required(r, &p, "quote_version", "version", "decision", "reason"); e != nil {
+					return nil, e
+				}
+				return s.DecideApproval(ctx, a, r.PathValue("id"), r.PathValue("approval"), r.Header.Get("Idempotency-Key"), p)
+			})
+			register("POST /api/v1/quotes/{id}/approvals/{approval}/revoke", func(ctx context.Context, a core.Actor, r *http.Request) (any, error) {
+				var p ApprovalRevoke
+				if e := required(r, &p, "quote_version", "version", "reason"); e != nil {
+					return nil, e
+				}
+				return s.RevokeApproval(ctx, a, r.PathValue("id"), r.PathValue("approval"), r.Header.Get("Idempotency-Key"), p)
+			})
+		}
 		register("PATCH /api/v1/quotes/{id}/status", func(ctx context.Context, a core.Actor, r *http.Request) (any, error) {
 			var p TransitionInput
 			if e := required(r, &p, "status", "version"); e != nil {
