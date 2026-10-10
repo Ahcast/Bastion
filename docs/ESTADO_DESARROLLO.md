@@ -93,7 +93,9 @@ El sistema actual soporta moneda explícita `HNL` o `USD`, pero **no realiza con
 
 **No implementar una conversión monetaria inventando estas reglas.** Primero debe quedar cerrado el contrato comercial FX y sus invariantes; después se implementan migración/servicio/API/UI y pruebas exactas.
 
-No existe evidencia en la documentación actual que autorice asumir automáticamente una tasa solo porque exista una fuente externa disponible.
+Se preparó [development/quotes-fx-proposal.md](development/quotes-fx-proposal.md) como documento **no normativo**. La propuesta verifica al Banco Central de Honduras como fuente oficial candidata para USD/HNL, separa observación de tasa de política comercial y propone snapshots inmutables. No autoriza todavía elegir TCR/compra/venta, redondeo, fallback de vigencia, override manual ni presentación final.
+
+La investigación oficial no autoriza asumir automáticamente una tasa solo porque esté publicada. La semántica comercial de cada conversión debe promoverse al contrato normativo antes de escribir código FX.
 
 ## Integraciones cruzadas posteriores
 
@@ -119,7 +121,7 @@ Estas validaciones externas son gates de producción; no deben falsearse con fix
 
 ## Próximo paso exacto
 
-1. Cerrar el contrato FX de Cotizaciones sin asumir reglas no aprobadas.
+1. Promover decisiones aprobadas desde la propuesta FX al contrato normativo de Cotizaciones.
 2. Implementar FX fechado con números exactos, snapshots, autorización e historial según ese contrato.
 3. Agregar pruebas unitarias, MySQL/race, REST, Angular y navegador para FX.
 4. Actualizar contrato/OpenAPI/runbook/checkpoint y ejecutar CI completo.
