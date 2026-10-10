@@ -66,7 +66,7 @@ RFQ/aprobación/envío, cotizaciones recibidas oficiales, métricas calculadas e
 
 ## Unidad 3 — Procesos/receptor crawler
 
-Código: migración 0004_processes.sql, internal/modules/processes y composición, scopes técnicos explícitos en Core; Angular y contratos/runbook. Código Python, CLI, esperas/reintentos y ACK conservados. Solo datos sintéticos y MySQL 5.7 aislado; no consultas a HonduCompras ni S3/Bluehost productivos.
+Código: migraciones 0004_processes.sql/0005_process_changes.sql, internal/modules/processes y composición, scopes técnicos explícitos en Core; Angular y contratos/runbook. Código Python, CLI, esperas/reintentos y ACK conservados. Solo datos sintéticos y MySQL 5.7 aislado; no consultas a HonduCompras ni S3/Bluehost productivos.
 
 Fusión por campo/observed_at, evidencia atrasada durable, documentos parciales sin eliminación y hashes confirmados conservados. Identidad única, versiones/diffs y hechos transaccionales; ACK después de commit y replay autorizado. Cierres de snapshot verifican contadores de lotes y admiten nuevas entregas del mismo run. Marcas/notas personales no son campos de fuente. Consultas SQL paginadas/IDOR, exportación neutralizada con límite explícito, tres tools MCP de lectura. No se encolan jobs AI sin consumidor.
 

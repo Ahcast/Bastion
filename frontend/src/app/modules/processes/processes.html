@@ -15,6 +15,6 @@
 @if(api.has('procesos.mark')){<button [disabled]="busy()" (click)="personal('interest')">{{p.is_interesting?'Desmarcar interés':'Marcar interés'}}</button>}
 <label>Nota personal<textarea [(ngModel)]="note" [disabled]="!api.has('procesos.note')"></textarea></label>@if(api.has('procesos.note')){<button [disabled]="busy()" (click)="personal('note')">Guardar nota</button>}
 <h3>Documentos de fuente</h3>@for(d of p.documents;track d.url){<p>{{d.name}} · {{d.sha256?'Checksum registrado':'Descarga pendiente'}}<br>{{d.url}}</p>}@empty{<p>No se observaron documentos.</p>}
-<h3>Histórico</h3>@for(v of history();track v.id){<p>Versión {{v.version}} · {{v.created_at}} · {{v.changes.join(', ')}}</p>}
+<h3>Histórico</h3>@for(v of history();track v.id){<details><summary>Versión {{v.version}} · {{v.created_at}}</summary>@for(d of v.diff;track $index){<p>{{changeLabel(d.kind)}}</p><p>Anterior</p><pre style="white-space:pre-wrap">{{d.before|json}}</pre><p>Actual</p><pre style="white-space:pre-wrap">{{d.after|json}}</pre>}</details>}
 <button [disabled]="historyPage<=1" (click)="historyPage=historyPage-1;versions()">Versiones anteriores</button><button [disabled]="historyPage*25>=historyTotal()" (click)="historyPage=historyPage+1;versions()">Más versiones</button></section>}
 @if(api.has('procesos.admin')){<section><h2>Estado de ingestión</h2><button (click)="status()">Consultar ejecuciones recientes</button>@for(r of runs();track r['run_id']+':'+r['batch_id']){<p>{{r['run_id']}} · {{r['status']}}</p>}</section>}

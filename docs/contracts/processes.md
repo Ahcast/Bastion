@@ -25,3 +25,5 @@ Quotes implementará conversión determinista cliente/expediente/source_process_
 ## Aceptación
 
 MySQL 5.7 real: replay/concurrencia/rollback, lotes inválidos, orden por campo, documentos parciales/hash confirmado, cierres múltiples, ausencia, revocación/scopes/IDOR y cadenas >2^53. Pruebas REST autenticación y cliente Python wire sin cambios, Angular/navegador y regresión Core/Clientes/Proveedores/crawler. No comenzar Cotizaciones hasta cerrar todas las pruebas y CI.
+
+Diff durable: process_changes conserva versión, tipo DESCRIPTION_CHANGED/DEADLINE_CHANGED/METADATA_CHANGED/DOCUMENT_ADDED/DOCUMENT_REMOVED/DOCUMENT_CHANGED, campo y valores anterior/posterior. GET versions incluye diff autorizado; snapshots y cambios se confirman con el lote. La migración adicional 0005 conserva el checksum de 0004 ya publicada.

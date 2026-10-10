@@ -180,6 +180,9 @@ func (s *Service) Import(ctx context.Context, a core.Actor, run, k string, p Bat
 				if e != nil {
 					return nil, e
 				}
+				if e = saveChanges(ctx, tx, id, version, differences(old, state, changes)); e != nil {
+					return nil, e
+				}
 				topic := "process.updated"
 				if version == 1 {
 					topic = "process.created"

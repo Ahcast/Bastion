@@ -1,6 +1,6 @@
 # Ejecutar Procesos y receptor crawler
 
-Requisitos y arranque compartidos: [Core](core-runbook.md). Migración global 0004_processes.sql; runner conserva checksum/lock/dirty. Nunca usar credenciales ni datos productivos para tests. BASTION_PROCESSES_ENABLED=true por defecto; false bloquea rutas/herramientas después de reiniciar sin borrar datos.
+Requisitos y arranque compartidos: [Core](core-runbook.md). Migraciones globales 0004_processes.sql y 0005_process_changes.sql; runner conserva checksum/lock/dirty. Nunca usar credenciales ni datos productivos para tests. BASTION_PROCESSES_ENABLED=true por defecto; false bloquea rutas/herramientas después de reiniciar sin borrar datos.
 
 Un administrador asigna explícitamente procesos.view/mark/note/export/admin a los usuarios autorizados. No hay permisos comerciales implícitos por ser administrador. El crawler necesita un usuario propietario activo/TOTP con grants all crawler.runs.create/crawler.processes.import/crawler.runs.complete. El administrador de servicios, con reautenticación, crea una identidad con esos tres scopes y vigencia limitada. El token se entrega una sola vez y se conserva fuera de Git; revocación y retiro de permisos bloquean replays.
 

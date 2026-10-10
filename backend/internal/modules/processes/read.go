@@ -260,5 +260,16 @@ func (s *Service) Versions(ctx context.Context, a core.Actor, id string, page, l
 		}
 		out = append(out, map[string]any{"id": vid, "version": v, "content_hash": h, "data": json.RawMessage(data), "changes": json.RawMessage(changes), "created_at": at})
 	}
+	if e = rows.Err(); e != nil {
+		return nil, e
+	}
+	rows.Close()
+	for _, v := range out {
+		d, e := changes(ctx, s.Core.DB, id, v["version"].(string))
+		if e != nil {
+			return nil, e
+		}
+		v["diff"] = d
+	}
 	return map[string]any{"data": out, "total": total, "page": page, "per_page": limit}, rows.Err()
 }

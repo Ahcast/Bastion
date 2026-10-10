@@ -159,6 +159,15 @@ func TestProcessesCompletionCountersPersonalAndExport(t *testing.T) {
 	if _, e = s.Import(ctx, a, "HC-synthetic-test", p.ID, p); e != nil {
 		t.Fatal(e)
 	}
+	hist, e := s.Versions(ctx, human, id, 1, 25)
+	if e != nil {
+		t.Fatal(e)
+	}
+	vlist := hist.(map[string]any)["data"].([]map[string]any)
+	diff := vlist[0]["diff"].([]processes.Change)
+	if len(diff) != 1 || diff[0].Kind != "METADATA_CHANGED" || string(diff[0].Before) != `"=Entidad"` || string(diff[0].After) != `"=Entidad nueva"` {
+		t.Fatal(diff)
+	}
 	record, e := s.Get(ctx, human, id)
 	if e != nil || record.Note != note || !record.Interesting || record.PersonalVersion != 2 || record.Version != 2 {
 		t.Fatal(record, e)

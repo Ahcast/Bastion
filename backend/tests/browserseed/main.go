@@ -91,4 +91,11 @@ func main() {
 		log.Fatal(e)
 	}
 
+	if _, e = db.Exec(`INSERT INTO crawler_runs VALUES('HC-BROWSER-TEST','honducompras',UTC_TIMESTAMP(6),4,UTC_TIMESTAMP(6))`); e != nil {
+		log.Fatal(e)
+	}
+	if _, e = db.Exec(`INSERT INTO process_versions(process_id,crawler_run_id,version,content_hash,normalized_data,changes,observed_at,created_at) SELECT id,'HC-BROWSER-TEST',version,content_hash,normalized_data,'[]',UTC_TIMESTAMP(6),UTC_TIMESTAMP(6) FROM processes WHERE id=1`); e != nil {
+		log.Fatal(e)
+	}
+
 }

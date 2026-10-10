@@ -1138,6 +1138,36 @@
           "created_at": {
             "type": "string",
             "format": "date-time"
+          },
+          "diff": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "kind": {
+                  "enum": [
+                    "DESCRIPTION_CHANGED",
+                    "DEADLINE_CHANGED",
+                    "METADATA_CHANGED",
+                    "DOCUMENT_ADDED",
+                    "DOCUMENT_REMOVED",
+                    "DOCUMENT_CHANGED"
+                  ]
+                },
+                "field": {
+                  "type": "string"
+                },
+                "before": {},
+                "after": {}
+              },
+              "required": [
+                "kind",
+                "field",
+                "before",
+                "after"
+              ],
+              "additionalProperties": false
+            }
           }
         },
         "required": [
@@ -1146,7 +1176,8 @@
           "content_hash",
           "data",
           "changes",
-          "created_at"
+          "created_at",
+          "diff"
         ],
         "additionalProperties": false
       },
