@@ -1,0 +1,126 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Bastion Cotizaciones FX — Observaciones",
+    "version": "0.1.0",
+    "description": "Registro histórico USD/HNL. No selecciona una tasa ni convierte cotizaciones. Ver quotes-fx.md."
+  },
+  "paths": {
+    "/api/v1/quotes/fx-observations": {
+      "get": {
+        "summary": "Listar observaciones FX globales autorizadas",
+        "parameters": [
+          {"name": "rate_kind", "in": "query", "schema": {"type": "string", "enum": ["tcr", "buy", "sell", "manual"]}},
+          {"name": "source", "in": "query", "schema": {"type": "string", "enum": ["bch", "manual"]}},
+          {"name": "page", "in": "query", "schema": {"type": "integer", "minimum": 1, "maximum": 100000, "default": 1}},
+          {"name": "per_page", "in": "query", "schema": {"type": "integer", "minimum": 1, "maximum": 100, "default": 25}}
+        ],
+        "responses": {
+          "200": {"description": "Página autorizada", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/FXPage"}}}},
+          "401": {"description": "Sesión requerida"},
+          "403": {"description": "Permiso global cotizaciones.fx.view requerido"},
+          "422": {"description": "Filtros inválidos"}
+        }
+      },
+      "post": {
+        "summary": "Registrar observación FX append-only",
+        "description": "Actor humano, scope all y reautenticación reciente. No aplica la tasa a ninguna cotización.",
+        "parameters": [
+          {"name": "Idempotency-Key", "in": "header", "required": true, "schema": {"type": "string", "minLength": 8, "maxLength": 100}}
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {"application/json": {"schema": {"$ref": "#/components/schemas/FXObservationInput"}}}
+        },
+        "responses": {
+          "200": {"description": "Observación registrada o replay confirmado", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/WriteResult"}}}},
+          "401": {"description": "Sesión requerida"},
+          "403": {"description": "Permiso, actor o reautenticación insuficiente"},
+          "404": {"description": "Observación a corregir no existe"},
+          "409": {"description": "Intención conflictiva o segundo reemplazo directo"},
+          "422": {"description": "DTO, tasa, fecha, hash o motivo inválido"}
+        }
+      }
+    },
+    "/api/v1/quotes/fx-observations/{id}": {
+      "get": {
+        "summary": "Consultar observación FX por ID",
+        "parameters": [
+          {"name": "id", "in": "path", "required": true, "schema": {"$ref": "#/components/schemas/ID"}}
+        ],
+        "responses": {
+          "200": {"description": "Observación autorizada", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/FXObservation"}}}},
+          "401": {"description": "Sesión requerida"},
+          "403": {"description": "Permiso global cotizaciones.fx.view requerido"},
+          "404": {"description": "Observación inexistente"},
+          "422": {"description": "ID inválido"}
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "ID": {"type": "string", "pattern": "^[1-9][0-9]*$"},
+      "Rate": {"type": "string", "pattern": "^(0|[1-9][0-9]{0,11})(\\.[0-9]{1,12})?$"},
+      "FXObservationInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["rate_kind", "rate", "valid_from", "valid_to", "source", "source_reference", "source_published_at", "evidence_hash", "supersedes_id", "reason"],
+        "properties": {
+          "rate_kind": {"type": "string", "enum": ["tcr", "buy", "sell", "manual"]},
+          "rate": {"$ref": "#/components/schemas/Rate"},
+          "valid_from": {"type": "string", "format": "date-time"},
+          "valid_to": {"type": "string", "description": "RFC3339 o cadena vacía"},
+          "source": {"type": "string", "enum": ["bch", "manual"]},
+          "source_reference": {"type": "string", "minLength": 1, "maxLength": 1000},
+          "source_published_at": {"type": "string", "description": "RFC3339 o cadena vacía"},
+          "evidence_hash": {"type": "string", "pattern": "^$|^[a-f0-9]{64}$"},
+          "supersedes_id": {"type": "string", "pattern": "^$|^[1-9][0-9]*$"},
+          "reason": {"type": "string", "maxLength": 1000}
+        }
+      },
+      "FXObservation": {
+        "type": "object",
+        "required": ["id", "base_currency", "quote_currency", "rate_kind", "rate", "valid_from", "source", "source_reference", "evidence_hash", "supersedes_id", "superseded", "reason", "created_by", "created_by_name", "created_at"],
+        "properties": {
+          "id": {"$ref": "#/components/schemas/ID"},
+          "base_currency": {"type": "string", "enum": ["USD"]},
+          "quote_currency": {"type": "string", "enum": ["HNL"]},
+          "rate_kind": {"type": "string", "enum": ["tcr", "buy", "sell", "manual"]},
+          "rate": {"$ref": "#/components/schemas/Rate"},
+          "valid_from": {"type": "string", "format": "date-time"},
+          "valid_to": {"type": ["string", "null"], "format": "date-time"},
+          "source": {"type": "string", "enum": ["bch", "manual"]},
+          "source_reference": {"type": "string"},
+          "source_published_at": {"type": ["string", "null"], "format": "date-time"},
+          "evidence_hash": {"type": "string"},
+          "supersedes_id": {"type": "string"},
+          "superseded": {"type": "boolean"},
+          "reason": {"type": "string"},
+          "created_by": {"$ref": "#/components/schemas/ID"},
+          "created_by_name": {"type": "string"},
+          "created_at": {"type": "string", "format": "date-time"}
+        }
+      },
+      "FXPage": {
+        "type": "object",
+        "required": ["data", "total", "page", "per_page"],
+        "properties": {
+          "data": {"type": "array", "items": {"$ref": "#/components/schemas/FXObservation"}},
+          "total": {"type": "integer", "minimum": 0},
+          "page": {"type": "integer", "minimum": 1},
+          "per_page": {"type": "integer", "minimum": 1, "maximum": 100}
+        }
+      },
+      "WriteResult": {
+        "type": "object",
+        "required": ["id"],
+        "properties": {"id": {"$ref": "#/components/schemas/ID"}}
+      }
+    },
+    "securitySchemes": {
+      "Session": {"type": "apiKey", "in": "cookie", "name": "__Host-bastion_session"}
+    }
+  },
+  "security": [{"Session": []}]
+}
