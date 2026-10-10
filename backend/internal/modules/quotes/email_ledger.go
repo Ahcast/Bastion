@@ -9,25 +9,28 @@ import (
 )
 
 type EmailAuthorizationView struct {
-	ID            string    `json:"id"`
-	QuoteVersion  uint64    `json:"quote_version,string"`
-	PDFSnapshotID string    `json:"pdf_snapshot_id"`
-	CreatedBy     string    `json:"created_by"`
-	To            []string  `json:"to"`
-	CC            []string  `json:"cc"`
-	BCC           []string  `json:"bcc"`
-	AttachmentIDs []string  `json:"attachment_ids"`
-	Subject       string    `json:"subject"`
-	Message       string    `json:"message"`
-	ScheduledAt   time.Time `json:"scheduled_at"`
-	ApprovalID    string    `json:"approval_id,omitempty"`
-	MessageID     string    `json:"message_id,omitempty"`
-	JobID         string    `json:"job_id,omitempty"`
-	Status        string    `json:"status"`
-	ErrorCode     string    `json:"error_code,omitempty"`
-	AcceptedAt    *time.Time `json:"accepted_at,omitempty"`
-	CreatedAt     time.Time `json:"created_at"`
-	UpdatedAt     time.Time `json:"updated_at"`
+	ID              string     `json:"id"`
+	QuoteVersion    uint64     `json:"quote_version,string"`
+	PDFSnapshotID   string     `json:"pdf_snapshot_id"`
+	CreatedBy       string     `json:"created_by"`
+	To              []string   `json:"to"`
+	CC              []string   `json:"cc"`
+	BCC             []string   `json:"bcc"`
+	AttachmentIDs   []string   `json:"attachment_ids"`
+	Subject         string     `json:"subject"`
+	Message         string     `json:"message"`
+	ScheduledAt     time.Time  `json:"scheduled_at"`
+	ApprovalID      string     `json:"approval_id,omitempty"`
+	ApprovalVersion uint64     `json:"approval_version,string,omitempty"`
+	ApprovalStatus  string     `json:"approval_status,omitempty"`
+	RequestedBy     string     `json:"requested_by,omitempty"`
+	MessageID       string     `json:"message_id,omitempty"`
+	JobID           string     `json:"job_id,omitempty"`
+	Status          string     `json:"status"`
+	ErrorCode       string     `json:"error_code,omitempty"`
+	AcceptedAt      *time.Time `json:"accepted_at,omitempty"`
+	CreatedAt       time.Time  `json:"created_at"`
+	UpdatedAt       time.Time  `json:"updated_at"`
 }
 
 type EmailAuthorizationPage struct {
@@ -49,8 +52,9 @@ func (s *Service) EmailAuthorizations(ctx context.Context, a core.Actor, quoteID
 		if e := tx.QueryRowContext(ctx, `SELECT COUNT(*) FROM quote_email_intents WHERE quote_id=?`, quoteID).Scan(&out.Total); e != nil {
 			return e
 		}
-		rows, e := tx.QueryContext(ctx, `SELECT CAST(id AS CHAR),quote_version,CAST(pdf_snapshot_id AS CHAR),CAST(created_by AS CHAR),to_json,cc_json,bcc_json,attachment_ids_json,subject,body,scheduled_at,COALESCE(CAST(approval_id AS CHAR),''),COALESCE(message_id,''),COALESCE(job_id,''),status,COALESCE(error_code,''),accepted_at,created_at,updated_at
-			FROM quote_email_intents WHERE quote_id=? ORDER BY id DESC LIMIT ? OFFSET ?`, quoteID, perPage, (page-1)*perPage)
+		rows, e := tx.QueryContext(ctx, `SELECT CAST(i.id AS CHAR),i.quote_version,CAST(i.pdf_snapshot_id AS CHAR),CAST(i.created_by AS CHAR),i.to_json,i.cc_json,i.bcc_json,i.attachment_ids_json,i.subject,i.body,i.scheduled_at,COALESCE(CAST(i.approval_id AS CHAR),''),COALESCE(a.version,0),COALESCE(a.status,''),COALESCE(CAST(a.requested_by AS CHAR),''),COALESCE(i.message_id,''),COALESCE(i.job_id,''),i.status,COALESCE(i.error_code,''),i.accepted_at,i.created_at,i.updated_at
+			FROM quote_email_intents i LEFT JOIN approvals a ON a.id=i.approval_id
+			WHERE i.quote_id=? ORDER BY i.id DESC LIMIT ? OFFSET ?`, quoteID, perPage, (page-1)*perPage)
 		if e != nil {
 			return e
 		}
@@ -59,7 +63,7 @@ func (s *Service) EmailAuthorizations(ctx context.Context, a core.Actor, quoteID
 			var v EmailAuthorizationView
 			var toRaw, ccRaw, bccRaw, attachmentsRaw string
 			var accepted sql.NullTime
-			if e = rows.Scan(&v.ID, &v.QuoteVersion, &v.PDFSnapshotID, &v.CreatedBy, &toRaw, &ccRaw, &bccRaw, &attachmentsRaw, &v.Subject, &v.Message, &v.ScheduledAt, &v.ApprovalID, &v.MessageID, &v.JobID, &v.Status, &v.ErrorCode, &accepted, &v.CreatedAt, &v.UpdatedAt); e != nil {
+			if e = rows.Scan(&v.ID, &v.QuoteVersion, &v.PDFSnapshotID, &v.CreatedBy, &toRaw, &ccRaw, &bccRaw, &attachmentsRaw, &v.Subject, &v.Message, &v.ScheduledAt, &v.ApprovalID, &v.ApprovalVersion, &v.ApprovalStatus, &v.RequestedBy, &v.MessageID, &v.JobID, &v.Status, &v.ErrorCode, &accepted, &v.CreatedAt, &v.UpdatedAt); e != nil {
 				return e
 			}
 			if v.To, e = decodeStrings(toRaw); e != nil {
