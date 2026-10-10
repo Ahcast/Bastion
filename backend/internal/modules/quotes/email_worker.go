@@ -23,7 +23,7 @@ type emailFile struct {
 func (s *Service) emailFiles(ctx context.Context, tx *sql.Tx, intent quoteEmailIntent) ([]emailFile, error) {
 	files := make([]emailFile, 0, 1+len(intent.AttachmentIDs))
 	var issued emailFile
-	e := tx.QueryRowContext(ctx, `SELECT v.storage_key,v.filename,v.media_type,v.size_bytes,v.checksum
+	e := tx.QueryRowContext(ctx, `SELECT v.object_key,v.filename,v.media_type,v.size_bytes,v.checksum
 		FROM quote_pdf_snapshots p
 		JOIN documents d ON d.id=p.document_id
 		JOIN document_versions v ON v.document_id=d.id AND v.number=d.current_version
@@ -37,7 +37,7 @@ func (s *Service) emailFiles(ctx context.Context, tx *sql.Tx, intent quoteEmailI
 	files = append(files, issued)
 	for _, id := range intent.AttachmentIDs {
 		var f emailFile
-		e = tx.QueryRowContext(ctx, `SELECT v.storage_key,v.filename,v.media_type,v.size_bytes,v.checksum
+		e = tx.QueryRowContext(ctx, `SELECT v.object_key,v.filename,v.media_type,v.size_bytes,v.checksum
 			FROM documents d JOIN document_versions v ON v.document_id=d.id AND v.number=d.current_version
 			WHERE d.id=? AND d.entity_type='quotes' AND d.entity_id=? AND d.is_generated=FALSE AND d.deleted_at IS NULL AND v.status='available'`, id, intent.QuoteID).Scan(&f.Key, &f.Filename, &f.MediaType, &f.Size, &f.Checksum)
 		if e == sql.ErrNoRows {
