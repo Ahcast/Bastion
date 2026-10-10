@@ -1,8 +1,8 @@
 # Plan ejecutable del proyecto
 
-Core de plataforma y base implementados: ver [estado](status.md) y [runbook](core-runbook.md). Los criterios de infraestructura externa permanecen pendientes aunque las pruebas locales pasen. Clientes cerró la primera unidad de datos base. Proveedores cerró la segunda unidad con pruebas locales y CI satisfactorias; la base de Procesos/receptor crawler cerró pruebas y CI; Cotizaciones tiene aprobada la unidad de borradores/cálculo/conversión y incorpora PDF de borrador/adjuntos y estados preliminares/revisiones; incorpora aprobación humana vinculada (validación vigente en status) y incorpora emisión segura de PDF; conserva correo/bulk pendientes. Consultar status para evidencia vigente y continuar una unidad por vez.
+Core de plataforma y base implementados: ver [checkpoint operativo](../ESTADO_DESARROLLO.md), [estado histórico](status.md) y [runbook](core-runbook.md). Los criterios de infraestructura externa permanecen pendientes aunque las pruebas locales/CI pasen. Clientes, Proveedores y la base de Procesos/receptor crawler están cerrados. Cotizaciones tiene implementados borradores/cálculo/conversión desde Procesos, PDF/adjuntos, estados/revisiones, aprobación humana, emisión segura de PDF, correo comercial durable y bulk trazable. La unidad activa siguiente es el contrato e implementación de FX fechado; no iniciar OC todavía. Consultar el checkpoint para evidencia vigente y continuar una unidad por vez.
 
-El agente implementa cada fase hasta su aceptación, actualiza status.md y continúa. No sustituir implementación por plan nuevo. Las fases pueden desarrollarse con datos sintéticos y MySQL 5.7 local de prueba; los bloqueos de infraestructura se verifican antes de producción, sin migrar la BD a AWS.
+El agente implementa cada fase hasta su aceptación, actualiza el checkpoint/estado y continúa. No sustituir implementación por plan nuevo. Las fases pueden desarrollarse con datos sintéticos y MySQL 5.7 local/CI de prueba; los bloqueos de infraestructura se verifican antes de producción, sin migrar la BD a AWS.
 
 | Fase | Trabajo y entregables | Criterio de aceptación |
 | --- | --- | --- |
@@ -18,7 +18,7 @@ El agente implementa cada fase hasta su aceptación, actualiza status.md y conti
 
 ## Secuencia obligatoria de módulos
 
-Clientes → Proveedores → Procesos/receptor crawler → Cotizaciones → Órdenes de Compra de clientes → Facturas/pagos → Gastos → Reportes → Colaboración. Workflow/aprobaciones e IA se integran según dependencias, sin entradas adicionales de menú. Antes de avanzar, cerrar pruebas unitarias, MySQL/integridad, autorización, UI/navegador, regresión y CI de la unidad actual; registrar evidencia y límites externos en status.md. No escribir el siguiente módulo mientras haya pruebas pendientes o fallidas. Las vistas cruzadas se incorporan cuando ambos propietarios existan, sin inventar datos ni declarar integración anticipada.
+Clientes → Proveedores → Procesos/receptor crawler → Cotizaciones → Órdenes de Compra de clientes → Facturas/pagos → Gastos → Reportes → Colaboración. Workflow/aprobaciones e IA se integran según dependencias, sin entradas adicionales de menú. Antes de avanzar, cerrar pruebas unitarias, MySQL/integridad, autorización, UI/navegador, regresión y CI de la unidad actual; registrar evidencia y límites externos en el checkpoint/status. No escribir el siguiente módulo mientras haya pruebas pendientes/fallidas o reglas comerciales indispensables sin contrato. Las vistas cruzadas se incorporan cuando ambos propietarios existan, sin inventar datos ni declarar integración anticipada.
 
 ## Antes de implementar cada módulo
 
@@ -26,7 +26,7 @@ Clientes → Proveedores → Procesos/receptor crawler → Cotizaciones → Órd
 2. Definir migraciones/índices, entidades/DTO, estados/transiciones, permisos, eventos/jobs y errores. No copiar toda la documentación al código.
 3. Implementar servicios y pruebas de invariantes; handlers REST/MCP finos; Angular consume contratos.
 4. Verificar casos de fallo reales: duplicados, payload/version/lease inválidos, acceso denegado, caída antes/después del commit.
-5. Actualizar OpenAPI, docs solo si cambia contrato, y status con comandos/resultados. Commit en main.
+5. Actualizar OpenAPI, docs solo si cambia contrato, y status/checkpoint con comandos/resultados. Commit en main.
 
 ## Definición de terminado
 
@@ -38,6 +38,10 @@ MySQL remoto TLS o túnel SSH verificado, acceso y soporte Percona; DNS/certific
 
 No implementar integración pagada de inferencia como solución automática a un bloqueo Work. RPO/RTO, retención y reglas de scoring/envío se configuran sin inventar valores aprobados.
 
-Cotizaciones en desarrollo: borradores/cálculo/conversión, PDF de borrador/adjuntos, estados/revisiones y aprobación humana y emisión segura de PDF implementados. Continuar correo/bulk y aceptación completa antes de pasar a OC; ver contrato/runbook de Quotes y status.md.
+## Cotizaciones — continuidad vigente
 
-Prerrequisito de correo Quotes cerrado: transporte Core To/CC/BCC/adjuntos y programación durable EnqueueAt (0011), con CI satisfactorio. Continuar autorización comercial vinculada a destinatarios/contenido, ledger SMTP y formulario Quotes; no interpretar el cierre técnico como aceptación del envío comercial. Ver [contrato](../contracts/mail-transport.md) y [estado](status.md).
+Correo comercial y bulk dejaron de ser pendientes: ambos están implementados y validados en CI. Bulk durable está certificado en el checkpoint con migración 0013, REST, Angular y Playwright real.
+
+La siguiente unidad es **FX fechado**. El sistema permite cotizaciones explícitas en HNL o USD, pero no conversión implícita. Antes de programar FX se debe definir de forma normativa la fuente/tipo de tasa, fecha efectiva, snapshot/historial, precisión/redondeo, autoridad de modificación, efecto sobre versiones/aprobaciones/emisiones y presentación UI/PDF/exportación. No inventar esos valores en código.
+
+Las conversiones Quotes→OC/Factura se integran con los servicios propietarios cuando esos módulos existan; Quotes no escribe sus tablas directamente. Esto no autoriza a saltar a OC mientras FX y la aceptación restante de Cotizaciones no estén cerrados.
