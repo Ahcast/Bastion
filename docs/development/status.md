@@ -23,6 +23,10 @@ Actualizado el 10 de octubre de 2026. Core 0.1.0 publicado y validado en CI; Cli
 | Infraestructura real | MySQL TLS/túnel/hosting, DNS/HTTPS, S3/IAM, SMTP y memoria conjunta con crawler pendientes |
 | Git | Solo main; limpieza reactiva vigente; prevención GitHub requiere plan Pro |
 
+## Cierre vigente de Cotizaciones — 2026-10-10
+
+Prevalece sobre las notas históricas inferiores: correo/bulk ya estaban publicados. El usuario decidió HNL y USD separados, sin FX automático. Se completa cierre de estados comerciales y se corrigen atomicidad/reautorización bulk y replay/revalidación de correo. No se modifica infraestructura ni se envían mensajes reales. Backend/MySQL5.7/race y navegador del nuevo código pendientes de CI; Angular build/47 pruebas locales aprobados antes de la regresión final. Resultado definitivo y SHA se registrarán tras completar ejecución.
+
 ## Verificación del Core (unidad anterior)
 
 - gofmt, go vet y build server/worker/admin satisfactorios.

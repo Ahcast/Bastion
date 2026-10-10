@@ -9,6 +9,7 @@ import (
 
 	"github.com/Ahcast/Bastion/backend/internal/core"
 	"github.com/Ahcast/Bastion/backend/internal/core/security"
+	"github.com/Ahcast/Bastion/backend/internal/modules/workflow"
 )
 
 type EmailObjectReader interface {
@@ -163,7 +164,19 @@ func (s *Service) jobEmailBindingHash(ctx context.Context, tx *sql.Tx, user stri
 	if e != nil {
 		return "", e
 	}
-	return security.Hash(string(raw)), nil
+	hash := security.Hash(string(raw))
+	if s.Approvals == nil {
+		return "", core.Disabled
+	}
+	v, e := s.Approvals.Get(ctx, tx, intent.ApprovalID, "quote_email_intents", intent.ID)
+	if e != nil {
+		return "", e
+	}
+	b := workflow.Binding{Action: "quote.send", Entity: "quote_email_intents", ID: intent.ID, Version: 1, Hash: hash, Owner: q.Owner, Team: q.Team, ViewPermission: "cotizaciones.view", RequestPermission: "cotizaciones.request_approval", DecisionPermission: "cotizaciones.approve", RevokePermission: "cotizaciones.revoke_approval"}
+	if e = s.Approvals.VerifyConsumed(ctx, tx, v, b); e != nil {
+		return "", e
+	}
+	return hash, nil
 }
 
 func smtpHostAllowed(host string, allowed []string) bool {
@@ -345,6 +358,24 @@ func (s *Service) CommercialEmailHandler(reader EmailObjectReader, mailer core.M
 		return s.Core.Transact(ctx, func(tx *sql.Tx) error {
 			if e := core.Changed(tx.ExecContext(ctx, `UPDATE quote_email_intents SET status='accepted',accepted_at=UTC_TIMESTAMP(6),error_code=NULL,updated_at=UTC_TIMESTAMP(6) WHERE id=? AND status='sending'`, intent.ID)); e != nil {
 				return e
+			}
+			// Record the historical send even if a user revised the quote during SMTP.
+			q, e := scan(tx.QueryRowContext(ctx, `SELECT `+columns+` FROM quotes WHERE id=? FOR UPDATE`, payload.QuoteID))
+			if e != nil {
+				return e
+			}
+			if q.Status == "approved" && q.Version == intent.QuoteVersion && q.Deleted == nil {
+				if e = s.items(ctx, tx, &q); e != nil {
+					return e
+				}
+				if e = core.Changed(tx.ExecContext(ctx, `UPDATE quotes SET status='sent',version=version+1,updated_by=?,updated_at=UTC_TIMESTAMP(6) WHERE id=? AND version=?`, a.UserID, q.ID, q.Version)); e != nil {
+					return e
+				}
+				q.Status = "sent"
+				q.Version++
+				if _, e = s.record(ctx, tx, a, q, "quote.sent"); e != nil {
+					return e
+				}
 			}
 			return s.Core.Audit(ctx, tx, a, "quote.email_accepted", "quotes", payload.QuoteID, "accepted", map[string]string{"intent_id": intent.ID, "job_id": j.ID, "message_id": intent.MessageID})
 		})

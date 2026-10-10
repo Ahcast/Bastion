@@ -171,3 +171,20 @@ func TestQuoteCommercialEmailPreparingCanResumeWithoutDuplicateExternalEffect(t 
 		t.Fatal("safe preparation resume failed", mailer.calls, e)
 	}
 }
+
+func TestQuoteEmailQueueReplayAndRevokedApprover(t *testing.T) {
+	s, a, id, intent, objects := approvedEmailIntent(t, time.Now().Add(-time.Second))
+	configureQuoteSMTP(t, s, a)
+	j := queueAndClaimEmail(t, s, a, id, intent)
+	v, e := s.QueueEmail(ctx, a, id, intent, "delivery-queue")
+	if e != nil || customerResult(t, v, e)["job_id"] != j.ID {
+		t.Fatal("lost ACK cannot replay", v, e)
+	}
+	if _, e = s.Core.DB.Exec(`DELETE ur FROM user_roles ur JOIN approvals p ON p.decided_by=ur.user_id JOIN quote_email_intents i ON i.approval_id=p.id WHERE i.id=?`, intent); e != nil {
+		t.Fatal(e)
+	}
+	mailer := &quoteMailer{}
+	if e = s.CommercialEmailHandler(objects, mailer)(ctx, j); e == nil || mailer.calls != 0 {
+		t.Fatal("revoked approver allowed SMTP", e, mailer.calls)
+	}
+}

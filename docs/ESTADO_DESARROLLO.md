@@ -19,7 +19,7 @@ Actualizado: 2026-10-10.
 - Clientes: unidad cerrada y validada.
 - Proveedores: unidad cerrada y validada.
 - Procesos/receptor crawler: unidad base cerrada y validada.
-- Cotizaciones: **módulo activo; bulk cerrado, aceptación integral aún no cerrada**.
+- Cotizaciones: **cierre monomoneda implementado; validación final en curso**.
 - OC de clientes y módulos posteriores: no iniciar todavía.
 - Producción: no desplegada ni migrada.
 
@@ -78,24 +78,13 @@ Regresión corregida antes de certificar:
 - `QuoteBulk` estaba importado pero no montado en `quotes.html`;
 - ambos defectos quedaron corregidos y cubiertos por build/tests/navegador.
 
-## Unidad activa siguiente — Contrato FX de Cotizaciones
+## Cierre activo — Cotizaciones en monedas separadas
 
-El sistema actual soporta moneda explícita `HNL` o `USD`, pero **no realiza conversión implícita**. El alcance menciona FX fechado, pero el repositorio todavía no define de forma normativa:
+Decisión explícita del usuario 2026-10-10: cotizar en HNL o USD separados; sin conversión automática. FX queda como ampliación futura, no bloquea esta entrega. La propuesta FX conserva carácter no normativo.
 
-- fuente de la tasa;
-- tasa de compra, venta u otra;
-- fecha/hora efectiva y zona horaria;
-- política de snapshot e historial;
-- precisión y redondeo de tasa e importes convertidos;
-- autoridad/permisos para crear, corregir o sustituir una tasa;
-- tratamiento de cotizaciones ya aprobadas/emitidas cuando cambia la tasa;
-- presentación exacta de la tasa en UI/PDF/exportaciones.
+Implementación de cierre: lotes con efecto/ledger atómicos y replay reautorizado; UI conserva intención pendiente y bloquea bulk durante edición; replay de encolado comercial; revalidación del aprobador al ejecutar; SMTP aceptado produce estado Enviada; aceptación/rechazo/vencimiento y reapertura con motivo/auditoría. Vencida solo después del último día de validez en Honduras.
 
-**No implementar una conversión monetaria inventando estas reglas.** Primero debe quedar cerrado el contrato comercial FX y sus invariantes; después se implementan migración/servicio/API/UI y pruebas exactas.
-
-Se preparó [development/quotes-fx-proposal.md](development/quotes-fx-proposal.md) como documento **no normativo**. La propuesta verifica al Banco Central de Honduras como fuente oficial candidata para USD/HNL, separa observación de tasa de política comercial y propone snapshots inmutables. No autoriza todavía elegir TCR/compra/venta, redondeo, fallback de vigencia, override manual ni presentación final.
-
-La investigación oficial no autoriza asumir automáticamente una tasa solo porque esté publicada. La semántica comercial de cada conversión debe promoverse al contrato normativo antes de escribir código FX.
+Pruebas nuevas: rollback del ledger, concurrencia, pérdida de scopes, autorización de correo revocada, replay, estados finales; navegador cubre correo/worker con adaptador SMTP sin red y recorrido comercial. **Cierre sujeto al CI de estos cambios; no usar el CI del hito bulk anterior como evidencia del nuevo código.**
 
 ## Integraciones cruzadas posteriores
 
@@ -121,8 +110,4 @@ Estas validaciones externas son gates de producción; no deben falsearse con fix
 
 ## Próximo paso exacto
 
-1. Promover decisiones aprobadas desde la propuesta FX al contrato normativo de Cotizaciones.
-2. Implementar FX fechado con números exactos, snapshots, autorización e historial según ese contrato.
-3. Agregar pruebas unitarias, MySQL/race, REST, Angular y navegador para FX.
-4. Actualizar contrato/OpenAPI/runbook/checkpoint y ejecutar CI completo.
-5. Solo entonces reevaluar cierre de Cotizaciones y el inicio de Órdenes de Compra de clientes.
+Ejecutar y verificar CI de este cierre. Registrar SHA/resultados en status.md; solo declarar cerrado el alcance monomoneda cuando backend/MySQL5.7/race, Angular y navegador pasen. Mantener las integraciones productivas sin activar. No iniciar otro módulo en esta tarea.

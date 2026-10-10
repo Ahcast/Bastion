@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/Ahcast/Bastion/backend/internal/core"
@@ -63,7 +64,8 @@ func validateBulkItems(items []BulkItemInput) error {
 	}
 	seen := make(map[string]struct{}, len(items))
 	for _, item := range items {
-		if core.ID(item.ID) != nil || item.Version == 0 {
+		n, parseErr := strconv.ParseUint(item.ID, 10, 64)
+		if parseErr != nil || n == 0 || strconv.FormatUint(n, 10) != item.ID || item.Version == 0 {
 			return core.Invalid
 		}
 		if _, ok := seen[item.ID]; ok {
@@ -105,6 +107,9 @@ func (s *Service) createBulkBatch(ctx context.Context, a core.Actor, key, action
 	var out any
 	e = s.Core.Transact(ctx, func(tx *sql.Tx) error {
 		if e := s.gate(ctx, tx, a, perm); e != nil {
+			return e
+		}
+		if e := s.gate(ctx, tx, a, "cotizaciones.view"); e != nil {
 			return e
 		}
 		var e error
@@ -171,7 +176,7 @@ func (s *Service) pendingBulkItems(ctx context.Context, batch string) ([]bulkPen
 	return out, rows.Err()
 }
 
-func (s *Service) settleBulkItem(ctx context.Context, batch string, position int, status, errorCode string, result any) error {
+func (s *Service) settleBulkItem(ctx context.Context, tx *sql.Tx, batch string, position int, status, errorCode string, result any) error {
 	var raw any
 	if result != nil {
 		encoded, e := json.Marshal(result)
@@ -180,19 +185,19 @@ func (s *Service) settleBulkItem(ctx context.Context, batch string, position int
 		}
 		raw = string(encoded)
 	}
-	_, e := s.Core.DB.ExecContext(ctx, `UPDATE quote_batch_items SET item_status=?,error_code=?,result_json=?,updated_at=UTC_TIMESTAMP(6) WHERE batch_id=? AND position=? AND item_status='pending'`, status, errorCode, raw, batch, position)
+	_, e := tx.ExecContext(ctx, `UPDATE quote_batch_items SET item_status=?,error_code=?,result_json=?,updated_at=UTC_TIMESTAMP(6) WHERE batch_id=? AND position=? AND item_status='pending'`, status, errorCode, raw, batch, position)
 	return e
 }
 
-func (s *Service) executeBulkItem(ctx context.Context, a core.Actor, batch, action, target string, item bulkPendingItem) (any, error) {
+func (s *Service) executeBulkItem(ctx context.Context, tx *sql.Tx, a core.Actor, batch, action, target string, item bulkPendingItem) (any, error) {
 	key := fmt.Sprintf("quote-bulk-%s-%s-%d", action, batch, item.Position)
 	switch action {
 	case "status":
-		return s.Transition(ctx, a, item.ID, key, TransitionInput{Status: target, Version: item.Version})
+		return s.transitionInTransaction(ctx, tx, a, item.ID, key, TransitionInput{Status: target, Version: item.Version})
 	case "clone":
-		return s.Clone(ctx, a, item.ID, key, item.Version)
+		return s.cloneInTransaction(ctx, tx, a, item.ID, key, item.Version)
 	case "export":
-		q, e := s.Get(ctx, a, item.ID)
+		q, e := s.access(ctx, tx, a, item.ID, "cotizaciones.view", true, false)
 		if e != nil {
 			return nil, e
 		}
@@ -305,6 +310,51 @@ func (s *Service) loadBulkResponse(ctx context.Context, a core.Actor, batch, act
 	if e = rows.Err(); e != nil {
 		return out, e
 	}
+	if e = rows.Close(); e != nil {
+		return out, e
+	}
+	e = s.Core.Transact(ctx, func(tx *sql.Tx) error {
+		perm, e := bulkPermission(action)
+		if e != nil {
+			return e
+		}
+		if e = s.gate(ctx, tx, a, perm); e != nil {
+			return e
+		}
+		if e = s.gate(ctx, tx, a, "cotizaciones.view"); e != nil {
+			return e
+		}
+		for i := range out.Results {
+			item := &out.Results[i]
+			if item.Status != "success" {
+				continue
+			}
+			q, accessErr := s.access(ctx, tx, a, item.ID, "cotizaciones.view", true, false)
+			if accessErr == nil && action == "status" {
+				accessErr = s.Core.Authorize(ctx, tx, a, perm, q.Owner, q.Team, false)
+			}
+			if accessErr == nil && action == "clone" {
+				var cloned struct {
+					ID string `json:"id"`
+				}
+				if e := json.Unmarshal(item.Result, &cloned); e != nil {
+					return e
+				}
+				_, accessErr = s.access(ctx, tx, a, cloned.ID, "cotizaciones.view", true, false)
+			}
+			if accessErr != nil {
+				if accessErr != core.Missing && accessErr != core.Forbidden {
+					return accessErr
+				}
+				// Redact this response only. Preserve the durable historical result.
+				item.Status, item.Error, item.Result = "unavailable", "not_found", nil
+			}
+		}
+		return nil
+	})
+	if e != nil {
+		return BulkResponse{}, e
+	}
 	if action == "export" && out.Status == "completed" {
 		out.Filename = "cotizaciones-" + batch + ".csv"
 		out.Content, e = bulkCSV(out.Results)
@@ -313,6 +363,45 @@ func (s *Service) loadBulkResponse(ctx context.Context, a core.Actor, batch, act
 		}
 	}
 	return out, nil
+}
+
+// Each item commits its domain effect and ledger together. The savepoint
+// discards any partial action/idempotency writes before recording a client error.
+func (s *Service) runBulkItem(ctx context.Context, a core.Actor, batch, action, target string, item bulkPendingItem) error {
+	return s.Core.Transact(ctx, func(tx *sql.Tx) error {
+		perm, e := bulkPermission(action)
+		if e != nil {
+			return e
+		}
+		if e = s.gate(ctx, tx, a, perm); e != nil {
+			return e
+		}
+		if e = s.gate(ctx, tx, a, "cotizaciones.view"); e != nil {
+			return e
+		}
+		var state string
+		if e = tx.QueryRowContext(ctx, `SELECT item_status FROM quote_batch_items WHERE batch_id=? AND position=? FOR UPDATE`, batch, item.Position).Scan(&state); e != nil {
+			return e
+		}
+		if state != "pending" {
+			return nil
+		}
+		if _, e = tx.ExecContext(ctx, "SAVEPOINT bulk_action"); e != nil {
+			return e
+		}
+		result, actionErr := s.executeBulkItem(ctx, tx, a, batch, action, target, item)
+		if actionErr != nil {
+			var ce *core.Error
+			if !errors.As(actionErr, &ce) || ce.Status >= 500 || ce.Status == 429 || ce.Status == 401 {
+				return actionErr
+			}
+			if _, e = tx.ExecContext(ctx, "ROLLBACK TO SAVEPOINT bulk_action"); e != nil {
+				return e
+			}
+			return s.settleBulkItem(ctx, tx, batch, item.Position, "failed", bulkErrorCode(actionErr), nil)
+		}
+		return s.settleBulkItem(ctx, tx, batch, item.Position, "success", "", result)
+	})
 }
 
 func (s *Service) runBulkBatch(ctx context.Context, a core.Actor, batch, action string) (BulkResponse, error) {
@@ -335,17 +424,7 @@ func (s *Service) runBulkBatch(ctx context.Context, a core.Actor, batch, action 
 			return BulkResponse{}, e
 		}
 		for _, item := range items {
-			result, e := s.executeBulkItem(ctx, a, batch, action, target, item)
-			if e != nil {
-				if !core.IsClient(e) {
-					return BulkResponse{}, e
-				}
-				if e = s.settleBulkItem(ctx, batch, item.Position, "failed", bulkErrorCode(e), nil); e != nil {
-					return BulkResponse{}, e
-				}
-				continue
-			}
-			if e = s.settleBulkItem(ctx, batch, item.Position, "success", "", result); e != nil {
+			if e := s.runBulkItem(ctx, a, batch, action, target, item); e != nil {
 				return BulkResponse{}, e
 			}
 		}
@@ -382,3 +461,4 @@ func (s *Service) BulkExport(ctx context.Context, a core.Actor, key string, p Bu
 	}
 	return s.runBulkBatch(ctx, a, batch, "export")
 }
+

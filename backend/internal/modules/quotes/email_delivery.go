@@ -30,21 +30,21 @@ func (s *Service) QueueEmail(ctx context.Context, a core.Actor, quoteID, intentI
 		if e != nil {
 			return e
 		}
-		if intent.Status != "approved" || intent.ApprovalID == "" || intent.QuoteVersion != q.Version {
-			return core.Conflict
-		}
-		binding, e := s.emailBinding(ctx, tx, a, q, intent)
-		if e != nil || binding.Hash != intent.BindingHash {
-			if e != nil {
-				return e
+		out, e = s.Core.Idempotent(ctx, tx, a, "quotes.email_queue:"+intentID, key, map[string]string{"intent_id": intent.ID, "binding_hash": intent.BindingHash}, func() (any, error) {
+			if intent.Status != "approved" || intent.ApprovalID == "" || intent.QuoteVersion != q.Version {
+				return nil, core.Conflict
 			}
-			return core.Conflict
-		}
-		approval, e := s.Approvals.Get(ctx, tx, intent.ApprovalID, "quote_email_intents", intent.ID)
-		if e != nil {
-			return e
-		}
-		out, e = s.Core.Idempotent(ctx, tx, a, "quotes.email_queue:"+intentID, key, map[string]string{"intent_id": intent.ID, "binding_hash": binding.Hash}, func() (any, error) {
+			binding, e := s.emailBinding(ctx, tx, a, q, intent)
+			if e != nil || binding.Hash != intent.BindingHash {
+				if e != nil {
+					return nil, e
+				}
+				return nil, core.Conflict
+			}
+			approval, e := s.Approvals.Get(ctx, tx, intent.ApprovalID, "quote_email_intents", intent.ID)
+			if e != nil {
+				return nil, e
+			}
 			// Consumption and durable enqueue share this transaction. A crash cannot
 			// consume approval without preserving the send intention, or vice versa.
 			if e := s.Approvals.Consume(ctx, tx, a, approval.ApprovalID, binding, "cotizaciones.send"); e != nil {

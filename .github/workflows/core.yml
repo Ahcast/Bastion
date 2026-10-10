@@ -38,6 +38,7 @@ jobs:
           unformatted="$(gofmt -l cmd internal database tests)"
           if [ -n "$unformatted" ]; then
             printf 'Files requiring gofmt:\n%s\n' "$unformatted"
+            gofmt -d cmd internal database tests
             exit 1
           fi
       - name: Run Go tests with race detector

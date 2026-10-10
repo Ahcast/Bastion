@@ -120,6 +120,13 @@ func main() {
 		log.Fatal(e)
 	}
 
+	smtpSecret, e := security.Encrypt(s.Config.Key, "synthetic-password")
+	if e != nil {
+		log.Fatal(e)
+	}
+	if _, e = db.Exec(`INSERT INTO settings(name,value,secret,updated_at) VALUES('smtp',?,?,UTC_TIMESTAMP(6))`, `{"host":"smtp.example.test","port":587,"username":"synthetic","from":"ventas@example.test","tls":"starttls"}`, smtpSecret); e != nil {
+		log.Fatal(e)
+	}
 	// Two independent people exercise human approval; no production grants.
 	for _, email := range []string{"approval-requester@example.test", "approval-reviewer@example.test", "emission-requester@example.test", "emission-reviewer@example.test"} {
 		r, e := db.Exec(`INSERT INTO users(email,name,password_hash,totp_secret,active,created_at,updated_at) SELECT ?, 'Aprobación sintética',password_hash,?,TRUE,UTC_TIMESTAMP(6),UTC_TIMESTAMP(6) FROM users WHERE id=1`, email, secret)

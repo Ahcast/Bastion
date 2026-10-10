@@ -187,6 +187,18 @@ func (s *Service) Verify(ctx context.Context, tx *sql.Tx, v Approval, b Binding)
 	if v.Status != "approved" {
 		return approvalError("approval_not_active", "La aprobación no está activa.")
 	}
+	return s.verifyAuthority(ctx, tx, v, b)
+}
+
+// VerifyConsumed revalidates authorization before its queued effect.
+func (s *Service) VerifyConsumed(ctx context.Context, tx *sql.Tx, v Approval, b Binding) error {
+	if v.Status != "consumed" {
+		return approvalError("approval_not_consumed", "El envío no tiene autorización consumida.")
+	}
+	return s.verifyAuthority(ctx, tx, v, b)
+}
+
+func (s *Service) verifyAuthority(ctx context.Context, tx *sql.Tx, v Approval, b Binding) error {
 	if !sameBinding(v, b) {
 		return approvalError("approval_changed", "La versión o el contenido aprobado cambió.")
 	}

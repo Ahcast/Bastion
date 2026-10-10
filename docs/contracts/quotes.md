@@ -144,3 +144,16 @@ Hasta que esas decisiones estén cerradas, una cotización puede crearse y opera
 Estas conversiones son server-side, transaccionales e idempotentes y deben conservar referencia de origen. Se implementan cuando existan los módulos propietarios. Quotes entrega un snapshot/DTO público autorizado al servicio destino; OC/Factura valida sus propias reglas y persiste en su transacción/composición definida. Quotes no debe importar ni escribir directamente tablas privadas de OC/Facturas.
 
 No crear endpoints simulados ni tablas temporales en Quotes para adelantar estas conversiones. La ausencia actual de OC/Factura no invalida las unidades ya cerradas, pero impide declarar la integración cruzada terminada.
+
+
+## Cierre comercial y alcance aprobado — 2026-10-10
+
+Decisión del usuario: HNL y USD separados, sin conversión automática. FX queda fuera de este cierre; la propuesta no autoriza código de conversión. OC/Factura/IA se integran al existir sus propietarios.
+
+Sin migración nueva: quotes.status VARCHAR, quote_versions y auditoría existentes. Tras aceptación SMTP, el worker cambia approved→sent y crea una versión/evento en la misma TX del ledger accepted, únicamente si la versión enviada sigue vigente. Si hubo edición durante SMTP, conserva el nuevo borrador y solo registra el envío histórico. sent acredita aceptación SMTP, nunca entrega final ni lectura. uncertain no cambia el estado comercial ni reenvía automáticamente.
+
+PATCH /quotes/{id}/status añade reason opcional (máximo 1000 caracteres; obligatorio para destinos accepted/rejected/expired y para reabrir estados finales). Solo sent→accepted/rejected/expired; sent/accepted/rejected/expired→draft permite revisión explícita. No permite establecer sent ni approved desde el cliente. Expired exige que la fecha local de Honduras sea posterior a fecha de cotización + validity_days; el último día completo sigue siendo válido. Transición manual, sin scheduler oculto. Mismos permisos view/transition, scopes, sesión humana, versión e Idempotency-Key; motivo auditado en TX. 422 motivo/destino inválido, 409 estado/versión/vigencia, 403/404 autorización. Estados finales bloquean edición directa; reabrir crea Borrador y nueva aprobación/emisión.
+
+Lotes: efecto comercial y resultado por ítem comparten TX; fallo del ledger revierte el efecto. Fallos transitorios dejan pendiente; replay reautoriza resultados y redacta los que ya no son visibles. La UI conserva cuerpo/clave originales ante timeout aunque cambie la selección y bloquea lotes con ficha abierta. Bulk conserva destinos preliminares; resultados comerciales finales son individuales y requieren motivo.
+
+Aceptación: concurrencia y rollback de lotes, reanudación/revocación, estados comerciales tras SMTP aceptado/incierto, historial, vigencia y revisiones; Angular y navegador real. No confundir cierre de desarrollo con conexión/despliegue productivo.

@@ -45,3 +45,6 @@ Correo comercial y bulk dejaron de ser pendientes: ambos están implementados y 
 La siguiente unidad es **FX fechado**. El sistema permite cotizaciones explícitas en HNL o USD, pero no conversión implícita. Antes de programar FX se debe definir de forma normativa la fuente/tipo de tasa, fecha efectiva, snapshot/historial, precisión/redondeo, autoridad de modificación, efecto sobre versiones/aprobaciones/emisiones y presentación UI/PDF/exportación. No inventar esos valores en código.
 
 Las conversiones Quotes→OC/Factura se integran con los servicios propietarios cuando esos módulos existan; Quotes no escribe sus tablas directamente. Esto no autoriza a saltar a OC mientras FX y la aceptación restante de Cotizaciones no estén cerrados.
+
+
+Cierre vigente 2026-10-10: Cotizaciones opera HNL/USD separados por decisión explícita; FX deja de ser gate del módulo actual. Completar pruebas del cierre comercial/recuperación y registrar CI antes de declarar terminado. OC/Factura/IA conservan sus dependencias y no se implementan dentro de Quotes.

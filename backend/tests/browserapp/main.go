@@ -18,6 +18,8 @@ import (
 	"github.com/Ahcast/Bastion/backend/internal/core/api"
 	"github.com/Ahcast/Bastion/backend/internal/core/runtime"
 	"github.com/Ahcast/Bastion/backend/internal/core/security"
+	"github.com/Ahcast/Bastion/backend/internal/modules/quotes"
+	"github.com/Ahcast/Bastion/backend/internal/modules/workflow"
 	"github.com/go-sql-driver/mysql"
 )
 
@@ -80,6 +82,22 @@ func (f *objects) serve(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 	_, _ = w.Write(f.data[d.key])
 }
+
+// This adapter cannot access the network or deliver a real message.
+type syntheticMailer struct{}
+
+func (syntheticMailer) Send(ctx context.Context, settings core.SMTPSettings, password string, email core.Email) error {
+	return core.ValidateEmail(email)
+}
+func (f *objects) ReadObject(ctx context.Context, key string, max int64) ([]byte, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	b, ok := f.data[key]
+	if !ok || int64(len(b)) > max {
+		return nil, core.Missing
+	}
+	return append([]byte{}, b...), nil
+}
 func main() {
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -96,11 +114,22 @@ func main() {
 		os.Exit(1)
 	}
 	s.Config.Files = true
+	s.Config.Email = true
+	s.Config.SMTPHosts = []string{"smtp.example.test"}
 	f := &objects{data: map[string][]byte{}, links: map[string]download{}}
 	if e = composition.RegisterFiles(s, r, logger, f); e != nil {
 		logger.Error("synthetic composition unavailable")
 		os.Exit(1)
 	}
+	q := &quotes.Service{Core: s, Approvals: &workflow.Service{Core: s}}
+	w := core.Worker{Service: s, Handlers: map[string]core.JobHandler{"quote.email.send": q.CommercialEmailHandler(f, syntheticMailer{}), "notification": s.NotificationHandler}}
+	go func() {
+		for range time.NewTicker(200 * time.Millisecond).C {
+			if e := w.Run(context.Background(), 30); e != nil {
+				logger.Error("synthetic worker failed")
+			}
+		}
+	}()
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /synthetic-objects/{token}", f.serve)
 	mux.Handle("/", api.New(s, r, f, logger))

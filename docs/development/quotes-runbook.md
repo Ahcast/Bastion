@@ -84,3 +84,10 @@ La moneda de una cotización sigue siendo explícitamente `HNL` o `USD`; no exis
 8. representación en UI, PDF y exportaciones.
 
 Hasta que eso exista, cualquier conversión automática USD↔HNL sería una regla comercial inventada y debe permanecer deshabilitada.
+
+
+## Cierre monomoneda
+
+HNL o USD por cotización, sin conversión automática (decisión del usuario). Tras SMTP aceptado, recargar ficha muestra Enviada; no acredita lectura/entrega final. Registrar motivo y pasar a Aceptada/Rechazada/Vencida. Vencida requiere fecha local posterior a fecha+validez. Reabrir en Borrador antes de editar una cotización enviada/final. PDF emitido histórico se conserva. Lotes requieren cerrar la ficha; tras timeout usar Reintentar lote, que conserva IDs/versiones/cuerpo/clave. CSV confirmado puede descargarse otra vez.
+
+El navegador de CI usa API/Angular/MySQL reales y adaptadores de objetos y correo sintéticos sin red; nunca configura Bluehost ni ejecuta SMTP real. El worker de pruebas ejecuta la misma lógica comercial. Ver status.md para evidencia final.

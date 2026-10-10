@@ -11,3 +11,19 @@ describe('Cotizaciones en lote',()=>{
  it('expone batch y fallos parciales sin calcular importes en cliente',async()=>{bulk.selected.set(new Set(['1','2']));api.write.mockResolvedValue({batch_id:'44',action:'clone',status:'completed',results:[{position:0,id:'1',version:'3',status:'success'},{position:1,id:'2',version:'7',status:'failed',error_code:'conflict'}]});const changed=vi.fn();bulk.changed.subscribe(changed);await bulk.run('clone');expect(bulk.notice()).toBe('Lote 44: 1 correctas, 1 con error.');expect(bulk.failures()[0].error_code).toBe('conflict');expect(changed).toHaveBeenCalledTimes(1);expect(bulk.count()).toBe(0);expect(bulk.rows[0].total).toBe('100.00')});
  it('selección total usa únicamente filas visibles',()=>{bulk.toggleAll({target:{checked:true}} as unknown as Event);expect([...bulk.selected()]).toEqual(['1','2']);bulk.rows=[bulk.rows[0]];bulk.ngOnChanges();expect(bulk.count()).toBe(0)});
 });
+
+describe('Recuperación de lotes',()=>{
+ it('conserva cuerpo original después de recargar filas y cambiar destino',async()=>{
+  const api={write:vi.fn().mockRejectedValue(new Error()),message:()=> 'Falló',has:()=>true};TestBed.configureTestingModule({providers:[{provide:Client,useValue:api}]});
+  const bulk=TestBed.runInInjectionContext(()=>new QuoteBulk());bulk.rows=[{id:'9007199254740993',number:'COT-1',customer_name:'A',reference:'',date:'2026-10-10',currency:'HNL',total:'1.01',status:'draft',version:'12'}];bulk.selected.set(new Set([bulk.rows[0].id]));await bulk.run('clone');
+  const call=api.write.mock.calls[0];bulk.rows=[];bulk.ngOnChanges();bulk.target='review';await bulk.run('status');expect(api.write).toHaveBeenCalledTimes(1);await bulk.retry();expect(api.write.mock.calls[1]).toEqual(call);
+ });
+ it('no pierde la intención ni anuncia éxito mientras el lote siga en proceso',async()=>{
+  const api={write:vi.fn().mockResolvedValue({batch_id:'3',action:'status',status:'processing',results:[]}),message:()=>'',has:()=>true};TestBed.configureTestingModule({providers:[{provide:Client,useValue:api}]});
+  const bulk=TestBed.runInInjectionContext(()=>new QuoteBulk());bulk.pending.set({action:'status',body:{items:[{id:'1',version:'1'}],status:'costing'},key:'same-key'});await bulk.retry();expect(bulk.pending()?.key).toBe('same-key');expect(bulk.notice()).toContain('en proceso');
+ });
+ it('renderiza controles y bloquea la operación mientras esté abierta una ficha',async()=>{
+  const api={write:vi.fn(),message:()=>'',has:()=>true};TestBed.configureTestingModule({providers:[{provide:Client,useValue:api}]});const fixture=TestBed.createComponent(QuoteBulk);fixture.componentRef.setInput('rows',[{id:'1',number:'COT-1',version:'2',customer_name:'A'}]);fixture.componentRef.setInput('disabled',true);fixture.detectChanges();
+  expect(fixture.nativeElement.textContent).toContain('Acciones en lote');expect(fixture.nativeElement.querySelector('input').disabled).toBe(true);fixture.componentInstance.selected.set(new Set(['1']));await fixture.componentInstance.run('clone');expect(api.write).not.toHaveBeenCalled();
+ });
+});

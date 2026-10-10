@@ -517,3 +517,7 @@ Borrador → Costeo → Revisión → Aprobada internamente → Enviada → Acep
 ## Estado de implementación
 
 La primera unidad implementa borradores, cálculo exacto, snapshots, numeración, edición, clonación, versiones, papelera/restauración, consulta MCP y conversión determinista desde Procesos. [Contrato implementado](../contracts/quotes.md), [OpenAPI](../contracts/quotes-openapi.json) y [runbook](../development/quotes-runbook.md). PDF de borrador y adjuntos implementados en la segunda unidad. Estados preliminares draft/costing/review y revisiones implementados. Aprobación humana vinculada y emisión segura de PDF implementadas. Correo/programación, bulk, FX e integración con OC/Factura mantienen el alcance objetivo y sus pruebas pendientes. No se declara el módulo completo ni se avanza al siguiente por esta unidad.
+
+## Alcance vigente de cierre — 2026-10-10
+
+Usuario: HNL/USD separados sin conversión automática; FX es ampliación futura. Correo y bulk implementados; estados enviados/finales y recuperación reforzados, pruebas finales en curso según status.md. Integraciones OC/Factura/IA pertenecen a sus siguientes fases; no se presentan como implementadas. La evidencia de desarrollo no acredita conexiones productivas.

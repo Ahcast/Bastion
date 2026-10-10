@@ -24,4 +24,15 @@ test('Cotizaciones: origen, cálculo exacto, persistencia, versión, clonación 
  expect(download.suggestedFilename()).toMatch(/^cotizaciones-\d+\.csv$/);
  const stream=await download.createReadStream();let csv='';for await(const chunk of stream)csv+=chunk.toString();
  expect(csv).toContain('COT-000001');expect(csv).toContain('COT-000002');expect(csv).not.toContain('Nota interna');
+ await page.getByLabel('Seleccionar todas las cotizaciones visibles',{exact:true}).check();
+ await page.getByRole('button',{name:'Cambiar estado de seleccionadas',exact:true}).click();
+ await expect(page.getByRole('status')).toContainText(/2 correctas, 0 con error/);
+ await page.getByLabel('Seleccionar todas las cotizaciones visibles',{exact:true}).check();
+ await page.getByRole('button',{name:'Cambiar estado de seleccionadas',exact:true}).click();
+ await expect(page.getByRole('status')).toContainText(/0 correctas, 2 con error/);
+ await page.getByLabel('Seleccionar todas las cotizaciones visibles',{exact:true}).check();
+ await page.getByRole('button',{name:'Clonar seleccionadas',exact:true}).click();
+ await expect(page.getByText('4 cotizaciones · Página 1',{exact:true})).toBeVisible();
+
 });
+

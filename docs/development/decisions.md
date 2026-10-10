@@ -85,3 +85,7 @@ Emitir conserva quotes.status=approved y su versión inmutable, con evidencia is
 Ampliar Core.Mail sin dependencias nuevas: sobre explícito To/CC/BCC y adjuntos en memoria, validación estricta y MIME mediante go-mail fijado. El adaptador no resuelve rutas/URLs ni autoriza destinatarios. Cota técnica inicial de 10 MiB de adjuntos y 20 destinatarios documentada; no acredita límites ni conectividad Bluehost. Preservar Recipient para la prueba SMTP existente.
 
 La fecha programada pertenece a la intención durable outbox, no al momento del publicador. EnqueueAt y migración 0011 transportan UTC/microsegundos hasta jobs.available_at; eventos legacy conservan ejecución inmediata. Los servicios técnicos se cierran por separado antes de componer el ledger/autorización/UI comercial de Quotes. No se modifica el significado de emisión ni se activa correo.
+
+## 2026-10-10 — Alcance de cierre Cotizaciones
+
+El usuario escogió explícitamente HNL y USD separados sin conversión automática. FX queda fuera del cierre actual; no se elige una tasa BCH ni se inventa política cambiaria. Conversiones OC/Factura se incorporan mediante propietarios futuros. Se completa flujo comercial posterior al SMTP; estados finales y reapertura requieren motivo y versión. La fecha de vencimiento se evalúa en Honduras después del día fecha+validez completo. Lotes comparten transacción entre efecto e ítem; la aprobación consumida se revalida antes de enviar. Sin dependencias ni migraciones nuevas.

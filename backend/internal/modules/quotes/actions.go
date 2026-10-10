@@ -77,32 +77,38 @@ func (s *Service) Clone(ctx context.Context, a core.Actor, id, key string, versi
 	}
 	var out any
 	e := s.Core.Transact(ctx, func(tx *sql.Tx) error {
-		if e := s.gate(ctx, tx, a, "cotizaciones.create"); e != nil {
-			return e
-		}
-		q, e := s.access(ctx, tx, a, id, "cotizaciones.view", true, false)
-		if e != nil {
-			return e
-		}
-		if e = s.items(ctx, tx, &q); e != nil {
-			return e
-		}
-		out, e = s.Core.Idempotent(ctx, tx, a, "quotes.clone:"+id, key, map[string]any{"version": fmt.Sprint(version)}, func() (any, error) {
-			if q.Deleted != nil || q.Version != version {
-				return nil, core.Conflict
-			}
-			q.ID = ""
-			q.Number = ""
-			q.Status = "draft"
-			q.Owner = a.UserID
-			q.Team = ""
-			q.Version = 1
-			q.Deleted = nil
-			return s.persist(ctx, tx, a, &q, "quote.cloned")
-		})
+		var e error
+		out, e = s.cloneInTransaction(ctx, tx, a, id, key, version)
 		return e
 	})
 	return out, e
+}
+
+// Shared by the single-record action and durable bulk item transaction.
+func (s *Service) cloneInTransaction(ctx context.Context, tx *sql.Tx, a core.Actor, id, key string, version uint64) (any, error) {
+	if e := s.gate(ctx, tx, a, "cotizaciones.create"); e != nil {
+		return nil, e
+	}
+	q, e := s.access(ctx, tx, a, id, "cotizaciones.view", true, false)
+	if e != nil {
+		return nil, e
+	}
+	if e = s.items(ctx, tx, &q); e != nil {
+		return nil, e
+	}
+	return s.Core.Idempotent(ctx, tx, a, "quotes.clone:"+id, key, map[string]any{"version": fmt.Sprint(version)}, func() (any, error) {
+		if q.Deleted != nil || q.Version != version {
+			return nil, core.Conflict
+		}
+		q.ID = ""
+		q.Number = ""
+		q.Status = "draft"
+		q.Owner = a.UserID
+		q.Team = ""
+		q.Version = 1
+		q.Deleted = nil
+		return s.persist(ctx, tx, a, &q, "quote.cloned")
+	})
 }
 func (s *Service) Trash(ctx context.Context, a core.Actor, id, key string, version uint64, restore bool) (any, error) {
 	if a.Type != "user" {
@@ -252,3 +258,4 @@ func (s *Service) Versions(ctx context.Context, a core.Actor, id string, page, l
 	}
 	return map[string]any{"data": data, "total": total, "page": page, "per_page": limit}, rows.Err()
 }
+
