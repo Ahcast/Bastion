@@ -219,6 +219,15 @@ func TestQuoteAttachmentsBothPoliciesQuarantineTrashAndRestore(t *testing.T) {
 	if e = s.Core.ScanFile(ctx, a, doc, 1, true, "synthetic-scan-reference"); e != nil {
 		t.Fatal(e)
 	}
+	if _, e = s.Core.DB.Exec("UPDATE sessions SET reauthenticated_at=NULL WHERE token_hash=?", a.SessionHash); e != nil {
+		t.Fatal(e)
+	}
+	if _, e = s.Core.TrashFile(ctx, a, doc, "quote-trash-file", 2, false); e == nil || e.Error() != "reauth_required" {
+		t.Fatal("missing reauthentication error", e)
+	}
+	if _, e = s.Core.DB.Exec("UPDATE sessions SET reauthenticated_at=UTC_TIMESTAMP(6) WHERE token_hash=?", a.SessionHash); e != nil {
+		t.Fatal(e)
+	}
 	if _, e = s.Core.TrashFile(ctx, a, doc, "quote-trash-file", 2, false); e != nil {
 		t.Fatal(e)
 	}

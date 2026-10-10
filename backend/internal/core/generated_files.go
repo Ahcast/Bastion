@@ -79,7 +79,10 @@ func (s *Service) TrashFile(ctx context.Context, a Actor, id, key string, versio
 			return e
 		}
 		if e := s.Authorize(ctx, tx, a, "core.documents.write", owner, team.String, true); e != nil {
-			return Missing
+			if e == Forbidden {
+				return Missing
+			}
+			return e
 		}
 		if entity.Valid {
 			policy, ok := s.DocumentPolicies[entity.String]
