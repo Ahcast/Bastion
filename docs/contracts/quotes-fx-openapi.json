@@ -6,7 +6,7 @@
     "description": "Registro histórico USD/HNL. No selecciona una tasa ni convierte cotizaciones. Ver quotes-fx.md."
   },
   "paths": {
-    "/api/v1/quotes/fx-observations": {
+    "/api/v1/quote-fx/observations": {
       "get": {
         "summary": "Listar observaciones FX globales autorizadas",
         "parameters": [
@@ -42,7 +42,7 @@
         }
       }
     },
-    "/api/v1/quotes/fx-observations/{id}": {
+    "/api/v1/quote-fx/observations/{id}": {
       "get": {
         "summary": "Consultar observación FX por ID",
         "parameters": [
