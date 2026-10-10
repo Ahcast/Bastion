@@ -1,8 +1,8 @@
 # Bastion
 
-Aplicación operativa de Castillo IT. Core Go/Angular y catálogos de Clientes y Proveedores y catálogo/ingestión de Procesos implementados; Cotizaciones en desarrollo con borradores, cálculo, PDF/adjuntos y estados preliminares/revisiones y aprobación humana vinculada/emisión segura de PDF, con crawler Python existente. Los demás módulos comerciales e integraciones productivas se desarrollan por fases. [Ejecutar Core](docs/development/core-runbook.md) · [Ejecutar Clientes](docs/development/customers-runbook.md) · [Ejecutar Proveedores](docs/development/suppliers-runbook.md).
+Aplicación operativa de Castillo IT. Core Go/Angular, Clientes, Proveedores y Procesos/receptor crawler tienen sus unidades base implementadas. Cotizaciones es el módulo activo: borradores y cálculo exacto, PDF/adjuntos, estados/revisiones, aprobación humana, emisión segura, correo comercial durable y bulk trazable están implementados y probados. La siguiente unidad es FX fechado, bloqueada hasta cerrar su política comercial; no iniciar Órdenes de Compra todavía. Los demás módulos comerciales e integraciones productivas se desarrollan por fases.
 
-**Entrada del agente:** [AGENTS.md](AGENTS.md) → [maestro](docs/Proyecto_Bastion_Documento_Maestro.md) → [plan](docs/development/plan.md).
+**Entrada del agente:** [AGENTS.md](AGENTS.md) → [checkpoint operativo](docs/ESTADO_DESARROLLO.md) → [maestro](docs/Proyecto_Bastion_Documento_Maestro.md) → [plan](docs/development/plan.md).
 
 | Ruta | Contenido | Alojamiento |
 | --- | --- | --- |
@@ -12,10 +12,8 @@ Aplicación operativa de Castillo IT. Core Go/Angular y catálogos de Clientes y
 | backend/database | Migraciones SQL y acceso a datos | MySQL alojado en Bluehost |
 | S3 | Archivos privados, evidencia y backups | AWS |
 
-Solo main está permitida. Los commits conservan versiones; no crear ramas adicionales. Ver [regla Git](docs/development/git-policy.md).
+Solo `main` está permitida. Los commits conservan versiones; no crear ramas adicionales. Ver [regla Git](docs/development/git-policy.md).
 
-No se despliega software ni se activa correo por actualizar documentación. Las capacidades externas sin verificar se registran en [estado](docs/development/status.md).
+No se despliega software ni se activa correo por actualizar documentación. Las capacidades externas sin verificar se registran en el [checkpoint operativo](docs/ESTADO_DESARROLLO.md) y el [estado histórico](docs/development/status.md).
 
-[Ejecutar Procesos y receptor crawler](docs/development/processes-runbook.md).
-
-[Ejecutar borradores de Cotizaciones](docs/development/quotes-runbook.md).
+Runbooks: [Core](docs/development/core-runbook.md) · [Clientes](docs/development/customers-runbook.md) · [Proveedores](docs/development/suppliers-runbook.md) · [Procesos y receptor crawler](docs/development/processes-runbook.md) · [Cotizaciones](docs/development/quotes-runbook.md).
