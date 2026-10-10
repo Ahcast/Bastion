@@ -133,6 +133,7 @@ func (s *Service) ModuleFiles(logger *slog.Logger, enabled bool, objects core.Ob
 			return Calculate(p)
 		})
 		s.registerBulk(register)
+		s.registerFX(register)
 		if s.Approvals != nil {
 			register("POST /api/v1/quotes/{id}/emit", func(ctx context.Context, a core.Actor, r *http.Request) (any, error) {
 				var p EmitInput
