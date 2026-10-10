@@ -24,6 +24,16 @@ type Worker struct {
 }
 
 func (s *Service) Enqueue(ctx context.Context, tx *sql.Tx, a Actor, kind, permission string, payload any) (string, error) {
+	return s.EnqueueAt(ctx, tx, a, kind, permission, payload, time.Now().UTC())
+}
+
+// EnqueueAt commits the requested execution time with the durable intention.
+// Scheduling does not bypass current authorization or the worker's live checks.
+func (s *Service) EnqueueAt(ctx context.Context, tx *sql.Tx, a Actor, kind, permission string, payload any, available time.Time) (string, error) {
+	available = available.UTC().Truncate(time.Microsecond)
+	if available.Year() < 1000 || available.Year() > 9999 {
+		return "", Invalid
+	}
 	if e := s.Authorize(ctx, tx, a, permission, a.UserID, "", false); e != nil {
 		return "", e
 	}
@@ -32,19 +42,23 @@ func (s *Service) Enqueue(ctx context.Context, tx *sql.Tx, a Actor, kind, permis
 		return "", e
 	}
 	id := security.ID()
-	_, e = tx.ExecContext(ctx, `INSERT INTO outbox_events(id,kind,payload,user_id,permission,correlation_id,created_at) VALUES(?,?,?,?,?,?,UTC_TIMESTAMP(6))`, id, kind, string(b), a.UserID, permission, a.CorrelationID)
+	_, e = tx.ExecContext(ctx, `INSERT INTO outbox_events(id,kind,payload,user_id,permission,correlation_id,created_at,available_at) VALUES(?,?,?,?,?,?,UTC_TIMESTAMP(6),?)`, id, kind, string(b), a.UserID, permission, a.CorrelationID, available)
 	return id, e
 }
 func (s *Service) PublishOutbox(ctx context.Context) error {
 	return s.Transact(ctx, func(tx *sql.Tx) error {
-		rows, e := tx.QueryContext(ctx, "SELECT id,kind,payload,user_id,permission,correlation_id FROM outbox_events WHERE published_at IS NULL ORDER BY created_at,id LIMIT 20 FOR UPDATE")
+		rows, e := tx.QueryContext(ctx, "SELECT id,kind,payload,user_id,permission,correlation_id,COALESCE(available_at,created_at) FROM outbox_events WHERE published_at IS NULL ORDER BY created_at,id LIMIT 20 FOR UPDATE")
 		if e != nil {
 			return e
 		}
-		var events []Job
+		type scheduled struct {
+			Job
+			Available time.Time
+		}
+		var events []scheduled
 		for rows.Next() {
-			var j Job
-			if e = rows.Scan(&j.ID, &j.Kind, &j.Payload, &j.UserID, &j.Permission, &j.CorrelationID); e != nil {
+			var j scheduled
+			if e = rows.Scan(&j.ID, &j.Kind, &j.Payload, &j.UserID, &j.Permission, &j.CorrelationID, &j.Available); e != nil {
 				rows.Close()
 				return e
 			}
@@ -56,7 +70,7 @@ func (s *Service) PublishOutbox(ctx context.Context) error {
 			return e
 		}
 		for _, j := range events {
-			if _, e = tx.ExecContext(ctx, `INSERT IGNORE INTO jobs(id,kind,payload,user_id,permission,correlation_id,status,available_at,created_at) VALUES(?,?,?,?,?,?,'pending',UTC_TIMESTAMP(6),UTC_TIMESTAMP(6))`, j.ID, j.Kind, string(j.Payload), j.UserID, j.Permission, j.CorrelationID); e != nil {
+			if _, e = tx.ExecContext(ctx, `INSERT IGNORE INTO jobs(id,kind,payload,user_id,permission,correlation_id,status,available_at,created_at) VALUES(?,?,?,?,?,?,'pending',?,UTC_TIMESTAMP(6))`, j.ID, j.Kind, string(j.Payload), j.UserID, j.Permission, j.CorrelationID, j.Available); e != nil {
 				return e
 			}
 			if _, e = tx.ExecContext(ctx, "UPDATE outbox_events SET published_at=UTC_TIMESTAMP(6) WHERE id=?", j.ID); e != nil {

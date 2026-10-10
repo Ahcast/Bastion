@@ -80,3 +80,8 @@ Buscar aprobación/Revisión/conexión reveló MySQL 1267 al comparar parámetro
 ## 2026-10-10 — Emisión PDF separada de entrega
 
 Emitir conserva quotes.status=approved y su versión inmutable, con evidencia issued dentro de quote_pdf_snapshots. Cambiar a sent sin SMTP/entrega autorizada sería falso; agregar un estado comercial distinto del grafo aprobado no es necesario. La reserva no consume aprobación: render/PutImmutable fuera de TX y revalidación/consumo/documento/hecho atómicos al finalizar. Replay confirmado recupera evidencia histórica, pending no elude vigencia ni cambios. Permiso emit específico sin grants automáticos. El test browser usa una composición aislada con store en memoria en tests/browserapp; cmd/server y adapter S3 productivos no incorporan mocks.
+# Transporte y programación previos al correo Quotes — 2026-10-10
+
+Ampliar Core.Mail sin dependencias nuevas: sobre explícito To/CC/BCC y adjuntos en memoria, validación estricta y MIME mediante go-mail fijado. El adaptador no resuelve rutas/URLs ni autoriza destinatarios. Cota técnica inicial de 10 MiB de adjuntos y 20 destinatarios documentada; no acredita límites ni conectividad Bluehost. Preservar Recipient para la prueba SMTP existente.
+
+La fecha programada pertenece a la intención durable outbox, no al momento del publicador. EnqueueAt y migración 0011 transportan UTC/microsegundos hasta jobs.available_at; eventos legacy conservan ejecución inmediata. Los servicios técnicos se cierran por separado antes de componer el ledger/autorización/UI comercial de Quotes. No se modifica el significado de emisión ni se activa correo.

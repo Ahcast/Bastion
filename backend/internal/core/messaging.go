@@ -8,7 +8,15 @@ import (
 	"time"
 )
 
-type Email struct{ ID, Recipient, Subject, Body, MessageID string }
+type Email struct {
+	ID, Recipient, Subject, Body, MessageID string
+	To, CC, BCC                             []string
+	Attachments                             []EmailAttachment
+}
+type EmailAttachment struct {
+	Filename, MediaType string
+	Data                []byte
+}
 type Mailer interface {
 	Send(context.Context, SMTPSettings, string, Email) error
 }
