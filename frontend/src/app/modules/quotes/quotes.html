@@ -3,6 +3,7 @@
 @if(api.has('cotizaciones.create')){<button (click)="new()" [disabled]="busy()">Nueva cotización</button>}
 <p>{{total()}} cotizaciones · Página {{page}}</p><button [disabled]="page<=1||busy()" (click)="page=page-1;load()">Anterior</button><button [disabled]="page*25>=total()||busy()" (click)="page=page+1;load()">Siguiente</button>
 @for(q of rows();track q.id){<article class="card"><h2>{{q.number}}</h2><p>{{q.customer_name}} · {{q.reference}}</p><p>{{stateLabel(q.status)}} · {{q.date}} · {{q.currency}} {{q.total}}</p><button (click)="open(q.id)">Ver cotización {{q.number}}</button></article>}@empty{<p>No hay cotizaciones para estos filtros.</p>}
+@if(!deleted){<bastion-quote-bulk [rows]="rows()" (changed)="load(true)"/>}
 @if(editing()){
 <section class="card"><h2>{{selected()?.number||'Nuevo borrador'}}</h2>
 @if(selected()?.source_process_id){<p>Proceso de origen <a routerLink="/processes" [queryParams]="{id:selected()?.source_process_id}">Ver proceso</a></p>}
