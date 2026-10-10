@@ -19,79 +19,81 @@ Actualizado: 2026-10-10.
 - Clientes: unidad cerrada y validada.
 - Proveedores: unidad cerrada y validada.
 - Procesos/receptor crawler: unidad base cerrada y validada.
-- Cotizaciones: **cierre monomoneda implementado; validación final en curso**.
-- OC de clientes y módulos posteriores: no iniciar todavía.
+- Cotizaciones: **cerrado y validado en CI para el alcance monomoneda HNL/USD**.
+- OC de clientes: **módulo activo siguiente**.
+- Facturas/pagos y módulos posteriores: pendientes; no iniciar antes de cerrar OC por unidades.
 - Producción: no desplegada ni migrada.
 
-## Cotizaciones — completado
+## Cotizaciones — cierre certificado
 
-- Borradores, cálculo exacto, versiones, idempotencia y auditoría.
-- Conversión desde Procesos preservando snapshots autorizados.
-- Adjuntos y PDF de borrador.
-- Estados preliminares Costeo/Revisión.
-- Aprobación humana de dos personas y revocación.
-- Emisión segura e inmutable de PDF aprobado.
-- Transporte Core de correo y programación durable.
-- Autorización comercial específica de destinatarios, asunto, mensaje, PDF emitido, adjuntos y horario.
-- Worker de correo con revalidación de permisos y binding antes del efecto externo.
-- Ledger durable; resultado SMTP incierto queda `uncertain` y no se reenvía a ciegas.
-- Integridad SHA/size de PDF y adjuntos antes del SMTP.
-- Revocación de autorización sigue disponible aunque la evidencia haya cambiado.
-- UI de correo comercial y pruebas de navegador.
-- Bulk durable de cotizaciones:
-  - migración `0013_quote_batches.sql` con cabecera e ítems persistentes;
-  - `POST /api/v1/quotes/bulk/status`;
-  - `POST /api/v1/quotes/bulk/clone`;
-  - `POST /api/v1/quotes/bulk/export`;
-  - `batch_id` estable y resultado por cotización;
-  - reintentos con identidad de lote e idempotencia derivada por ítem;
-  - errores cliente por ítem sin ocultar fallos parciales;
-  - errores internos dejan trabajo pendiente para retry seguro;
-  - exportación congelada, neutralizada contra fórmulas y sin costos, márgenes ni notas privadas;
-  - selección múltiple Angular y acciones de estado/clonado/exportación;
-  - la UI bulk no aparece en la papelera.
+Alcance cerrado:
 
-## Último hito certificado — Bulk de Cotizaciones
+- borradores, cálculo decimal exacto, versiones, idempotencia, auditoría y snapshots;
+- conversión desde Procesos;
+- adjuntos y PDF de borrador;
+- Costeo/Revisión, historial y control optimista;
+- aprobación humana, revocación y emisión PDF inmutable;
+- correo comercial durable, autorización explícita, worker, revalidación y estado SMTP incierto;
+- estados comerciales finales/reapertura con motivo;
+- bulk durable de estado, clonación y exportación, con resultado por ítem, recuperación, CSV público congelado y neutralización de fórmulas;
+- observaciones FX append-only como registro auxiliar, sin conversión automática de cotizaciones;
+- HNL y USD permanecen monedas explícitas y separadas.
 
-HEAD certificado: `e3f70fee85a8fd1be6dcdd56fd9fc0ada20f6328`.
+Correcciones de cierre:
 
-Core checks: GitHub Actions run `38088666258`, conclusión `success`:
-- Go format/vet: aprobado.
-- `go test -race -count=1 ./...` contra MySQL 5.7: aprobado.
-- Builds Go: aprobados.
-- Angular build/tests: aprobados.
-- Navegador contra API + Angular + MySQL reales de CI: aprobado.
+- el namespace FX quedó separado en `/quote-fx/observations` para evitar colisión de rutas;
+- reautenticación/ARIA del ledger FX y pruebas navegador quedaron estabilizadas;
+- bulk conserva selección válida al refrescar filas y usa la versión recargada;
+- integración MySQL prueba dos lotes de estado consecutivos: primero exitoso y segundo con conflictos controlados, sin bloqueo;
+- Playwright espera el reset real de la selección entre acciones bulk, sin sleeps ni reducción de aserciones.
+
+### HEAD final certificado de Cotizaciones
+
+HEAD: `0a98bf756c4e7a3965b7b625473258509fbaa571`.
+
+Core checks: run `38094367694`, conclusión `success`:
+- Go format/vet: aprobado;
+- `go test -race -count=1 ./...` contra MySQL 5.7: aprobado;
+- builds Go: aprobados;
+- Angular build/tests: aprobados;
+- Playwright contra API + Angular + MySQL reales de CI: aprobado.
 
 También aprobados para el mismo HEAD:
-- Documentation checks: run `38088666202`.
-- Single branch policy: run `38088666297`.
+- Documentation checks: run `38094367696`;
+- Single branch policy: run `38094367728`.
 
-Cobertura específica bulk:
-- integración MySQL verifica lote trazable/idempotente, replay sin duplicados, fallo parcial y rechazo de selección duplicada;
-- exportación congela el snapshot público y neutraliza fórmulas de hoja de cálculo;
-- REST verifica DTO estricto e `Idempotency-Key`;
-- Angular verifica retry con la misma clave y exposición de fallos parciales;
-- Playwright real crea dos cotizaciones, selecciona ambas desde la UI bulk, descarga CSV y comprueba que la nota privada no se filtra.
+Este CI sustituye como evidencia de cierre a los checkpoints anteriores de Cotizaciones. No acredita S3, SMTP, Percona/Bluehost ni despliegue productivo reales.
 
-Regresión corregida antes de certificar:
-- el primer montaje de bulk tenía un bloque Angular mal cerrado;
-- `QuoteBulk` estaba importado pero no montado en `quotes.html`;
-- ambos defectos quedaron corregidos y cubiertos por build/tests/navegador.
+## Módulo activo — Órdenes de Compra de clientes
 
-## Cierre activo — Cotizaciones en monedas separadas
+Fuente funcional: `docs/modules/purchase-orders.md`. El maestro y `development/decisions.md` resuelven la nomenclatura vigente:
 
-Decisión explícita del usuario 2026-10-10: cotizar en HNL o USD separados; sin conversión automática. FX queda como ampliación futura, no bloquea esta entrega. La propuesta FX conserva carácter no normativo.
+- el menú **Órdenes de Compra** significa órdenes recibidas de clientes;
+- tablas canónicas: `customer_purchase_orders` y `customer_purchase_order_items`;
+- REST: `/purchase-orders`;
+- las futuras órdenes emitidas por Castillo IT a proveedores pertenecen a `supplier_purchase_orders` y no se mezclan en este módulo;
+- no crear tablas genéricas `orders`/`order_items`.
 
-Implementación de cierre: lotes con efecto/ledger atómicos y replay reautorizado; UI conserva intención pendiente y bloquea bulk durante edición; replay de encolado comercial; revalidación del aprobador al ejecutar; SMTP aceptado produce estado Enviada; aceptación/rechazo/vencimiento y reapertura con motivo/auditoría. Vencida solo después del último día de validez en Honduras.
+El documento de módulo conserva estados legacy y una secuencia actual más amplia. Para no mezclar grafos incompatibles, la primera unidad implementará únicamente el agregado íntegro de OC de cliente con estado inicial `Recibida`; las transiciones se cerrarán en una unidad posterior con contrato/pruebas propios.
 
-Pruebas nuevas: rollback del ledger, concurrencia, pérdida de scopes, autorización de correo revocada, replay, estados finales; navegador cubre correo/worker con adaptador SMTP sin red y recorrido comercial. **Cierre sujeto al CI de estos cambios; no usar el CI del hito bulk anterior como evidencia del nuevo código.**
+### Primera unidad a implementar
+
+1. Definir contrato exacto de cabecera/ítems, permisos, índices y DTO.
+2. Crear migración global siguiente, compatible con MySQL 5.7.
+3. Implementar servicio Go para alta, consulta, listado y edición versionada; una OC y sus ítems se guardan en una sola transacción.
+4. Implementar cálculo canónico exacto en Go usando DECIMAL/cadenas, sin `float64` financiero.
+5. Registrar auditoría/hecho e idempotencia; IDs JSON como cadenas y `409` en versión obsoleta.
+6. Exponer REST y contrato OpenAPI; Angular en español después de cerrar backend de la unidad.
+7. Probar unitarias, integración MySQL, autorización, navegador y CI antes de añadir estados, conversiones, documentos o factura.
+
+Fuera de esta primera unidad: grafo completo de estados, entrega, cotización→OC, OC→factura, documentos, clone, AI y OC a proveedores.
 
 ## Integraciones cruzadas posteriores
 
-- Cotización → OC y Cotización → Factura deben ser server-side, transaccionales/idempotentes y conservar referencia de origen.
-- Quotes no debe escribir directamente tablas privadas de OC o Facturas.
-- La integración se completa mediante los servicios propietarios cuando existan esos módulos.
-- Este pendiente no autoriza a iniciar OC antes de resolver la aceptación restante de Cotizaciones.
+- Cotización → OC debe ser server-side, transaccional/idempotente y conservar `source_quote_id`.
+- Quotes no escribe directamente tablas privadas de OC; la conversión se completa mediante el servicio propietario PurchaseOrders.
+- OC → Factura se implementará cuando exista el propietario Invoices y conservará `invoice_id` durable.
+- Vistas cruzadas se incorporan cuando ambos propietarios estén implementados; no crear stubs ni datos ficticios.
 
 ## Validaciones externas aún pendientes
 
@@ -110,4 +112,4 @@ Estas validaciones externas son gates de producción; no deben falsearse con fix
 
 ## Próximo paso exacto
 
-Ejecutar y verificar CI de este cierre. Registrar SHA/resultados en status.md; solo declarar cerrado el alcance monomoneda cuando backend/MySQL5.7/race, Angular y navegador pasen. Mantener las integraciones productivas sin activar. No iniciar otro módulo en esta tarea.
+Cerrar el **contrato mínimo de la unidad 1 de OC de clientes** a partir del maestro, modelo de datos, decisiones y spec `purchase-orders.md`; después implementar migración + servicio Go + pruebas de invariantes. No implementar todavía transiciones, conversiones, documentos ni Facturas.
