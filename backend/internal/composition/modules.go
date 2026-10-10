@@ -7,6 +7,7 @@ import (
 	"github.com/Ahcast/Bastion/backend/internal/core/registry"
 	"github.com/Ahcast/Bastion/backend/internal/modules/customers"
 	"github.com/Ahcast/Bastion/backend/internal/modules/processes"
+	"github.com/Ahcast/Bastion/backend/internal/modules/quotes"
 	"github.com/Ahcast/Bastion/backend/internal/modules/suppliers"
 	"log/slog"
 	"os"
@@ -60,6 +61,27 @@ func Register(s *core.Service, r *registry.Registry, logger *slog.Logger) error 
 		s.RegisterServiceWrites(processes.CrawlerPermissions)
 	}
 	if e := r.Register(processService.Module(logger, processEnabled)); e != nil {
+		return e
+	}
+
+	quoteEnabled := true
+	if v := os.Getenv("BASTION_QUOTES_ENABLED"); v != "" {
+		if v != "true" && v != "false" {
+			return fmt.Errorf("invalid quotes enable flag")
+		}
+		quoteEnabled = v == "true"
+	}
+	quoteService := &quotes.Service{Core: s}
+	if enabled {
+		quoteService.Customers = service
+	}
+	if processEnabled {
+		quoteService.Processes = processService
+	}
+	if quoteEnabled {
+		s.RegisterPermissions(quotes.Permissions, []string{"cotizaciones.view"})
+	}
+	if e := r.Register(quoteService.Module(logger, quoteEnabled)); e != nil {
 		return e
 	}
 	return r.Validate()

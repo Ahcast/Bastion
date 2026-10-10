@@ -15,3 +15,5 @@ Pruebas de integración requieren MySQL 5.7 dedicado: BASTION_TEST_MYSQL_DSN deb
 Frontend Angular/MySQL/correo permanecen en Bluehost. Core/API/MCP/crawler/workers en Lightsail; archivos S3. No se incluye MySQL de producción en AWS. [Crawler Python existente](crawler/README.md) se conserva sin cambios. Clientes y Proveedores implementados; catálogo de fuente y receptor de Procesos implementados. Demás módulos comerciales pendientes según el plan.
 
 Proveedores: internal/modules/suppliers, migración 0003_suppliers.sql y composición independiente de Clientes. [Ejecutar y validar](../docs/development/suppliers-runbook.md).
+
+Quotes implementa borradores/cálculo, clones/versiones/papelera y conversión desde Procesos. [Runbook](../docs/development/quotes-runbook.md); emisión/adjuntos/correo/estados/bulk/conversiones OC/Factura pendientes.

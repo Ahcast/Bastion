@@ -20,7 +20,7 @@ Procesos expone GET /api/v1/processes, /{id}, /{id}/versions; PATCH /{id}/intere
 
 ## Dependencias conservadas
 
-Quotes implementará conversión determinista cliente/expediente/source_process_id sin copiar ítems; AI/Workflow y Colaboración implementarán investigación, resultados, tareas/comentarios/aprobaciones. No introducir endpoints simulados ni activar envíos. Esta unidad no acredita esas integraciones ni S3/Bluehost productivos.
+Quotes implementa conversión determinista cliente/expediente/source_process_id sin copiar ítems cuando ambos módulos están habilitados; AI/Workflow y Colaboración implementarán investigación, resultados, tareas/comentarios/aprobaciones. No introducir endpoints simulados ni activar envíos. Esta unidad no acredita esas integraciones ni S3/Bluehost productivos.
 
 ## Aceptación
 

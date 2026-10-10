@@ -56,3 +56,9 @@ Scopes crawler explícitos son las únicas escrituras técnicas añadidas; no au
 El receptor tiene presupuesto 75 s y deadline de respuesta/proxy 85 s, inferiores al read timeout 90 s del cliente existente. El límite general de 25 s se mantiene para las demás rutas. Evita hacer incompatible el ACK síncrono de 100 registros con la latencia remota MySQL; límites reales siguen por medir. Cambios por versión se insertan en un único statement parametrizado, sin un viaje por documento. El proxy solo amplía tamaño/tiempo en la ruta machine del crawler.
 
 El lote conserva checksum/metadata/ACK; cada observación conserva su cuerpo. Evitar duplicar todo el lote en un único parámetro SQL permite importar cuerpos HTTP mayores que max_allowed_packet sin exigir privilegios/configuración global Bluehost. Complete limita extracción a 64 KiB.
+
+## 10 de octubre de 2026 — Cotizaciones por unidades verificables
+
+Primera unidad de Quotes: borradores/cálculo/conversión, sin declarar completada emisión ni módulo. shopspring/decimal v1.4.0 fijado; descuento general en centavos con cociente/resto exacto y mayor resto, empate por posición. Impuesto por grupo después del descuento, half-up a dos decimales. Costos/margen/notas internos. USD/HNL explícitos sin mezcla/conversión implícita; FX fechado conserva alcance futuro. Flete como ítem con impuesto explícito, sin inventar fiscalidad.
+
+Snapshots de servicios públicos dentro de TX del agregado evitan transacciones anidadas, carreras y lectura/escritura cruzada de tablas maestras. Replays reautorizados conservan snapshot/intención incluso si cambia fuente. Número correlativo transaccional, papelera y versiones durables. Workflow/aprobación/PDF/S3/correo y servicios OC/Factura no se sustituyen con estados libres ni endpoints simulados. No avanzar al siguiente módulo hasta cerrar aceptación completa de Quotes.

@@ -37,3 +37,5 @@ Función completa, error explícito y manejo de fallos; build y pruebas relevant
 MySQL remoto TLS o túnel SSH verificado, acceso y soporte Percona; DNS/certificados; S3/IAM; SMTP/IMAP; fiscalidad SAR/series/plantillas reales; Work/Grokbot y skills comerciales. Registrar evidencia ausente. Mantener escenarios locales de prueba y continuar módulos independientes. Feature flags dejan conexiones/envíos externos deshabilitados hasta configurar y validar.
 
 No implementar integración pagada de inferencia como solución automática a un bloqueo Work. RPO/RTO, retención y reglas de scoring/envío se configuran sin inventar valores aprobados.
+
+Cotizaciones en desarrollo: primera unidad borradores/cálculo/conversión. Continuar emisión/PDF/adjuntos/correo/estados/bulk y aceptación completa antes de pasar a OC; ver contrato/runbook de Quotes y status.md.

@@ -98,4 +98,18 @@ func main() {
 		log.Fatal(e)
 	}
 
+	// Quote operator exists only in the isolated browser schema; production grants none.
+	if _, e = db.Exec(`INSERT INTO users(email,name,password_hash,totp_secret,active,created_at,updated_at) SELECT 'quotes@example.test','Operador Cotizaciones sintético',password_hash,?,TRUE,UTC_TIMESTAMP(6),UTC_TIMESTAMP(6) FROM users WHERE id=1`, secret); e != nil {
+		log.Fatal(e)
+	}
+	if _, e = db.Exec(`INSERT INTO roles(id,name) VALUES(5,'Cotizaciones sintético')`); e != nil {
+		log.Fatal(e)
+	}
+	if _, e = db.Exec(`INSERT INTO role_permissions SELECT 5,name,'all' FROM permissions WHERE name LIKE 'cotizaciones.%' OR name='procesos.view'`); e != nil {
+		log.Fatal(e)
+	}
+	if _, e = db.Exec(`INSERT INTO user_roles VALUES(5,5)`); e != nil {
+		log.Fatal(e)
+	}
+
 }

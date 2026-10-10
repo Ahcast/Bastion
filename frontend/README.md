@@ -16,4 +16,6 @@ Desplegar solo dist/bastion-ui/browser a Bluehost; nunca node_modules, fuentes p
 
 Proveedores: src/app/modules/suppliers, ruta /suppliers y navegación según proveedores.view/módulo habilitado. Evidencia y ficha consumen el mismo contrato Go; valores decimales se transportan como cadenas.
 
-Procesos incorpora ruta /processes con filtros, interés/nota personal, versiones/diffs, CSV y estado protegido. Conversión a cotización y resultados AI se incorporan en sus fases.
+Procesos incorpora ruta /processes con filtros, interés/nota personal, versiones/diffs, CSV y estado protegido. Conversión a borrador de cotización disponible con Quotes habilitado y permisos de ambos módulos; resultados AI pendientes.
+
+Cotizaciones: ruta /quotes, borradores/cálculo backend, snapshots, historial/clones/papelera y filtros URL. PDF/adjuntos/correo/estados/bulk pendientes; no módulo completo.

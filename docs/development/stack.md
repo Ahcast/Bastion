@@ -26,3 +26,5 @@ El agente fija versiones exactas en go.mod/go.sum y package-lock.json tras una i
 Go 1.27 y el SDK MCP oficial fueron contrastados con sus fuentes oficiales el 9 de octubre de 2026. Consultar [Go](https://go.dev/doc/devel/release), [matriz Angular](https://angular.dev/reference/versions), [SDK MCP](https://github.com/modelcontextprotocol/go-sdk), [driver MySQL](https://github.com/go-sql-driver/mysql) y docs del paquete seleccionado. Versiones y condiciones de cuenta no se deducen del chat.
 
 OAuth/MCP externo bloqueado hasta comprobar proveedor y cliente; esto no bloquea REST, Core, módulos ni pruebas locales con identidades de servicio limitadas. No exponer /mcp sin validación de identidad, Origin, permisos, audiencia cuando use OAuth y límites.
+
+Cálculo Cotizaciones: github.com/shopspring/decimal v1.4.0, fijado en go.mod/go.sum; constructores desde cadenas y cociente/resto exactos. Fuente primaria: https://github.com/shopspring/decimal/releases/tag/v1.4.0.
