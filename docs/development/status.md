@@ -70,7 +70,7 @@ Código: migración 0004_processes.sql, internal/modules/processes y composició
 
 Fusión por campo/observed_at, evidencia atrasada durable, documentos parciales sin eliminación y hashes confirmados conservados. Identidad única, versiones/diffs y hechos transaccionales; ACK después de commit y replay autorizado. Cierres de snapshot verifican contadores de lotes y admiten nuevas entregas del mismo run. Marcas/notas personales no son campos de fuente. Consultas SQL paginadas/IDOR, exportación neutralizada con límite explícito, tres tools MCP de lectura. No se encolan jobs AI sin consumidor.
 
-Pruebas locales: Angular build y 17 tests aprobados; 49 tests Go/race/MySQL y 17 crawler offline aprobados. Navegador y CI pendientes; no declarar unidad cerrada hasta registrar evidencia. Conversión a cotización, estados/asignación comercial, colaboración y AI mantienen sus dependencias; no hay endpoints simulados ni investigación/envíos activados. S3 raw no se valida mediante la recepción API.
+Pruebas locales: Angular build y 17 tests aprobados; 51 tests Go/race/MySQL y 17 crawler offline aprobados. Navegador y CI pendientes; no declarar unidad cerrada hasta registrar evidencia. Conversión a cotización, estados/asignación comercial, colaboración y AI mantienen sus dependencias; no hay endpoints simulados ni investigación/envíos activados. S3 raw no se valida mediante la recepción API.
 
 ## Continuidad
 

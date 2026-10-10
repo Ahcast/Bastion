@@ -168,6 +168,11 @@ func Merge(old State, clocks Clocks, o Observation) (State, Clocks, []string, er
 		var v string
 		_ = json.Unmarshal(o.Data[f], &v)
 		v = strings.Join(strings.Fields(v), " ")
+		if f == "deadline" {
+			if t, e := time.Parse(time.RFC3339Nano, v); e == nil {
+				v = t.UTC().Format(time.RFC3339Nano)
+			}
+		}
 		t := c[f]
 		if o.Observed.Before(t) {
 			continue

@@ -66,3 +66,18 @@ func TestMergeRejectsHashUnknownFieldsAndTimestampTie(t *testing.T) {
 		t.Fatal("protected field")
 	}
 }
+func TestEquivalentDeadlineOffsetsDoNotCreateChanges(t *testing.T) {
+	at := time.Now().UTC().Add(-time.Hour)
+	o := observation(at, map[string]json.RawMessage{"deadline": json.RawMessage(`"2026-11-01T10:00:00-06:00"`)}, "deadline")
+	state, c, _, e := Merge(emptyState(), Clocks{}, o)
+	if e != nil {
+		t.Fatal(e)
+	}
+	o.Observed = o.Observed.Add(time.Minute)
+	o.Data["deadline"] = json.RawMessage(`"2026-11-01T16:00:00Z"`)
+	o.ContentHash = hash(o.Data)
+	next, _, changes, e := Merge(state, c, o)
+	if e != nil || len(changes) != 0 || hash(next) != hash(state) {
+		t.Fatal(changes, e)
+	}
+}

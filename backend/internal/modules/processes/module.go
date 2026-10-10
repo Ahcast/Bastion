@@ -1,10 +1,13 @@
 package processes
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"github.com/Ahcast/Bastion/backend/internal/core"
 	"github.com/Ahcast/Bastion/backend/internal/core/api"
 	"github.com/Ahcast/Bastion/backend/internal/core/registry"
+	"io"
 	"log/slog"
 	"net/http"
 	"strconv"
@@ -45,7 +48,7 @@ func (s *Service) Module(logger *slog.Logger, enabled bool) registry.Module {
 			}
 			add("PATCH /api/v1/processes/{id}/"+path, func(c context.Context, a core.Actor, r *http.Request) (any, error) {
 				var p PersonalInput
-				if e := api.Decode(r, &p); e != nil {
+				if e := decodePersonal(r, &p); e != nil {
 					return nil, e
 				}
 				return s.Personal(c, a, r.PathValue("id"), r.Header.Get("Idempotency-Key"), kind, p)
@@ -110,4 +113,21 @@ func filter(r *http.Request) (Filter, error) {
 		f.HideMunicipalities = v.Get("hide_municipalities") == "true"
 	}
 	return f, nil
+}
+
+func decodePersonal(r *http.Request, p *PersonalInput) error {
+	b, e := io.ReadAll(r.Body)
+	if e != nil {
+		return core.Invalid
+	}
+	var fields map[string]json.RawMessage
+	if json.Unmarshal(b, &fields) != nil {
+		return core.Invalid
+	}
+	v, ok := fields["version"]
+	if !ok || bytes.Equal(bytes.TrimSpace(v), []byte("null")) {
+		return core.Invalid
+	}
+	r.Body = io.NopCloser(bytes.NewReader(b))
+	return api.Decode(r, p)
 }

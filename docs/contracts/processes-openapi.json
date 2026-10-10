@@ -193,7 +193,14 @@
         ],
         "responses": {
           "200": {
-            "description": "Resultado autorizado confirmado; importación ACK posterior a commit"
+            "description": "Resultado autorizado confirmado; importación ACK posterior a commit",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/List"
+                }
+              }
+            }
           },
           "401": {
             "description": "Identidad inválida"
@@ -214,7 +221,96 @@
             "description": "Límite de concurrencia"
           }
         },
-        "parameters": []
+        "parameters": [
+          {
+            "name": "search",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "entity",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "interesting",
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "source_active",
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "current",
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "hide_municipalities",
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "direction",
+            "in": "query",
+            "schema": {
+              "enum": [
+                "asc",
+                "desc"
+              ]
+            }
+          },
+          {
+            "name": "date_from",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "date_to",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100000,
+              "default": 1
+            }
+          },
+          {
+            "name": "per_page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 25
+            }
+          }
+        ]
       }
     },
     "/api/v1/processes/{id}": {
@@ -226,7 +322,14 @@
         ],
         "responses": {
           "200": {
-            "description": "Resultado autorizado confirmado; importación ACK posterior a commit"
+            "description": "Resultado autorizado confirmado; importación ACK posterior a commit",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Process"
+                }
+              }
+            }
           },
           "401": {
             "description": "Identidad inválida"
@@ -268,7 +371,14 @@
         ],
         "responses": {
           "200": {
-            "description": "Resultado autorizado confirmado; importación ACK posterior a commit"
+            "description": "Resultado autorizado confirmado; importación ACK posterior a commit",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VersionList"
+                }
+              }
+            }
           },
           "401": {
             "description": "Identidad inválida"
@@ -463,7 +573,27 @@
         ],
         "responses": {
           "200": {
-            "description": "Resultado autorizado confirmado; importación ACK posterior a commit"
+            "description": "Resultado autorizado confirmado; importación ACK posterior a commit",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "filename": {
+                      "type": "string"
+                    },
+                    "content": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "filename",
+                    "content"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
           },
           "401": {
             "description": "Identidad inválida"
@@ -484,7 +614,96 @@
             "description": "Límite de concurrencia"
           }
         },
-        "parameters": []
+        "parameters": [
+          {
+            "name": "search",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "entity",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "interesting",
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "source_active",
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "current",
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "hide_municipalities",
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "direction",
+            "in": "query",
+            "schema": {
+              "enum": [
+                "asc",
+                "desc"
+              ]
+            }
+          },
+          {
+            "name": "date_from",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "date_to",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100000,
+              "default": 1
+            }
+          },
+          {
+            "name": "per_page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 25
+            }
+          }
+        ]
       }
     }
   },
@@ -561,8 +780,7 @@
                     }
                   },
                   "required": [
-                    "url",
-                    "name"
+                    "url"
                   ],
                   "additionalProperties": false
                 }
@@ -571,7 +789,8 @@
             "additionalProperties": false
           },
           "documents_complete": {
-            "type": "boolean"
+            "type": "boolean",
+            "default": false
           },
           "completeness": {
             "enum": [
@@ -596,7 +815,6 @@
           "observed_at",
           "fields_present",
           "data",
-          "documents_complete",
           "completeness",
           "content_hash",
           "raw_sha256"
@@ -776,6 +994,190 @@
         "required": [
           "note",
           "version"
+        ],
+        "additionalProperties": false
+      },
+      "Process": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "entity": {
+            "type": "string"
+          },
+          "reference": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "deadline": {
+            "type": "string"
+          },
+          "created_by": {
+            "type": "string"
+          },
+          "team_id": {
+            "type": "string"
+          },
+          "version": {
+            "type": "string"
+          },
+          "personal_version": {
+            "type": "string"
+          },
+          "note": {
+            "type": "string"
+          },
+          "is_source_active": {
+            "type": "boolean"
+          },
+          "is_current": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "is_interesting": {
+            "type": "boolean"
+          },
+          "documents": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "url": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "sha256": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "url",
+                "name"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "entity",
+          "reference",
+          "description",
+          "deadline",
+          "created_by",
+          "team_id",
+          "version",
+          "personal_version",
+          "note",
+          "is_source_active",
+          "is_current",
+          "is_interesting",
+          "documents"
+        ]
+      },
+      "List": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Process"
+            }
+          },
+          "total": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "per_page": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100
+          }
+        },
+        "required": [
+          "data",
+          "total",
+          "page",
+          "per_page"
+        ],
+        "additionalProperties": false
+      },
+      "Version": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "version": {
+            "type": "string"
+          },
+          "content_hash": {
+            "type": "string"
+          },
+          "data": {
+            "type": "object"
+          },
+          "changes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "version",
+          "content_hash",
+          "data",
+          "changes",
+          "created_at"
+        ],
+        "additionalProperties": false
+      },
+      "VersionList": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Version"
+            }
+          },
+          "total": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "per_page": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100
+          }
+        },
+        "required": [
+          "data",
+          "total",
+          "page",
+          "per_page"
         ],
         "additionalProperties": false
       }

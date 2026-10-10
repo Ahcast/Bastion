@@ -5,6 +5,7 @@ import (
 	"github.com/Ahcast/Bastion/backend/internal/core"
 	"log/slog"
 	"net/http"
+	"strings"
 )
 
 // ActorFrom only returns a complete authenticated context created by Core middleware.
@@ -30,7 +31,9 @@ func Operation(s *core.Service, logger *slog.Logger, action Action) http.Handler
 		}
 		v, e := action(r.Context(), a, r)
 		if e != nil {
-			if e == core.Forbidden {
+			if strings.HasPrefix(r.URL.Path, "/api/internal/v1/crawler/") {
+				_ = s.Audit(r.Context(), s.DB, a, "crawler.request_rejected", "route", r.Pattern, "rejected", map[string]string{})
+			} else if e == core.Forbidden {
 				_ = s.Audit(r.Context(), s.DB, a, "api.denied", "route", r.Pattern, "denied", map[string]string{})
 			}
 			server.error(w, r, e)
