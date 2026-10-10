@@ -17,17 +17,17 @@ import (
 const quoteEmailBindingSchema = 1
 
 type EmailAuthorizationRequest struct {
-	QuoteVersion   uint64   `json:"quote_version,string"`
-	PDFSnapshotID  string   `json:"pdf_snapshot_id"`
-	To             []string `json:"to"`
-	CC             []string `json:"cc"`
-	BCC            []string `json:"bcc"`
-	AttachmentIDs  []string `json:"attachment_ids"`
-	Subject        string   `json:"subject"`
-	Message        string   `json:"message"`
-	ScheduledAt    string   `json:"scheduled_at"`
-	ExpiresAt      string   `json:"expires_at"`
-	Reason         string   `json:"reason"`
+	QuoteVersion  uint64   `json:"quote_version,string"`
+	PDFSnapshotID string   `json:"pdf_snapshot_id"`
+	To            []string `json:"to"`
+	CC            []string `json:"cc"`
+	BCC           []string `json:"bcc"`
+	AttachmentIDs []string `json:"attachment_ids"`
+	Subject       string   `json:"subject"`
+	Message       string   `json:"message"`
+	ScheduledAt   string   `json:"scheduled_at"`
+	ExpiresAt     string   `json:"expires_at"`
+	Reason        string   `json:"reason"`
 }
 
 type EmailAuthorizationDecision struct {
