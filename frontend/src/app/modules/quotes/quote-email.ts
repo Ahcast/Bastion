@@ -2,7 +2,6 @@ import {Component,Input,OnChanges,inject,signal} from '@angular/core';
 import {FormsModule} from '@angular/forms';
 import {DatePipe} from '@angular/common';
 import {Client} from '../../core/api/client';
-import {Reauthentication} from '../../core/security/reauthentication';
 
 interface EmailQuote {id:string;number:string;version:string;status:string;created_by?:string;deleted_at:string|null;customer:{email:string}}
 interface PDFSnapshot {id:string;quote_version:string;status:string;kind:'draft'|'issued'}
@@ -11,7 +10,7 @@ interface EmailIntent {id:string;quote_version:string;pdf_snapshot_id:string;cre
 
 @Component({
  selector:'bastion-quote-email',
- imports:[FormsModule,DatePipe,Reauthentication],
+ imports:[FormsModule,DatePipe],
  template:`
  <section class="card">
   <h3>Envío comercial</h3>
@@ -36,7 +35,6 @@ interface EmailIntent {id:string;quote_version:string;pdf_snapshot_id:string;cre
   }
   <h4>Ledger de correo</h4>
   <p>{{total()}} intenciones registradas · Página {{page}}</p>
-  @if(api.has('cotizaciones.approve')||api.has('cotizaciones.revoke_approval')||api.has('cotizaciones.send')){<bastion-reauthentication/>}
   <label>Motivo de decisión o revocación<textarea [(ngModel)]="decisionReason" maxlength="1000"></textarea></label>
   @for(x of intents();track x.id){<article class="card">
    <p><strong>{{statusLabel(x.status)}}</strong> · versión {{x.quote_version}} · programado {{x.scheduled_at|date:'dd/MM/yyyy HH:mm':'-0600'}} Honduras</p>
