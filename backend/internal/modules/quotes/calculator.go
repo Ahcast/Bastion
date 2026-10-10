@@ -10,8 +10,14 @@ import (
 type Item = finance.Item
 type CalculatedItem = finance.CalculatedItem
 type Calculation = finance.Calculation
-type CalculationInput = finance.CalculationInput
 type Result = finance.Result
+
+type CalculationInput struct {
+	Items        []Item `json:"items"`
+	DiscountType string `json:"general_discount_type"`
+	Discount     string `json:"general_discount"`
+	Exoneration  string `json:"exoneration_reference"`
+}
 
 func number(v string, scale int32) (decimal.Decimal, error) {
 	return finance.ParseDecimal(v, scale)
@@ -22,5 +28,10 @@ func validText(v string, n int, required bool) bool {
 }
 
 func Calculate(p CalculationInput) (Result, error) {
-	return finance.Calculate(p)
+	return finance.Calculate(finance.CalculationInput{
+		Items:        p.Items,
+		DiscountType: p.DiscountType,
+		Discount:     p.Discount,
+		Exoneration:  p.Exoneration,
+	})
 }
