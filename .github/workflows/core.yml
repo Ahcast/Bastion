@@ -32,7 +32,14 @@ jobs:
           cache-dependency-path: backend/go.sum
       - run: go mod download
       - run: go vet ./...
-      - run: test -z "$(gofmt -l cmd internal database tests)"
+      - name: Check Go formatting
+        shell: bash
+        run: |
+          unformatted="$(gofmt -l cmd internal database tests)"
+          if [ -n "$unformatted" ]; then
+            printf 'Files requiring gofmt:\n%s\n' "$unformatted"
+            exit 1
+          fi
       - run: go test -race -count=1 ./...
       - run: make build
   frontend:
