@@ -40,7 +40,20 @@ jobs:
             printf 'Files requiring gofmt:\n%s\n' "$unformatted"
             exit 1
           fi
-      - run: go test -race -count=1 ./...
+      - name: Run Go tests with race detector
+        id: backend_tests
+        shell: bash
+        run: |
+          set -o pipefail
+          go test -race -count=1 ./... 2>&1 | tee /tmp/bastion-go-test.log
+      - name: Upload backend test failure log
+        if: failure() && steps.backend_tests.outcome == 'failure'
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-go-test-log
+          path: /tmp/bastion-go-test.log
+          if-no-files-found: error
+          retention-days: 3
       - run: make build
   frontend:
     runs-on: ubuntu-latest
