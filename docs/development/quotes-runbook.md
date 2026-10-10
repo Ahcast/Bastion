@@ -10,7 +10,7 @@ Validación: gofmt/vet/build y go test -race con BASTION_TEST_MYSQL_DSN dedicado
 
 ## Continuidad obligatoria
 
-Cotizaciones permanece en desarrollo. Antes de cerrar módulo: revisiones de emisión y emisión del PDF aprobado e integración S3 real, envío inmediato/programado autorizado con mismo PDF y ledger, bulk trazable y FX fechado según necesidad comercial. Conversiones OC/Factura deben usar servicios propietarios al implementarlos sin escribir sus tablas desde Quotes. AI opcional sin impedir operación manual. No avanzar al siguiente módulo por haber aprobado solamente borradores/cálculo.
+Cotizaciones permanece en desarrollo. Antes de cerrar módulo: validar integración S3 real, envío inmediato/programado autorizado con mismo PDF y ledger, bulk trazable y FX fechado según necesidad comercial. Conversiones OC/Factura deben usar servicios propietarios al implementarlos sin escribir sus tablas desde Quotes. AI opcional sin impedir operación manual. No avanzar al siguiente módulo por haber aprobado solamente borradores/cálculo.
 
 ## Archivos y PDF de borrador
 
@@ -24,7 +24,7 @@ Aprobación implementada: Workflow posee aprobación humana por acción/entidad/
 
 ## Estados preliminares
 
-Aplicar 0008 en entorno autorizado y asignar cotizaciones.transition explícitamente; no hay grants automáticos. Desde borrador pasar a Costeo; guardar ítems antes de Revisión. Volver a Borrador/Costeo para corregir, o guardar una edición (genera versión en Borrador). Adjuntos se modifican solo en Borrador/Costeo; papelera comercial solo Borrador. Cada paso usa versión confirmada e intención. Un timeout conserva la clave; un conflicto exige consultar la versión actual. Las ediciones sin guardar se conservan y bloquean cambios de estado en UI. PDF continúa como BORRADOR, sin certificar aprobación ni envío. Correo/emisión y configuración editable de definiciones siguen pendientes; aprobación interna descrita abajo.
+Aplicar 0008 en entorno autorizado y asignar cotizaciones.transition explícitamente; no hay grants automáticos. Desde borrador pasar a Costeo; guardar ítems antes de Revisión. Volver a Borrador/Costeo para corregir, o guardar una edición (genera versión en Borrador). Adjuntos se modifican solo en Borrador/Costeo; papelera comercial solo Borrador. Cada paso usa versión confirmada e intención. Un timeout conserva la clave; un conflicto exige consultar la versión actual. Las ediciones sin guardar se conservan y bloquean cambios de estado en UI. PDF continúa como BORRADOR, sin certificar aprobación ni envío. Correo y configuración editable de definiciones siguen pendientes; aprobación interna/emisión descritas abajo.
 
 ## Aprobación interna humana
 
