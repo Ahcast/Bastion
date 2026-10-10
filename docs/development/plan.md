@@ -1,6 +1,6 @@
 # Plan ejecutable del proyecto
 
-Core de plataforma y base implementados: ver [estado](status.md) y [runbook](core-runbook.md). Los criterios de infraestructura externa permanecen pendientes aunque las pruebas locales pasen. Clientes cerró la primera unidad de datos base. Proveedores cerró la segunda unidad con pruebas locales y CI satisfactorias; corresponde Procesos/receptor crawler, todavía sin iniciar. Consultar status para evidencia vigente y continuar una unidad por vez.
+Core de plataforma y base implementados: ver [estado](status.md) y [runbook](core-runbook.md). Los criterios de infraestructura externa permanecen pendientes aunque las pruebas locales pasen. Clientes cerró la primera unidad de datos base. Proveedores cerró la segunda unidad con pruebas locales y CI satisfactorias; Procesos/receptor crawler está implementado y en cierre de pruebas/CI; después corresponde Cotizaciones. Consultar status para evidencia vigente y continuar una unidad por vez.
 
 El agente implementa cada fase hasta su aceptación, actualiza status.md y continúa. No sustituir implementación por plan nuevo. Las fases pueden desarrollarse con datos sintéticos y MySQL 5.7 local de prueba; los bloqueos de infraestructura se verifican antes de producción, sin migrar la BD a AWS.
 

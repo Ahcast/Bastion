@@ -56,12 +56,13 @@ type Grant struct {
 	Scope      string `json:"scope"`
 }
 type Service struct {
-	DB                     *sql.DB
-	Config                 config.Config
-	DummyHash              string
-	ModulePermissions      []string
-	ServiceReadPermissions []string
-	DocumentPolicies       map[string]DocumentPolicy
+	DB                      *sql.DB
+	Config                  config.Config
+	DummyHash               string
+	ModulePermissions       []string
+	ServiceReadPermissions  []string
+	ServiceWritePermissions []string
+	DocumentPolicies        map[string]DocumentPolicy
 }
 
 func New(db *sql.DB, c config.Config) *Service {
@@ -72,6 +73,11 @@ func New(db *sql.DB, c config.Config) *Service {
 func (s *Service) RegisterPermissions(permissions, serviceReads []string) {
 	s.ModulePermissions = append(s.ModulePermissions, permissions...)
 	s.ServiceReadPermissions = append(s.ServiceReadPermissions, serviceReads...)
+}
+
+// RegisterServiceWrites permits only explicitly composed technical ingestion scopes.
+func (s *Service) RegisterServiceWrites(permissions []string) {
+	s.ServiceWritePermissions = append(s.ServiceWritePermissions, permissions...)
 }
 func (s *Service) PermissionCatalog() []string {
 	return append(append([]string{}, Permissions...), s.ModulePermissions...)

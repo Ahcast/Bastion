@@ -48,3 +48,5 @@ Pruebas: denegación anónima, MFA incompleto, acceso a registro ajeno, revoke/e
 ## Contrato implementado del Core
 
 [OpenAPI Core](core-openapi.json) contiene DTO/rutas de plataforma. Core ofrece perfil/preferencias y regeneración recovery/password, usuarios/invitaciones/roles/equipos/settings/integraciones, auditoría/jobs/notificaciones, SMTP de prueba/conciliación, archivos versionados y lectura MCP técnica. Clientes tiene [contrato](customers.md) y [OpenAPI](customers-openapi.json) implementados; Proveedores tiene [contrato](suppliers.md) y [OpenAPI](suppliers-openapi.json) implementados; los demás módulos/crawler/AI siguen pendientes. OAuth Work permanece deshabilitado hasta validar proveedor.
+
+Procesos aporta [contrato](processes.md) y [OpenAPI](processes-openapi.json): receptor crawler wire 1.0, consulta, interés/nota personal, versiones, estado y CSV. La unidad no incorpora aún conversión a Quotes ni ejecución AI.

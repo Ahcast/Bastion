@@ -425,7 +425,7 @@ func (s *Service) CreateService(ctx context.Context, a Actor, name string, scope
 		if !contains(s.PermissionCatalog(), p) {
 			return nil, Invalid
 		}
-		if p != "core.modules.read" && p != "core.documents.read" && p != "core.jobs.read" && !contains(s.ServiceReadPermissions, p) {
+		if p != "core.modules.read" && p != "core.documents.read" && p != "core.jobs.read" && !contains(s.ServiceReadPermissions, p) && !contains(s.ServiceWritePermissions, p) {
 			return nil, Forbidden
 		}
 	}

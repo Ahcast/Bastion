@@ -1,5 +1,8 @@
 # Módulo Procesos
 
+Catálogo de fuente e ingestión implementados en la unidad 3; [contrato](../contracts/processes.md), [OpenAPI](../contracts/processes-openapi.json), [runbook](../development/processes-runbook.md) y [evidencia](../development/status.md). Conversión a Quotes, estados/asignación comercial, colaboración y resultados AI se incorporan en sus fases; los requisitos siguientes conservan ese alcance futuro. La identidad/versionado/ACK wire vigente se rige por IMPORT_CONTRACT, sin sustituir el cliente Python.
+
+
 ## Objetivo
 
 Convertir Procesos en el punto de entrada de oportunidades de HonduCompras, preservando filtros, marcas, notas y exportación legacy, con ingestión API, versionado, trazabilidad y conexión nativa hacia Cotizaciones.
@@ -1023,60 +1026,5 @@ Document hash para detectar reemplazos.
 
 ---
 
-
-
-## Presentación del módulo
-
-# processes
-
-
-# 14. Módulo Procesos
-
-Fuente principal:
-
-HonduCompras crawler.
-
-Estados de negocio posibles:
-
-```text
-Nuevo
-Revisión
-Asignado
-Analizando
-Interesante
-Cotizando
-Oferta preparada
-Presentado
-Adjudicado
-Perdido
-Cancelado
-Cerrado
-```
-
-Funciones:
-
-- ver proceso;
-- ver histórico;
-- ver cambios;
-- ver documentos;
-- asignar responsable;
-- asignar equipo;
-- prioridad;
-- comentarios;
-- tareas;
-- análisis AI;
-- score;
-- items;
-- crear cotización;
-- iniciar research;
-- iniciar procurement.
-
----
-
-## Pipeline IA y revisión del usuario — 2026-10-07
-
-Ver [integración](../architecture/ai-integration.md), [contrato](../contracts/ai-pipeline.md) y [presentación](ai-results.md). Puntuación diaria de pendientes, investigación por ítem, RFQ con Grokbot, precio sugerido con antecedentes S3/MySQL y fichas. Resultados progresivos dentro de Procesos, con fuentes, fecha y cumplimiento por requisito. Estado de investigación separado de revisión humana y presentación de oferta.
-
-La creación básica de cotización sigue operativa sin IA. Acción adicional explícita del usuario incorpora solo alternativas, cantidades, precios y adjuntos seleccionados, mediante Quotes y sin sobrescribir ediciones humanas. No se exportan automáticamente costos, proveedores, márgenes ni notas internas al cliente.
 
 

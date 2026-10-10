@@ -75,4 +75,20 @@ func main() {
 		log.Fatal(e)
 	}
 
+	if _, e = db.Exec(`INSERT INTO users(email,name,password_hash,totp_secret,active,created_at,updated_at) SELECT 'processes@example.test','Operador Procesos sintético',password_hash,?,TRUE,UTC_TIMESTAMP(6),UTC_TIMESTAMP(6) FROM users WHERE id=1`, secret); e != nil {
+		log.Fatal(e)
+	}
+	if _, e = db.Exec(`INSERT INTO roles(id,name) VALUES(4,'Procesos sintético')`); e != nil {
+		log.Fatal(e)
+	}
+	if _, e = db.Exec(`INSERT INTO role_permissions SELECT 4,name,'all' FROM permissions WHERE name LIKE 'procesos.%'`); e != nil {
+		log.Fatal(e)
+	}
+	if _, e = db.Exec(`INSERT INTO user_roles VALUES(4,4)`); e != nil {
+		log.Fatal(e)
+	}
+	if _, e = db.Exec(`INSERT INTO processes(id,source,external_id,source_url,entity,reference,description,deadline,normalized_data,field_clocks,content_hash,created_by,first_seen_at,last_seen_at,version) VALUES(1,'honducompras','synthetic-browser','https://example.test/process','Entidad sintética','HC-TEST-001','Especificaciones sintéticas','',?, '{}',?,4,UTC_TIMESTAMP(6),UTC_TIMESTAMP(6),1)`, `{"fields":{"entity":"Entidad sintética","reference":"HC-TEST-001","description":"Especificaciones sintéticas"},"documents":[]}`, security.Hash("synthetic")); e != nil {
+		log.Fatal(e)
+	}
+
 }

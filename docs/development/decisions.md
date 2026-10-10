@@ -46,3 +46,9 @@ Unidad iniciada tras cerrar Clientes en CI. Catálogo independiente de Customers
 Snapshot/LegacySnapshot conservan proveedor autorizado o texto histórico con ID null sin crear fichas automáticamente. price_observations manuales no son cotizaciones oficiales ni sustituyen candidatos/runs de AI. RFQ/correo aprobado, cotizaciones recibidas y métricas calculadas quedan para sus propietarios AI/Workflow/comerciales; las conexiones OC/Gastos se añaden en sus fases. Ningún evento encola trabajos desconocidos.
 
 La interfaz conserva cambios pendientes de ficha al registrar notas/evidencia y el ID/version confirmados si falla recarga posterior a POST. Captura de observaciones y presentación de timestamps usan Honduras UTC−06:00; persistencia UTC. Corrección del DatePipe global para evitar depender de la zona del navegador. Datos de ensayo MySQL en directorio temporal nuevo por ejecución; no restaurar/checkpoint de archivos de un InnoDB activo. Pruebas y límites reales en status.md.
+
+## 2026-10-09 — Procesos y receptor wire 1.0
+
+Se conserva el cliente Python y su entrega de snapshots reintentables. Orden por campo, clocks de catálogo/documentos y evidencia atrasada impiden pérdidas por parcialidad o entrega fuera de orden. Idempotencia durable del lote independiente del token, con autorización vigente antes de replay; cierre por snapshot valida sumas, sin sellar permanentemente el run. Hasta AI, EmitEvent conserva hechos sin crear jobs de tipo desconocido; el outbox AI del contrato conceptual se conectará al consumidor propietario.
+
+Scopes crawler explícitos son las únicas escrituras técnicas añadidas; no autorizar escrituras MCP comerciales. Máximo HTTP 24 MiB/cuatro importaciones concurrentes; exportación máximo explícito 10000 con error y filtros. Observaciones/raw hashes no prueban que los bytes S3 existan; no descargar URLs externas desde el receptor. Campos comerciales/asignaciones y Quotes/AI/Colaboración permanecen en sus fases, sin stubs.

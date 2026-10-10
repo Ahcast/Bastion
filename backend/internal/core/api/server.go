@@ -109,6 +109,7 @@ func (s *Server) handle(pattern string, authenticated bool, f endpoint) {
 }
 func (s *Server) middleware(next http.Handler) http.Handler {
 	slots := make(chan struct{}, 32)
+	crawlerSlots := make(chan struct{}, 4)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ctx, cancel := context.WithTimeout(r.Context(), 25*time.Second)
 		defer cancel()
@@ -170,13 +171,41 @@ func (s *Server) middleware(next http.Handler) http.Handler {
 			s.json(w, 200, map[string]string{"status": "ready"})
 			return
 		}
-		r.Body = http.MaxBytesReader(w, r.Body, 1024*1024)
+		bodyLimit := int64(1024 * 1024)
+		if strings.HasPrefix(r.URL.Path, "/api/internal/v1/crawler/") {
+			select {
+			case crawlerSlots <- struct{}{}:
+				defer func() { <-crawlerSlots }()
+			default:
+				s.error(w, r, &core.Error{Code: "rate_limited", Message: "El importador está ocupado. Reintente más tarde.", Status: 429})
+				return
+			}
+			bodyLimit = 24 * 1024 * 1024
+		}
+		r.Body = http.MaxBytesReader(w, r.Body, bodyLimit)
 		ip, _, _ := net.SplitHostPort(r.RemoteAddr)
 		if ip == "" {
 			ip = r.RemoteAddr
 		}
 		if e := s.Service.Limit(r.Context(), "api-ip:"+ip, 3000); e != nil {
 			s.error(w, r, e)
+			return
+		}
+		if strings.HasPrefix(r.URL.Path, "/api/internal/v1/crawler/") {
+			header := r.Header.Get("Authorization")
+			if !strings.HasPrefix(header, "Bearer ") {
+				s.error(w, r, core.Unauthorized)
+				return
+			}
+			a, e := s.Service.AuthenticateService(r.Context(), strings.TrimPrefix(header, "Bearer "))
+			if e != nil {
+				s.error(w, r, e)
+				return
+			}
+			a.Source = "crawler"
+			a.RequestID = id
+			a.CorrelationID = id
+			next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), contextKey{}, request{Actor: a, Session: core.Session{MFA: true}})))
 			return
 		}
 		if r.URL.Path == "/mcp" {

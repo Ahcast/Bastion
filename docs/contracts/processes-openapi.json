@@ -1,0 +1,795 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Bastion Procesos",
+    "version": "0.1.0"
+  },
+  "paths": {
+    "/api/internal/v1/crawler/runs": {
+      "post": {
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Resultado autorizado confirmado; importación ACK posterior a commit"
+          },
+          "401": {
+            "description": "Identidad inválida"
+          },
+          "403": {
+            "description": "Permiso insuficiente"
+          },
+          "404": {
+            "description": "Entidad no accesible"
+          },
+          "409": {
+            "description": "Conflicto"
+          },
+          "422": {
+            "description": "Solicitud inválida o límite de exportación"
+          },
+          "429": {
+            "description": "Límite de concurrencia"
+          }
+        },
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Run"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/internal/v1/crawler/runs/{run_id}/processes": {
+      "post": {
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Resultado autorizado confirmado; importación ACK posterior a commit",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ACK"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Identidad inválida"
+          },
+          "403": {
+            "description": "Permiso insuficiente"
+          },
+          "404": {
+            "description": "Entidad no accesible"
+          },
+          "409": {
+            "description": "Conflicto"
+          },
+          "422": {
+            "description": "Solicitud inválida o límite de exportación"
+          },
+          "429": {
+            "description": "Límite de concurrencia"
+          }
+        },
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Batch"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/internal/v1/crawler/runs/{run_id}/complete": {
+      "post": {
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Resultado autorizado confirmado; importación ACK posterior a commit"
+          },
+          "401": {
+            "description": "Identidad inválida"
+          },
+          "403": {
+            "description": "Permiso insuficiente"
+          },
+          "404": {
+            "description": "Entidad no accesible"
+          },
+          "409": {
+            "description": "Conflicto"
+          },
+          "422": {
+            "description": "Solicitud inválida o límite de exportación"
+          },
+          "429": {
+            "description": "Límite de concurrencia"
+          }
+        },
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Complete"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/processes": {
+      "get": {
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Resultado autorizado confirmado; importación ACK posterior a commit"
+          },
+          "401": {
+            "description": "Identidad inválida"
+          },
+          "403": {
+            "description": "Permiso insuficiente"
+          },
+          "404": {
+            "description": "Entidad no accesible"
+          },
+          "409": {
+            "description": "Conflicto"
+          },
+          "422": {
+            "description": "Solicitud inválida o límite de exportación"
+          },
+          "429": {
+            "description": "Límite de concurrencia"
+          }
+        },
+        "parameters": []
+      }
+    },
+    "/api/v1/processes/{id}": {
+      "get": {
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Resultado autorizado confirmado; importación ACK posterior a commit"
+          },
+          "401": {
+            "description": "Identidad inválida"
+          },
+          "403": {
+            "description": "Permiso insuficiente"
+          },
+          "404": {
+            "description": "Entidad no accesible"
+          },
+          "409": {
+            "description": "Conflicto"
+          },
+          "422": {
+            "description": "Solicitud inválida o límite de exportación"
+          },
+          "429": {
+            "description": "Límite de concurrencia"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/processes/{id}/versions": {
+      "get": {
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Resultado autorizado confirmado; importación ACK posterior a commit"
+          },
+          "401": {
+            "description": "Identidad inválida"
+          },
+          "403": {
+            "description": "Permiso insuficiente"
+          },
+          "404": {
+            "description": "Entidad no accesible"
+          },
+          "409": {
+            "description": "Conflicto"
+          },
+          "422": {
+            "description": "Solicitud inválida o límite de exportación"
+          },
+          "429": {
+            "description": "Límite de concurrencia"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/processes/{id}/interest": {
+      "patch": {
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Resultado autorizado confirmado; importación ACK posterior a commit"
+          },
+          "401": {
+            "description": "Identidad inválida"
+          },
+          "403": {
+            "description": "Permiso insuficiente"
+          },
+          "404": {
+            "description": "Entidad no accesible"
+          },
+          "409": {
+            "description": "Conflicto"
+          },
+          "422": {
+            "description": "Solicitud inválida o límite de exportación"
+          },
+          "429": {
+            "description": "Límite de concurrencia"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Interest"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/processes/{id}/note": {
+      "patch": {
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Resultado autorizado confirmado; importación ACK posterior a commit"
+          },
+          "401": {
+            "description": "Identidad inválida"
+          },
+          "403": {
+            "description": "Permiso insuficiente"
+          },
+          "404": {
+            "description": "Entidad no accesible"
+          },
+          "409": {
+            "description": "Conflicto"
+          },
+          "422": {
+            "description": "Solicitud inválida o límite de exportación"
+          },
+          "429": {
+            "description": "Límite de concurrencia"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Note"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/processes/status": {
+      "get": {
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Resultado autorizado confirmado; importación ACK posterior a commit"
+          },
+          "401": {
+            "description": "Identidad inválida"
+          },
+          "403": {
+            "description": "Permiso insuficiente"
+          },
+          "404": {
+            "description": "Entidad no accesible"
+          },
+          "409": {
+            "description": "Conflicto"
+          },
+          "422": {
+            "description": "Solicitud inválida o límite de exportación"
+          },
+          "429": {
+            "description": "Límite de concurrencia"
+          }
+        },
+        "parameters": []
+      }
+    },
+    "/api/v1/processes/export": {
+      "post": {
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Resultado autorizado confirmado; importación ACK posterior a commit"
+          },
+          "401": {
+            "description": "Identidad inválida"
+          },
+          "403": {
+            "description": "Permiso insuficiente"
+          },
+          "404": {
+            "description": "Entidad no accesible"
+          },
+          "409": {
+            "description": "Conflicto"
+          },
+          "422": {
+            "description": "Solicitud inválida o límite de exportación"
+          },
+          "429": {
+            "description": "Límite de concurrencia"
+          }
+        },
+        "parameters": []
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Observation": {
+        "type": "object",
+        "properties": {
+          "source": {
+            "const": "honducompras"
+          },
+          "external_id": {
+            "type": "string"
+          },
+          "source_url": {
+            "type": "string",
+            "format": "uri"
+          },
+          "observed_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "fields_present": {
+            "type": "array",
+            "items": {
+              "enum": [
+                "entity",
+                "reference",
+                "deadline",
+                "description"
+              ]
+            },
+            "uniqueItems": true
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "entity": {
+                "type": "string"
+              },
+              "reference": {
+                "type": "string"
+              },
+              "deadline": {
+                "type": "string"
+              },
+              "description": {
+                "type": "string"
+              },
+              "documents": {
+                "type": "array",
+                "maxItems": 100,
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "url": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "sha256": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "pattern": "^[a-f0-9]{64}$"
+                    },
+                    "download_status": {
+                      "enum": [
+                        "PENDING",
+                        "DOWNLOADED"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "url",
+                    "name"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "additionalProperties": false
+          },
+          "documents_complete": {
+            "type": "boolean"
+          },
+          "completeness": {
+            "enum": [
+              "EMPTY",
+              "PARTIAL",
+              "COMPLETE"
+            ]
+          },
+          "content_hash": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "raw_sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          }
+        },
+        "required": [
+          "source",
+          "external_id",
+          "source_url",
+          "observed_at",
+          "fields_present",
+          "data",
+          "documents_complete",
+          "completeness",
+          "content_hash",
+          "raw_sha256"
+        ],
+        "additionalProperties": false
+      },
+      "ACK": {
+        "type": "object",
+        "properties": {
+          "batch_id": {
+            "type": "string"
+          },
+          "status": {
+            "const": "IMPORTED"
+          },
+          "received": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "new": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "updated": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "unchanged": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "errors": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "batch_id",
+          "status",
+          "received",
+          "new",
+          "updated",
+          "unchanged",
+          "errors"
+        ],
+        "additionalProperties": false
+      },
+      "Run": {
+        "type": "object",
+        "properties": {
+          "run_id": {
+            "type": "string"
+          },
+          "started_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "source": {
+            "const": "honducompras"
+          }
+        },
+        "required": [
+          "run_id",
+          "started_at",
+          "source"
+        ],
+        "additionalProperties": false
+      },
+      "Batch": {
+        "type": "object",
+        "properties": {
+          "batch_id": {
+            "type": "string"
+          },
+          "schema_version": {
+            "const": "1.0"
+          },
+          "processes": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 100,
+            "items": {
+              "$ref": "#/components/schemas/Observation"
+            }
+          }
+        },
+        "required": [
+          "batch_id",
+          "schema_version",
+          "processes"
+        ],
+        "additionalProperties": false
+      },
+      "Complete": {
+        "type": "object",
+        "properties": {
+          "batch_id": {
+            "type": "string"
+          },
+          "extraction": {
+            "type": "object"
+          },
+          "import": {
+            "type": "object",
+            "properties": {
+              "received": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "new": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "updated": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "unchanged": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "errors": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "batch_id": {
+                "type": "string"
+              },
+              "status": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "received",
+              "new",
+              "updated",
+              "unchanged",
+              "errors"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "batch_id",
+          "extraction",
+          "import"
+        ],
+        "additionalProperties": false
+      },
+      "Interest": {
+        "type": "object",
+        "properties": {
+          "is_interesting": {
+            "type": "boolean"
+          },
+          "version": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "is_interesting",
+          "version"
+        ],
+        "additionalProperties": false
+      },
+      "Note": {
+        "type": "object",
+        "properties": {
+          "note": {
+            "type": "string",
+            "maxLength": 4000
+          },
+          "version": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "note",
+          "version"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "securitySchemes": {
+      "bearer": {
+        "type": "http",
+        "scheme": "bearer"
+      },
+      "session": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "__Host-bastion_session"
+      }
+    }
+  }
+}

@@ -13,9 +13,10 @@ Actualizado el 9 de octubre de 2026. Core 0.1.0 publicado y validado en CI; Clie
 | Archivos | Metadatos/versiones, adapter AWS SDK, upload/checksum/cuarentena/descarga y registro de análisis; S3 real y scanner externo no validados |
 | MCP | SDK oficial Streamable HTTP, bearer técnico limitado y conformance por SDK cliente; OAuth/Work pendientes |
 | Frontend Angular | Core de sesión, shell, Inicio y Configuración implementados; UI española; build y tests |
-| Crawler Python | Conservado sin cambios; 17 pruebas offline satisfactorias; receptor Processes aún pendiente |
+| Crawler Python | Conservado sin cambios; 17 pruebas offline satisfactorias; receptor Processes implementado; CI pendiente |
 | Clientes | Ficha/catálogo Go y Angular, contactos/direcciones/notas, historial, snapshots/resolución exacta, permisos y documentos implementados; pruebas locales y CI aprobados |
 | Proveedores | Catálogo, contactos/etiquetas/productos, condiciones/evaluación manual, evidencia de precios, historial/notas/documentos y REST/MCP implementados; pruebas locales y CI aprobados |
+| Procesos | Ingestión transaccional, observaciones/versiones, consultas, marcas/notas, CSV y REST/MCP/Angular implementados; pruebas y CI en cierre |
 | Demás módulos comerciales | Pendientes; se implementan de uno en uno tras cerrar pruebas y CI del anterior |
 | Despliegue | Templates systemd/nginx/Bluehost preparados; no instalados ni desplegados |
 | Infraestructura real | MySQL TLS/túnel/hosting, DNS/HTTPS, S3/IAM, SMTP y memoria conjunta con crawler pendientes |
@@ -34,7 +35,7 @@ Actualizado el 9 de octubre de 2026. Core 0.1.0 publicado y validado en CI; Clie
 
 Acceso Bluehost cifrado/restringido, soporte/parches Percona, cuentas DB de mínimo privilegio, backup/restore, clave de cifrado/custodia, corpus curado de contraseñas comprometidas, DNS/HTTPS/CORS/CSP, bucket privado/cifrado/CORS S3/IAM, ejecutor de análisis de archivos y evidencia, SMTP/IMAP autorizado, OAuth delegado Work, medición 2 GB/crawler/jobs y protección perimetral real. Los adapters compilados y sus tests no acreditan esos servicios.
 
-No habilitar integraciones productivas ni migrar BD real mediante tests. No existen aún receptor crawler, tools/pipeline AI, workflows comerciales ni documentos de ventas. El Core admite archivos vinculados a Clientes y Proveedores mediante sus políticas y rechaza entidades/módulos no registrados. La vista 360° de Clientes no inventa procesos/cotizaciones/órdenes/facturas/pagos pendientes.
+No habilitar integraciones productivas ni migrar BD real mediante tests. Receptor crawler implementado; tools/pipeline AI, workflows comerciales y documentos de ventas pendientes. El Core admite archivos vinculados a Clientes y Proveedores mediante sus políticas y rechaza entidades/módulos no registrados. La vista 360° de Clientes no inventa procesos/cotizaciones/órdenes/facturas/pagos pendientes.
 
 ## Unidad 1 de módulos — Clientes
 
@@ -63,6 +64,14 @@ Código final [8e9add2](https://github.com/Ahcast/Bastion/commit/8e9add2b2a66341
 
 RFQ/aprobación/envío, cotizaciones recibidas oficiales, métricas calculadas e investigación automática conservan sus requisitos, pendientes de AI/Workflow y sus propietarios. No se activó correo ni se consultó HonduCompras/S3/Bluehost real. Proveedores no declara esas conexiones finalizadas por aprobar su catálogo manual.
 
+## Unidad 3 — Procesos/receptor crawler
+
+Código: migración 0004_processes.sql, internal/modules/processes y composición, scopes técnicos explícitos en Core; Angular y contratos/runbook. Código Python, CLI, esperas/reintentos y ACK conservados. Solo datos sintéticos y MySQL 5.7 aislado; no consultas a HonduCompras ni S3/Bluehost productivos.
+
+Fusión por campo/observed_at, evidencia atrasada durable, documentos parciales sin eliminación y hashes confirmados conservados. Identidad única, versiones/diffs y hechos transaccionales; ACK después de commit y replay autorizado. Cierres de snapshot verifican contadores de lotes y admiten nuevas entregas del mismo run. Marcas/notas personales no son campos de fuente. Consultas SQL paginadas/IDOR, exportación neutralizada con límite explícito, tres tools MCP de lectura. No se encolan jobs AI sin consumidor.
+
+Pruebas locales: Angular build y 17 tests aprobados; 49 tests Go/race/MySQL y 17 crawler offline aprobados. Navegador y CI pendientes; no declarar unidad cerrada hasta registrar evidencia. Conversión a cotización, estados/asignación comercial, colaboración y AI mantienen sus dependencias; no hay endpoints simulados ni investigación/envíos activados. S3 raw no se valida mediante la recepción API.
+
 ## Continuidad
 
-Orden: Clientes → Proveedores → Procesos/receptor crawler → Cotizaciones → OC de clientes → Facturas/pagos → Gastos → Reportes → Colaboración; Workflow/AI según dependencias. Clientes y Proveedores cerrados con evidencia local y CI satisfactoria. Próxima unidad: Procesos/receptor crawler, aún sin iniciar. Leer contrato/spec de Procesos y contrato único IMPORT_CONTRACT del crawler antes de su implementación. Mantener all/self/team, snapshots, transacciones y permisos mínimos en cada unidad. No se han desplegado servicios ni migrado datos productivos.
+Orden: Clientes → Proveedores → Procesos/receptor crawler → Cotizaciones → OC de clientes → Facturas/pagos → Gastos → Reportes → Colaboración; Workflow/AI según dependencias. Clientes y Proveedores cerrados con evidencia local y CI satisfactoria. Unidad en curso: Procesos/receptor crawler, implementada y en verificación; no iniciar Cotizaciones hasta cerrar pruebas y CI. Leer contrato/spec de Procesos y contrato único IMPORT_CONTRACT del crawler antes de su implementación. Mantener all/self/team, snapshots, transacciones y permisos mínimos en cada unidad. No se han desplegado servicios ni migrado datos productivos.
