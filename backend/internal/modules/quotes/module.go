@@ -168,6 +168,13 @@ func (s *Service) ModuleFiles(logger *slog.Logger, enabled bool, objects core.Ob
 				}
 				return s.RevokeApproval(ctx, a, r.PathValue("id"), r.PathValue("approval"), r.Header.Get("Idempotency-Key"), p)
 			})
+			register("GET /api/v1/quotes/{id}/email-authorizations", func(ctx context.Context, a core.Actor, r *http.Request) (any, error) {
+				f, e := filter(r)
+				if e != nil {
+					return nil, e
+				}
+				return s.EmailAuthorizations(ctx, a, r.PathValue("id"), f.Page, f.PerPage)
+			})
 			register("POST /api/v1/quotes/{id}/email-authorizations", func(ctx context.Context, a core.Actor, r *http.Request) (any, error) {
 				var p EmailAuthorizationRequest
 				if e := required(r, &p, "quote_version", "pdf_snapshot_id", "to", "cc", "bcc", "attachment_ids", "subject", "message", "scheduled_at", "expires_at", "reason"); e != nil {
@@ -188,6 +195,9 @@ func (s *Service) ModuleFiles(logger *slog.Logger, enabled bool, objects core.Ob
 					return nil, e
 				}
 				return s.RevokeEmailAuthorization(ctx, a, r.PathValue("id"), r.PathValue("intent"), r.Header.Get("Idempotency-Key"), p)
+			})
+			register("POST /api/v1/quotes/{id}/email-authorizations/{intent}/send", func(ctx context.Context, a core.Actor, r *http.Request) (any, error) {
+				return s.QueueEmail(ctx, a, r.PathValue("id"), r.PathValue("intent"), r.Header.Get("Idempotency-Key"))
 			})
 		}
 		register("PATCH /api/v1/quotes/{id}/status", func(ctx context.Context, a core.Actor, r *http.Request) (any, error) {
