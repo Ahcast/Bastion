@@ -19,6 +19,9 @@ func (s *Service) QueueEmail(ctx context.Context, a core.Actor, quoteID, intentI
 	}
 	var out any
 	e := s.Core.Transact(ctx, func(tx *sql.Tx) error {
+		if !s.Core.IntegrationEnabledUsing(ctx, tx, "email") || !s.Core.IntegrationEnabledUsing(ctx, tx, "files") {
+			return core.Disabled
+		}
 		q, e := s.access(ctx, tx, a, quoteID, "cotizaciones.send", true, true)
 		if e != nil {
 			return e
