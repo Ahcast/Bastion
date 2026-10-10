@@ -10,7 +10,7 @@ Validación: gofmt/vet/build y go test -race con BASTION_TEST_MYSQL_DSN dedicado
 
 ## Continuidad obligatoria
 
-Cotizaciones permanece en desarrollo. Antes de cerrar módulo: estados/aprobaciones y revisiones de emisión, emisión del PDF aprobado e integración S3 real, envío inmediato/programado autorizado con mismo PDF y ledger, bulk trazable y FX fechado según necesidad comercial. Conversiones OC/Factura deben usar servicios propietarios al implementarlos sin escribir sus tablas desde Quotes. AI opcional sin impedir operación manual. No avanzar al siguiente módulo por haber aprobado solamente borradores/cálculo.
+Cotizaciones permanece en desarrollo. Antes de cerrar módulo: revisiones de emisión y emisión del PDF aprobado e integración S3 real, envío inmediato/programado autorizado con mismo PDF y ledger, bulk trazable y FX fechado según necesidad comercial. Conversiones OC/Factura deben usar servicios propietarios al implementarlos sin escribir sus tablas desde Quotes. AI opcional sin impedir operación manual. No avanzar al siguiente módulo por haber aprobado solamente borradores/cálculo.
 
 ## Archivos y PDF de borrador
 
