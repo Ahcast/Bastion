@@ -1,6 +1,6 @@
 # Estado del proyecto
 
-Actualizado el 9 de octubre de 2026. Core 0.1.0 publicado y validado en CI; Clientes 0.1.0 publicado y validado en pruebas locales y CI; unidad 1 cerrada. Proveedores 0.1.0 publicado y validado en pruebas locales y CI; unidad 2 cerrada. Producción no desplegada.
+Actualizado el 9 de octubre de 2026. Core 0.1.0 publicado y validado en CI; Clientes 0.1.0 publicado y validado en pruebas locales y CI; unidad 1 cerrada. Proveedores 0.1.0 publicado y validado en pruebas locales y CI; unidad 2 cerrada. Catálogo de fuente y receptor de Procesos publicados y validados en pruebas locales y CI; unidad 3 de base cerrada. Producción no desplegada.
 
 | Área | Estado real |
 | --- | --- |
@@ -13,10 +13,10 @@ Actualizado el 9 de octubre de 2026. Core 0.1.0 publicado y validado en CI; Clie
 | Archivos | Metadatos/versiones, adapter AWS SDK, upload/checksum/cuarentena/descarga y registro de análisis; S3 real y scanner externo no validados |
 | MCP | SDK oficial Streamable HTTP, bearer técnico limitado y conformance por SDK cliente; OAuth/Work pendientes |
 | Frontend Angular | Core de sesión, shell, Inicio y Configuración implementados; UI española; build y tests |
-| Crawler Python | Conservado sin cambios; 17 pruebas offline satisfactorias; receptor Processes implementado; CI pendiente |
+| Crawler Python | Conservado sin cambios; 17 pruebas offline satisfactorias; receptor Processes validado en CI |
 | Clientes | Ficha/catálogo Go y Angular, contactos/direcciones/notas, historial, snapshots/resolución exacta, permisos y documentos implementados; pruebas locales y CI aprobados |
 | Proveedores | Catálogo, contactos/etiquetas/productos, condiciones/evaluación manual, evidencia de precios, historial/notas/documentos y REST/MCP implementados; pruebas locales y CI aprobados |
-| Procesos | Ingestión transaccional, observaciones/versiones, consultas, marcas/notas, CSV y REST/MCP/Angular implementados; pruebas y CI en cierre |
+| Procesos | Ingestión transaccional, observaciones/versiones, consultas, marcas/notas, CSV y REST/MCP/Angular implementados; catálogo/ingestión validados en pruebas y CI; funciones cruzadas pendientes |
 | Demás módulos comerciales | Pendientes; se implementan de uno en uno tras cerrar pruebas y CI del anterior |
 | Despliegue | Templates systemd/nginx/Bluehost preparados; no instalados ni desplegados |
 | Infraestructura real | MySQL TLS/túnel/hosting, DNS/HTTPS, S3/IAM, SMTP y memoria conjunta con crawler pendientes |
@@ -70,8 +70,10 @@ Código: migraciones 0004_processes.sql/0005_process_changes.sql, internal/modul
 
 Fusión por campo/observed_at, evidencia atrasada durable, documentos parciales sin eliminación y hashes confirmados conservados. Identidad única, versiones/diffs y hechos transaccionales; ACK después de commit y replay autorizado. Cierres de snapshot verifican contadores de lotes y admiten nuevas entregas del mismo run. Marcas/notas personales no son campos de fuente. Consultas SQL paginadas/IDOR, exportación neutralizada con límite explícito, tres tools MCP de lectura. No se encolan jobs AI sin consumidor.
 
-Pruebas locales: Angular build y 17 tests aprobados; 53 tests Go/race/MySQL y 17 crawler offline aprobados. Navegador y CI pendientes; no declarar unidad cerrada hasta registrar evidencia. Conversión a cotización, estados/asignación comercial, colaboración y AI mantienen sus dependencias; no hay endpoints simulados ni investigación/envíos activados. S3 raw no se valida mediante la recepción API.
+Pruebas locales: Angular build y 17 tests aprobados; 53 tests Go/race/MySQL aprobados sin integración omitida (43 anteriores + 10 Procesos: 5 unitarias y 5 de integración); 17 crawler offline aprobados. CI aprobó los cuatro flujos reales de navegador: Core, Clientes, Proveedores y Procesos. El lote de 30 registros y más de 4 MiB se confirmó sin cambios globales de max_allowed_packet. Historial incluye diff anterior/posterior transaccional. Conversión a cotización, estados/asignación comercial, colaboración y AI mantienen sus dependencias; no hay endpoints simulados ni investigación/envíos activados. S3 raw no se valida mediante la recepción API.
+
+Código final [bab3790](https://github.com/Ahcast/Bastion/commit/bab37902f1ef250a386ae1f5f8ff11df8fd1c7d4): [Core checks 38015160340](https://github.com/Ahcast/Bastion/actions/runs/38015160340) aprobó backend (formato/vet/race/MySQL5.7/builds), frontend (build y 17 pruebas) y navegador (cuatro flujos reales). También aprobaron [documentación](https://github.com/Ahcast/Bastion/actions/runs/38015160330) y [rama única](https://github.com/Ahcast/Bastion/actions/runs/38015160324). Aceptación del catálogo/ingestión cerrada; no equivale a haber implementado conversión/flujo comercial/AI ni a validar infraestructura productiva.
 
 ## Continuidad
 
-Orden: Clientes → Proveedores → Procesos/receptor crawler → Cotizaciones → OC de clientes → Facturas/pagos → Gastos → Reportes → Colaboración; Workflow/AI según dependencias. Clientes y Proveedores cerrados con evidencia local y CI satisfactoria. Unidad en curso: Procesos/receptor crawler, implementada y en verificación; no iniciar Cotizaciones hasta cerrar pruebas y CI. Leer contrato/spec de Procesos y contrato único IMPORT_CONTRACT del crawler antes de su implementación. Mantener all/self/team, snapshots, transacciones y permisos mínimos en cada unidad. No se han desplegado servicios ni migrado datos productivos.
+Orden: Clientes → Proveedores → Procesos/receptor crawler → Cotizaciones → OC de clientes → Facturas/pagos → Gastos → Reportes → Colaboración; Workflow/AI según dependencias. Clientes y Proveedores cerrados con evidencia local y CI satisfactoria. Unidad de base Procesos/receptor crawler cerrada con pruebas y CI satisfactorios. Próxima unidad: Cotizaciones, incluida conversión determinista desde Procesos. Leer contrato/spec de Quotes y los servicios públicos de Clientes/Procesos antes de implementar la siguiente unidad. Mantener all/self/team, snapshots, transacciones y permisos mínimos en cada unidad. No se han desplegado servicios ni migrado datos productivos.

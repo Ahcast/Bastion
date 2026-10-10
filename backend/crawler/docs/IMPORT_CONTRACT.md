@@ -1,4 +1,6 @@
-# Contrato de integración con backend Go en Lightsail — pendiente de implementación
+# Contrato de integración con backend Go en Lightsail — wire 1.0
+
+Receptor implementado por Processes: [contrato servidor](../../../docs/contracts/processes.md), [runbook](../../../docs/development/processes-runbook.md) y [estado/pruebas](../../../docs/development/status.md). Código cliente, payloads y ACK conservados; esto no acredita conexiones productivas.
 
 Base HTTPS: /api/internal/v1/crawler. Identidad crawler-lightsail, bearer token
 con scopes crawler.runs.create, crawler.processes.import, crawler.runs.complete.
@@ -25,8 +27,9 @@ no debe impedir nuevas observaciones posteriores del mismo run.
    negocio, excluyendo observed_at, download_status y demás estados técnicos.
    El content_hash recibido describe la observación, no sustituye este cálculo.
 8. Si cambió contenido relevante: insertar process_versions, diff y tipos de
-   cambio; actualizar processes y crear evento en outbox para AI en la misma
-   transacción. Si no cambió: actualizar last_seen (MAX), no crear versión.
+   cambio; actualizar processes y conservar el hecho durable en domain_events en la misma
+   transacción. El outbox de trabajo AI se conecta cuando exista su consumidor;
+   no crear jobs desconocidos ni ejecutar inferencia en la importación. Si no cambió: actualizar last_seen (MAX), no crear versión.
 9. first_seen=MIN observaciones, last_seen=MAX. No eliminar por ausencias.
 10. Guardar ACK y confirmar transacción antes de responder. El ACK de recepción
     HTTP 202 no equivale a importación: el cliente de esta versión exige 200/201
