@@ -1,0 +1,26 @@
+CREATE TABLE quote_email_intents (
+ id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+ quote_id BIGINT UNSIGNED NOT NULL,
+ quote_version BIGINT UNSIGNED NOT NULL,
+ pdf_snapshot_id BIGINT UNSIGNED NOT NULL,
+ created_by BIGINT UNSIGNED NOT NULL,
+ to_json JSON NOT NULL,
+ cc_json JSON NOT NULL,
+ bcc_json JSON NOT NULL,
+ subject VARCHAR(200) NOT NULL,
+ body TEXT NOT NULL,
+ scheduled_at DATETIME(6) NOT NULL,
+ binding_hash CHAR(64) CHARACTER SET ascii NOT NULL,
+ approval_id BIGINT UNSIGNED NULL,
+ status VARCHAR(24) CHARACTER SET ascii NOT NULL DEFAULT 'pending_approval',
+ created_at DATETIME(6) NOT NULL,
+ updated_at DATETIME(6) NOT NULL,
+ UNIQUE(approval_id),
+ FOREIGN KEY(quote_id,quote_version) REFERENCES quote_versions(quote_id,version),
+ FOREIGN KEY(pdf_snapshot_id) REFERENCES quote_pdf_snapshots(id),
+ FOREIGN KEY(created_by) REFERENCES users(id),
+ FOREIGN KEY(approval_id) REFERENCES approvals(id),
+ INDEX quote_email_quote(quote_id,id),
+ INDEX quote_email_status(status,scheduled_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+INSERT IGNORE INTO permissions(name) VALUES('cotizaciones.send');
