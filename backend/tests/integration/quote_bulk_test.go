@@ -1,8 +1,10 @@
 package integration
 
 import (
+	"context"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/Ahcast/Bastion/backend/internal/core"
 	"github.com/Ahcast/Bastion/backend/internal/modules/quotes"
@@ -50,6 +52,34 @@ func TestQuoteBulkStatusIsTraceableAndIdempotent(t *testing.T) {
 	changed.Status = "review"
 	if _, e = s.BulkStatus(ctx, a, "bulk-status-request", changed); e != core.Conflict {
 		t.Fatal("changed replay", e)
+	}
+}
+
+func TestQuoteBulkStatusConsecutiveConflictCompletes(t *testing.T) {
+	s, a, _ := quotesFixture(t)
+	grantQuote(t, s.Core, a, "all")
+	first := makeQuote(t, s, a, "bulk-status-consecutive-first", quoteInput())
+	second := makeQuote(t, s, a, "bulk-status-consecutive-second", quoteInput())
+
+	initial := quotes.BulkStatusInput{Status: "costing", Items: []quotes.BulkItemInput{{ID: first, Version: 1}, {ID: second, Version: 1}}}
+	if result, e := s.BulkStatus(ctx, a, "bulk-status-consecutive-success", initial); e != nil || result.Status != "completed" {
+		t.Fatal(result, e)
+	}
+
+	conflictCtx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	conflictInput := quotes.BulkStatusInput{Status: "costing", Items: []quotes.BulkItemInput{{ID: first, Version: 2}, {ID: second, Version: 2}}}
+	result, e := s.BulkStatus(conflictCtx, a, "bulk-status-consecutive-conflict", conflictInput)
+	if e != nil {
+		t.Fatal(e)
+	}
+	if result.Status != "completed" || len(result.Results) != 2 {
+		t.Fatal(result)
+	}
+	for _, item := range result.Results {
+		if item.Status != "failed" || item.Error != "conflict" {
+			t.Fatal(item)
+		}
 	}
 }
 
