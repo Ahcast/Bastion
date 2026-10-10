@@ -29,17 +29,17 @@ func fxFilter(r *http.Request) (FXFilter, error) {
 }
 
 func (s *Service) registerFX(register func(string, api.Action)) {
-	register("GET /api/v1/quotes/fx-observations", func(ctx context.Context, a core.Actor, r *http.Request) (any, error) {
+	register("GET /api/v1/quote-fx/observations", func(ctx context.Context, a core.Actor, r *http.Request) (any, error) {
 		f, e := fxFilter(r)
 		if e != nil {
 			return nil, e
 		}
 		return s.ListFXObservations(ctx, a, f)
 	})
-	register("GET /api/v1/quotes/fx-observations/{id}", func(ctx context.Context, a core.Actor, r *http.Request) (any, error) {
+	register("GET /api/v1/quote-fx/observations/{id}", func(ctx context.Context, a core.Actor, r *http.Request) (any, error) {
 		return s.GetFXObservation(ctx, a, r.PathValue("id"))
 	})
-	register("POST /api/v1/quotes/fx-observations", func(ctx context.Context, a core.Actor, r *http.Request) (any, error) {
+	register("POST /api/v1/quote-fx/observations", func(ctx context.Context, a core.Actor, r *http.Request) (any, error) {
 		var p FXObservationInput
 		if e := required(r, &p, "rate_kind", "rate", "valid_from", "valid_to", "source", "source_reference", "source_published_at", "evidence_hash", "supersedes_id", "reason"); e != nil {
 			return nil, e
