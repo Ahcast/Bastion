@@ -4,12 +4,13 @@ Cada tema tiene una fuente única. No se reproducen capítulos del maestro en ca
 
 | Tema | Documento |
 | --- | --- |
+| Punto exacto para reanudar desarrollo | [Checkpoint operativo](ESTADO_DESARROLLO.md) |
 | Alcance y hosting aprobados | [Maestro](Proyecto_Bastion_Documento_Maestro.md) |
 | Instrucciones del agente | [AGENTS](../AGENTS.md) |
 | Topología y estructura | [Arquitectura](architecture/README.md) |
 | Tecnologías | [Stack](development/stack.md) |
 | Secuencia y aceptación | [Plan](development/plan.md) |
-| Trabajo hecho y bloqueos | [Estado](development/status.md) |
+| Historial amplio de trabajo y bloqueos | [Estado histórico](development/status.md) |
 | Decisiones y contradicciones resueltas | [Decisiones](development/decisions.md) |
 | Una sola rama | [Política Git](development/git-policy.md) |
 | Identidad, permisos, seguridad y servicios compartidos | [Core](architecture/core.md) |
@@ -26,6 +27,6 @@ Cada tema tiene una fuente única. No se reproducen capítulos del maestro en ca
 
 Documentos eliminados por duplicación siguen en el historial Git; no son instrucciones vigentes. No se pierde el alcance comercial por consolidar archivos.
 
-Core implementado: [ejecución y pruebas](development/core-runbook.md), [OpenAPI](contracts/core-openapi.json), [estado](development/status.md).
+Core implementado: [ejecución y pruebas](development/core-runbook.md), [OpenAPI](contracts/core-openapi.json). Catálogos implementados: [Clientes](development/customers-runbook.md) y [Proveedores](development/suppliers-runbook.md).
 
-Catálogos implementados: [Clientes](development/customers-runbook.md) y [Proveedores](development/suppliers-runbook.md); contratos por módulo en contracts.
+Cotizaciones es el módulo activo. Su contrato vigente está en [quotes.md](contracts/quotes.md), el contrato REST en [quotes-openapi.json](contracts/quotes-openapi.json) y la operación/pruebas en [quotes-runbook.md](development/quotes-runbook.md). Borradores, cálculo, archivos/PDF, estados, aprobación, emisión, correo comercial y bulk están implementados; FX fechado es la siguiente unidad y no debe programarse hasta cerrar sus reglas normativas. El checkpoint indica el hito certificado y las validaciones externas todavía pendientes.
