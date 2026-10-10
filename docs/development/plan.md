@@ -1,6 +1,6 @@
 # Plan ejecutable del proyecto
 
-Core de plataforma y base implementados: ver [checkpoint operativo](../ESTADO_DESARROLLO.md), [estado histórico](status.md) y [runbook](core-runbook.md). Los criterios de infraestructura externa permanecen pendientes aunque las pruebas locales/CI pasen. Clientes, Proveedores y la base de Procesos/receptor crawler están cerrados. Cotizaciones tiene implementados borradores/cálculo/conversión desde Procesos, PDF/adjuntos, estados/revisiones, aprobación humana, emisión segura de PDF, correo comercial durable y bulk trazable. La unidad activa siguiente es el contrato e implementación de FX fechado; no iniciar OC todavía. Consultar el checkpoint para evidencia vigente y continuar una unidad por vez.
+Core de plataforma y base implementados: ver [checkpoint operativo](../ESTADO_DESARROLLO.md), [estado histórico](status.md) y [runbook](core-runbook.md). Los criterios de infraestructura externa permanecen pendientes aunque las pruebas locales/CI pasen. Clientes, Proveedores, Procesos/receptor crawler y Cotizaciones están cerrados para su alcance aprobado y certificados en CI. La unidad activa siguiente es **Órdenes de Compra de clientes**, desarrollada de forma incremental desde su contrato propietario. Consultar el checkpoint para evidencia vigente y continuar una unidad por vez.
 
 El agente implementa cada fase hasta su aceptación, actualiza el checkpoint/estado y continúa. No sustituir implementación por plan nuevo. Las fases pueden desarrollarse con datos sintéticos y MySQL 5.7 local/CI de prueba; los bloqueos de infraestructura se verifican antes de producción, sin migrar la BD a AWS.
 
@@ -38,13 +38,16 @@ MySQL remoto TLS o túnel SSH verificado, acceso y soporte Percona; DNS/certific
 
 No implementar integración pagada de inferencia como solución automática a un bloqueo Work. RPO/RTO, retención y reglas de scoring/envío se configuran sin inventar valores aprobados.
 
-## Cotizaciones — continuidad vigente
+## Cotizaciones — cierre vigente
 
-Correo comercial y bulk dejaron de ser pendientes: ambos están implementados y validados en CI. Bulk durable está certificado en el checkpoint con migración 0013, REST, Angular y Playwright real.
+Cotizaciones está cerrado para el alcance aprobado en el HEAD `0a98bf756c4e7a3965b7b625473258509fbaa571`: HNL/USD explícitos y separados, sin conversión automática; cálculo exacto, snapshots/versiones, PDF/adjuntos, workflow/aprobación, emisión, correo comercial, estados finales, bulk y registro FX auxiliar. El mismo HEAD aprobó backend con race/MySQL 5.7/builds, Angular, Playwright real, documentación y política de rama única. Consultar `../ESTADO_DESARROLLO.md` para runs y límites externos.
 
-La siguiente unidad es **FX fechado**. El sistema permite cotizaciones explícitas en HNL o USD, pero no conversión implícita. Antes de programar FX se debe definir de forma normativa la fuente/tipo de tasa, fecha efectiva, snapshot/historial, precisión/redondeo, autoridad de modificación, efecto sobre versiones/aprobaciones/emisiones y presentación UI/PDF/exportación. No inventar esos valores en código.
+Las conversiones Quotes→OC/Factura se integran con los servicios propietarios cuando esos módulos existan; Quotes no escribe sus tablas directamente.
 
-Las conversiones Quotes→OC/Factura se integran con los servicios propietarios cuando esos módulos existan; Quotes no escribe sus tablas directamente. Esto no autoriza a saltar a OC mientras FX y la aceptación restante de Cotizaciones no estén cerrados.
+## Órdenes de Compra de clientes — unidad activa
 
+El maestro y `development/decisions.md` resuelven la nomenclatura: el menú OC representa órdenes **recibidas de clientes**; usar `customer_purchase_orders` / `customer_purchase_order_items` y REST `/purchase-orders`. Las futuras órdenes emitidas a proveedores serán `supplier_purchase_orders` y quedan fuera de este módulo.
 
-Cierre vigente 2026-10-10: Cotizaciones opera HNL/USD separados por decisión explícita; FX deja de ser gate del módulo actual. Completar pruebas del cierre comercial/recuperación y registrar CI antes de declarar terminado. OC/Factura/IA conservan sus dependencias y no se implementan dentro de Quotes.
+`modules/purchase-orders.md` conserva tanto estados legacy como un flujo actual más amplio. No mezclar ambos grafos implícitamente. La primera unidad implementa únicamente el agregado íntegro de OC de cliente con estado inicial `Recibida`: cabecera, ítems, cálculo exacto, CRUD/versionado, autorización, idempotencia, auditoría, API y pruebas. Estados/transiciones posteriores se incorporan en una unidad separada después de fijar su contrato.
+
+Fuera de la primera unidad: Cotización→OC, OC→Factura, entrega, clonación, documentos, AI, OC a proveedores y cualquier estado distinto de `Recibida`.
