@@ -166,3 +166,24 @@ func TestQuoteEmailAuthorizationRequiresIssuedCurrentPDFAndLiveGrant(t *testing.
 		t.Fatal("send grant bypass", e)
 	}
 }
+
+func TestQuoteEmailAuthorizationRevocationSurvivesEvidenceDrift(t *testing.T) {
+	s, a, _, id, snapshot := emailAuthorizationFixture(t)
+	v := requestEmailAuthorization(t, s, a, id, snapshot, "email-auth-revoke-drift")
+	if _, e := s.Core.DB.Exec(`UPDATE quote_pdf_snapshots SET input_hash=REPEAT('e',64) WHERE id=?`, snapshot); e != nil {
+		t.Fatal(e)
+	}
+	revoked, e := s.RevokeEmailAuthorizationSafe(ctx, a, id, v["id"], "email-auth-revoke-drift-action", quotes.EmailAuthorizationRevoke{Version: 1, Reason: "Cancelar autorización aunque cambie la evidencia"})
+	if e != nil {
+		t.Fatal(e)
+	}
+	b, _ := json.Marshal(revoked)
+	var result map[string]string
+	if e = json.Unmarshal(b, &result); e != nil || result["status"] != "revoked" {
+		t.Fatal(result, e)
+	}
+	var status string
+	if e = s.Core.DB.QueryRow(`SELECT status FROM quote_email_intents WHERE id=?`, v["id"]).Scan(&status); e != nil || status != "revoked" {
+		t.Fatal(status, e)
+	}
+}
