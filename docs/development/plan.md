@@ -39,3 +39,5 @@ MySQL remoto TLS o túnel SSH verificado, acceso y soporte Percona; DNS/certific
 No implementar integración pagada de inferencia como solución automática a un bloqueo Work. RPO/RTO, retención y reglas de scoring/envío se configuran sin inventar valores aprobados.
 
 Cotizaciones en desarrollo: borradores/cálculo/conversión, PDF de borrador/adjuntos, estados/revisiones y aprobación humana y emisión segura de PDF implementados. Continuar correo/bulk y aceptación completa antes de pasar a OC; ver contrato/runbook de Quotes y status.md.
+
+Prerrequisito de correo Quotes cerrado: transporte Core To/CC/BCC/adjuntos y programación durable EnqueueAt (0011), con CI satisfactorio. Continuar autorización comercial vinculada a destinatarios/contenido, ledger SMTP y formulario Quotes; no interpretar el cierre técnico como aceptación del envío comercial. Ver [contrato](../contracts/mail-transport.md) y [estado](status.md).

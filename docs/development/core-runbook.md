@@ -47,6 +47,8 @@ go run ./cmd/worker
 
 Runner de hasta 30 jobs/60 s, unidades con timeout 45 s y lease 90 s; reintentos hasta 5. Ejecutar con timer cada minuto, sin solapamiento del proceso systemd; MySQL soporta múltiples workers acotados. Outbox transaccional se publica de forma idempotente; no requiere Redis. Actor vigente se reevalúa. Trabajo desconocido falla explícitamente. Reintento administrativo solo failed; uncertain necesita conciliación.
 
+La migración 0011 habilita EnqueueAt: fecha UTC/microsegundos persistida en outbox y conservada al publicar jobs. El adaptador SMTP admite To/CC/BCC y adjuntos verificados del propietario, con límites y MIME definidos en el [contrato de transporte](../contracts/mail-transport.md). Estos servicios internos no activan el correo comercial de Cotizaciones; la prueba SMTP existente sigue limitada al correo propio.
+
 Los flags de entorno son techo: settings/integrations permite desactivar inmediatamente MCP/files/email mediante administración con reautenticación y auditoría; no permite superar ese techo. BASTION_EMAIL_ENABLED=true y allowlist BASTION_SMTP_ALLOWED_HOSTS solo en entorno autorizado. Config SMTP: TLS implícito 465 o STARTTLS obligatorio 587, nunca plaintext. Credenciales cifradas no aparecen en API. Prueba encolada solo al correo propio, con reautenticación/Idempotency-Key. Worker registra sending antes de red; timeout/crash puede dejar sending/uncertain. No reenvía a ciegas. Conciliación requiere evidencia y no crea otro envío. accepted significa aceptación SMTP, no entrega al buzón. Mailer falso se inyecta solo en tests. Lectura IMAP/RFQ pertenece a la fase de integración AI, no está activada aquí.
 
 ## Archivos S3 y cuarentena
