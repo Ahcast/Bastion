@@ -18,11 +18,11 @@ describe('Registro FX de Cotizaciones',()=>{
  });
  it('lista filtros sin realizar cálculos de moneda en cliente',async()=>{
   api.get.mockResolvedValue({data:[],total:0,page:1,per_page:25});fx.filterKind='tcr';fx.filterSource='bch';await fx.load();
-  expect(api.get).toHaveBeenCalledWith('/quotes/fx-observations?page=1&per_page=25&rate_kind=tcr&source=bch');expect(fx.total()).toBe(0);
+  expect(api.get).toHaveBeenCalledWith('/quote-fx/observations?page=1&per_page=25&rate_kind=tcr&source=bch');expect(fx.total()).toBe(0);
  });
  it('normaliza horas de Honduras, envía strings y conserva la clave al reintentar',async()=>{
   fx.rateKind='tcr';fx.rate='26.123456789012';fx.validFrom='2026-10-10T08:30';fx.validTo='2026-10-10T17:00';fx.source='bch';fx.sourceReference='synthetic:bch:tcr';fx.sourcePublishedAt='2026-10-10T07:45';fx.evidenceHash='';fx.reason='';
-  api.write.mockRejectedValue(new Error('caída sintética'));await fx.record();const first=api.write.mock.calls[0];expect(first[0]).toBe('POST');expect(first[1]).toBe('/quotes/fx-observations');expect(first[2]).toEqual({rate_kind:'tcr',rate:'26.123456789012',valid_from:'2026-10-10T14:30:00.000Z',valid_to:'2026-10-10T23:00:00.000Z',source:'bch',source_reference:'synthetic:bch:tcr',source_published_at:'2026-10-10T13:45:00.000Z',evidence_hash:'',supersedes_id:'',reason:''});
+  api.write.mockRejectedValue(new Error('caída sintética'));await fx.record();const first=api.write.mock.calls[0];expect(first[0]).toBe('POST');expect(first[1]).toBe('/quote-fx/observations');expect(first[2]).toEqual({rate_kind:'tcr',rate:'26.123456789012',valid_from:'2026-10-10T14:30:00.000Z',valid_to:'2026-10-10T23:00:00.000Z',source:'bch',source_reference:'synthetic:bch:tcr',source_published_at:'2026-10-10T13:45:00.000Z',evidence_hash:'',supersedes_id:'',reason:''});
   await fx.record();expect(api.write.mock.calls[1][3]).toBe(first[3]);expect(fx.rate).toBe('26.123456789012');
  });
  it('prepara una corrección sin sobrescribir la observación visible',()=>{
