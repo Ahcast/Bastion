@@ -51,7 +51,7 @@ func (s *Service) QueueEmail(ctx context.Context, a core.Actor, quoteID, intentI
 				return nil, e
 			}
 			messageID := "<" + security.ID() + "@bastion.castilloit.net>"
-			jobID, e := s.Core.EnqueueAt(ctx, tx, a, "quote.email.send", "cotizaciones.send", map[string]string{"quote_id": quoteID, "intent_id": intent.ID}, intent.ScheduledAt)
+			jobID, e := s.Core.EnqueueScopedAt(ctx, tx, a, "quote.email.send", "cotizaciones.send", map[string]string{"quote_id": quoteID, "intent_id": intent.ID}, intent.ScheduledAt, q.Owner, q.Team)
 			if e != nil {
 				return nil, e
 			}

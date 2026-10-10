@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"strings"
 	"time"
 
@@ -193,6 +194,14 @@ func (s *Service) failEmailIntent(ctx context.Context, id, code string) error {
 	return e
 }
 
+// Transient database/network failures preserve the resumable preparation state.
+func (s *Service) rejectEmailClientError(ctx context.Context, id, code string, cause error) {
+	var ce *core.Error
+	if errors.As(cause, &ce) && ce.Status >= 400 && ce.Status < 500 && ce.Status != 429 {
+		_ = s.failEmailIntent(ctx, id, code)
+	}
+}
+
 func (s *Service) failSendingBeforeExternal(ctx context.Context, id, code string) error {
 	_, e := s.Core.DB.ExecContext(ctx, `UPDATE quote_email_intents SET status='failed',error_code=?,updated_at=UTC_TIMESTAMP(6) WHERE id=? AND status='sending'`, code, id)
 	return e
@@ -204,6 +213,26 @@ func (s *Service) uncertainEmailIntent(ctx context.Context, id string) error {
 		return e
 	}
 	return core.ErrUncertain
+}
+
+// AuthorizeEmailJob applies current record scopes without a browser session.
+func (s *Service) AuthorizeEmailJob(ctx context.Context, j core.Job) error {
+	if j.Kind != "quote.email.send" || j.Permission != "cotizaciones.send" {
+		return core.Forbidden
+	}
+	var payload struct {
+		QuoteID string `json:"quote_id"`
+	}
+	if json.Unmarshal(j.Payload, &payload) != nil {
+		return core.Invalid
+	}
+	return s.Core.Transact(ctx, func(tx *sql.Tx) error {
+		q, e := s.jobQuote(ctx, tx, j.UserID, payload.QuoteID, "cotizaciones.send")
+		if e != nil {
+			return e
+		}
+		return s.Core.AuthorizeGrantHolder(ctx, tx, j.UserID, "cotizaciones.view", q.Owner, q.Team)
+	})
 }
 
 // CommercialEmailHandler revalidates the approved binding both before and
@@ -278,18 +307,18 @@ func (s *Service) CommercialEmailHandler(reader EmailObjectReader, mailer core.M
 				}
 				return core.ErrUncertain
 			}
-			_ = s.failEmailIntent(ctx, payload.IntentID, "preparation_rejected")
+			s.rejectEmailClientError(ctx, payload.IntentID, "preparation_rejected", e)
 			return e
 		}
 
 		email := core.Email{ID: intent.ID, To: append([]string{}, intent.To...), CC: append([]string{}, intent.CC...), BCC: append([]string{}, intent.BCC...), Subject: intent.Subject, Body: intent.Message, MessageID: intent.MessageID}
 		for _, f := range files {
 			b, e := reader.ReadObject(ctx, f.Key, f.Size)
-			if e != nil || int64(len(b)) != f.Size || security.Hash(string(b)) != f.Checksum {
+			if e != nil {
+				return e
+			}
+			if int64(len(b)) != f.Size || security.Hash(string(b)) != f.Checksum {
 				_ = s.failEmailIntent(ctx, intent.ID, "attachment_integrity_failed")
-				if e != nil {
-					return e
-				}
 				return core.Conflict
 			}
 			email.Attachments = append(email.Attachments, core.EmailAttachment{Filename: f.Filename, MediaType: f.MediaType, Data: b})
@@ -298,7 +327,7 @@ func (s *Service) CommercialEmailHandler(reader EmailObjectReader, mailer core.M
 			_ = s.failEmailIntent(ctx, intent.ID, "envelope_invalid")
 			return e
 		}
-		if e = s.Core.JobAllowed(ctx, j); e != nil {
+		if e = s.AuthorizeEmailJob(ctx, j); e != nil {
 			_ = s.failEmailIntent(ctx, intent.ID, "authorization_revoked")
 			return e
 		}
@@ -341,10 +370,10 @@ func (s *Service) CommercialEmailHandler(reader EmailObjectReader, mailer core.M
 			return core.Changed(tx.ExecContext(ctx, `UPDATE quote_email_intents SET status='sending',updated_at=UTC_TIMESTAMP(6) WHERE id=? AND status='preparing'`, intent.ID))
 		})
 		if e != nil {
-			_ = s.failEmailIntent(ctx, intent.ID, "pre_send_revalidation_failed")
+			s.rejectEmailClientError(ctx, intent.ID, "pre_send_revalidation_failed", e)
 			return e
 		}
-		if e = s.Core.JobAllowed(ctx, j); e != nil {
+		if e = s.AuthorizeEmailJob(ctx, j); e != nil {
 			// The network call has not started yet, so this state is known failed,
 			// not uncertain, even though the sending marker was already persisted.
 			_ = s.failSendingBeforeExternal(ctx, intent.ID, "authorization_revoked")

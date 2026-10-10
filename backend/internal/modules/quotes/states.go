@@ -111,4 +111,3 @@ func (s *Service) transitionInTransaction(ctx context.Context, tx *sql.Tx, a cor
 		return result, nil
 	})
 }
-

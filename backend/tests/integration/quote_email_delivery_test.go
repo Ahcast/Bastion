@@ -188,3 +188,51 @@ func TestQuoteEmailQueueReplayAndRevokedApprover(t *testing.T) {
 		t.Fatal("revoked approver allowed SMTP", e, mailer.calls)
 	}
 }
+
+type retryQuoteObjects struct {
+	*pdfObjects
+	fail bool
+}
+
+func (r *retryQuoteObjects) ReadObject(ctx context.Context, key string, max int64) ([]byte, error) {
+	if r.fail {
+		return nil, errors.New("synthetic temporary object outage")
+	}
+	return r.pdfObjects.ReadObject(ctx, key, max)
+}
+
+func TestQuoteEmailObjectOutageResumesWithoutDuplicate(t *testing.T) {
+	s, a, id, intent, objects := approvedEmailIntent(t, time.Now().Add(-time.Second))
+	configureQuoteSMTP(t, s, a)
+	j := queueAndClaimEmail(t, s, a, id, intent)
+	reader := &retryQuoteObjects{pdfObjects: objects, fail: true}
+	mailer := &quoteMailer{}
+	h := s.CommercialEmailHandler(reader, mailer)
+	if e := h(ctx, j); e == nil || mailer.calls != 0 {
+		t.Fatal("outage ignored", e, mailer.calls)
+	}
+	reader.fail = false
+	if e := h(ctx, j); e != nil || mailer.calls != 1 {
+		t.Fatal("preparation not recoverable", e, mailer.calls)
+	}
+	v, e := s.QueueEmail(ctx, a, id, intent, "delivery-queue")
+	if e != nil || customerResult(t, v, e)["job_id"] != j.ID {
+		t.Fatal("historical queue replay", v, e)
+	}
+}
+
+func TestQuoteEmailWorkerSupportsSelfScope(t *testing.T) {
+	s, a, id, intent, objects := approvedEmailIntent(t, time.Now().Add(-time.Second))
+	configureQuoteSMTP(t, s, a)
+	if _, e := s.Core.DB.Exec(`UPDATE role_permissions p JOIN user_roles ur ON ur.role_id=p.role_id SET p.scope='self' WHERE ur.user_id=? AND p.permission='cotizaciones.send'`, a.UserID); e != nil {
+		t.Fatal(e)
+	}
+	if _, e := s.QueueEmail(ctx, a, id, intent, "delivery-self-queue"); e != nil {
+		t.Fatal(e)
+	}
+	mailer := &quoteMailer{}
+	w := core.Worker{Service: s.Core, Authorizers: map[string]core.JobHandler{"quote.email.send": s.AuthorizeEmailJob}, Handlers: map[string]core.JobHandler{"quote.email.send": s.CommercialEmailHandler(objects, mailer)}}
+	if e := w.Run(ctx, 10); e != nil || mailer.calls != 1 {
+		t.Fatal("self-scoped worker", e, mailer.calls)
+	}
+}

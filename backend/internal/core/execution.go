@@ -19,8 +19,9 @@ type Job struct {
 }
 type JobHandler func(context.Context, Job) error
 type Worker struct {
-	Service  *Service
-	Handlers map[string]JobHandler
+	Service     *Service
+	Handlers    map[string]JobHandler
+	Authorizers map[string]JobHandler
 }
 
 func (s *Service) Enqueue(ctx context.Context, tx *sql.Tx, a Actor, kind, permission string, payload any) (string, error) {
@@ -30,11 +31,16 @@ func (s *Service) Enqueue(ctx context.Context, tx *sql.Tx, a Actor, kind, permis
 // EnqueueAt commits the requested execution time with the durable intention.
 // Scheduling does not bypass current authorization or the worker's live checks.
 func (s *Service) EnqueueAt(ctx context.Context, tx *sql.Tx, a Actor, kind, permission string, payload any, available time.Time) (string, error) {
+	return s.EnqueueScopedAt(ctx, tx, a, kind, permission, payload, available, a.UserID, "")
+}
+
+// EnqueueScopedAt checks the owning aggregate scope before durable scheduling.
+func (s *Service) EnqueueScopedAt(ctx context.Context, tx *sql.Tx, a Actor, kind, permission string, payload any, available time.Time, owner, team string) (string, error) {
 	available = available.UTC().Truncate(time.Microsecond)
 	if available.Year() < 1000 || available.Year() > 9999 {
 		return "", Invalid
 	}
-	if e := s.Authorize(ctx, tx, a, permission, a.UserID, "", false); e != nil {
+	if e := s.Authorize(ctx, tx, a, permission, owner, team, false); e != nil {
 		return "", e
 	}
 	b, e := json.Marshal(payload)
@@ -135,7 +141,11 @@ func (w *Worker) Run(ctx context.Context, max int) error {
 			return e
 		}
 		runCtx, cancel := context.WithTimeout(ctx, 45*time.Second)
-		e = w.Service.JobAllowed(runCtx, j)
+		if authorize := w.Authorizers[j.Kind]; authorize != nil {
+			e = authorize(runCtx, j)
+		} else {
+			e = w.Service.JobAllowed(runCtx, j)
+		}
 		if e == nil {
 			h, ok := w.Handlers[j.Kind]
 			if !ok {

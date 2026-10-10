@@ -122,7 +122,7 @@ func main() {
 		os.Exit(1)
 	}
 	q := &quotes.Service{Core: s, Approvals: &workflow.Service{Core: s}}
-	w := core.Worker{Service: s, Handlers: map[string]core.JobHandler{"quote.email.send": q.CommercialEmailHandler(f, syntheticMailer{}), "notification": s.NotificationHandler}}
+	w := core.Worker{Service: s, Authorizers: map[string]core.JobHandler{"quote.email.send": q.AuthorizeEmailJob}, Handlers: map[string]core.JobHandler{"quote.email.send": q.CommercialEmailHandler(f, syntheticMailer{}), "notification": s.NotificationHandler}}
 	go func() {
 		for range time.NewTicker(200 * time.Millisecond).C {
 			if e := w.Run(context.Background(), 30); e != nil {

@@ -43,7 +43,7 @@ func main() {
 	}
 	approvals := &workflow.Service{Core: s}
 	quoteService := &quotes.Service{Core: s, Approvals: approvals}
-	w := core.Worker{Service: s, Handlers: map[string]core.JobHandler{
+	w := core.Worker{Service: s, Authorizers: map[string]core.JobHandler{"quote.email.send": quoteService.AuthorizeEmailJob}, Handlers: map[string]core.JobHandler{
 		"notification":     s.NotificationHandler,
 		"email.test":       s.EmailHandler(adapters.SMTP{}),
 		"quote.email.send": quoteService.CommercialEmailHandler(reader, adapters.SMTP{}),
