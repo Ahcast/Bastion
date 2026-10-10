@@ -121,7 +121,7 @@ func main() {
 	}
 
 	// Two independent people exercise human approval; no production grants.
-	for _, email := range []string{"approval-requester@example.test", "approval-reviewer@example.test"} {
+	for _, email := range []string{"approval-requester@example.test", "approval-reviewer@example.test", "emission-requester@example.test", "emission-reviewer@example.test"} {
 		r, e := db.Exec(`INSERT INTO users(email,name,password_hash,totp_secret,active,created_at,updated_at) SELECT ?, 'Aprobación sintética',password_hash,?,TRUE,UTC_TIMESTAMP(6),UTC_TIMESTAMP(6) FROM users WHERE id=1`, email, secret)
 		if e != nil {
 			log.Fatal(e)

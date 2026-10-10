@@ -18,4 +18,4 @@ Proveedores: src/app/modules/suppliers, ruta /suppliers y navegación según pro
 
 Procesos incorpora ruta /processes con filtros, interés/nota personal, versiones/diffs, CSV y estado protegido. Conversión a borrador de cotización disponible con Quotes habilitado y permisos de ambos módulos; resultados AI pendientes.
 
-Cotizaciones: ruta /quotes, borradores/cálculo backend, snapshots, historial/clones/papelera y filtros URL. PDF de borrador y adjuntos implementados; correo/estados/bulk pendientes; no módulo completo.
+Cotizaciones: ruta /quotes, borradores/cálculo backend, snapshots, historial/clones/papelera y filtros URL. PDF de borrador y adjuntos implementados; estados/revisiones, aprobación humana y emisión de PDF aprobado implementados; correo/bulk pendientes; no módulo completo.

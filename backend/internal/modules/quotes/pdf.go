@@ -172,6 +172,12 @@ func AmountWords(v, currency string) (string, error) {
 	return apocope(words(n)) + connector + unit + " con " + fixed[1] + "/100", nil
 }
 func RenderPDF(q PublicQuote) ([]byte, int, error) {
+	return renderPDF(q, false)
+}
+func RenderIssuedPDF(q PublicQuote) ([]byte, int, error) {
+	return renderPDF(q, true)
+}
+func renderPDF(q PublicQuote, issued bool) ([]byte, int, error) {
 	if q.Template != 1 || ValidateGraphic(q.Logo) != nil || ValidateGraphic(q.Stamp) != nil {
 		return nil, 0, core.Invalid
 	}
@@ -197,7 +203,11 @@ func RenderPDF(q PublicQuote) ([]byte, int, error) {
 			return e
 		}
 		pdf.SetXY(42, 800)
-		if e := pdf.Cell(nil, fmt.Sprintf("%s | Versión %d | Página %d | BORRADOR - no enviada", q.Number, q.Version, pages)); e != nil {
+		label := "BORRADOR - no enviada"
+		if issued {
+			label = "EMITIDA - no acredita envío"
+		}
+		if e := pdf.Cell(nil, fmt.Sprintf("%s | Versión %d | Página %d | %s", q.Number, q.Version, pages, label)); e != nil {
 			return e
 		}
 		y = 42

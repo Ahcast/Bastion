@@ -128,6 +128,13 @@ func (s *Service) ModuleFiles(logger *slog.Logger, enabled bool, objects core.Ob
 			return Calculate(p)
 		})
 		if s.Approvals != nil {
+			register("POST /api/v1/quotes/{id}/emit", func(ctx context.Context, a core.Actor, r *http.Request) (any, error) {
+				var p EmitInput
+				if e := required(r, &p, "version", "approval_id"); e != nil {
+					return nil, e
+				}
+				return s.Emit(ctx, a, r.PathValue("id"), r.Header.Get("Idempotency-Key"), p)
+			})
 			register("GET /api/v1/quotes/{id}/approvals", func(ctx context.Context, a core.Actor, r *http.Request) (any, error) {
 				f, e := filter(r)
 				if e != nil {

@@ -233,7 +233,7 @@ func (s *Service) PDFs(ctx context.Context, a core.Actor, id string, page, limit
 	if e := s.Core.DB.QueryRowContext(ctx, `SELECT COUNT(*) FROM quote_pdf_snapshots WHERE quote_id=?`, id).Scan(&total); e != nil {
 		return nil, e
 	}
-	data, e := s.Core.Rows(ctx, `SELECT CAST(id AS CHAR) id,CAST(quote_version AS CHAR) quote_version,CAST(document_id AS CHAR) document_id,status,created_at FROM quote_pdf_snapshots WHERE quote_id=? ORDER BY id DESC LIMIT ? OFFSET ?`, id, limit, (page-1)*limit)
+	data, e := s.Core.Rows(ctx, `SELECT CAST(id AS CHAR) id,CAST(quote_version AS CHAR) quote_version,CAST(document_id AS CHAR) document_id,status,kind,CAST(approval_id AS CHAR) approval_id,issued_at,created_at FROM quote_pdf_snapshots WHERE quote_id=? ORDER BY id DESC LIMIT ? OFFSET ?`, id, limit, (page-1)*limit)
 	if e != nil {
 		return nil, e
 	}

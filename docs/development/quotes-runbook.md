@@ -1,6 +1,6 @@
 # Ejecutar Cotizaciones (borradores)
 
-Requiere Core Go, migraciones globales hasta 0009 en MySQL5.7 aislado y Angular. Seguir [Core](core-runbook.md); no migrar producción como parte de pruebas. BASTION_QUOTES_ENABLED=true (default) registra rutas/tools, false requiere reinicio y conserva tablas. Clientes/Procesos deshabilitados retiran sus integraciones; manual sigue funcionando. Roles requieren asignación explícita cotizaciones.view/create/update/delete/pdf; root técnico no recibe esos permisos. Papelera/restauración requieren reautenticación reciente desde el Core.
+Requiere Core Go, migraciones globales hasta 0010 en MySQL5.7 aislado y Angular. Seguir [Core](core-runbook.md); no migrar producción como parte de pruebas. BASTION_QUOTES_ENABLED=true (default) registra rutas/tools, false requiere reinicio y conserva tablas. Clientes/Procesos deshabilitados retiran sus integraciones; manual sigue funcionando. Roles requieren asignación explícita cotizaciones.view/create/update/delete/pdf; root técnico no recibe esos permisos. Papelera/restauración requieren reautenticación reciente desde el Core.
 
 [Contrato](../contracts/quotes.md) y [OpenAPI](../contracts/quotes-openapi.json). Guardar requiere agregado editable completo, versión cadena y Idempotency-Key. Resolver un ID de cliente carga snapshot autorizado; conservar el ID mantiene el snapshot. Desvincular ID permite edición manual; un cambio del maestro no reescribe cotizaciones. Conversión desde proceso usa fecha elegida, solo entidad y expediente, deja ítems vacíos; no crea cliente automáticamente. Falta de permiso Clientes usa texto manual sin revelar coincidencias.
 
@@ -20,7 +20,7 @@ Generación usa versión guardada, snapshot público y objetos inmutables. Rende
 
 UI permite vincular documento existente con versión, subir directamente mediante presign sin cookie, verificar integridad y vincular. Reintento de ACK de verificación conserva cuarentena/disponibilidad ya confirmada tras reautorizar. Solo scanner autorizado puede aprobar contenido subido. Papelera/restauración Core versionada no borra objetos; bloquea descarga/reemplazo. PDFs generados no admiten reemplazo/papelera genérica. Clonación no copia adjuntos. Vista previa abre visor del navegador con tipo seguro y URL temporal; descarga fuerza attachment. Ambas requieren contenido aprobado y políticas live. Revisar PDF/adjuntos y datos guardados antes de futura emisión.
 
-Siguiente unidad obligatoria: Workflow debe poseer aprobación humana por acción/entidad/versión/hash/vigencia, consumida por Quotes mediante servicio público. Estados y emisión no aceptan PATCH libre ni aprobación inventada. Definir contrato/migración/políticas antes de código; comprobar revisión, cambios de adjuntos, revocación y aprobación obsoleta antes de conectar SMTP inmediato/programado.
+Aprobación implementada: Workflow posee aprobación humana por acción/entidad/versión/hash/vigencia, consumida por Quotes mediante servicio público. La emisión usa el contrato descrito abajo; estados no aceptan PATCH libre ni aprobación inventada. Comprobar revisión, adjuntos y aprobación obsoleta antes de conectar SMTP.
 
 ## Estados preliminares
 
@@ -34,4 +34,14 @@ Consultar aprobaciones → solicitar con vigencia explícita → otro usuario re
 
 Ante timeout repetir misma intención/payload; el replay de solicitud confirmada funciona incluso después de vencer y vuelve a exigir permisos actuales. Una intención nueva necesita vigencia futura. Confirmar identidad borra contraseña y segundo factor del formulario tras cada intento. Deshabilitar Workflow retira rutas de aprobación; datos se conservan, hash/versiones se revalidan al reactivar.
 
-Esta unidad no emite PDF final ni envía correo. El PDF actual conserva BORRADOR; siguiente unidad es emisión segura ligada al consumo único de aprobación, antes de SMTP/programación/bulk/FX y aceptación completa de Cotizaciones.
+La aprobación por sí sola no emite ni envía. La emisión es una acción separada, descrita abajo.
+
+## Emitir PDF aprobado
+
+Aplicar 0010 y asignar cotizaciones.emit explícitamente, además de view/pdf y core.documents.write. Configurar Files/almacenamiento privado y Workflow. Consultar aprobaciones de una versión guardada approved: solo una aprobación vigente para esa versión permite Emitir PDF aprobado. Confirmar identidad si se requiere; guardar o cancelar ediciones pendientes primero. Una emisión consume la aprobación y aparece en Consultar PDFs como Emitida; quotes conserva estado Aprobada internamente hasta implementar entrega real. No se marca Enviada ni se encola correo.
+
+Timeout: reintentar misma intención/payload. pending conserva la proyección congelada; edición/revocación/vencimiento/pérdida de autoridad impiden completarla. Después del commit un replay autorizado recupera el documento histórico sin consumir otra aprobación, aunque se haya creado otra revisión. PDFs emitidos no se reemplazan ni se eliminan; editar crea borrador y requiere nueva revisión/aprobación para emitir de nuevo. Cambios de empresa/activos no reescriben documentos históricos.
+
+Prueba navegador: tests/browserapp es una composición exclusiva de bastion_browser_test, development/loopback, sin email/MCP; usa almacenamiento en memoria con objetos inmutables y URLs temporales para probar descarga de bytes. No forma parte de make build ni del servidor productivo; no certifica S3/IAM. CI arranca esta composición y conserva API, políticas y MySQL reales. Producción usa cmd/server y adapter S3 original.
+
+Próxima unidad: envío inmediato/programado con autorización específica de destinatarios/contenido/adjuntos, mismo PDF emitido y ledger SMTP; luego bulk/FX y aceptación integral antes de OC.

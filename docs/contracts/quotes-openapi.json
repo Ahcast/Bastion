@@ -1,9 +1,9 @@
 {
   "openapi": "3.0.3",
   "info": {
-    "title": "Bastion Cotizaciones: borradores, archivos, estados y aprobaciones",
-    "version": "0.4.0",
-    "description": "Aprobación humana interna vinculada a versión, contenido y vigencia. Emisión, envío, bulk y conversiones OC/Factura pendientes. Ver quotes.md."
+    "title": "Bastion Cotizaciones: borradores, archivos, aprobaciones y emisión",
+    "version": "0.5.0",
+    "description": "Emisión de PDF inmutable con aprobación consumida transaccionalmente. Correo, bulk y conversiones OC/Factura pendientes. Ver quotes.md."
   },
   "paths": {
     "/api/v1/quotes": {
@@ -1211,6 +1211,70 @@
           }
         }
       }
+    },
+    "/api/v1/quotes/{id}/emit": {
+      "post": {
+        "summary": "Emitir PDF aprobado con reautenticación; no envía correo",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]*$"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EmitInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "PDF emitido o evidencia histórica recuperada",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Emission"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sesión requerida"
+          },
+          "403": {
+            "description": "Permiso o reautenticación requerida"
+          },
+          "404": {
+            "description": "No visible"
+          },
+          "409": {
+            "description": "Versión, contenido, vigencia o aprobación conflictiva"
+          },
+          "422": {
+            "description": "DTO inválido"
+          },
+          "503": {
+            "description": "Files o Workflow deshabilitados"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -1606,6 +1670,66 @@
           "entity_id": {
             "type": "string",
             "pattern": "^[1-9][0-9]*$"
+          }
+        }
+      },
+      "EmitInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "version",
+          "approval_id"
+        ],
+        "properties": {
+          "version": {
+            "type": "string",
+            "pattern": "^[1-9][0-9]*$"
+          },
+          "approval_id": {
+            "type": "string",
+            "pattern": "^[1-9][0-9]*$"
+          }
+        }
+      },
+      "Emission": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "document_id",
+          "quote_version",
+          "status",
+          "kind",
+          "approval_id"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[1-9][0-9]*$"
+          },
+          "document_id": {
+            "type": "string",
+            "pattern": "^[1-9][0-9]*$"
+          },
+          "quote_version": {
+            "type": "string",
+            "pattern": "^[1-9][0-9]*$"
+          },
+          "approval_id": {
+            "type": "string",
+            "pattern": "^[1-9][0-9]*$"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "available"
+            ]
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "issued"
+            ]
           }
         }
       }

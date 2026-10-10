@@ -15,7 +15,7 @@ import (
 	"time"
 )
 
-var Permissions = []string{"cotizaciones.view", "cotizaciones.create", "cotizaciones.update", "cotizaciones.delete", "cotizaciones.pdf", "cotizaciones.transition", "cotizaciones.request_approval", "cotizaciones.approve", "cotizaciones.revoke_approval"}
+var Permissions = []string{"cotizaciones.view", "cotizaciones.create", "cotizaciones.update", "cotizaciones.delete", "cotizaciones.pdf", "cotizaciones.transition", "cotizaciones.request_approval", "cotizaciones.approve", "cotizaciones.revoke_approval", "cotizaciones.emit"}
 
 type CustomerInput struct {
 	ID      string `json:"id"`

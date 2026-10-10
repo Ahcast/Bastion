@@ -73,3 +73,38 @@ func TestTotalInSpanishWordsAndGraphicValidation(t *testing.T) {
 		t.Fatal("invalid graphic")
 	}
 }
+
+func TestIssuedPDFDeterministicDistinctFromDraftAndLongPagination(t *testing.T) {
+	p := publicFixture()
+	draft, _, e := RenderPDF(p)
+	if e != nil {
+		t.Fatal(e)
+	}
+	issued, pages, e := RenderIssuedPDF(p)
+	if e != nil || pages != 1 || bytes.Equal(draft, issued) {
+		t.Fatal(pages, e)
+	}
+	again, _, e := RenderIssuedPDF(p)
+	if e != nil || !bytes.Equal(again, issued) {
+		t.Fatal("issued bytes changed", e)
+	}
+	if path := os.Getenv("BASTION_PDF_ISSUED_OUTPUT"); path != "" {
+		if e = os.WriteFile(path, issued, 0600); e != nil {
+			t.Fatal(e)
+		}
+	}
+	p.Items[0].Description = strings.Repeat("Especificación sintética con acentos. ", 500)
+	long, n, e := RenderIssuedPDF(p)
+	if e != nil || n < 3 {
+		t.Fatal(n, e)
+	}
+	if path := os.Getenv("BASTION_PDF_ISSUED_LONG_OUTPUT"); path != "" {
+		if e = os.WriteFile(path, long, 0600); e != nil {
+			t.Fatal(e)
+		}
+	}
+	p.Items[0].Description = "Glifo no soportado 🔥"
+	if _, _, e = RenderIssuedPDF(p); e != core.Invalid {
+		t.Fatal(e)
+	}
+}

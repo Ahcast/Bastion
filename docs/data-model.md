@@ -126,3 +126,5 @@ Archivos Quotes incorpora quote_pdf_snapshots en 0007: FK a versión inmutable, 
 Estados preliminares Quotes reutilizan quotes.status/version y quote_versions; 0008 registra permiso de transición sin asignarlo a roles. No se crean tablas de aprobación antes de implementar su propietario Workflow. Ver contrato Quotes para grafo y revisiones.
 
 Aprobaciones humanas en 0009: Workflow posee approvals/approval_events con binding de acción/entidad/versión/hash, ámbito, solicitante/aprobador, vigencia, versión y eventos append-only. Quotes aplica solicitud/decisión/revocación y cambios comerciales en la misma TX. Ningún ledger de aprobación entrega correo; consumo único deberá compartir la TX del efecto comercial. No se crean workflow_definitions/instances configurables antes de su fase.
+
+Emisión Quotes en 0010 amplía quote_pdf_snapshots: kind draft/issued, approval_id único, binding_hash e issued_by/issued_at. La emisión conserva la versión aprobada de Quote y consume Workflow en la misma TX del documento/auditoría/hecho. pending no tiene documento descargable; approved no significa sent.
