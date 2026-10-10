@@ -39,10 +39,11 @@ for file in sorted((ROOT / 'docs' / 'contracts').glob('*-openapi.json')):
     openapi_docs[file.name] = document
 
 # Quotes is the active commercial module and its Go registry is authoritative for
-# exposed REST operations. Keep the machine-readable contract from lagging behind
-# newly registered routes. Static register("METHOD /path", ...) calls are found
-# automatically; three legacy routes are assembled by a small loop in module.go
-# and are declared explicitly here until that registration is made static.
+# exposed REST operations. Keep the machine-readable contract synchronized in
+# both directions: every registered route must be documented and every documented
+# REST operation must still exist. Static register("METHOD /path", ...) calls are
+# found automatically; three legacy routes are assembled by a small loop in
+# module.go and are declared explicitly here until that registration is static.
 quotes_contract = openapi_docs.get('quotes-openapi.json')
 quotes_dir = ROOT / 'backend' / 'internal' / 'modules' / 'quotes'
 if quotes_contract is not None and quotes_dir.is_dir():
@@ -72,6 +73,11 @@ if quotes_contract is not None and quotes_dir.is_dir():
         errors.append(
             'docs/contracts/quotes-openapi.json: '
             f'missing registered Quotes route {method.upper()} {path}'
+        )
+    for method, path in sorted(documented - registered):
+        errors.append(
+            'docs/contracts/quotes-openapi.json: '
+            f'documents nonexistent Quotes route {method.upper()} {path}'
         )
 
 if errors:
