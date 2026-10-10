@@ -32,6 +32,10 @@ func emailAuthorizationFixture(t *testing.T) (*quotes.Service, core.Actor, core.
 
 func requestEmailAuthorization(t *testing.T, s *quotes.Service, a core.Actor, id, snapshot, key string) map[string]string {
 	t.Helper()
+	// Truncating to the current hour makes an intentional replay with the same
+	// idempotency key byte-for-byte identical while keeping the approval future-dated.
+	scheduled := time.Now().UTC().Truncate(time.Hour).Add(2 * time.Hour)
+	expires := scheduled.Add(time.Hour)
 	v, e := s.RequestEmailAuthorization(ctx, a, id, key, quotes.EmailAuthorizationRequest{
 		QuoteVersion:  4,
 		PDFSnapshotID: snapshot,
@@ -41,8 +45,8 @@ func requestEmailAuthorization(t *testing.T, s *quotes.Service, a core.Actor, id
 		AttachmentIDs: []string{},
 		Subject:       "Cotización aprobada",
 		Message:       "Adjuntamos la cotización aprobada.",
-		ScheduledAt:   time.Now().Add(time.Minute).UTC().Format(time.RFC3339Nano),
-		ExpiresAt:     time.Now().Add(time.Hour).UTC().Format(time.RFC3339Nano),
+		ScheduledAt:   scheduled.Format(time.RFC3339Nano),
+		ExpiresAt:     expires.Format(time.RFC3339Nano),
 		Reason:        "Autorizar envío comercial",
 	})
 	if e != nil {
