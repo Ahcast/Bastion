@@ -61,7 +61,12 @@ func smtpHostAllowed(host string, allowed []string) bool {
 }
 
 func (s *Service) failEmailIntent(ctx context.Context, id, code string) error {
-	_, e := s.Core.DB.ExecContext(ctx, `UPDATE quote_email_intents SET status='failed',error_code=?,updated_at=UTC_TIMESTAMP(6) WHERE id=? AND status IN ('queued','preparing','sending')`, code, id)
+	_, e := s.Core.DB.ExecContext(ctx, `UPDATE quote_email_intents SET status='failed',error_code=?,updated_at=UTC_TIMESTAMP(6) WHERE id=? AND status IN ('queued','preparing')`, code, id)
+	return e
+}
+
+func (s *Service) failSendingBeforeExternal(ctx context.Context, id, code string) error {
+	_, e := s.Core.DB.ExecContext(ctx, `UPDATE quote_email_intents SET status='failed',error_code=?,updated_at=UTC_TIMESTAMP(6) WHERE id=? AND status='sending'`, code, id)
 	return e
 }
 
@@ -91,6 +96,7 @@ func (s *Service) CommercialEmailHandler(reader EmailObjectReader, mailer core.M
 		a := core.Actor{Type: "user", ID: j.UserID, UserID: j.UserID, Source: "job", RequestID: security.ID(), CorrelationID: j.CorrelationID}
 		var intent quoteEmailIntent
 		var files []emailFile
+		alreadyAccepted := false
 		e := s.Core.Transact(ctx, func(tx *sql.Tx) error {
 			var lease string
 			if e := tx.QueryRowContext(ctx, `SELECT lease_token FROM jobs WHERE id=? AND lease_until>UTC_TIMESTAMP(6) FOR UPDATE`, j.ID).Scan(&lease); e != nil || lease != j.Lease {
@@ -101,10 +107,17 @@ func (s *Service) CommercialEmailHandler(reader EmailObjectReader, mailer core.M
 			if e != nil {
 				return e
 			}
-			if intent.JobID != j.ID || intent.Status != "queued" {
-				if intent.Status == "accepted" {
-					return nil
-				}
+			if intent.JobID != j.ID {
+				return core.Conflict
+			}
+			switch intent.Status {
+			case "accepted":
+				alreadyAccepted = true
+				return nil
+			case "sending", "uncertain":
+				return core.ErrUncertain
+			case "queued", "preparing":
+			default:
 				return core.Conflict
 			}
 			q, e := s.access(ctx, tx, a, payload.QuoteID, "cotizaciones.view", false, false)
@@ -122,9 +135,21 @@ func (s *Service) CommercialEmailHandler(reader EmailObjectReader, mailer core.M
 			if e != nil {
 				return e
 			}
+			if intent.Status == "preparing" {
+				return nil
+			}
 			return core.Changed(tx.ExecContext(ctx, `UPDATE quote_email_intents SET status='preparing',error_code=NULL,updated_at=UTC_TIMESTAMP(6) WHERE id=? AND status='queued'`, intent.ID))
 		})
+		if alreadyAccepted {
+			return nil
+		}
 		if e != nil {
+			if e == core.ErrUncertain {
+				if intent.Status == "sending" {
+					return s.uncertainEmailIntent(ctx, payload.IntentID)
+				}
+				return core.ErrUncertain
+			}
 			_ = s.failEmailIntent(ctx, payload.IntentID, "preparation_rejected")
 			return e
 		}
@@ -192,7 +217,9 @@ func (s *Service) CommercialEmailHandler(reader EmailObjectReader, mailer core.M
 			return e
 		}
 		if e = s.Core.JobAllowed(ctx, j); e != nil {
-			_ = s.failEmailIntent(ctx, intent.ID, "authorization_revoked")
+			// The network call has not started yet, so this state is known failed,
+			// not uncertain, even though the sending marker was already persisted.
+			_ = s.failSendingBeforeExternal(ctx, intent.ID, "authorization_revoked")
 			return e
 		}
 		sendCtx, cancel := context.WithTimeout(ctx, 20*time.Second)
