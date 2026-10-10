@@ -65,7 +65,13 @@ func (s *Server) error(w http.ResponseWriter, r *http.Request, e error) {
 			ce = core.Conflict
 		} else {
 			ce = &core.Error{Code: "internal", Message: "No se pudo completar la operación.", Status: 500}
-			s.Logger.Error("request failed", "request_id", w.Header().Get("X-Request-ID"), "method", r.Method, "path", r.URL.Path)
+			// Classify failures without logging driver messages, SQL, payloads or
+			// credentials. The stable numeric code makes concurrency diagnosable.
+			databaseCode := uint16(0)
+			if me != nil {
+				databaseCode = me.Number
+			}
+			s.Logger.Error("request failed", "request_id", w.Header().Get("X-Request-ID"), "method", r.Method, "path", r.URL.Path, "database_error_number", databaseCode, "context_canceled", errors.Is(e, context.Canceled), "deadline_exceeded", errors.Is(e, context.DeadlineExceeded))
 		}
 	}
 	s.json(w, ce.Status, map[string]any{"code": ce.Code, "message": ce.Message, "request_id": w.Header().Get("X-Request-ID")})
