@@ -1,9 +1,9 @@
 {
   "openapi": "3.0.3",
   "info": {
-    "title": "Bastion Cotizaciones: unidad de borradores",
-    "version": "0.1.0",
-    "description": "Contrato limitado a esta unidad; PDF/envío/bulk/estados y conversiones OC/Factura pendientes. Salidas y cálculo canónico detallados en quotes.md."
+    "title": "Bastion Cotizaciones: borradores, archivos y PDF",
+    "version": "0.2.0",
+    "description": "Borradores/cálculo/adjuntos/PDF de borrador implementados. Emisión/envío/bulk/estados y conversiones OC/Factura pendientes. Ver quotes.md."
   },
   "paths": {
     "/api/v1/quotes": {
@@ -578,6 +578,301 @@
             }
           }
         ]
+      }
+    },
+    "/api/v1/quotes/{id}/documents": {
+      "get": {
+        "summary": "Listar adjuntos autorizados",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]*$"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          {
+            "name": "per_page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            }
+          },
+          {
+            "name": "deleted",
+            "in": "query",
+            "schema": {
+              "type": "boolean",
+              "default": false
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Resultado autorizado"
+          },
+          "403": {
+            "description": "Acceso denegado"
+          },
+          "404": {
+            "description": "No visible"
+          },
+          "409": {
+            "description": "Versión o intención conflictiva"
+          },
+          "422": {
+            "description": "Entrada inválida"
+          },
+          "503": {
+            "description": "Integración deshabilitada"
+          }
+        }
+      },
+      "post": {
+        "summary": "Vincular documento existente y versionar cotización",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]*$"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Resultado autorizado"
+          },
+          "403": {
+            "description": "Acceso denegado"
+          },
+          "404": {
+            "description": "No visible"
+          },
+          "409": {
+            "description": "Versión o intención conflictiva"
+          },
+          "422": {
+            "description": "Entrada inválida"
+          },
+          "503": {
+            "description": "Integración deshabilitada"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "document_id",
+                  "document_version",
+                  "version"
+                ],
+                "properties": {
+                  "document_id": {
+                    "type": "string",
+                    "pattern": "^[1-9][0-9]*$"
+                  },
+                  "document_version": {
+                    "type": "string",
+                    "pattern": "^[1-9][0-9]*$"
+                  },
+                  "version": {
+                    "type": "string",
+                    "pattern": "^[1-9][0-9]*$"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/quotes/{id}/pdf": {
+      "post": {
+        "summary": "Generar o recuperar PDF de versión guardada",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]*$"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Resultado autorizado"
+          },
+          "403": {
+            "description": "Acceso denegado"
+          },
+          "404": {
+            "description": "No visible"
+          },
+          "409": {
+            "description": "Versión o intención conflictiva"
+          },
+          "422": {
+            "description": "Entrada inválida"
+          },
+          "503": {
+            "description": "Integración deshabilitada"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "version"
+                ],
+                "properties": {
+                  "version": {
+                    "type": "string",
+                    "pattern": "^[1-9][0-9]*$"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/quotes/{id}/pdfs": {
+      "get": {
+        "summary": "Listar snapshots PDF autorizados",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]*$"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          {
+            "name": "per_page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Resultado autorizado"
+          },
+          "403": {
+            "description": "Acceso denegado"
+          },
+          "404": {
+            "description": "No visible"
+          },
+          "409": {
+            "description": "Versión o intención conflictiva"
+          },
+          "422": {
+            "description": "Entrada inválida"
+          },
+          "503": {
+            "description": "Integración deshabilitada"
+          }
+        }
+      }
+    },
+    "/api/v1/quotes/{id}/pdfs/{snapshot}/download": {
+      "get": {
+        "summary": "Descargar PDF inmutable mediante política Core",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]*$"
+            }
+          },
+          {
+            "name": "snapshot",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]*$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Resultado autorizado"
+          },
+          "403": {
+            "description": "Acceso denegado"
+          },
+          "404": {
+            "description": "No visible"
+          },
+          "409": {
+            "description": "Versión o intención conflictiva"
+          },
+          "422": {
+            "description": "Entrada inválida"
+          },
+          "503": {
+            "description": "Integración deshabilitada"
+          }
+        }
       }
     }
   },

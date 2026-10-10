@@ -89,6 +89,9 @@ func object(v any) map[string]any {
 	return m
 }
 func (s *Service) Module(logger *slog.Logger, enabled bool) registry.Module {
+	return s.ModuleFiles(logger, enabled, nil)
+}
+func (s *Service) ModuleFiles(logger *slog.Logger, enabled bool, objects core.Objects) registry.Module {
 	return registry.Module{ID: "quotes", Label: "Cotizaciones", Version: "0.1.0", Enabled: enabled, Dependencies: []string{"core"}, Permissions: Permissions, Routes: func(mux *http.ServeMux) {
 		register := func(p string, f api.Action) { mux.Handle(p, api.Operation(s.Core, logger, f)) }
 		register("GET /api/v1/quotes", func(ctx context.Context, a core.Actor, r *http.Request) (any, error) {
@@ -150,6 +153,48 @@ func (s *Service) Module(logger *slog.Logger, enabled bool) registry.Module {
 				return s.Trash(ctx, a, r.PathValue("id"), r.Header.Get("Idempotency-Key"), p.Version, op == "restore")
 			})
 		}
+		register("GET /api/v1/quotes/{id}/documents", func(ctx context.Context, a core.Actor, r *http.Request) (any, error) {
+			f, e := filter(r)
+			if e != nil {
+				return nil, e
+			}
+			return s.Documents(ctx, a, r.PathValue("id"), f.Page, f.PerPage, f.Deleted)
+		})
+		register("POST /api/v1/quotes/{id}/documents", func(ctx context.Context, a core.Actor, r *http.Request) (any, error) {
+			var p struct {
+				Document        string `json:"document_id"`
+				Version         uint64 `json:"version,string"`
+				DocumentVersion uint64 `json:"document_version,string"`
+			}
+			if e := required(r, &p, "document_id", "version", "document_version"); e != nil {
+				return nil, e
+			}
+			return s.LinkDocument(ctx, a, r.PathValue("id"), r.Header.Get("Idempotency-Key"), p.Document, p.Version, p.DocumentVersion)
+		})
+		register("POST /api/v1/quotes/{id}/pdf", func(ctx context.Context, a core.Actor, r *http.Request) (any, error) {
+			var p struct {
+				Version uint64 `json:"version,string"`
+			}
+			if e := required(r, &p, "version"); e != nil {
+				return nil, e
+			}
+			return s.GeneratePDF(ctx, a, r.PathValue("id"), r.Header.Get("Idempotency-Key"), p.Version)
+		})
+		register("GET /api/v1/quotes/{id}/pdfs", func(ctx context.Context, a core.Actor, r *http.Request) (any, error) {
+			f, e := filter(r)
+			if e != nil {
+				return nil, e
+			}
+			return s.PDFs(ctx, a, r.PathValue("id"), f.Page, f.PerPage)
+		})
+		register("GET /api/v1/quotes/{id}/pdfs/{snapshot}/download", func(ctx context.Context, a core.Actor, r *http.Request) (any, error) {
+			id, e := s.PDFDocument(ctx, a, r.PathValue("id"), r.PathValue("snapshot"))
+			if e != nil {
+				return nil, e
+			}
+			return s.Core.DownloadFile(ctx, a, id, 0, objects)
+		})
+
 		if s.Processes != nil {
 			register("POST /api/v1/processes/{id}/create-quote", func(ctx context.Context, a core.Actor, r *http.Request) (any, error) {
 				var p FromProcessInput

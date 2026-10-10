@@ -597,7 +597,7 @@ func (s *Service) Documents(ctx context.Context, a core.Actor, id string, page, 
 	if _, e := s.Get(ctx, a, id); e != nil {
 		return nil, e
 	}
-	predicate := `d.entity_type='customers' AND d.entity_id=? AND EXISTS(SELECT 1 FROM user_roles ur JOIN role_permissions rp ON rp.role_id=ur.role_id WHERE ur.user_id=? AND rp.permission='core.documents.read' AND (rp.scope='all' OR (rp.scope='self' AND d.owner_id=?) OR (rp.scope='team' AND EXISTS(SELECT 1 FROM team_members tm WHERE tm.team_id=d.team_id AND tm.user_id=?))))`
+	predicate := `d.deleted_at IS NULL AND d.entity_type='customers' AND d.entity_id=? AND EXISTS(SELECT 1 FROM user_roles ur JOIN role_permissions rp ON rp.role_id=ur.role_id WHERE ur.user_id=? AND rp.permission='core.documents.read' AND (rp.scope='all' OR (rp.scope='self' AND d.owner_id=?) OR (rp.scope='team' AND EXISTS(SELECT 1 FROM team_members tm WHERE tm.team_id=d.team_id AND tm.user_id=?))))`
 	args := []any{id, a.UserID, a.UserID, a.UserID}
 	var total int
 	if e := s.Core.DB.QueryRowContext(ctx, `SELECT COUNT(*) FROM documents d WHERE `+predicate, args...).Scan(&total); e != nil {

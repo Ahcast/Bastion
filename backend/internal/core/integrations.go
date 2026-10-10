@@ -14,12 +14,15 @@ type Integrations struct {
 
 // Deployment flags are an upper bound; administrative configuration can disable integrations immediately.
 func (s *Service) IntegrationEnabled(ctx context.Context, name string) bool {
+	return s.IntegrationEnabledUsing(ctx, s.DB, name)
+}
+func (s *Service) IntegrationEnabledUsing(ctx context.Context, q Querier, name string) bool {
 	ceiling := map[string]bool{"mcp": s.Config.MCP, "files": s.Config.Files, "email": s.Config.Email}
 	if !ceiling[name] {
 		return false
 	}
 	var raw string
-	e := s.DB.QueryRowContext(ctx, "SELECT value FROM settings WHERE name='integrations'").Scan(&raw)
+	e := q.QueryRowContext(ctx, "SELECT value FROM settings WHERE name='integrations'").Scan(&raw)
 	if e == sql.ErrNoRows {
 		return true
 	}

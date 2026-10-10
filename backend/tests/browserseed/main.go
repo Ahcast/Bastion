@@ -105,10 +105,18 @@ func main() {
 	if _, e = db.Exec(`INSERT INTO roles(id,name) VALUES(5,'Cotizaciones sintético')`); e != nil {
 		log.Fatal(e)
 	}
-	if _, e = db.Exec(`INSERT INTO role_permissions SELECT 5,name,'all' FROM permissions WHERE name LIKE 'cotizaciones.%' OR name='procesos.view'`); e != nil {
+	if _, e = db.Exec(`INSERT INTO role_permissions SELECT 5,name,'all' FROM permissions WHERE name LIKE 'cotizaciones.%' OR name IN ('procesos.view','core.documents.read','core.documents.write')`); e != nil {
 		log.Fatal(e)
 	}
 	if _, e = db.Exec(`INSERT INTO user_roles VALUES(5,5)`); e != nil {
+		log.Fatal(e)
+	}
+
+	// Synthetic quarantined metadata only: no S3 request, bytes or scanner bypass.
+	if _, e = db.Exec(`INSERT INTO documents(id,owner_id,created_at) VALUES(900,5,UTC_TIMESTAMP(6))`); e != nil {
+		log.Fatal(e)
+	}
+	if _, e = db.Exec(`INSERT INTO document_versions VALUES(900,1,'synthetic-browser/attachment.pdf','adjunto-sintetico.pdf','application/pdf',9,?,'quarantined',NULL,UTC_TIMESTAMP(6))`, security.Hash("synthetic")); e != nil {
 		log.Fatal(e)
 	}
 

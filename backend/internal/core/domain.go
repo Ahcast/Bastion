@@ -30,7 +30,9 @@ func (s *Service) BindDocument(ctx context.Context, tx *sql.Tx, a Actor, id, ent
 	var owner string
 	var team, kind sql.NullString
 	var old uint64
-	if e := tx.QueryRowContext(ctx, `SELECT owner_id,team_id,entity_type,version FROM documents WHERE id=? FOR UPDATE`, id).Scan(&owner, &team, &kind, &old); e != nil {
+	var deleted sql.NullTime
+	var generated bool
+	if e := tx.QueryRowContext(ctx, `SELECT owner_id,team_id,entity_type,version,deleted_at,is_generated FROM documents WHERE id=? FOR UPDATE`, id).Scan(&owner, &team, &kind, &old, &deleted, &generated); e != nil {
 		if e == sql.ErrNoRows {
 			return Missing
 		}
@@ -39,7 +41,7 @@ func (s *Service) BindDocument(ctx context.Context, tx *sql.Tx, a Actor, id, ent
 	if e := s.Authorize(ctx, tx, a, "core.documents.write", owner, team.String, true); e != nil {
 		return Missing
 	}
-	if kind.Valid || old != version {
+	if kind.Valid || deleted.Valid || generated || old != version {
 		return Conflict
 	}
 	if e := Changed(tx.ExecContext(ctx, `UPDATE documents SET entity_type=?,entity_id=?,version=version+1 WHERE id=? AND version=?`, entity, entityID, id, version)); e != nil {

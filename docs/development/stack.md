@@ -19,7 +19,7 @@ Core implementado con Go 1.27.2, Angular 22.2.2, TypeScript 6.0.3 y Node 24.19.0
 | Frontend | Angular estable soportado + TypeScript/RxJS compatibles; Node 24 LTS para build; npm lockfile |
 | UI | Formularios accesibles, navegación modular; una biblioteca visual mantenida compatible, sin cambiar menú |
 | Tests | testing/httptest de Go; Angular y navegador para flujos; unittest Python existente |
-| PDF | Generación servidor/worker ligera evaluada; no hacer del PDF navegador/base64 la fuente persistida |
+| PDF | gopdf v0.38.1 + x/image v0.47.0, fuente Go Unicode integrada, renderer Go ligero; bytes persistidos en S3 |
 
 El agente fija versiones exactas en go.mod/go.sum y package-lock.json tras una instalación/build/prueba. No copiar el antiguo supuesto Angular 22 + TypeScript 6 sin validar la matriz vigente. No prereleases ni upgrade automático de majors. Registrar selección/razón en decisions.md. Si una biblioteca no cumple MySQL 5.7, seguridad o memoria, escoger alternativa compatible y documentar.
 

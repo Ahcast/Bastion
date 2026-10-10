@@ -26,10 +26,7 @@ func main() {
 		os.Exit(1)
 	}
 	defer s.DB.Close()
-	if e = composition.Register(s, r, logger); e != nil {
-		logger.Error("module configuration unavailable")
-		os.Exit(1)
-	}
+
 	ctx, cancel = context.WithTimeout(context.Background(), 5*time.Second)
 	e = database.Ready(ctx, s.DB)
 	cancel()
@@ -45,6 +42,11 @@ func main() {
 			os.Exit(1)
 		}
 	}
+	if e = composition.RegisterFiles(s, r, logger, objects); e != nil {
+		logger.Error("module configuration unavailable")
+		os.Exit(1)
+	}
+
 	server := &http.Server{Addr: s.Config.Listen, Handler: api.New(s, r, objects, logger), ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 15 * time.Second, WriteTimeout: 30 * time.Second, IdleTimeout: 60 * time.Second, MaxHeaderBytes: 16 * 1024}
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, syscall.SIGTERM, syscall.SIGINT)

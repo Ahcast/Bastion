@@ -14,7 +14,7 @@ import (
 	"time"
 )
 
-var Permissions = []string{"cotizaciones.view", "cotizaciones.create", "cotizaciones.update", "cotizaciones.delete"}
+var Permissions = []string{"cotizaciones.view", "cotizaciones.create", "cotizaciones.update", "cotizaciones.delete", "cotizaciones.pdf"}
 
 type CustomerInput struct {
 	ID      string `json:"id"`
@@ -68,9 +68,11 @@ type ProcessSource interface {
 	QuoteSourceInTransaction(context.Context, *sql.Tx, core.Actor, string) (processes.QuoteSource, error)
 }
 type Service struct {
-	Core      *core.Service
-	Customers CustomerSource
-	Processes ProcessSource
+	Core        *core.Service
+	Customers   CustomerSource
+	Processes   ProcessSource
+	Store       PDFStore
+	Logo, Stamp []byte
 }
 
 func normalize(p *Input) error {

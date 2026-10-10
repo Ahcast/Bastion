@@ -53,11 +53,15 @@ func (s *Service) DocumentAccess(ctx context.Context, q Querier, a Actor, id, pe
 	var team, entity, eid sql.NullString
 	var number int
 	var version uint64
-	if e := q.QueryRowContext(ctx, "SELECT owner_id,team_id,entity_type,entity_id,current_version,version FROM documents WHERE id=?", id).Scan(&owner, &team, &entity, &eid, &number, &version); e != nil {
+	var deleted sql.NullTime
+	if e := q.QueryRowContext(ctx, "SELECT owner_id,team_id,entity_type,entity_id,current_version,version,deleted_at FROM documents WHERE id=?", id).Scan(&owner, &team, &entity, &eid, &number, &version, &deleted); e != nil {
 		if e == sql.ErrNoRows {
 			return 0, 0, Missing
 		}
 		return 0, 0, e
+	}
+	if deleted.Valid {
+		return 0, 0, Missing
 	}
 	if e := s.Authorize(ctx, q, a, permission, owner, team.String, false); e != nil {
 		return 0, 0, Missing
@@ -107,11 +111,12 @@ func (s *Service) CreateFile(ctx context.Context, a Actor, id, key string, c Fil
 				docID = WrapID(n)
 			} else {
 				var old int
+				var generated bool
 				var version uint64
-				if e := tx.QueryRowContext(ctx, "SELECT current_version,version FROM documents WHERE id=? FOR UPDATE", docID).Scan(&old, &version); e != nil {
+				if e := tx.QueryRowContext(ctx, "SELECT current_version,version,is_generated FROM documents WHERE id=? FOR UPDATE", docID).Scan(&old, &version, &generated); e != nil {
 					return nil, e
 				}
-				if version != c.Version {
+				if generated || version != c.Version {
 					return nil, Conflict
 				}
 				number = old + 1
@@ -164,6 +169,10 @@ func (s *Service) FinalizeFile(ctx context.Context, a Actor, id string, objects 
 	var size int64
 	if e = s.DB.QueryRowContext(ctx, "SELECT object_key,media_type,checksum,size_bytes,status FROM document_versions WHERE document_id=? AND number=?", id, number).Scan(&key, &media, &hash, &size, &status); e != nil {
 		return e
+	}
+	if status == "quarantined" || status == "available" {
+		// A lost verification acknowledgement is safe to replay after live authorization.
+		return nil
 	}
 	if status != "pending" {
 		return Conflict
@@ -246,7 +255,7 @@ func (s *Service) Documents(ctx context.Context, a Actor, limit, offset int) (an
 	if !hasDocumentGrant(grants) {
 		return nil, Forbidden
 	}
-	rows, e := s.DB.QueryContext(ctx, `SELECT d.id,d.current_version,d.version,v.filename,v.media_type,v.size_bytes,v.status FROM documents d JOIN document_versions v ON v.document_id=d.id AND v.number=d.current_version WHERE d.entity_type IS NULL AND (EXISTS(SELECT 1 FROM user_roles ur JOIN role_permissions rp ON rp.role_id=ur.role_id WHERE ur.user_id=? AND rp.permission='core.documents.read' AND (rp.scope='all' OR (rp.scope='self' AND d.owner_id=?) OR (rp.scope='team' AND EXISTS(SELECT 1 FROM team_members tm WHERE tm.team_id=d.team_id AND tm.user_id=?))))) ORDER BY d.id DESC LIMIT ? OFFSET ?`, a.UserID, a.UserID, a.UserID, limit, offset)
+	rows, e := s.DB.QueryContext(ctx, `SELECT d.id,d.current_version,d.version,v.filename,v.media_type,v.size_bytes,v.status FROM documents d JOIN document_versions v ON v.document_id=d.id AND v.number=d.current_version WHERE d.deleted_at IS NULL AND d.entity_type IS NULL AND (EXISTS(SELECT 1 FROM user_roles ur JOIN role_permissions rp ON rp.role_id=ur.role_id WHERE ur.user_id=? AND rp.permission='core.documents.read' AND (rp.scope='all' OR (rp.scope='self' AND d.owner_id=?) OR (rp.scope='team' AND EXISTS(SELECT 1 FROM team_members tm WHERE tm.team_id=d.team_id AND tm.user_id=?))))) ORDER BY d.id DESC LIMIT ? OFFSET ?`, a.UserID, a.UserID, a.UserID, limit, offset)
 	if e != nil {
 		return nil, e
 	}

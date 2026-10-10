@@ -16,4 +16,4 @@ Frontend Angular/MySQL/correo permanecen en Bluehost. Core/API/MCP/crawler/worke
 
 Proveedores: internal/modules/suppliers, migración 0003_suppliers.sql y composición independiente de Clientes. [Ejecutar y validar](../docs/development/suppliers-runbook.md).
 
-Quotes implementa borradores/cálculo, clones/versiones/papelera y conversión desde Procesos. [Runbook](../docs/development/quotes-runbook.md); emisión/adjuntos/correo/estados/bulk/conversiones OC/Factura pendientes.
+Quotes implementa borradores/cálculo, clones/versiones/papelera y conversión desde Procesos. [Runbook](../docs/development/quotes-runbook.md); PDF de borrador/adjuntos implementados; emisión/correo/estados/bulk/conversiones OC/Factura pendientes.

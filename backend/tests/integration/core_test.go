@@ -404,6 +404,9 @@ func TestFilesQuarantineChecksumAndAccess(t *testing.T) {
 	if _, e = s.DownloadFile(ctx, a, id, 0, fake); e != core.Forbidden {
 		t.Fatal("quarantine bypass", e)
 	}
+	if e = s.FinalizeFile(ctx, a, id, fake); e != nil {
+		t.Fatal("lost verification ACK could not replay", e)
+	}
 	if e = s.ScanFile(ctx, a, id, 1, true, "synthetic-scan-evidence"); e != nil {
 		t.Fatal(e)
 	}

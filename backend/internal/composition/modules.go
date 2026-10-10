@@ -9,11 +9,15 @@ import (
 	"github.com/Ahcast/Bastion/backend/internal/modules/processes"
 	"github.com/Ahcast/Bastion/backend/internal/modules/quotes"
 	"github.com/Ahcast/Bastion/backend/internal/modules/suppliers"
+	"io"
 	"log/slog"
 	"os"
 )
 
 func Register(s *core.Service, r *registry.Registry, logger *slog.Logger) error {
+	return RegisterFiles(s, r, logger, nil)
+}
+func RegisterFiles(s *core.Service, r *registry.Registry, logger *slog.Logger, objects core.Objects) error {
 	enabled := true
 	if v := os.Getenv("BASTION_CUSTOMERS_ENABLED"); v != "" {
 		if v != "true" && v != "false" {
@@ -72,6 +76,28 @@ func Register(s *core.Service, r *registry.Registry, logger *slog.Logger) error 
 		quoteEnabled = v == "true"
 	}
 	quoteService := &quotes.Service{Core: s}
+	if quoteEnabled && objects != nil {
+		store, ok := objects.(quotes.PDFStore)
+		if !ok {
+			return fmt.Errorf("generated PDF storage unavailable")
+		}
+		quoteService.Store = store
+	}
+	for name, dst := range map[string]*[]byte{"BASTION_PDF_LOGO": &quoteService.Logo, "BASTION_PDF_STAMP": &quoteService.Stamp} {
+		if path := os.Getenv(name); quoteEnabled && path != "" {
+			f, e := os.Open(path)
+			if e != nil {
+				return fmt.Errorf("PDF graphic unavailable")
+			}
+			data, e := io.ReadAll(io.LimitReader(f, 1024*1024+1))
+			f.Close()
+			if e != nil || quotes.ValidateGraphic(data) != nil {
+				return fmt.Errorf("invalid PDF graphic")
+			}
+			*dst = data
+		}
+	}
+
 	if enabled {
 		quoteService.Customers = service
 	}
@@ -80,8 +106,12 @@ func Register(s *core.Service, r *registry.Registry, logger *slog.Logger) error 
 	}
 	if quoteEnabled {
 		s.RegisterPermissions(quotes.Permissions, []string{"cotizaciones.view"})
+		s.DocumentPolicies["quotes"] = quoteService.DocumentPolicy
 	}
-	if e := r.Register(quoteService.Module(logger, quoteEnabled)); e != nil {
+	if !quoteEnabled {
+		delete(s.DocumentPolicies, "quotes")
+	}
+	if e := r.Register(quoteService.ModuleFiles(logger, quoteEnabled, objects)); e != nil {
 		return e
 	}
 	return r.Validate()

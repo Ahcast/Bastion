@@ -550,6 +550,22 @@ func (s *Server) routes() {
 		}
 		return nil, s.Service.ReconcileEmail(r.Context(), x.Actor, r.PathValue("id"), p.Status, p.Reference)
 	})
+	for _, restore := range []bool{false, true} {
+		pattern := "DELETE /api/v1/documents/{id}"
+		if restore {
+			pattern = "POST /api/v1/documents/{id}/restore"
+		}
+		s.handle(pattern, true, func(w http.ResponseWriter, r *http.Request, x request) (any, error) {
+			var p struct {
+				Version uint64 `json:"version,string"`
+			}
+			if e := Decode(r, &p); e != nil {
+				return nil, e
+			}
+			return s.Service.TrashFile(r.Context(), x.Actor, r.PathValue("id"), r.Header.Get("Idempotency-Key"), p.Version, restore)
+		})
+	}
+
 	s.handle("GET /api/v1/documents", true, func(w http.ResponseWriter, r *http.Request, x request) (any, error) {
 		l, o, e := page(r)
 		if e != nil {
