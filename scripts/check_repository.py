@@ -39,14 +39,12 @@ for file in sorted((ROOT / 'docs' / 'contracts').glob('*-openapi.json')):
     openapi_docs[file.name] = document
 
 # Quotes is the active commercial module and its Go registry is authoritative for
-# exposed REST operations. Keep the machine-readable contract synchronized in
-# both directions: every registered route must be documented and every documented
-# REST operation must still exist. Static register("METHOD /path", ...) calls are
-# found automatically. Five legacy routes are assembled by loops in module.go and
-# are declared explicitly here until their registration becomes static.
-quotes_contract = openapi_docs.get('quotes-openapi.json')
+# exposed REST operations. The mature quote aggregate and the isolated FX
+# observation foundation have separate machine-readable contracts; their union
+# must match the Go registry exactly and a route may not be documented twice.
+quotes_contract_names = ('quotes-openapi.json', 'quotes-fx-openapi.json')
 quotes_dir = ROOT / 'backend' / 'internal' / 'modules' / 'quotes'
-if quotes_contract is not None and quotes_dir.is_dir():
+if all(name in openapi_docs for name in quotes_contract_names) and quotes_dir.is_dir():
     route_pattern = re.compile(
         r'register\("(GET|POST|PATCH|PUT|DELETE) (/api/v1/[^"\\]+)"'
     )
@@ -62,23 +60,35 @@ if quotes_contract is not None and quotes_dir.is_dir():
         ('post', '/api/v1/quotes/{id}/restore'),
     })
 
-    documented: set[tuple[str, str]] = set()
-    for path, operations in quotes_contract['paths'].items():
-        if not isinstance(operations, dict):
-            errors.append(f'docs/contracts/quotes-openapi.json: invalid operations for {path}')
-            continue
-        for method in operations:
-            if method.lower() in {'get', 'post', 'patch', 'put', 'delete'}:
-                documented.add((method.lower(), path))
+    documented_by: dict[tuple[str, str], str] = {}
+    for contract_name in quotes_contract_names:
+        contract = openapi_docs[contract_name]
+        for path, operations in contract['paths'].items():
+            if not isinstance(operations, dict):
+                errors.append(f'docs/contracts/{contract_name}: invalid operations for {path}')
+                continue
+            for method in operations:
+                operation = (method.lower(), path)
+                if operation[0] not in {'get', 'post', 'patch', 'put', 'delete'}:
+                    continue
+                previous = documented_by.get(operation)
+                if previous is not None:
+                    errors.append(
+                        f'docs/contracts/{contract_name}: duplicates {method.upper()} {path} '
+                        f'already documented by {previous}'
+                    )
+                else:
+                    documented_by[operation] = contract_name
 
+    documented = set(documented_by)
     for method, path in sorted(registered - documented):
         errors.append(
-            'docs/contracts/quotes-openapi.json: '
-            f'missing registered Quotes route {method.upper()} {path}'
+            'Quotes OpenAPI contracts: '
+            f'missing registered route {method.upper()} {path}'
         )
     for method, path in sorted(documented - registered):
         errors.append(
-            'docs/contracts/quotes-openapi.json: '
+            f'docs/contracts/{documented_by[(method, path)]}: '
             f'documents nonexistent Quotes route {method.upper()} {path}'
         )
 
