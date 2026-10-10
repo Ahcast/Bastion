@@ -57,6 +57,7 @@ func required(r *http.Request, v any, names ...string) error {
 	r.Body = io.NopCloser(bytes.NewReader(b))
 	return api.Decode(r, v)
 }
+
 func filter(r *http.Request) (Filter, error) {
 	f := Filter{Search: r.URL.Query().Get("search"), Page: 1, PerPage: 25}
 	var e error
@@ -76,21 +77,25 @@ func filter(r *http.Request) (Filter, error) {
 	}
 	return f, nil
 }
+
 func safe(e error) error {
 	if e == nil || core.IsClient(e) {
 		return e
 	}
 	return &core.Error{Code: "internal", Message: "No se pudo completar la operación.", Status: 500}
 }
+
 func object(v any) map[string]any {
 	b, _ := json.Marshal(v)
 	var m map[string]any
 	_ = json.Unmarshal(b, &m)
 	return m
 }
+
 func (s *Service) Module(logger *slog.Logger, enabled bool) registry.Module {
 	return s.ModuleFiles(logger, enabled, nil)
 }
+
 func (s *Service) ModuleFiles(logger *slog.Logger, enabled bool, objects core.Objects) registry.Module {
 	return registry.Module{ID: "quotes", Label: "Cotizaciones", Version: "0.1.0", Enabled: enabled, Dependencies: []string{"core"}, Permissions: Permissions, Routes: func(mux *http.ServeMux) {
 		register := func(p string, f api.Action) { mux.Handle(p, api.Operation(s.Core, logger, f)) }
@@ -162,6 +167,27 @@ func (s *Service) ModuleFiles(logger *slog.Logger, enabled bool, objects core.Ob
 					return nil, e
 				}
 				return s.RevokeApproval(ctx, a, r.PathValue("id"), r.PathValue("approval"), r.Header.Get("Idempotency-Key"), p)
+			})
+			register("POST /api/v1/quotes/{id}/email-authorizations", func(ctx context.Context, a core.Actor, r *http.Request) (any, error) {
+				var p EmailAuthorizationRequest
+				if e := required(r, &p, "quote_version", "pdf_snapshot_id", "to", "cc", "bcc", "attachment_ids", "subject", "message", "scheduled_at", "expires_at", "reason"); e != nil {
+					return nil, e
+				}
+				return s.RequestEmailAuthorization(ctx, a, r.PathValue("id"), r.Header.Get("Idempotency-Key"), p)
+			})
+			register("POST /api/v1/quotes/{id}/email-authorizations/{intent}/decision", func(ctx context.Context, a core.Actor, r *http.Request) (any, error) {
+				var p EmailAuthorizationDecision
+				if e := required(r, &p, "version", "decision", "reason"); e != nil {
+					return nil, e
+				}
+				return s.DecideEmailAuthorization(ctx, a, r.PathValue("id"), r.PathValue("intent"), r.Header.Get("Idempotency-Key"), p)
+			})
+			register("POST /api/v1/quotes/{id}/email-authorizations/{intent}/revoke", func(ctx context.Context, a core.Actor, r *http.Request) (any, error) {
+				var p EmailAuthorizationRevoke
+				if e := required(r, &p, "version", "reason"); e != nil {
+					return nil, e
+				}
+				return s.RevokeEmailAuthorization(ctx, a, r.PathValue("id"), r.PathValue("intent"), r.Header.Get("Idempotency-Key"), p)
 			})
 		}
 		register("PATCH /api/v1/quotes/{id}/status", func(ctx context.Context, a core.Actor, r *http.Request) (any, error) {
