@@ -42,24 +42,24 @@ type EmailAuthorizationRevoke struct {
 }
 
 type quoteEmailIntent struct {
-	ID             string
-	QuoteID        string
-	QuoteVersion   uint64
-	PDFSnapshotID  string
-	CreatedBy      string
-	To             []string
-	CC             []string
-	BCC            []string
-	AttachmentIDs  []string
-	Subject        string
-	Message        string
-	ScheduledAt    time.Time
-	BindingHash    string
-	ApprovalID     string
-	Status         string
-	MessageID      string
-	JobID          string
-	ErrorCode      string
+	ID            string
+	QuoteID       string
+	QuoteVersion  uint64
+	PDFSnapshotID string
+	CreatedBy     string
+	To            []string
+	CC            []string
+	BCC           []string
+	AttachmentIDs []string
+	Subject       string
+	Message       string
+	ScheduledAt   time.Time
+	BindingHash   string
+	ApprovalID    string
+	Status        string
+	MessageID     string
+	JobID         string
+	ErrorCode     string
 }
 
 func normalizeQuoteEmailRequest(p *EmailAuthorizationRequest) (time.Time, time.Time, error) {
@@ -169,16 +169,16 @@ func (s *Service) emailBinding(ctx context.Context, tx *sql.Tx, a core.Actor, q 
 		return b, e
 	}
 	input := struct {
-		Schema      int            `json:"schema"`
-		QuoteID     string         `json:"quote_id"`
-		QuoteVersion uint64        `json:"quote_version,string"`
-		To          []string       `json:"to"`
-		CC          []string       `json:"cc"`
-		BCC         []string       `json:"bcc"`
-		Subject     string         `json:"subject"`
-		Message     string         `json:"message"`
-		ScheduledAt string         `json:"scheduled_at"`
-		Evidence    map[string]any `json:"evidence"`
+		Schema       int            `json:"schema"`
+		QuoteID      string         `json:"quote_id"`
+		QuoteVersion uint64         `json:"quote_version,string"`
+		To           []string       `json:"to"`
+		CC           []string       `json:"cc"`
+		BCC          []string       `json:"bcc"`
+		Subject      string         `json:"subject"`
+		Message      string         `json:"message"`
+		ScheduledAt  string         `json:"scheduled_at"`
+		Evidence     map[string]any `json:"evidence"`
 	}{quoteEmailBindingSchema, q.ID, q.Version, intent.To, intent.CC, intent.BCC, intent.Subject, intent.Message, intent.ScheduledAt.UTC().Format(time.RFC3339Nano), evidence}
 	raw, e := json.Marshal(input)
 	if e != nil {
