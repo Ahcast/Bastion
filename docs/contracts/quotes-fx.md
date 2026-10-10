@@ -39,9 +39,11 @@ El ledger es información global y no pertenece a un usuario o equipo. Por ello 
 
 Contrato machine-readable: `quotes-fx-openapi.json`.
 
-- `GET /api/v1/quotes/fx-observations`
-- `GET /api/v1/quotes/fx-observations/{id}`
-- `POST /api/v1/quotes/fx-observations`
+El namespace FX se separa deliberadamente de `/api/v1/quotes/{id}/...` para que una palabra reservada de FX nunca pueda interpretarse como ID de cotización por el router HTTP.
+
+- `GET /api/v1/quote-fx/observations`
+- `GET /api/v1/quote-fx/observations/{id}`
+- `POST /api/v1/quote-fx/observations`
 
 Listado acepta `rate_kind`, `source`, `page` y `per_page` (máximo 100). Escritura exige `Idempotency-Key`; DTO completo y estricto. `base_currency`, `quote_currency`, actor, timestamps técnicos y estado `superseded` son server-side y no se aceptan en el POST.
 
@@ -83,6 +85,8 @@ Debe verificarse en MySQL 5.7 y race detector:
 7. manual/corrección sin motivo rechazados;
 8. ventana temporal y escala inválidas rechazadas;
 9. fallo de auditoría revierte observación e intención;
-10. REST DTO estricto y OpenAPI sincronizado.
+10. REST DTO estricto y OpenAPI sincronizado;
+11. el namespace REST no colisiona con rutas `/quotes/{id}/...`;
+12. Angular y navegador dejan explícito que registrar una observación no convierte cotizaciones.
 
 Esta aceptación **no cierra FX completo**. La siguiente subunidad no puede convertir cotizaciones hasta promover una política explícita de selección/vigencia/redondeo desde la propuesta FX al contrato correspondiente.
