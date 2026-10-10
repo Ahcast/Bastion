@@ -55,3 +55,19 @@ func (s *S3) DownloadURL(ctx context.Context, key, name string) (string, error) 
 	}
 	return r.URL, nil
 }
+
+func (s *S3) PreviewURL(ctx context.Context, key, name, media string) (string, error) {
+	switch media {
+	case "application/pdf", "image/png", "image/jpeg":
+	case "text/plain":
+		media = "text/plain; charset=utf-8"
+	default:
+		return "", core.Invalid
+	}
+	d := mime.FormatMediaType("inline", map[string]string{"filename": name})
+	r, e := s.Presign.PresignGetObject(ctx, &s3.GetObjectInput{Bucket: aws.String(s.Bucket), Key: aws.String(key), ResponseContentDisposition: aws.String(d), ResponseContentType: aws.String(media)}, s3.WithPresignExpires(5*time.Minute))
+	if e != nil {
+		return "", fmt.Errorf("s3 presign: %w", e)
+	}
+	return r.URL, nil
+}

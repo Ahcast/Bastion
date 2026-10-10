@@ -217,7 +217,18 @@ func (s *Service) ScanFile(ctx context.Context, a Actor, id string, number int, 
 		return s.Audit(ctx, tx, a, "files.scan", "document", id, status, map[string]any{"number": number, "scanner_reference": reference})
 	})
 }
+
+type PreviewObjects interface {
+	PreviewURL(context.Context, string, string, string) (string, error)
+}
+
+func (s *Service) PreviewFile(ctx context.Context, a Actor, id string, number int, objects Objects) (any, error) {
+	return s.deliverFile(ctx, a, id, number, objects, true)
+}
 func (s *Service) DownloadFile(ctx context.Context, a Actor, id string, number int, objects Objects) (any, error) {
+	return s.deliverFile(ctx, a, id, number, objects, false)
+}
+func (s *Service) deliverFile(ctx context.Context, a Actor, id string, number int, objects Objects, preview bool) (any, error) {
 	if !s.IntegrationEnabled(ctx, "files") || objects == nil {
 		return nil, Disabled
 	}
@@ -228,18 +239,34 @@ func (s *Service) DownloadFile(ctx context.Context, a Actor, id string, number i
 	if number == 0 {
 		number = current
 	}
-	var key, name, status string
-	if e = s.DB.QueryRowContext(ctx, "SELECT object_key,filename,status FROM document_versions WHERE document_id=? AND number=?", id, number).Scan(&key, &name, &status); e != nil {
+	var key, name, status, media string
+	if e = s.DB.QueryRowContext(ctx, "SELECT object_key,filename,status,media_type FROM document_versions WHERE document_id=? AND number=?", id, number).Scan(&key, &name, &status, &media); e != nil {
 		return nil, Missing
 	}
 	if status != "available" {
 		return nil, Forbidden
 	}
-	url, e := objects.DownloadURL(ctx, key, name)
+	var url string
+	action := "files.download"
+	if preview {
+		switch media {
+		case "application/pdf", "image/png", "image/jpeg", "text/plain":
+		default:
+			return nil, Invalid
+		}
+		renderer, ok := objects.(PreviewObjects)
+		if !ok {
+			return nil, Disabled
+		}
+		url, e = renderer.PreviewURL(ctx, key, name, media)
+		action = "files.preview"
+	} else {
+		url, e = objects.DownloadURL(ctx, key, name)
+	}
 	if e != nil {
 		return nil, e
 	}
-	if e = s.Audit(ctx, s.DB, a, "files.download", "document", id, "success", map[string]int{"number": number}); e != nil {
+	if e = s.Audit(ctx, s.DB, a, action, "document", id, "success", map[string]int{"number": number}); e != nil {
 		return nil, e
 	}
 	return map[string]any{"url": url, "expires_in": int((5 * time.Minute).Seconds())}, nil

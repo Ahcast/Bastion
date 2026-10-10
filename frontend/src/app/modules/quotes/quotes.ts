@@ -22,6 +22,7 @@ export class Quotes implements OnInit{
  if(this.uploadState.stage==='uploaded'){await this.api.write('POST',`/documents/${this.uploadState.id}/finalize`);this.uploadState.stage='verified'}
  this.documentId=this.uploadState.id;this.documentVersion='1';this.busy.set(false);await this.linkDocument();if(!this.error()){this.file=null;this.uploadState=null;this.pending.delete('quote-upload:'+q.id)}
  }catch(e){this.error.set(this.api.message(e))}finally{this.busy.set(false)}}
+ async previewDocument(id:string){try{const r=await this.api.get<{url:string}>(`/documents/${id}/preview`);window.open(r.url,'_blank','noopener,noreferrer')}catch(e){this.error.set(this.api.message(e))}}
  async downloadDocument(id:string){try{const r=await this.api.get<{url:string}>(`/documents/${id}/download`);window.open(r.url,'_blank','noopener,noreferrer')}catch(e){this.error.set(this.api.message(e))}}
  async loadPDFs(){const q=this.selected();if(!q)return;try{const r=await this.api.get<{data:{id:string;quote_version:string;status:string}[];total:number}>(`/quotes/${q.id}/pdfs?page=${this.pdfPage}`);this.pdfs.set(r.data);this.pdfTotal.set(r.total)}catch(e){this.error.set(this.api.message(e))}}
  async generatePDF(){const q=this.selected();if(!q||this.busy())return;const path=`/quotes/${q.id}/pdf`,body={version:q.version};this.busy.set(true);this.error.set('');try{await this.api.write('POST',path,body,this.key(path,body));this.pending.delete(path);await this.loadPDFs()}catch(e){this.error.set(this.api.message(e))}finally{this.busy.set(false)}}

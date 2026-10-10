@@ -42,6 +42,12 @@ func (f *pdfObjects) UploadURL(context.Context, string, string, int64, string) (
 func (f *pdfObjects) DownloadURL(context.Context, string, string) (string, error) {
 	return "https://example.test/authorized-download", nil
 }
+func (f *pdfObjects) PreviewURL(ctx context.Context, key, name, media string) (string, error) {
+	if media != "application/pdf" {
+		return "", core.Invalid
+	}
+	return "https://example.test/authorized-preview", nil
+}
 func (f *pdfObjects) Info(ctx context.Context, key string) (core.ObjectInfo, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
@@ -172,12 +178,18 @@ func TestQuotePDFConcurrentIntentAndRollbackAfterObjectWrite(t *testing.T) {
 		t.Fatal("duplicate objects", len(f.data))
 	}
 }
+
+type previewObjects struct{ objects }
+
+func (f previewObjects) PreviewURL(context.Context, string, string, string) (string, error) {
+	return "https://example.test/authorized-preview", nil
+}
 func TestQuoteAttachmentsBothPoliciesQuarantineTrashAndRestore(t *testing.T) {
 	s, a, _ := pdfFixture(t)
 	id := makeQuote(t, s, a, "file-quote-create", quoteInput())
 	content := "%PDF-1.7\nsynthetic"
 	raw, _ := hexBytes(security.Hash(content))
-	f := objects{core.ObjectInfo{Size: int64(len(content)), Checksum: base64Checksum(raw), Prefix: []byte(content)}}
+	f := previewObjects{objects{core.ObjectInfo{Size: int64(len(content)), Checksum: base64Checksum(raw), Prefix: []byte(content)}}}
 	v, e := s.Core.CreateFile(ctx, a, "", "quote-upload-file", core.FileRequest{Filename: "test.pdf", MediaType: "application/pdf", Size: int64(len(content)), Checksum: security.Hash(content)}, f)
 	if e != nil {
 		t.Fatal(e)
@@ -200,6 +212,9 @@ func TestQuoteAttachmentsBothPoliciesQuarantineTrashAndRestore(t *testing.T) {
 	}
 	if _, e = s.Core.DownloadFile(ctx, a, doc, 0, f); e != core.Forbidden {
 		t.Fatal(e)
+	}
+	if _, e = s.Core.PreviewFile(ctx, a, doc, 0, f); e != core.Forbidden {
+		t.Fatal("quarantine preview", e)
 	}
 	if e = s.Core.ScanFile(ctx, a, doc, 1, true, "synthetic-scan-reference"); e != nil {
 		t.Fatal(e)
@@ -224,9 +239,15 @@ func TestQuoteAttachmentsBothPoliciesQuarantineTrashAndRestore(t *testing.T) {
 	if _, e = s.Core.DownloadFile(ctx, a, doc, 0, f); e != nil {
 		t.Fatal(e)
 	}
+	if _, e = s.Core.PreviewFile(ctx, a, doc, 0, f); e != nil {
+		t.Fatal("approved preview", e)
+	}
 	delete(s.Core.DocumentPolicies, "quotes")
 	if _, e = s.Core.DownloadFile(ctx, a, doc, 0, f); e != core.Forbidden {
 		t.Fatal("disabled policy", e)
+	}
+	if _, e = s.Core.PreviewFile(ctx, a, doc, 0, f); e != core.Forbidden {
+		t.Fatal("disabled preview policy", e)
 	}
 	_ = fmt.Sprint(doc)
 }

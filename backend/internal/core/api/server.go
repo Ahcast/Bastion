@@ -607,6 +607,18 @@ func (s *Server) routes() {
 		}
 		return s.Service.DownloadFile(r.Context(), x.Actor, r.PathValue("id"), n, s.Objects)
 	})
+	s.handle("GET /api/v1/documents/{id}/preview", true, func(w http.ResponseWriter, r *http.Request, x request) (any, error) {
+		n := 0
+		if q := r.URL.Query().Get("number"); q != "" {
+			var e error
+			n, e = strconv.Atoi(q)
+			if e != nil || n < 1 {
+				return nil, core.Invalid
+			}
+		}
+		return s.Service.PreviewFile(r.Context(), x.Actor, r.PathValue("id"), n, s.Objects)
+	})
+
 	s.mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) { s.error(w, r, core.Missing) })
 }
 func (s *Server) Modules(ctx context.Context, a core.Actor) (any, error) {
