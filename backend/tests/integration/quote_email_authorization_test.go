@@ -12,6 +12,14 @@ import (
 func emailAuthorizationFixture(t *testing.T) (*quotes.Service, core.Actor, core.Actor, string, string) {
 	t.Helper()
 	s, a, reviewer, id, emit := emissionFixture(t)
+	// Reviewing a commercial send includes reviewing the exact issued PDF and
+	// attachments. The reviewer therefore needs read access to that evidence;
+	// Quotes approval permissions alone are intentionally insufficient.
+	if _, e := s.Core.DB.Exec(`INSERT INTO role_permissions(role_id,permission,scope)
+		SELECT ur.role_id,'core.documents.read','all' FROM user_roles ur WHERE ur.user_id=?
+		ON DUPLICATE KEY UPDATE scope=VALUES(scope)`, reviewer.UserID); e != nil {
+		t.Fatal(e)
+	}
 	if _, e := s.Emit(ctx, a, id, "email-auth-issued", emit); e != nil {
 		t.Fatal(e)
 	}
@@ -150,7 +158,7 @@ func TestQuoteEmailAuthorizationRequiresIssuedCurrentPDFAndLiveGrant(t *testing.
 		ScheduledAt:   time.Now().UTC().Format(time.RFC3339Nano),
 		ExpiresAt:     time.Now().Add(time.Hour).UTC().Format(time.RFC3339Nano),
 		Reason:        "No debe ignorar autorización vigente",
-	}); e != core.Forbidden {
+	}); e != core.Missing {
 		t.Fatal("send grant bypass", e)
 	}
 }
