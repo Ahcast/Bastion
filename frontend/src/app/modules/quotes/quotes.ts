@@ -4,6 +4,7 @@ import {JsonPipe,DatePipe} from '@angular/common';
 import {Reauthentication} from '../../core/security/reauthentication';
 import {ActivatedRoute,Router,RouterLink} from '@angular/router';
 import {Client} from '../../core/api/client';
+import {QuoteEmail} from './quote-email';
 export interface Item {description:string;unit:string;quantity:string;unit_price:string;unit_cost:string;discount_type:string;discount:string;tax:string}
 interface Customer{id:string;name:string;rtn:string;contact:string;phone:string;email:string;address:string}
 export interface Input{customer:Customer;reference:string;date:string;validity_days:number;currency:string;terms:string;private_notes:string;author_contact:string;exoneration_reference:string;general_discount_type:string;general_discount:string;items:Item[];version:string}
@@ -12,7 +13,7 @@ export interface Quote extends Omit<Input,'items'>{id:string;number:string;statu
 export interface PDFSnapshot{id:string;quote_version:string;status:string;kind:'draft'|'issued';approval_id?:string;issued_at?:string}
 export interface Approval{id:string;entity_version:string;version:string;requested_by:string;decided_by:string;status:string;reason:string;expires_at:string;valid:boolean;invalid_reason:string}
 export function empty():Input{return {customer:{id:'',name:'',rtn:'',contact:'',phone:'',email:'',address:''},reference:'',date:new Intl.DateTimeFormat('en-CA',{timeZone:'America/Tegucigalpa',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date()),validity_days:30,currency:'HNL',terms:'',private_notes:'',author_contact:'',exoneration_reference:'',general_discount_type:'amount',general_discount:'0',items:[],version:'0'}}
-@Component({imports:[FormsModule,JsonPipe,DatePipe,RouterLink,Reauthentication],templateUrl:'./quotes.html'})
+@Component({imports:[FormsModule,JsonPipe,DatePipe,RouterLink,Reauthentication,QuoteEmail],templateUrl:'./quotes.html'})
 export class Quotes implements OnInit{
  api=inject(Client);route=inject(ActivatedRoute);router=inject(Router);rows=signal<Summary[]>([]);selected=signal<Quote|null>(null);history=signal<Quote[]>([]);historyTotal=signal(0);historyPage=1;error=signal('');busy=signal(false);total=signal(0);preview=signal<Record<string,string|number>|null>(null);editing=signal(false);form=empty();search='';deleted=false;page=1;private pending=new Map<string,{body:string;key:string}>();
  documents=signal<{id:string;version:string;filename:string;status:string;media_type:string}[]>([]);documentTotal=signal(0);documentPage=1;documentTrash=false;documentId='';documentVersion='1';pdfs=signal<PDFSnapshot[]>([]);pdfTotal=signal(0);pdfPage=1;file:File|null=null;private uploadState:{file:File;id:string;stage:'created'|'uploaded'|'verified'}|null=null;
