@@ -16,6 +16,7 @@ func init() {
 }
 
 var fxHashPattern = regexp.MustCompile(`^[a-f0-9]{64}$`)
+var fxDecimalPattern = regexp.MustCompile(`^(0|[1-9][0-9]*)(\.[0-9]+)?$`)
 
 type FXObservationInput struct {
 	RateKind          string `json:"rate_kind"`
@@ -79,7 +80,7 @@ func validFXSource(v string) bool {
 
 func normalizeFXRate(v string) (string, error) {
 	v = strings.TrimSpace(v)
-	if len(v) == 0 || len(v) > 25 || !decimalPattern.MatchString(v) {
+	if len(v) == 0 || len(v) > 25 || !fxDecimalPattern.MatchString(v) {
 		return "", core.Invalid
 	}
 	parts := strings.Split(v, ".")
