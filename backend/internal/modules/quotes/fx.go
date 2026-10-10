@@ -3,7 +3,6 @@ package quotes
 import (
 	"context"
 	"database/sql"
-	"fmt"
 	"regexp"
 	"strings"
 	"time"
@@ -169,6 +168,13 @@ func nullableTime(v *time.Time) any {
 	return *v
 }
 
+// FX observations are global reference data, not records owned by one user/team.
+// Requiring scope=all avoids accidentally granting global rate visibility through
+// a self/team grant. Managing the ledger is sensitive and requires recent reauth.
+func (s *Service) fxGate(ctx context.Context, q core.Querier, a core.Actor, permission string, sensitive bool) error {
+	return s.Core.Authorize(ctx, q, a, permission, "", "", sensitive)
+}
+
 func (s *Service) RecordFXObservation(ctx context.Context, a core.Actor, key string, p FXObservationInput) (any, error) {
 	if a.Type != "user" {
 		return nil, core.Forbidden
@@ -179,26 +185,26 @@ func (s *Service) RecordFXObservation(ctx context.Context, a core.Actor, key str
 	}
 	var out any
 	e = s.Core.Transact(ctx, func(tx *sql.Tx) error {
-		if e := s.gate(ctx, tx, a, "cotizaciones.fx.manage"); e != nil {
+		if e := s.fxGate(ctx, tx, a, "cotizaciones.fx.manage", true); e != nil {
 			return e
-		}
-		if p.SupersedesID != "" {
-			var original string
-			if e := tx.QueryRowContext(ctx, `SELECT CAST(id AS CHAR) FROM quote_fx_observations WHERE id=? FOR UPDATE`, p.SupersedesID).Scan(&original); e == sql.ErrNoRows {
-				return core.Missing
-			} else if e != nil {
-				return e
-			}
-			var n int
-			if e := tx.QueryRowContext(ctx, `SELECT COUNT(*) FROM quote_fx_observations WHERE supersedes_id=?`, p.SupersedesID).Scan(&n); e != nil {
-				return e
-			} else if n != 0 {
-				return core.Conflict
-			}
 		}
 		var e error
 		out, e = s.Core.Idempotent(ctx, tx, a, "quotes.fx_observation", key, p, func() (any, error) {
-			res, e := tx.ExecContext(ctx, `INSERT INTO quote_fx_observations(base_currency,quote_currency,rate_kind,rate,valid_from,valid_to,source,source_reference,source_published_at,evidence_hash,supersedes_id,reason,created_by,created_at) VALUES('USD','HNL',?,?,?,?,?,?,?,?,?,?,?, ?,UTC_TIMESTAMP(6))`, p.RateKind, p.Rate, *from, nullableTime(to), p.Source, p.SourceReference, nullableTime(published), p.EvidenceHash, nullable(p.SupersedesID), p.Reason, a.UserID)
+			if p.SupersedesID != "" {
+				var original string
+				if e := tx.QueryRowContext(ctx, `SELECT CAST(id AS CHAR) FROM quote_fx_observations WHERE id=? FOR UPDATE`, p.SupersedesID).Scan(&original); e == sql.ErrNoRows {
+					return nil, core.Missing
+				} else if e != nil {
+					return nil, e
+				}
+				var n int
+				if e := tx.QueryRowContext(ctx, `SELECT COUNT(*) FROM quote_fx_observations WHERE supersedes_id=?`, p.SupersedesID).Scan(&n); e != nil {
+					return nil, e
+				} else if n != 0 {
+					return nil, core.Conflict
+				}
+			}
+			res, e := tx.ExecContext(ctx, `INSERT INTO quote_fx_observations(base_currency,quote_currency,rate_kind,rate,valid_from,valid_to,source,source_reference,source_published_at,evidence_hash,supersedes_id,reason,created_by,created_at) VALUES('USD','HNL',?,?,?,?,?,?,?,?,?,?,?,UTC_TIMESTAMP(6))`, p.RateKind, p.Rate, *from, nullableTime(to), p.Source, p.SourceReference, nullableTime(published), p.EvidenceHash, nullable(p.SupersedesID), p.Reason, a.UserID)
 			if e != nil {
 				return nil, e
 			}
@@ -236,7 +242,7 @@ func (s *Service) GetFXObservation(ctx context.Context, a core.Actor, id string)
 	if core.ID(id) != nil {
 		return out, core.Invalid
 	}
-	if e := s.gate(ctx, s.Core.DB, a, "cotizaciones.fx.view"); e != nil {
+	if e := s.fxGate(ctx, s.Core.DB, a, "cotizaciones.fx.view", false); e != nil {
 		return out, e
 	}
 	out, e := scanFX(s.Core.DB.QueryRowContext(ctx, `SELECT `+fxColumns+` FROM quote_fx_observations o JOIN users u ON u.id=o.created_by WHERE o.id=?`, id))
@@ -247,11 +253,13 @@ func (s *Service) GetFXObservation(ctx context.Context, a core.Actor, id string)
 }
 
 func (s *Service) ListFXObservations(ctx context.Context, a core.Actor, f FXFilter) (FXPage, error) {
+	f.RateKind = strings.ToLower(strings.TrimSpace(f.RateKind))
+	f.Source = strings.ToLower(strings.TrimSpace(f.Source))
 	out := FXPage{Data: []FXObservation{}, Page: f.Page, PerPage: f.PerPage}
 	if f.Page < 1 || f.Page > 100000 || f.PerPage < 1 || f.PerPage > 100 || (f.RateKind != "" && !validFXKind(f.RateKind)) || (f.Source != "" && !validFXSource(f.Source)) {
 		return out, core.Invalid
 	}
-	if e := s.gate(ctx, s.Core.DB, a, "cotizaciones.fx.view"); e != nil {
+	if e := s.fxGate(ctx, s.Core.DB, a, "cotizaciones.fx.view", false); e != nil {
 		return out, e
 	}
 	where := `1=1`
@@ -280,8 +288,4 @@ func (s *Service) ListFXObservations(ctx context.Context, a core.Actor, f FXFilt
 		out.Data = append(out.Data, v)
 	}
 	return out, rows.Err()
-}
-
-func (v FXObservation) String() string {
-	return fmt.Sprintf("%s/%s %s %s", v.BaseCurrency, v.QuoteCurrency, v.RateKind, v.Rate)
 }
