@@ -38,7 +38,11 @@ export class QuoteBulk implements OnChanges{
  @Input() disabled=false;
  @Output() changed=new EventEmitter<void>();
  selected=signal<Set<string>>(new Set());busy=signal(false);error=signal('');notice=signal('');result=signal<BulkResponse|null>(null);target='costing';pending=signal<BulkRequest|null>(null);
- ngOnChanges(){this.selected.set(new Set())}
+ ngOnChanges(){
+  const visible=new Set(this.rows.map(q=>q.id));
+  const next=new Set([...this.selected()].filter(id=>visible.has(id)));
+  if(next.size!==this.selected().size)this.selected.set(next);
+ }
  count(){return this.selected().size}
  locked(){return this.busy()||this.disabled||!!this.pending()}
  allSelected(){return this.rows.length>0&&this.rows.every(q=>this.selected().has(q.id))}
