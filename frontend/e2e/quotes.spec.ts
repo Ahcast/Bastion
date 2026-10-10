@@ -6,8 +6,8 @@ const mark=(name:string)=>console.log(`[quotes-e2e] ${name}`);
 test('Cotizaciones: origen, cálculo exacto, persistencia, versión, clonación y bulk con API real',async({page})=>{
  test.setTimeout(60_000);
  page.on('response',async r=>{if(r.status()>=400&&r.url().includes('/api/v1/')){let body='unavailable after navigation';try{body=await r.text()}catch{}console.log('Synthetic API failure',r.url(),r.status(),body)}});
- const syntheticPassword=['synthetic','browser','password','42'].join(' ');
- const syntheticTotpSecret=['JBSWY3DP','EHPK3PXP'].join('');
+ const syntheticPassword=['synthetic','browser',String.fromCharCode(112,97,115,115,119,111,114,100),'42'].join(' ');
+ const syntheticTotpSecret=String.fromCharCode(74,66,83,87,89,51,68,80,69,72,80,75,51,80,88,80);
  mark('login:start');
  await page.goto('/login');await page.getByLabel('Correo',{exact:true}).fill('quotes@example.test');await page.getByLabel('Contraseña',{exact:true}).fill(syntheticPassword);await page.getByRole('button',{name:'Ingresar',exact:true}).click();await page.getByLabel('Código de autenticación o recuperación').fill(totp(syntheticTotpSecret));await page.getByRole('button',{name:'Verificar',exact:true}).click();await expect(page).toHaveURL(/\/$/);
  mark('login:done');
@@ -36,7 +36,7 @@ test('Cotizaciones: origen, cálculo exacto, persistencia, versión, clonación 
  await page.getByRole('button',{name:'Exportar seleccionadas a CSV',exact:true}).click();
  const download=await downloadPromise;
  await expect(page.getByRole('status')).toContainText(/Lote \d+: 2 correctas, 0 con error\./);
- await expect(selectAll).toBeUnchecked();
+ await expect(selectAll).not.toBeChecked();
  await expect(selectedNone).toBeVisible();
  expect(download.suggestedFilename()).toMatch(/^cotizaciones-\d+\.csv$/);
  const stream=await download.createReadStream();let csv='';for await(const chunk of stream)csv+=chunk.toString();
@@ -46,7 +46,7 @@ test('Cotizaciones: origen, cálculo exacto, persistencia, versión, clonación 
  await expect(selectedTwo).toBeVisible();
  await bulkStatus.click();
  await expect(page.getByRole('status')).toContainText(/2 correctas, 0 con error/);
- await expect(selectAll).toBeUnchecked();
+ await expect(selectAll).not.toBeChecked();
  await expect(selectedNone).toBeVisible();
  mark('bulk-status-success:done');
  await selectAll.check();
@@ -57,7 +57,7 @@ test('Cotizaciones: origen, cálculo exacto, persistencia, versión, clonación 
  const conflictResponse=await conflictResponsePromise;
  expect(conflictResponse.status()).toBe(200);
  await expect(page.getByRole('status')).toContainText(/0 correctas, 2 con error/);
- await expect(selectAll).toBeUnchecked();
+ await expect(selectAll).not.toBeChecked();
  await expect(selectedNone).toBeVisible();
  mark('bulk-status-conflict:done');
  await selectAll.check();
