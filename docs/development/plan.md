@@ -38,4 +38,4 @@ MySQL remoto TLS o túnel SSH verificado, acceso y soporte Percona; DNS/certific
 
 No implementar integración pagada de inferencia como solución automática a un bloqueo Work. RPO/RTO, retención y reglas de scoring/envío se configuran sin inventar valores aprobados.
 
-Cotizaciones en desarrollo: primera unidad borradores/cálculo/conversión. Continuar emisión/PDF/adjuntos/correo/estados/bulk y aceptación completa antes de pasar a OC; ver contrato/runbook de Quotes y status.md.
+Cotizaciones en desarrollo: borradores/cálculo/conversión y PDF de borrador/adjuntos cerrados con pruebas y CI. Continuar emisión/correo/estados/aprobaciones/bulk y aceptación completa antes de pasar a OC; ver contrato/runbook de Quotes y status.md.
