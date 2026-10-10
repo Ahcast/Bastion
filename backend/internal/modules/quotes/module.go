@@ -194,7 +194,7 @@ func (s *Service) ModuleFiles(logger *slog.Logger, enabled bool, objects core.Ob
 				if e := required(r, &p, "version", "reason"); e != nil {
 					return nil, e
 				}
-				return s.RevokeEmailAuthorization(ctx, a, r.PathValue("id"), r.PathValue("intent"), r.Header.Get("Idempotency-Key"), p)
+				return s.RevokeEmailAuthorizationSafe(ctx, a, r.PathValue("id"), r.PathValue("intent"), r.Header.Get("Idempotency-Key"), p)
 			})
 			register("POST /api/v1/quotes/{id}/email-authorizations/{intent}/send", func(ctx context.Context, a core.Actor, r *http.Request) (any, error) {
 				return s.QueueEmail(ctx, a, r.PathValue("id"), r.PathValue("intent"), r.Header.Get("Idempotency-Key"))
