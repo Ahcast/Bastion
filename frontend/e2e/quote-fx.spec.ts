@@ -4,19 +4,22 @@ import {totp} from './helpers';
 test('Cotizaciones FX: registra una observación exacta sin convertir cotizaciones',async({page})=>{
  page.on('response',async r=>{if(r.status()>=400&&r.url().includes('/api/v1/')){let body='unavailable after navigation';try{body=await r.text()}catch{}console.log('Synthetic API failure',r.url(),r.status(),body)}});
  const syntheticPassword=['synthetic','browser','password','42'].join(' ');
+ const syntheticRecovery=['synthetic','fx','recovery'].join('-');
  await page.goto('/login');
- await page.getByLabel('Correo',{exact:true}).fill('quotes@example.test');
+ await page.getByLabel('Correo',{exact:true}).fill('fx@example.test');
  await page.getByLabel('Contraseña',{exact:true}).fill(syntheticPassword);
  await page.getByRole('button',{name:'Ingresar',exact:true}).click();
  await page.getByLabel('Código de autenticación o recuperación').fill(totp('JBSWY3DPEHPK3PXP'));
+ const mfa=page.waitForResponse(r=>r.url().includes('/api/v1/auth/mfa/challenge')&&r.status()===200);
  await page.getByRole('button',{name:'Verificar',exact:true}).click();
+ await mfa;
 
  await page.goto('/quotes/fx');
  await expect(page.getByRole('heading',{name:'Registro de tasas de cambio',exact:true})).toBeVisible();
  await expect(page.getByText('Este registro no convierte cotizaciones automáticamente.',{exact:false})).toBeVisible();
 
  await page.getByLabel('Contraseña para confirmar',{exact:true}).fill(syntheticPassword);
- await page.getByLabel('Código de confirmación',{exact:true}).fill(totp('JBSWY3DPEHPK3PXP'));
+ await page.getByLabel('Código de confirmación',{exact:true}).fill(syntheticRecovery);
  await page.getByRole('button',{name:'Confirmar identidad',exact:true}).click();
  await expect(page.getByText('Identidad confirmada. Puede continuar con la operación.',{exact:true})).toBeVisible();
 
