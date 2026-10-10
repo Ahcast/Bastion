@@ -20,10 +20,10 @@ interface FXInput{rate_kind:string;rate:string;valid_from:string;valid_to:string
  <p><strong>Este registro no convierte cotizaciones automáticamente.</strong> Conserva observaciones USD/HNL para uso futuro bajo una política comercial aprobada.</p>
  <form (ngSubmit)="load(true)">
   <label>Tipo de tasa
-   <select name="fx-filter-kind" [(ngModel)]="filterKind"><option value="">Todos</option><option value="tcr">TCR</option><option value="buy">Compra</option><option value="sell">Venta</option><option value="manual">Manual</option></select>
+   <select aria-label="Filtro tipo de tasa" name="fx-filter-kind" [(ngModel)]="filterKind"><option value="">Todos</option><option value="tcr">TCR</option><option value="buy">Compra</option><option value="sell">Venta</option><option value="manual">Manual</option></select>
   </label>
   <label>Fuente
-   <select name="fx-filter-source" [(ngModel)]="filterSource"><option value="">Todas</option><option value="bch">BCH</option><option value="manual">Manual</option></select>
+   <select aria-label="Filtro fuente" name="fx-filter-source" [(ngModel)]="filterSource"><option value="">Todas</option><option value="bch">BCH</option><option value="manual">Manual</option></select>
   </label>
   <button [disabled]="busy()">Consultar tasas</button>
  </form>
@@ -52,13 +52,13 @@ interface FXInput{rate_kind:string;rate:string;valid_from:string;valid_to:string
   <bastion-reauthentication/>
   <form (ngSubmit)="record()">
    <label>Tipo de tasa
-    <select name="fx-kind" [(ngModel)]="rateKind" required><option value="">Seleccione</option><option value="tcr">TCR</option><option value="buy">Compra</option><option value="sell">Venta</option><option value="manual">Manual</option></select>
+    <select aria-label="Tipo de tasa" name="fx-kind" [(ngModel)]="rateKind" required><option value="">Seleccione</option><option value="tcr">TCR</option><option value="buy">Compra</option><option value="sell">Venta</option><option value="manual">Manual</option></select>
    </label>
    <label>Tasa HNL por USD<input name="fx-rate" [(ngModel)]="rate" inputmode="decimal" required placeholder="26.123456789012"></label>
    <label>Vigente desde (hora de Honduras)<input type="datetime-local" name="fx-from" [(ngModel)]="validFrom" required></label>
    <label>Vigente hasta (hora de Honduras, opcional)<input type="datetime-local" name="fx-to" [(ngModel)]="validTo"></label>
    <label>Fuente
-    <select name="fx-source" [(ngModel)]="source" required><option value="">Seleccione</option><option value="bch">BCH</option><option value="manual">Manual</option></select>
+    <select aria-label="Fuente" name="fx-source" [(ngModel)]="source" required><option value="">Seleccione</option><option value="bch">BCH</option><option value="manual">Manual</option></select>
    </label>
    <label>Referencia de fuente<input name="fx-reference" [(ngModel)]="sourceReference" required maxlength="1000"></label>
    <label>Publicada por la fuente (hora de Honduras, opcional)<input type="datetime-local" name="fx-published" [(ngModel)]="sourcePublishedAt"></label>
