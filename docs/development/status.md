@@ -1,6 +1,6 @@
 # Estado del proyecto
 
-Actualizado el 9 de octubre de 2026. Core 0.1.0 publicado y validado en CI; Clientes 0.1.0 publicado y validado en pruebas locales y CI; unidad 1 cerrada. Producción no desplegada.
+Actualizado el 9 de octubre de 2026. Core 0.1.0 publicado y validado en CI; Clientes 0.1.0 publicado y validado en pruebas locales y CI; unidad 1 cerrada. Proveedores 0.1.0 implementado y verificado localmente; CI pendiente de cierre. Producción no desplegada.
 
 | Área | Estado real |
 | --- | --- |
@@ -15,6 +15,7 @@ Actualizado el 9 de octubre de 2026. Core 0.1.0 publicado y validado en CI; Clie
 | Frontend Angular | Core de sesión, shell, Inicio y Configuración implementados; UI española; build y tests |
 | Crawler Python | Conservado sin cambios; 17 pruebas offline satisfactorias; receptor Processes aún pendiente |
 | Clientes | Ficha/catálogo Go y Angular, contactos/direcciones/notas, historial, snapshots/resolución exacta, permisos y documentos implementados; pruebas locales y CI aprobados |
+| Proveedores | Catálogo, contactos/etiquetas/productos, condiciones/evaluación manual, evidencia de precios, historial/notas/documentos y REST/MCP implementados; CI pendiente |
 | Demás módulos comerciales | Pendientes; se implementan de uno en uno tras cerrar pruebas y CI del anterior |
 | Despliegue | Templates systemd/nginx/Bluehost preparados; no instalados ni desplegados |
 | Infraestructura real | MySQL TLS/túnel/hosting, DNS/HTTPS, S3/IAM, SMTP y memoria conjunta con crawler pendientes |
@@ -33,7 +34,7 @@ Actualizado el 9 de octubre de 2026. Core 0.1.0 publicado y validado en CI; Clie
 
 Acceso Bluehost cifrado/restringido, soporte/parches Percona, cuentas DB de mínimo privilegio, backup/restore, clave de cifrado/custodia, corpus curado de contraseñas comprometidas, DNS/HTTPS/CORS/CSP, bucket privado/cifrado/CORS S3/IAM, ejecutor de análisis de archivos y evidencia, SMTP/IMAP autorizado, OAuth delegado Work, medición 2 GB/crawler/jobs y protección perimetral real. Los adapters compilados y sus tests no acreditan esos servicios.
 
-No habilitar integraciones productivas ni migrar BD real mediante tests. No existen aún receptor crawler, tools/pipeline AI, workflows comerciales ni documentos de ventas. El Core admite archivos vinculados a Clientes mediante su política y rechaza entidades/módulos no registrados. La vista 360° de Clientes no inventa procesos/cotizaciones/órdenes/facturas/pagos pendientes.
+No habilitar integraciones productivas ni migrar BD real mediante tests. No existen aún receptor crawler, tools/pipeline AI, workflows comerciales ni documentos de ventas. El Core admite archivos vinculados a Clientes y Proveedores mediante sus políticas y rechaza entidades/módulos no registrados. La vista 360° de Clientes no inventa procesos/cotizaciones/órdenes/facturas/pagos pendientes.
 
 ## Unidad 1 de módulos — Clientes
 
@@ -47,6 +48,19 @@ Código: backend/internal/modules/customers, internal/composition, migración 00
 - Dos flujos de navegador contra MySQL/API/Angular reales satisfactorios: Core y Clientes. Clientes verifica alta/contacto/nota/edición persistida/duplicado/inactivación y filtros.
 - 17 pruebas crawler satisfactorias; gofmt, vet, builds y documentación verificados. Código final [ee296bd](https://github.com/Ahcast/Bastion/commit/ee296bd8a433701c028f625d45f7ba919d8a3950): [Core checks 37994052282](https://github.com/Ahcast/Bastion/actions/runs/37994052282) pasó backend con race detector/MySQL 5.7/builds, Angular y navegador real. También pasaron [documentación](https://github.com/Ahcast/Bastion/actions/runs/37994052191) y [rama única](https://github.com/Ahcast/Bastion/actions/runs/37994052247). Incluye DTO de resumen separado de ficha, conexión de lectura team/revocación y rechazo de create self hacia equipos ajenos. La incidencia inicial de descarga del contenedor y su solución están registradas en decisions.md. Todas las pruebas de aceptación de esta unidad cerradas; conexiones productivas externas mantienen los límites indicados arriba.
 
+## Unidad 2 de módulos — Proveedores
+
+Código: backend/internal/modules/suppliers, composición, migración 0003_suppliers.sql; Angular src/app/modules/suppliers; contrato/OpenAPI/runbook. No cambios del crawler ni migraciones anteriores; no dependencias nuevas. Roles comerciales siguen siendo explícitos. Datos históricos pueden conservar supplier_id null y nombre libre; snapshots/ResolveExact autorizados disponibles para futuros OC/Gastos.
+
+- 43 pruebas Go/race/MySQL 5.7 satisfactorias: las 27 anteriores más 16 de Proveedores (5 unitarias/DTO y 11 de integración). Migración limpia/repetida, duplicados entre ocho actores, doce intenciones idempotentes y ocho versiones concurrentes verificadas.
+- Rollback de agregado/evidencia/auditoría/hecho/intención ante fallo SQL; scopes/IDOR/equipos/revocación/reauth y BIGINT como cadena. Archivo vinculado exige ambas políticas y respeta cuarentena. Desactivar módulo bloquea transporte y retira su política.
+- Fuente/fecha/actor, precios y MOQ exactos, evidencias sin precio, filtro literal por referencia, paginación e historial redactado verificados. Web/catalog nunca se declara cotización oficial. SDK MCP verifica get/search/resolve/price-history y revocación, sin escritura de agentes ni OAuth Work.
+- npm ci/build y 14 pruebas Angular satisfactorios (8 anteriores, 6 Proveedores). DTO sin campos protegidos, claves/ediciones persistentes ante fallo, notas/precios conservan cambios pendientes, lector sin escritura; POST conserva ID/version confirmados si falla recarga. Fecha de fuente en Honduras convertida a UTC; presentación DatePipe fija UTC−06:00.
+- Navegador real: Core, Clientes y Proveedores; catálogo/contacto/producto/MOQ, nota, precio exacto, persistencia, duplicado, país e inactivación. Última regresión de los tres flujos con zona horaria corregida satisfactoria; CI por registrar.
+- 17 pruebas crawler offline satisfactorias; gofmt/vet/build y documentación verificados. Primer intento local sobre datadir checkpointado falló al recrear tablas InnoDB; directorio temporal nuevo y pruebas completas aprobadas. No se atribuye ese fallo al código productivo ni se utiliza una BD productiva para las pruebas.
+
+RFQ/aprobación/envío, cotizaciones recibidas oficiales, métricas calculadas e investigación automática conservan sus requisitos, pendientes de AI/Workflow y sus propietarios. No se activó correo ni se consultó HonduCompras/S3/Bluehost real. Proveedores no declara esas conexiones finalizadas por aprobar su catálogo manual.
+
 ## Continuidad
 
-Orden: Clientes → Proveedores → Procesos/receptor crawler → Cotizaciones → OC de clientes → Facturas/pagos → Gastos → Reportes → Colaboración; Workflow/AI según dependencias. Clientes cerrado con evidencia local y CI satisfactoria; Proveedores es la siguiente unidad y todavía no se ha iniciado. Antes de cualquier código de Proveedores, leer su especificación y definir contrato/migración/DTO/permisos/aceptación; aplicar el mismo cierre de pruebas y CI. Mantener all/self/team, snapshots, transacciones y permisos mínimos en cada unidad. No se han desplegado servicios ni migrado datos productivos.
+Orden: Clientes → Proveedores → Procesos/receptor crawler → Cotizaciones → OC de clientes → Facturas/pagos → Gastos → Reportes → Colaboración; Workflow/AI según dependencias. Clientes cerrado con evidencia local y CI satisfactoria; Proveedores implementado y en cierre de CI. Procesos/receptor crawler sigue sin iniciar; no comenzar hasta cerrar las pruebas y CI de Proveedores. Leer contrato/spec de Procesos y contrato único IMPORT_CONTRACT del crawler antes de su implementación. Mantener all/self/team, snapshots, transacciones y permisos mínimos en cada unidad. No se han desplegado servicios ni migrado datos productivos.

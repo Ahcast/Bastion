@@ -22,6 +22,7 @@ import { Client } from "../api/client";
           >Inicio</a
         >
         @if(api.has("clientes.view") && api.moduleEnabled("customers")){<a routerLink="/customers" routerLinkActive="active">Clientes</a>}
+        @if(api.has("proveedores.view") && api.moduleEnabled("suppliers")){<a routerLink="/suppliers" routerLinkActive="active">Proveedores</a>}
         <a routerLink="/settings" routerLinkActive="active">Configuración</a>
       </nav>
       <main>

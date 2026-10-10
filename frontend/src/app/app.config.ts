@@ -7,7 +7,7 @@ import {
 } from "@angular/core";
 import { provideRouter } from "@angular/router";
 import { provideHttpClient, withInterceptors } from "@angular/common/http";
-import { registerLocaleData } from "@angular/common";
+import { registerLocaleData, DATE_PIPE_DEFAULT_OPTIONS } from "@angular/common";
 import spanishHonduras from "@angular/common/locales/es-HN";
 import { routes } from "./app.routes";
 import { Client } from "./core/api/client";
@@ -15,7 +15,8 @@ import { apiInterceptor } from "./core/api/interceptor";
 registerLocaleData(spanishHonduras);
 export const appConfig: ApplicationConfig = {
   providers: [
-    {provide:LOCALE_ID,useValue:"es-HN"},
+    { provide: LOCALE_ID, useValue: "es-HN" },
+    { provide: DATE_PIPE_DEFAULT_OPTIONS, useValue: { timezone: "-0600" } },
     provideBrowserGlobalErrorListeners(),
     provideRouter(routes),
     provideHttpClient(withInterceptors([apiInterceptor])),

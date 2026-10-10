@@ -6,6 +6,7 @@ import (
 	"github.com/Ahcast/Bastion/backend/internal/core"
 	"github.com/Ahcast/Bastion/backend/internal/core/registry"
 	"github.com/Ahcast/Bastion/backend/internal/modules/customers"
+	"github.com/Ahcast/Bastion/backend/internal/modules/suppliers"
 	"log/slog"
 	"os"
 )
@@ -26,6 +27,23 @@ func Register(s *core.Service, r *registry.Registry, logger *slog.Logger) error 
 		delete(s.DocumentPolicies, "customers")
 	}
 	if e := r.Register(service.Module(logger, enabled)); e != nil {
+		return e
+	}
+	supplierEnabled := true
+	if v := os.Getenv("BASTION_SUPPLIERS_ENABLED"); v != "" {
+		if v != "true" && v != "false" {
+			return fmt.Errorf("invalid suppliers enable flag")
+		}
+		supplierEnabled = v == "true"
+	}
+	supplierService := &suppliers.Service{Core: s}
+	if supplierEnabled {
+		s.RegisterPermissions(suppliers.Permissions, []string{"proveedores.view"})
+		s.DocumentPolicies["suppliers"] = supplierService.DocumentPolicy
+	} else {
+		delete(s.DocumentPolicies, "suppliers")
+	}
+	if e := r.Register(supplierService.Module(logger, supplierEnabled)); e != nil {
 		return e
 	}
 	return r.Validate()

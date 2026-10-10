@@ -20,44 +20,15 @@ Mantener el catálogo de proveedores y convertirlo en una pieza reutilizable par
 - relaciones sin garantías SQL completas;
 - ausencia de trazabilidad de fuentes, contactos y precios investigados.
 
-## Modelo objetivo
+## Modelo y contrato implementado
 
-```text
-suppliers
-```
+Catálogo manual con ficha, contactos, categorías/marcas, productos, condiciones comerciales, evaluación humana, notas, historial, documentos privados y observaciones de precios con evidencia. Tablas/DTO/validadores en [contrato de Proveedores](../contracts/suppliers.md), [OpenAPI](../contracts/suppliers-openapi.json) y migración 0003_suppliers.sql. Sin deleted_at ni borrado: is_active conserva identidad y referencias. Campos opcionales de texto usan cadena vacía; canonical_rtn, equipo, evaluación, respuesta, precio y MOQ pueden ser NULL en SQL según contrato.
 
-Campos base:
-
-```text
-id
-name
-canonical_name
-rtn nullable
-country nullable
-website nullable
-email nullable
-phone nullable
-contact_name nullable
-notes nullable
-is_active
-created_by
-updated_by
-created_at
-updated_at
-deleted_at
-```
-
-Puede ampliarse después con:
-
-```text
-supplier_contacts
-supplier_quotes
-supplier_sources
-```
+Las futuras cotizaciones oficiales de proveedores/RFQ y resultados IA tienen sus propios estados y propietarios; no crear supplier_quotes/supplier_sources como duplicados de las observaciones manuales sin contrato de esa fase.
 
 ## Compatibilidad histórica
 
-Órdenes y gastos conservan:
+Cuando se implementen, Órdenes y Gastos conservarán:
 
 ```text
 supplier_id nullable
@@ -86,11 +57,11 @@ flowchart LR
 
 ### Órdenes
 
-Cada item puede referenciar proveedor y conservar snapshot.
+Al implementar Órdenes, cada ítem podrá seleccionar proveedor mediante servicio autorizado y conservar snapshot. Hoy existen Snapshot/ResolveExact; no existe aún el propietario de OC.
 
 ### Gastos
 
-Se agrega `supplier_id` opcional sin eliminar proveedor libre/snapshot.
+Al implementar Gastos se agregará supplier_id opcional sin eliminar proveedor libre/snapshot. LegacySnapshot ya conserva texto con ID null sin crear ni fusionar fichas.
 
 ## Seguridad
 
@@ -102,7 +73,7 @@ proveedores.update
 
 ## Integración de IA
 
-Tools:
+Tools objetivo; lectura search_suppliers/get_supplier/resolve_supplier_exact/get_supplier_price_history implementada. Herramientas de investigación, candidatos, RFQ y escritura de agentes pendientes de AI/Workflow:
 
 ```text
 search_suppliers()
@@ -179,7 +150,9 @@ La IA no puede:
 - revelar credenciales SMTP;
 - asumir que un precio observado incluye impuestos, envío o disponibilidad sin evidencia.
 
-## Criterios de aceptación
+## Criterios de aceptación del proyecto completo
+
+La unidad de catálogo cierra las pruebas indicadas en el contrato. Las siguientes conexiones se aceptan junto a sus propietarios futuros; no se declaran probadas por implementar el catálogo:
 
 - CRUD legacy preservado.
 - Órdenes siguen seleccionando proveedor.
@@ -192,71 +165,10 @@ La IA no puede:
 
 Ver [integración](../architecture/ai-integration.md), [contrato](../contracts/ai-pipeline.md) y [presentación](ai-results.md). Puntuación diaria de pendientes, investigación por ítem, RFQ con Grokbot, precio sugerido con antecedentes S3/MySQL y fichas. Resultados progresivos dentro de Procesos, con fuentes, fecha y cumplimiento por requisito. Estado de investigación separado de revisión humana y presentación de oferta.
 
-La creación básica de cotización sigue operativa sin IA. Acción adicional explícita del usuario incorpora solo alternativas, cantidades, precios y adjuntos seleccionados, mediante Quotes y sin sobrescribir ediciones humanas. No se exportan automáticamente costos, proveedores, márgenes ni notas internas al cliente.
+Al implementar Quotes, la creación básica de cotización deberá operar sin IA. Acción adicional explícita del usuario incorpora solo alternativas, cantidades, precios y adjuntos seleccionados, mediante Quotes y sin sobrescribir ediciones humanas. No se exportan automáticamente costos, proveedores, márgenes ni notas internas al cliente.
 
 
 
-## Alcance adicional conservado
+## Presentación y alcance conservado
 
-# Suppliers
-
-
-# 13. Módulo Proveedores
-
-Debe contener:
-
-- empresa;
-- país;
-- contactos;
-- emails;
-- categorías;
-- marcas;
-- productos;
-- RFQ;
-- cotizaciones recibidas;
-- precios;
-- lead times;
-- MOQ;
-- términos de pago;
-- documentos;
-- historial;
-- evaluación;
-- confiabilidad;
-- tiempos de respuesta.
-
----
-
-
-
-## Presentación del módulo
-
-# suppliers
-
-
-# 13. Módulo Proveedores
-
-Debe contener:
-
-- empresa;
-- país;
-- contactos;
-- emails;
-- categorías;
-- marcas;
-- productos;
-- RFQ;
-- cotizaciones recibidas;
-- precios;
-- lead times;
-- MOQ;
-- términos de pago;
-- documentos;
-- historial;
-- evaluación;
-- confiabilidad;
-- tiempos de respuesta.
-
----
-
-
-
+Empresa, país, contactos/emails, categorías/marcas, productos, precios con fuentes, lead times, MOQ, términos de pago, documentos, historial, evaluación/confiabilidad y respuesta. RFQ, cotizaciones recibidas oficiales y tiempos de respuesta calculados se integrarán mediante AI/Workflow y los propietarios comerciales; la ficha actual registra condiciones/evaluaciones manuales sin inventar esos resultados.

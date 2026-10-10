@@ -14,6 +14,7 @@ export const routes: Routes = [
     canActivate: [authenticated],
     loadComponent: () => import("./core/shell/shell").then((m) => m.Shell),
     children: [
+      { path:"suppliers", canActivate:[permitted],data:{permission:"proveedores.view",module:"suppliers"},loadComponent:()=>import("./modules/suppliers/suppliers").then(m=>m.Suppliers) },
       { path:"customers", canActivate:[permitted],data:{permission:"clientes.view",module:"customers"},loadComponent:()=>import("./modules/customers/customers").then(m=>m.Customers) },
       {
         path: "",

@@ -61,4 +61,18 @@ func main() {
 	if _, e = db.Exec(`INSERT INTO user_roles VALUES(2,2)`); e != nil {
 		log.Fatal(e)
 	}
+	// A separate synthetic employee is explicitly granted supplier permissions only in this test schema.
+	if _, e = db.Exec(`INSERT INTO users(email,name,password_hash,totp_secret,active,created_at,updated_at) SELECT 'suppliers@example.test','Operador Proveedores sintético',password_hash,?,TRUE,UTC_TIMESTAMP(6),UTC_TIMESTAMP(6) FROM users WHERE id=1`, secret); e != nil {
+		log.Fatal(e)
+	}
+	if _, e = db.Exec(`INSERT INTO roles(id,name) VALUES(3,'Proveedores sintético')`); e != nil {
+		log.Fatal(e)
+	}
+	if _, e = db.Exec(`INSERT INTO role_permissions SELECT 3,name,'all' FROM permissions WHERE name IN ('proveedores.view','proveedores.create','proveedores.update')`); e != nil {
+		log.Fatal(e)
+	}
+	if _, e = db.Exec(`INSERT INTO user_roles VALUES(3,3)`); e != nil {
+		log.Fatal(e)
+	}
+
 }

@@ -38,3 +38,11 @@ CI usa la imagen oficial MySQL 5.7.44 desde el mirror Docker Official Images de 
 Listado de Clientes devuelve CustomerSummary (ID/nombre/RTN/email/activo/versión), no colecciones vacías que aparenten una ficha completa. GET devuelve el agregado con contactos/direcciones; PATCH requiere todos los campos editables. Las conexiones técnicas de lectura admiten scope team cuando el creador posee el permiso y pertenece a un equipo; cada consulta filtra/reevalúa la pertenencia actual. Se probaron creación limitada y revocación de ese acceso.
 
 La asignación de equipo durante el alta requiere pertenencia actual o clientes.create all. Un permiso self no permite asignar equipos ajenos aunque el creador siga siendo propietario. Prueba de integración reproduce y rechaza esa intención por API de servicio.
+
+## 2026-10-09 — Proveedores, unidad 2
+
+Unidad iniciada tras cerrar Clientes en CI. Catálogo independiente de Customers, con normalización equivalente versión 1 y permisos explícitos all/self/team. Ficha con contactos, etiquetas categorías/marcas, productos/MOQ, condiciones y evaluación manual; historial, notas y observaciones de precio append-only con fuente/fecha. Valores DECIMAL exactos como cadenas, sin cálculos financieros ni redondeo silencioso. No requiere una dependencia nueva: la normalización usa x/text ya fijado y el almacenamiento no realiza aritmética financiera.
+
+Snapshot/LegacySnapshot conservan proveedor autorizado o texto histórico con ID null sin crear fichas automáticamente. price_observations manuales no son cotizaciones oficiales ni sustituyen candidatos/runs de AI. RFQ/correo aprobado, cotizaciones recibidas y métricas calculadas quedan para sus propietarios AI/Workflow/comerciales; las conexiones OC/Gastos se añaden en sus fases. Ningún evento encola trabajos desconocidos.
+
+La interfaz conserva cambios pendientes de ficha al registrar notas/evidencia y el ID/version confirmados si falla recarga posterior a POST. Captura de observaciones y presentación de timestamps usan Honduras UTC−06:00; persistencia UTC. Corrección del DatePipe global para evitar depender de la zona del navegador. Datos de ensayo MySQL en directorio temporal nuevo por ejecución; no restaurar/checkpoint de archivos de un InnoDB activo. Pruebas y límites reales en status.md.

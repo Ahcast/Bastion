@@ -1,0 +1,594 @@
+<h1>Proveedores</h1>
+<p>
+  Catálogo de proveedores y evidencia de precios. Las observaciones conservan su
+  fuente; no representan una cotización oficial ni confirman entrega, impuestos
+  o inventario.
+</p>
+<p class="error" role="alert">{{error()}}</p>
+<p role="status">{{message()}}</p>
+<section class="card" aria-label="Buscar proveedores">
+  <form (ngSubmit)="load(true)">
+    <label
+      >Buscar proveedor<input
+        name="search"
+        [(ngModel)]="search"
+        maxlength="180"
+    /></label>
+    <label
+      >Filtrar por país<input
+        name="country_filter"
+        [(ngModel)]="country"
+        maxlength="80"
+    /></label>
+    <label
+      >Estado del proveedor<select name="active_filter" [(ngModel)]="active">
+        <option value="true">Activos</option>
+        <option value="false">Inactivos</option>
+        <option value="">Todos</option>
+      </select></label
+    >
+    <button [disabled]="loading()">Buscar</button>
+  </form>
+  @if(api.has('proveedores.create')){<button
+    (click)="create()"
+    [disabled]="busy()"
+  >
+    Nuevo proveedor</button
+  >} @if(loading()){
+  <p role="status">Cargando proveedores…</p>
+  }@else{
+  <p>{{total()}} proveedores encontrados · Página {{page}}</p>
+  <div class="table-scroll">
+    <table>
+      <thead>
+        <tr>
+          <th>Nombre</th>
+          <th>País</th>
+          <th>Correo</th>
+          <th>Estado</th>
+          <th>Ficha</th>
+        </tr>
+      </thead>
+      <tbody>
+        @for(c of rows();track c.id){
+        <tr>
+          <td>{{c.name}}</td>
+          <td>{{c.country || 'Sin país'}}</td>
+          <td>{{c.email}}</td>
+          <td>{{c.is_active?'Activo':'Inactivo'}}</td>
+          <td>
+            <button
+              (click)="open(c.id)"
+              [disabled]="busy()"
+              [attr.aria-label]="'Abrir proveedor '+c.name"
+            >
+              Abrir
+            </button>
+          </td>
+        </tr>
+        }@empty{
+        <tr>
+          <td colspan="5">No se encontraron proveedores.</td>
+        </tr>
+        }
+      </tbody>
+    </table>
+  </div>
+  <button (click)="page=page-1;load()" [disabled]="page<=1||loading()">
+    Anterior</button
+  ><button
+    (click)="page=page+1;load()"
+    [disabled]="page*perPage>=total()||loading()"
+  >
+    Siguiente</button
+  >}
+</section>
+@if(editor();as c){
+<section class="card" aria-label="Ficha del proveedor">
+  <h2>{{c.id?'Ficha del proveedor':'Nuevo proveedor'}}</h2>
+  @if(c.id){
+  <p>
+    Versión {{c.version}}. Si otro usuario modifica la ficha, vuelva a abrirla
+    antes de guardar.
+  </p>
+  }
+  <form (ngSubmit)="save()">
+    <fieldset
+      [disabled]="busy() || (c.id ? !api.has('proveedores.update') : !api.has('proveedores.create'))"
+    >
+      <label
+        >Nombre del proveedor<input
+          name="name"
+          [(ngModel)]="c.name"
+          required
+          maxlength="180"
+      /></label>
+      <label
+        >RTN del proveedor<input
+          name="rtn"
+          [(ngModel)]="c.rtn"
+          maxlength="30"
+          placeholder="Opcional"
+      /></label>
+      <label
+        >País del proveedor<input
+          name="country"
+          [(ngModel)]="c.country"
+          maxlength="80"
+      /></label>
+      <label
+        >Sitio web del proveedor<input
+          name="website"
+          [(ngModel)]="c.website"
+          type="url"
+          maxlength="2048"
+      /></label>
+      <label
+        >Contacto principal<input
+          name="contact"
+          [(ngModel)]="c.contact_name"
+          maxlength="120"
+      /></label>
+      <label
+        >Teléfono del proveedor<input
+          name="phone"
+          [(ngModel)]="c.phone"
+          maxlength="50"
+      /></label>
+      <label
+        >Correo del proveedor<input
+          name="email"
+          [(ngModel)]="c.email"
+          type="email"
+          maxlength="254"
+      /></label>
+      <label
+        >Dirección principal<textarea
+          name="address"
+          [(ngModel)]="c.address"
+          maxlength="1000"
+        ></textarea>
+      </label>
+      <label
+        >Equipo responsable<select name="team" [(ngModel)]="c.team_id">
+          <option value="">Sin equipo</option>
+          @for(t of teams();track t.id){
+          <option [value]="t.id">{{t.name}}</option>
+          }
+        </select></label
+      >
+      <label
+        ><span
+          ><input type="checkbox" name="active" [(ngModel)]="c.is_active" />
+          Proveedor activo</span
+        ></label
+      >
+      <h3>Contactos adicionales</h3>
+      @for(x of c.contacts;track $index;let i=$index){
+      <fieldset>
+        <legend>Contacto {{i+1}}</legend>
+        <label
+          >Nombre del contacto<input
+            [name]="'cn'+i"
+            [(ngModel)]="x.name"
+            required
+            maxlength="120" /></label
+        ><label
+          >Cargo<input
+            [name]="'cr'+i"
+            [(ngModel)]="x.role"
+            maxlength="100" /></label
+        ><label
+          >Teléfono del contacto<input
+            [name]="'cp'+i"
+            [(ngModel)]="x.phone"
+            maxlength="50" /></label
+        ><label
+          >Correo del contacto<input
+            [name]="'ce'+i"
+            [(ngModel)]="x.email"
+            type="email"
+            maxlength="254" /></label
+        ><button
+          type="button"
+          class="secondary"
+          (click)="c.contacts.splice(i,1)"
+        >
+          Quitar contacto {{i+1}}
+        </button>
+      </fieldset>
+      }
+      <button
+        type="button"
+        (click)="contact()"
+        [disabled]="c.contacts.length>=20"
+      >
+        Agregar contacto
+      </button>
+      <h3>Condiciones comerciales y evaluación</h3>
+      <label
+        >Notas generales<textarea
+          name="general_notes"
+          [(ngModel)]="c.notes"
+          maxlength="4000"
+        ></textarea>
+      </label>
+      <label
+        >Términos de pago<textarea
+          name="payment_terms"
+          [(ngModel)]="c.payment_terms"
+          maxlength="1000"
+        ></textarea>
+      </label>
+      <label
+        >Plazo habitual de entrega<input
+          name="lead_time"
+          [(ngModel)]="c.lead_time"
+          maxlength="120"
+      /></label>
+      <label
+        >Evaluación manual<select name="evaluation" [(ngModel)]="c.evaluation">
+          <option [ngValue]="null">Sin evaluar</option>
+          @for(v of [1,2,3,4,5];track v){
+          <option [ngValue]="v">{{v}} de 5</option>
+          }
+        </select></label
+      >
+      <label
+        >Confiabilidad manual<select
+          name="reliability"
+          [(ngModel)]="c.reliability"
+        >
+          <option value="unknown">Sin evaluar</option>
+          <option value="low">Baja</option>
+          <option value="medium">Media</option>
+          <option value="high">Alta</option>
+        </select></label
+      >
+      <label
+        >Respuesta habitual en horas<input
+          name="response_hours"
+          [(ngModel)]="c.response_hours"
+          type="number"
+          min="0"
+          max="8760"
+          step="1"
+      /></label>
+      <label
+        >Categorías, una por línea<textarea
+          name="categories"
+          [(ngModel)]="categoriesText"
+        ></textarea>
+      </label>
+      <label
+        >Marcas, una por línea<textarea
+          name="brands"
+          [(ngModel)]="brandsText"
+        ></textarea>
+      </label>
+      <h3>Productos del catálogo</h3>
+      @for(x of c.products;track $index;let i=$index){
+      <fieldset>
+        <legend>Producto {{i+1}}</legend>
+        <label
+          >Nombre del producto<input
+            [name]="'pn'+i"
+            [(ngModel)]="x.name"
+            required
+            maxlength="120" /></label
+        ><label
+          >Marca del producto<input
+            [name]="'pb'+i"
+            [(ngModel)]="x.brand"
+            maxlength="80" /></label
+        ><label
+          >Referencia del producto<input
+            [name]="'pp'+i"
+            [(ngModel)]="x.part_number"
+            maxlength="80" /></label
+        ><label
+          >Descripción del producto<textarea
+            [name]="'pd'+i"
+            [(ngModel)]="x.description"
+            maxlength="1000"
+          ></textarea></label
+        ><label
+          >Plazo del producto<input
+            [name]="'pl'+i"
+            [(ngModel)]="x.lead_time"
+            maxlength="120" /></label
+        ><label
+          >Cantidad mínima del producto<input
+            [name]="'pm'+i"
+            [(ngModel)]="x.moq"
+            inputmode="decimal"
+            maxlength="64"
+            placeholder="Sin confirmar" /></label
+        ><button
+          type="button"
+          class="secondary"
+          (click)="c.products.splice(i,1)"
+        >
+          Quitar producto {{i+1}}
+        </button>
+      </fieldset>
+      }
+      <button
+        type="button"
+        (click)="product()"
+        [disabled]="c.products.length>=50"
+      >
+        Agregar producto
+      </button>
+      <button type="submit">Guardar proveedor</button>
+    </fieldset>
+  </form>
+  <button class="secondary" (click)="editor.set(null)" [disabled]="busy()">
+    Cerrar ficha
+  </button>
+  <details>
+    <summary>
+      Confirmar identidad para cambiar equipo, estado o vincular documentos
+    </summary>
+    <form (ngSubmit)="reauthenticate()">
+      <label
+        >Contraseña de confirmación<input
+          name="confirm_password"
+          [(ngModel)]="password"
+          type="password"
+          autocomplete="current-password"
+          required /></label
+      ><label
+        >Código de confirmación<input
+          name="confirm_factor"
+          [(ngModel)]="factor"
+          autocomplete="one-time-code"
+          required /></label
+      ><button [disabled]="busy()">Confirmar identidad</button>
+    </form>
+  </details>
+</section>
+@if(c.id){
+<section class="card">
+  <h2>Notas del proveedor</h2>
+  @if(api.has('proveedores.update')){
+  <form (ngSubmit)="addNote()">
+    <label
+      >Nueva nota<textarea
+        name="note"
+        [(ngModel)]="note"
+        required
+        maxlength="4000"
+      ></textarea></label
+    ><button [disabled]="busy()">Registrar nota</button>
+  </form>
+  } @for(n of notes();track n.id){
+  <article>
+    <p class="message">{{n.body}}</p>
+    <p>{{n.user_name}} · {{n.created_at|date:'short'}}</p>
+  </article>
+  }@empty{
+  <p>No hay notas registradas.</p>
+  }
+  <button (click)="notePage=notePage-1;loadNotes()" [disabled]="notePage<=1">
+    Notas anteriores</button
+  ><button
+    (click)="notePage=notePage+1;loadNotes()"
+    [disabled]="notePage*25>=noteTotal()"
+  >
+    Más notas
+  </button>
+</section>
+<section class="card">
+  <h2>Precios observados</h2>
+  <p>
+    Valores registrados con fuente y fecha. Disponibilidad, entrega, impuestos y
+    envío requieren confirmación independiente.
+  </p>
+  @if(api.has('proveedores.update')){
+  <form (ngSubmit)="recordPrice()">
+    <fieldset [disabled]="busy()">
+      <legend>Nueva observación</legend>
+      <label
+        >URL de la fuente<input
+          name="source_url"
+          [(ngModel)]="price.source_url"
+          type="url"
+          required
+          maxlength="2048"
+      /></label>
+      <label
+        >Tipo de fuente<select
+          name="source_type"
+          [(ngModel)]="price.source_type"
+        >
+          <option value="web">Página web</option>
+          <option value="catalog">Catálogo</option>
+        </select></label
+      >
+      <label
+        >Fecha y hora de la fuente (Honduras)<input
+          name="observed_at"
+          [(ngModel)]="price.observed_at"
+          type="datetime-local"
+          required
+      /></label>
+      <label
+        >Referencia observada<input
+          name="price_part"
+          [(ngModel)]="price.part_number"
+          maxlength="80"
+      /></label>
+      <label
+        >Precio observado<input
+          name="price"
+          [(ngModel)]="price.observed_price"
+          inputmode="decimal"
+          maxlength="64"
+          placeholder="Vacío si no hay precio"
+      /></label>
+      <label
+        >Moneda observada<input
+          name="currency"
+          [(ngModel)]="price.currency"
+          maxlength="3"
+          placeholder="USD, HNL…"
+      /></label>
+      <label
+        >Disponibilidad observada<input
+          name="availability"
+          [(ngModel)]="price.availability"
+          maxlength="500"
+      /></label>
+      <label
+        >Plazo observado<input
+          name="observed_lead"
+          [(ngModel)]="price.lead_time"
+          maxlength="120"
+      /></label>
+      <label
+        >Cantidad mínima observada<input
+          name="observed_moq"
+          [(ngModel)]="price.moq"
+          inputmode="decimal"
+          maxlength="64"
+      /></label>
+      <label
+        >Impuestos en el precio<select name="taxes" [(ngModel)]="price.taxes">
+          <option value="unknown">Sin confirmar</option>
+          <option value="included">Incluidos</option>
+          <option value="excluded">No incluidos</option>
+        </select></label
+      >
+      <label
+        >Envío en el precio<select name="shipping" [(ngModel)]="price.shipping">
+          <option value="unknown">Sin confirmar</option>
+          <option value="included">Incluido</option>
+          <option value="excluded">No incluido</option>
+        </select></label
+      >
+      <button>Registrar observación</button>
+    </fieldset>
+  </form>
+  }
+  <form (ngSubmit)="loadPrices(true)">
+    <label
+      >Filtrar precios por referencia exacta<input
+        name="price_filter"
+        [(ngModel)]="pricePart"
+        maxlength="80" /></label
+    ><button>Buscar precios</button>
+  </form>
+  @for(p of prices();track p.id){
+  <article>
+    <p>
+      {{p.part_number || 'Sin referencia'}} · {{p.observed_price || 'Sin precio
+      publicado'}} {{p.currency}} · {{p.source_observed_at|date:'short'}}
+    </p>
+    <p>
+      {{p.availability || 'Disponibilidad sin confirmar'}} · {{p.lead_time ||
+      'Entrega sin confirmar'}} · Cantidad mínima: {{p.moq || 'sin confirmar'}}
+    </p>
+    <p>Impuestos: {{inclusion(p.taxes)}} · Envío: {{inclusion(p.shipping)}}</p>
+    <a [href]="p.source_url" target="_blank" rel="noopener noreferrer"
+      >Consultar fuente</a
+    >
+    <p>Registrado por {{p.user_name}} · {{p.captured_at|date:'short'}}</p>
+  </article>
+  }@empty{
+  <p>No hay observaciones de precio.</p>
+  }
+  <button
+    (click)="pricePage=pricePage-1;loadPrices()"
+    [disabled]="pricePage<=1"
+  >
+    Precios anteriores</button
+  ><button
+    (click)="pricePage=pricePage+1;loadPrices()"
+    [disabled]="pricePage*25>=priceTotal()"
+  >
+    Más precios
+  </button>
+</section>
+<section class="card">
+  <h2>Historial del proveedor</h2>
+  <button (click)="loadHistory()">Actualizar historial</button>@for(h of
+  history();track h.id){
+  <p>
+    {{historyLabel(h.action)}} · {{h.actor_name}} ·
+    {{h.created_at|date:'short'}} @if(h.details.version){· Versión
+    {{h.details.version}}}
+  </p>
+  }@empty{
+  <p>No hay actividad cargada.</p>
+  }<button
+    (click)="historyPage=historyPage-1;loadHistory()"
+    [disabled]="historyPage<=1"
+  >
+    Historial anterior</button
+  ><button
+    (click)="historyPage=historyPage+1;loadHistory()"
+    [disabled]="historyPage*25>=historyTotal()"
+  >
+    Más historial
+  </button>
+</section>
+@if(api.has('core.documents.read')){
+<section class="card">
+  <h2>Documentos del proveedor</h2>
+  <button (click)="loadDocuments()">Actualizar documentos</button>@for(d of
+  documents();track d.id){
+  <p>
+    {{d.filename}} · {{state(d.status)}}
+    <button (click)="download(d.id)" [disabled]="d.status!=='available'">
+      Descargar
+    </button>
+  </p>
+  }@empty{
+  <p>
+    No hay documentos cargados. Suba el archivo desde Configuración y vincúlelo
+    aquí.
+  </p>
+  }<button
+    (click)="documentPage=documentPage-1;loadDocuments()"
+    [disabled]="documentPage<=1"
+  >
+    Documentos anteriores</button
+  ><button
+    (click)="documentPage=documentPage+1;loadDocuments()"
+    [disabled]="documentPage*25>=documentTotal()"
+  >
+    Más documentos
+  </button>
+  @if(api.has('proveedores.update')&&api.has('core.documents.write')){<button
+    (click)="loadPersonalFiles()"
+  >
+    Cargar archivos sin vínculo</button
+  ><button
+    (click)="personalPage=personalPage-1;loadPersonalFiles()"
+    [disabled]="personalPage<=1"
+  >
+    Archivos anteriores</button
+  ><button
+    (click)="personalPage=personalPage+1;loadPersonalFiles()"
+    [disabled]="personalFiles().length<25"
+  >
+    Más archivos
+  </button>
+  <form (ngSubmit)="linkDocument()">
+    <label
+      >Archivo para vincular<select
+        name="document"
+        [(ngModel)]="selectedDocument"
+        required
+      >
+        <option value="">Seleccione un archivo</option>
+        @for(d of personalFiles();track d.id){
+        <option [value]="d.id">{{d.filename}} · {{state(d.status)}}</option>
+        }
+      </select></label
+    ><button [disabled]="busy()">Vincular documento</button>
+  </form>
+  }
+</section>
+} }}

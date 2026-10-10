@@ -27,3 +27,5 @@ Cada tema tiene una fuente única. No se reproducen capítulos del maestro en ca
 Documentos eliminados por duplicación siguen en el historial Git; no son instrucciones vigentes. No se pierde el alcance comercial por consolidar archivos.
 
 Core implementado: [ejecución y pruebas](development/core-runbook.md), [OpenAPI](contracts/core-openapi.json), [estado](development/status.md).
+
+Catálogos implementados: [Clientes](development/customers-runbook.md) y [Proveedores](development/suppliers-runbook.md); contratos por módulo en contracts.
