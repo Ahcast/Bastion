@@ -141,4 +141,48 @@ func TestPurchaseOrderHTTPStrictContract(t *testing.T) {
 	if status != http.StatusConflict {
 		t.Fatal("stale patch accepted", status)
 	}
+	transitionPath := "/api/v1/purchase-orders/" + id + "/transition"
+	for _, invalid := range []map[string]any{
+		{"to_status": "confirmed"},
+		{"to_status": "confirmed", "version": nil},
+		{"to_status": "confirmed", "version": 2},
+		{"to_status": "confirmed", "version": "2", "extra": true},
+	} {
+		status, _ = purchaseOrderHTTP(t, h, "POST", transitionPath, invalid, cookie, csrf, s.Core.Config.Origin, "po-http-transition")
+		if status != http.StatusUnprocessableEntity {
+			t.Fatal("invalid transition accepted", status)
+		}
+	}
+	body := map[string]any{"to_status": "confirmed", "version": "2"}
+	status, _ = purchaseOrderHTTP(t, h, "POST", transitionPath, body, cookie, csrf, s.Core.Config.Origin, "")
+	if status != http.StatusUnprocessableEntity {
+		t.Fatal("transition without key", status)
+	}
+	status, out = purchaseOrderHTTP(t, h, "POST", transitionPath, body, cookie, csrf, s.Core.Config.Origin, "po-http-transition")
+	if status != http.StatusOK || out["status"] != "confirmed" || out["version"] != "3" {
+		t.Fatal("HTTP transition", status, out)
+	}
+	status, out = purchaseOrderHTTP(t, h, "POST", transitionPath, body, cookie, csrf, s.Core.Config.Origin, "po-http-transition")
+	if status != http.StatusOK || out["version"] != "3" {
+		t.Fatal("HTTP replay", status, out)
+	}
+	for _, position := range []string{"0", "201", "bad"} {
+		status, _ = purchaseOrderHTTP(t, h, "POST", "/api/v1/purchase-orders/"+id+"/items/"+position+"/transition", map[string]any{"to_status": "purchased", "version": "3"}, cookie, csrf, s.Core.Config.Origin, "po-http-item")
+		if status != http.StatusUnprocessableEntity {
+			t.Fatal("invalid position", position, status)
+		}
+	}
+	status, out = purchaseOrderHTTP(t, h, "POST", "/api/v1/purchase-orders/"+id+"/items/1/transition", map[string]any{"to_status": "purchased", "version": "3"}, cookie, csrf, s.Core.Config.Origin, "po-http-item")
+	if status != http.StatusOK || out["status"] != "confirmed" || out["version"] != "4" {
+		t.Fatal("HTTP item transition", status, out)
+	}
+	status, out, _ = execute(t, h, "GET", "/api/v1/purchase-orders/"+id+"/status-history?page=1&per_page=1", nil, cookie, "", s.Core.Config.Origin)
+	if status != http.StatusOK || out["total"] != float64(2) {
+		t.Fatal("HTTP history", status, out)
+	}
+	status, out, _ = execute(t, h, "GET", "/api/v1/purchase-orders?status=confirmed", nil, cookie, "", s.Core.Config.Origin)
+	if status != http.StatusOK || out["total"] != float64(1) {
+		t.Fatal("new status filter", status, out)
+	}
+
 }

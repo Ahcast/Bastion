@@ -278,7 +278,7 @@ func (s *Service) Save(ctx context.Context, a core.Actor, id, key string, p Inpu
 		}
 
 		out, e = s.Core.Idempotent(ctx, tx, a, "purchase_orders.save:"+id, key, p, func() (any, error) {
-			if id != "" && (old.Version != p.Version || old.Status != "received") {
+			if id != "" && (old.Version != p.Version || !editableOrder(old)) {
 				return nil, core.Conflict
 			}
 			customer, customerVersion, e := s.resolveCustomer(ctx, tx, a, p, old)

@@ -67,7 +67,7 @@ func (s *Service) List(ctx context.Context, a core.Actor, f Filter) (Page, error
 	if f.CustomerID != "" && core.ID(f.CustomerID) != nil {
 		return out, core.Invalid
 	}
-	if f.Status != "" && f.Status != "received" {
+	if f.Status != "" && !IsOrderStatus(f.Status) {
 		return out, core.Invalid
 	}
 

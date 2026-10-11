@@ -1,6 +1,6 @@
 # Bastion
 
-Aplicación operativa de Castillo IT. Core Go/Angular, Clientes, Proveedores y Procesos/receptor crawler tienen sus unidades base implementadas. Cotizaciones es el módulo activo: borradores y cálculo exacto, PDF/adjuntos, estados/revisiones, aprobación humana, emisión segura, correo comercial durable y bulk trazable están implementados y probados. La siguiente unidad es FX fechado, bloqueada hasta cerrar su política comercial; no iniciar Órdenes de Compra todavía. Los demás módulos comerciales e integraciones productivas se desarrollan por fases.
+Aplicación operativa de Castillo IT. Core, Clientes, Proveedores, Procesos/receptor crawler y Cotizaciones tienen su alcance implementado y validado en CI. El módulo activo es Órdenes de Compra de clientes: base cerrada; seguimiento de estados y entrega en validación. Los demás módulos se desarrollan en orden según el checkpoint. Producción e integraciones externas siguen pendientes.
 
 **Entrada del agente:** [AGENTS.md](AGENTS.md) → [checkpoint operativo](docs/ESTADO_DESARROLLO.md) → [maestro](docs/Proyecto_Bastion_Documento_Maestro.md) → [plan](docs/development/plan.md).
 

@@ -145,7 +145,7 @@ func (s *Service) Module(logger *slog.Logger, enabled bool) registry.Module {
 	return registry.Module{
 		ID:           "purchase-orders",
 		Label:        "Órdenes de Compra",
-		Version:      "0.1.0",
+		Version:      "0.2.0",
 		Enabled:      enabled,
 		Dependencies: []string{"core"},
 		Permissions:  Permissions,
@@ -173,6 +173,33 @@ func (s *Service) Module(logger *slog.Logger, enabled bool) registry.Module {
 			register("GET /api/v1/purchase-orders/{id}", func(ctx context.Context, a core.Actor, r *http.Request) (any, error) {
 				return s.Get(ctx, a, r.PathValue("id"))
 			})
+			register("GET /api/v1/purchase-orders/{id}/status-history", func(ctx context.Context, a core.Actor, r *http.Request) (any, error) {
+				page, perPage, e := orderPage(r)
+				if e != nil {
+					return nil, e
+				}
+				return s.StatusHistory(ctx, a, r.PathValue("id"), page, perPage)
+			})
+			transition := func(ctx context.Context, a core.Actor, r *http.Request) (any, error) {
+				key, e := requireIdempotency(r)
+				if e != nil {
+					return nil, e
+				}
+				var p TransitionInput
+				if _, e = strictRequired(r, &p, nil, "to_status", "version"); e != nil {
+					return nil, e
+				}
+				position := 0
+				if value := r.PathValue("position"); value != "" {
+					position, e = strconv.Atoi(value)
+					if e != nil || position < 1 || position > 200 {
+						return nil, core.Invalid
+					}
+				}
+				return s.Transition(ctx, a, r.PathValue("id"), key, position, p)
+			}
+			register("POST /api/v1/purchase-orders/{id}/transition", transition)
+			register("POST /api/v1/purchase-orders/{id}/items/{position}/transition", transition)
 			for _, method := range []string{"POST", "PATCH"} {
 				path := "/api/v1/purchase-orders"
 				if method == "PATCH" {

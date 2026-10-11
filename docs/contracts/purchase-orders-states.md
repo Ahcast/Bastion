@@ -92,6 +92,8 @@ Los estados de ítem son seguimiento operativo; no recalculan automáticamente e
 
 - para llevar la OC a `delivered`, todos sus ítems deben estar en `delivered`.
 
+La edición completa sólo se admite en `received` con todos los ítems `pending`. Después de cualquier avance se bloquea: Unidad 1 reemplaza ítems por posición y no puede conservar identidad operativa al reordenarlos. No reiniciar estados por PATCH. Los ítems tampoco avanzan tras una cabecera entregada/facturada/cerrada.
+
 No se imponen otras inferencias entre cabecera e ítems porque la documentación no define si una compra puede ser parcial, local, consolidada o con múltiples proveedores. En particular, `purchasing`, `in_transit`, `goods_received` y `preparing_delivery` no se derivan silenciosamente de porcentajes/contadores de ítems.
 
 ## 6. Facturación y cierre
@@ -192,7 +194,7 @@ purchase_order.item_status_changed
 purchase_order.delivered
 ```
 
-El payload mínimo identifica OC, versión, estado anterior/nuevo y actor. `delivered` puede coexistir con `status_changed` dentro de la misma transacción como hecho especializado; no dispara correo, factura, IA ni otro efecto por defecto.
+El sobre Core identifica OC, versión y actor. El estado anterior/nuevo y posición se conservan en historial y auditoría de la misma transacción; el consumidor puede resolver el hecho por OC/versión sin ampliar el contrato global de eventos. `delivered` puede coexistir con `status_changed` dentro de la misma transacción como hecho especializado; no dispara correo, factura, IA ni otro efecto por defecto.
 
 ## 12. Compatibilidad legacy
 

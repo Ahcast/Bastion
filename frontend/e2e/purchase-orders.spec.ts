@@ -4,7 +4,7 @@ import { totp } from "./helpers";
 const mark = (name: string) => console.log(`[purchase-orders-e2e] ${name}`);
 
 test("Órdenes de Compra: cálculo, alta, persistencia, edición y búsqueda con API real", async ({ page }) => {
-  test.setTimeout(60_000);
+  test.setTimeout(120_000);
   page.on("response", async (response) => {
     if (response.status() >= 400 && response.url().includes("/api/v1/")) {
       let body = "unavailable after navigation";
@@ -93,6 +93,36 @@ test("Órdenes de Compra: cálculo, alta, persistencia, edición y búsqueda con
   await page.getByRole("button", { name: "Buscar", exact: true }).click();
   await listResponse;
   await expect(page.getByRole("button", { name: "Ver orden OC-BROWSER-001", exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Ver orden OC-BROWSER-001", exact: true }).click();
+  for (const label of ["Confirmada", "Comprando", "En tránsito", "Recibido", "Preparando entrega"]) {
+    const response = page.waitForResponse((r) => r.request().method() === "POST" && /\/purchase-orders\/\d+\/transition$/.test(new URL(r.url()).pathname) && r.status() === 200);
+    await page.getByRole("button", { name: "Cambiar a " + label, exact: true }).click();
+    await response;
+    await expect(page.locator("p").filter({ hasText: "Estado: " + label }).first()).toBeVisible();
+    await expect(page.getByRole("button", { name: "Cambiar a " + label, exact: true })).toHaveCount(0);
+  }
+  await expect(page.getByRole("button", { name: "Cambiar a Entregado", exact: true })).toBeDisabled();
+  await expect(page.getByLabel("Comentarios de la orden", { exact: true })).toBeDisabled();
+  for (const label of ["Comprado", "Enviado", "Recibido", "Entregado"]) {
+    const response = page.waitForResponse((r) => r.request().method() === "POST" && /\/items\/1\/transition$/.test(new URL(r.url()).pathname) && r.status() === 200);
+    await page.getByRole("button", { name: "Ítem 1: cambiar a " + label, exact: true }).click();
+    await response;
+    await expect(page.getByRole("button", { name: "Ítem 1: cambiar a " + label, exact: true })).toHaveCount(0);
+  }
+  await page.getByLabel("Contraseña para confirmar", { exact: true }).fill(syntheticPassword);
+  await page.getByLabel("Código de confirmación", { exact: true }).fill(totp(syntheticTotpSecret));
+  await page.getByRole("button", { name: "Confirmar identidad", exact: true }).click();
+  await expect(page.getByText("Identidad confirmada. Puede continuar con la operación.", { exact: true })).toBeVisible();
+  const deliveredResponse = page.waitForResponse((r) => r.request().method() === "POST" && /\/purchase-orders\/\d+\/transition$/.test(new URL(r.url()).pathname) && r.status() === 200);
+  await page.getByRole("button", { name: "Cambiar a Entregado", exact: true }).click();
+  await deliveredResponse;
+  await expect(page.locator("p").filter({ hasText: /^Estado: Entregado$/ })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Historial de estados", exact: true })).toBeVisible();
+  await expect(page.locator("p").filter({ hasText: /^Total: HNL 201\.25$/ })).toBeVisible();
+  await page.reload();
+  await page.getByRole("button", { name: "Ver orden OC-BROWSER-001", exact: true }).click();
+  await expect(page.locator("p").filter({ hasText: /^Estado: Entregado$/ })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Cambiar a Facturado", exact: true })).toHaveCount(0);
   await page.screenshot({ path: "/tmp/bastion-purchase-orders.png", fullPage: true });
   mark("search:done");
 });

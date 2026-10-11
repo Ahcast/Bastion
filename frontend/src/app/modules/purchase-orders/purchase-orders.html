@@ -9,6 +9,12 @@
     <label>Buscar
       <input name="search" [(ngModel)]="search" maxlength="1000" placeholder="Número, cliente, descripción o comentario">
     </label>
+    <label>Estado de la orden
+      <select name="statusFilter" [(ngModel)]="statusFilter">
+        <option value="">Todos</option>
+        @for (status of orderStatuses; track status) { <option [value]="status">{{ statusLabel(status) }}</option> }
+      </select>
+    </label>
     <label>ID de cliente
       <input name="customerIdFilter" [(ngModel)]="customerId" inputmode="numeric">
     </label>
@@ -58,6 +64,36 @@
           <p><strong>Cotización de origen:</strong> {{ saved.source_quote_id }}</p>
         }
       </div>
+    }
+
+    @if (selected(); as saved) {
+      <section aria-label="Seguimiento de la orden">
+        @if (nextOrderStatus(); as next) {
+          <button type="button" (click)="transition(next)" [disabled]="busy() || dirty() || (next === 'delivered' && !deliveryReady())">Cambiar a {{ statusLabel(next) }}</button>
+          @if (next === 'delivered') {
+            <p>La entrega requiere todos los ítems entregados y confirmación de identidad vigente.</p>
+            <bastion-reauthentication />
+          }
+        }
+        @for (item of saved.items; track $index; let i = $index) {
+          <p>Ítem {{ i + 1 }}: {{ itemStatusLabel(item.status) }}</p>
+          @if (nextItemStatus(i); as next) {
+            <button type="button" (click)="transition(next, i + 1)" [disabled]="busy() || dirty()">Ítem {{ i + 1 }}: cambiar a {{ itemStatusLabel(next) }}</button>
+          }
+        }
+        <button type="button" (click)="loadHistory(1)" [disabled]="busy()">Ver historial de estados</button>
+        @if (historyTotal()) {
+          <h3>Historial de estados</h3>
+          @for (entry of history(); track entry.id) {
+            <p>{{ entry.item_position === null ? 'Orden' : 'Ítem ' + entry.item_position }}:
+              {{ entry.item_position === null ? statusLabel(entry.from_status) : itemStatusLabel(entry.from_status) }} →
+              {{ entry.item_position === null ? statusLabel(entry.to_status) : itemStatusLabel(entry.to_status) }} ·
+              Versión {{ entry.purchase_order_version }} · Usuario {{ entry.actor_id }} · {{ entry.created_at | date:'short':'-0600' }}</p>
+          }
+          <button type="button" (click)="loadHistory(historyPage - 1)" [disabled]="busy() || historyPage <= 1">Historial anterior</button>
+          <button type="button" (click)="loadHistory(historyPage + 1)" [disabled]="busy() || historyPage * 25 >= historyTotal()">Historial siguiente</button>
+        }
+      </section>
     }
 
     <form (ngSubmit)="save()">

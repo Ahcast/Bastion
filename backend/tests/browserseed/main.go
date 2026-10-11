@@ -138,7 +138,7 @@ func main() {
 	if _, e = db.Exec(`INSERT INTO roles(id,name) VALUES(7,'Órdenes sintético')`); e != nil {
 		log.Fatal(e)
 	}
-	if _, e = db.Exec(`INSERT INTO role_permissions SELECT 7,name,'all' FROM permissions WHERE name IN ('ordenes.view','ordenes.create','ordenes.update')`); e != nil {
+	if _, e = db.Exec(`INSERT INTO role_permissions SELECT 7,name,'all' FROM permissions WHERE name IN ('ordenes.view','ordenes.create','ordenes.update','ordenes.transition','ordenes.items.transition','ordenes.deliver')`); e != nil {
 		log.Fatal(e)
 	}
 	if _, e = db.Exec(`INSERT INTO user_roles SELECT id,7 FROM users WHERE email='purchase-orders@example.test'`); e != nil {

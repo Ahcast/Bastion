@@ -2,7 +2,7 @@
 
 Unidad comercial posterior al cierre de Cotizaciones. PurchaseOrders representa únicamente **órdenes recibidas de clientes**. Tablas propias iniciales: `customer_purchase_orders` y `customer_purchase_order_items`; REST `/api/v1/purchase-orders`. Las futuras órdenes emitidas por Castillo IT a proveedores pertenecen a `supplier_purchase_orders` y no forman parte de este módulo.
 
-Esta primera unidad implementa un agregado íntegro y versionado con un único estado técnico `received` (UI: **Recibida**). El grafo completo de estados, entrega, documentos, clonación, Cotización→OC y OC→Factura se implementará después en unidades separadas. La sección legacy de `modules/purchase-orders.md` no autoriza a mezclar sus estados `Pendiente/Listo/Entregado` con el flujo nuevo.
+La Unidad 1 implementa un agregado íntegro y versionado con estado inicial `received` (UI: **Recibida**). La Unidad 2 añade seguimiento y entrega según el [contrato normativo de estados](purchase-orders-states.md). Documentos, clonación, Cotización→OC y OC→Factura se implementarán después en unidades separadas. La sección legacy de `modules/purchase-orders.md` no autoriza a mezclar sus estados `Pendiente/Listo/Entregado` con el flujo nuevo.
 
 ## Reglas de dominio de la unidad 1
 
@@ -117,7 +117,7 @@ PATCH /api/v1/purchase-orders/{id}
 
 `calculate` no persiste y reutiliza el cálculo canónico. Listado paginado devuelve resumen, no el agregado incompleto. Filtros iniciales: búsqueda literal por número/cliente/descripción/comentario, `customer_id`, estado (`received`), total mínimo/máximo, página y `per_page`; total y data comparten el mismo predicado autorizado.
 
-POST/PATCH requieren `Idempotency-Key`. Errores siguen Core: 401/403/404/409/422. No existe DELETE ni endpoints de estado/conversión/documentos hasta su unidad correspondiente.
+POST/PATCH requieren `Idempotency-Key`. Errores siguen Core: 401/403/404/409/422. La Unidad 2 añade exclusivamente las tres rutas de transición/historial del contrato de estados. No existe DELETE ni endpoints de conversión/documentos hasta su unidad correspondiente.
 
 ## DTO de salida
 

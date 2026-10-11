@@ -130,7 +130,7 @@ func TestPurchaseOrderListScopesFiltersAndPagination(t *testing.T) {
 		{Page: 1, PerPage: 0},
 		{Page: 1, PerPage: 101},
 		{CustomerID: "bad", Page: 1, PerPage: 10},
-		{Status: "confirmed", Page: 1, PerPage: 10},
+		{Status: "legacy", Page: 1, PerPage: 10},
 		{TotalMin: ".5", Page: 1, PerPage: 10},
 		{TotalMax: "1e2", Page: 1, PerPage: 10},
 		{TotalMin: "10", TotalMax: "9.99", Page: 1, PerPage: 10},

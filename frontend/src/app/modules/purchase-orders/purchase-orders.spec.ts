@@ -211,6 +211,7 @@ describe("Órdenes de Compra", () => {
     const component = TestBed.createComponent(PurchaseOrders).componentInstance;
     component.page = 2;
     component.search = "Equipo";
+    component.statusFilter = "confirmed";
     component.customerId = "7";
     component.totalMin = "10.00";
     component.totalMax = "500.00";
@@ -218,10 +219,72 @@ describe("Órdenes de Compra", () => {
     await component.load();
     const path = api.get.mock.calls[0][0] as string;
     expect(path).toContain("page=2");
-    expect(path).toContain("status=received");
+    expect(path).toContain("status=confirmed");
     expect(path).toContain("customer_id=7");
     expect(path).toContain("total_min=10.00");
     expect(path).toContain("total_max=500.00");
     expect(component.total()).toBe(61);
   });
+  it("bloquea transiciones con cambios sin guardar y edición con avance de ítems", async () => {
+    const component = TestBed.createComponent(PurchaseOrders).componentInstance;
+    const saved = record();
+    component.selected.set(saved);
+    component.form = component.editable(saved);
+    component.form.comments = "Cambio pendiente";
+    await component.transition("confirmed");
+    expect(api.write).not.toHaveBeenCalled();
+    expect(component.error()).toContain("Guarde o descarte");
+    saved.items[0].status = "purchased";
+    component.selected.set({ ...saved });
+    expect(component.writable()).toBe(false);
+    expect(component.nextItemStatus(0)).toBe("shipped");
+  });
+
+  it("conserva intención de transición ante timeout y versión confirmada ante recarga fallida", async () => {
+    const component = TestBed.createComponent(PurchaseOrders).componentInstance;
+    component.selected.set(record());
+    component.form = component.editable(record());
+    api.write.mockRejectedValueOnce(new Error("timeout"));
+    await component.transition("confirmed");
+    api.write.mockResolvedValueOnce({ id: record().id, version: "2", status: "confirmed", to_status: "confirmed" });
+    api.get.mockRejectedValueOnce(new Error("reload"));
+    await component.transition("confirmed");
+    expect(api.write.mock.calls[0][3]).toBe(api.write.mock.calls[1][3]);
+    expect(component.selected()?.status).toBe("confirmed");
+    expect(component.selected()?.version).toBe("2");
+    expect(component.form.version).toBe("2");
+    expect(component.error()).toContain("registro cambió");
+  });
+
+  it("no ofrece estados reservados ni entrega incompleta o sin permisos", async () => {
+    const component = TestBed.createComponent(PurchaseOrders).componentInstance;
+    const saved = record();
+    saved.status = "preparing_delivery";
+    component.selected.set(saved);
+    component.form = component.editable(saved);
+    expect(component.nextOrderStatus()).toBe("delivered");
+    await component.transition("delivered");
+    expect(api.write).not.toHaveBeenCalled();
+    api.has.mockReturnValue(false);
+    expect(component.nextOrderStatus()).toBeNull();
+    expect(component.nextItemStatus(0)).toBeNull();
+    saved.status = "delivered";
+    component.selected.set({ ...saved });
+    expect(component.nextOrderStatus()).toBeNull();
+    expect(component.statusLabel("goods_received")).toBe("Recibido");
+    expect(component.itemStatusLabel("received")).toBe("Recibido");
+  });
+
+  it("consulta el historial paginado por ID string sin transformar la ficha", async () => {
+    const component = TestBed.createComponent(PurchaseOrders).componentInstance;
+    component.selected.set(record());
+    api.get.mockResolvedValueOnce({ data: [{ id: "1", item_position: 1, from_status: "pending", to_status: "purchased", actor_id: "42", purchase_order_version: "2", created_at: "2026-10-11T16:00:00Z" }], total: 26, page: 2, per_page: 25 });
+    await component.loadHistory(2);
+    expect(api.get.mock.calls[0][0]).toBe("/purchase-orders/9007199254740993/status-history?page=2&per_page=25");
+    expect(component.historyPage).toBe(2);
+    expect(component.historyTotal()).toBe(26);
+    expect(component.history()[0].item_position).toBe(1);
+    expect(component.selected()?.version).toBe("1");
+  });
+
 });

@@ -1,6 +1,12 @@
 import { Component, inject, signal, OnInit } from "@angular/core";
+import { DatePipe } from "@angular/common";
+import { Reauthentication } from "../../core/security/reauthentication";
 import { FormsModule } from "@angular/forms";
 import { Client } from "../../core/api/client";
+
+export type OrderStatus = "received" | "confirmed" | "purchasing" | "in_transit" | "goods_received" | "preparing_delivery" | "delivered" | "invoiced" | "closed";
+export type ItemStatus = "pending" | "purchased" | "shipped" | "received" | "delivered";
+interface HistoryEntry { id: string; item_position: number | null; from_status: string; to_status: string; actor_id: string; purchase_order_version: string; created_at: string }
 
 export interface PurchaseOrderCustomer {
   id: string;
@@ -63,14 +69,14 @@ export interface PurchaseOrderCalculation {
 
 export interface PurchaseOrder extends Omit<PurchaseOrderInput, "items"> {
   id: string;
-  status: "received";
+  status: OrderStatus;
   customer_version: string;
   source_quote_id: string | null;
   created_by: string;
   calculation: PurchaseOrderCalculation;
   items: (PurchaseOrderItemInput & {
     supplier_version: string;
-    status: "pending";
+    status: ItemStatus;
     unit_discount: string;
     gross: string;
     item_discount: string;
@@ -87,7 +93,7 @@ interface Summary {
   order_date: string;
   currency: "HNL" | "USD";
   total: string;
-  status: "received";
+  status: OrderStatus;
   version: string;
 }
 
@@ -127,7 +133,7 @@ export function emptyPurchaseOrder(): PurchaseOrderInput {
 }
 
 @Component({
-  imports: [FormsModule],
+  imports: [FormsModule, DatePipe, Reauthentication],
   templateUrl: "./purchase-orders.html",
   styles: [
     `fieldset { display:grid; gap:.8rem; border:1px solid #d6e1e8; margin:.7rem 0; padding:1rem; min-width:0 }
@@ -151,6 +157,11 @@ export class PurchaseOrders implements OnInit {
   preview = signal<PurchaseOrderCalculation | null>(null);
   form = emptyPurchaseOrder();
 
+  history = signal<HistoryEntry[]>([]);
+  historyTotal = signal(0);
+  historyPage = 1;
+  statusFilter = "";
+  orderStatuses: OrderStatus[] = ["received", "confirmed", "purchasing", "in_transit", "goods_received", "preparing_delivery", "delivered", "invoiced", "closed"];
   search = "";
   customerId = "";
   totalMin = "";
@@ -171,8 +182,8 @@ export class PurchaseOrders implements OnInit {
       const q = new URLSearchParams({
         page: String(this.page),
         per_page: String(this.perPage),
-        status: "received",
       });
+      if (this.statusFilter) q.set("status", this.statusFilter);
       if (this.search) q.set("search", this.search);
       if (this.customerId) q.set("customer_id", this.customerId);
       if (this.totalMin) q.set("total_min", this.totalMin);
@@ -211,6 +222,9 @@ export class PurchaseOrders implements OnInit {
     this.error.set("");
     try {
       const order = await this.api.get<PurchaseOrder>("/purchase-orders/" + id);
+      this.history.set([]);
+      this.historyTotal.set(0);
+      this.historyPage = 1;
       this.selected.set(order);
       this.form = this.editable(order);
       this.preview.set(order.calculation);
@@ -255,7 +269,84 @@ export class PurchaseOrders implements OnInit {
   }
 
   writable() {
-    return this.api.has(this.selected() ? "ordenes.update" : "ordenes.create");
+    const saved = this.selected();
+    return this.api.has(saved ? "ordenes.update" : "ordenes.create") &&
+      (!saved || (saved.status === "received" && saved.items.every((item) => item.status === "pending")));
+  }
+
+  dirty() {
+    const saved = this.selected();
+    return !!saved && JSON.stringify(this.form) !== JSON.stringify(this.editable(saved));
+  }
+
+  nextOrderStatus(): OrderStatus | null {
+    const saved = this.selected();
+    if (!saved) return null;
+    const index = this.orderStatuses.indexOf(saved.status);
+    if (index < 0 || index >= 6) return null;
+    const next = this.orderStatuses[index + 1];
+    const permission = next === "delivered" ? "ordenes.deliver" : "ordenes.transition";
+    return this.api.has(permission) ? next : null;
+  }
+
+  nextItemStatus(index: number): ItemStatus | null {
+    const saved = this.selected();
+    if (!saved || !this.api.has("ordenes.items.transition") || ["delivered", "invoiced", "closed"].includes(saved.status)) return null;
+    const statuses: ItemStatus[] = ["pending", "purchased", "shipped", "received", "delivered"];
+    const current = statuses.indexOf(saved.items[index]?.status);
+    return current >= 0 && current < 4 ? statuses[current + 1] : null;
+  }
+
+  deliveryReady() {
+    return this.selected()?.items.every((item) => item.status === "delivered") ?? false;
+  }
+
+  async transition(to: string, position = 0) {
+    const saved = this.selected();
+    if (!saved || this.busy()) return;
+    if (this.dirty()) {
+      this.error.set("Guarde o descarte los cambios antes de cambiar el estado.");
+      return;
+    }
+    const expected = position ? this.nextItemStatus(position - 1) : this.nextOrderStatus();
+    if (expected !== to || (position === 0 && to === "delivered" && !this.deliveryReady())) return;
+    const path = "/purchase-orders/" + saved.id + (position ? "/items/" + position : "") + "/transition";
+    const body = { to_status: to, version: saved.version };
+    this.busy.set(true);
+    this.error.set("");
+    try {
+      const result = await this.api.write<{ id: string; version: string; status: OrderStatus; to_status: string }>("POST", path, body, this.key(path, body));
+      this.pending.delete(path);
+      const updated = structuredClone(saved);
+      updated.version = result.version;
+      updated.status = result.status;
+      if (position) updated.items[position - 1].status = to as ItemStatus;
+      // Retain the confirmed version/state even when the following GET fails.
+      this.selected.set(updated);
+      this.form = this.editable(updated);
+      this.message.set("Estado actualizado.");
+      await this.openAfterSave(result.id);
+      await this.load();
+      await this.loadHistory(1);
+    } catch (e) {
+      this.error.set(this.api.message(e));
+    } finally {
+      this.busy.set(false);
+    }
+  }
+
+  async loadHistory(page = this.historyPage) {
+    const id = this.selected()?.id;
+    if (!id) return;
+    try {
+      const result = await this.api.get<Page<HistoryEntry>>("/purchase-orders/" + id + "/status-history?page=" + page + "&per_page=25");
+      if (this.selected()?.id !== id) return;
+      this.history.set(result.data);
+      this.historyTotal.set(result.total);
+      this.historyPage = result.page;
+    } catch (e) {
+      this.error.set(this.api.message(e));
+    }
   }
 
   addItem() {
@@ -362,10 +453,12 @@ export class PurchaseOrders implements OnInit {
   }
 
   statusLabel(status: string) {
-    return status === "received" ? "Recibida" : status;
+    const labels: Record<string, string> = { received: "Recibida", confirmed: "Confirmada", purchasing: "Comprando", in_transit: "En tránsito", goods_received: "Recibido", preparing_delivery: "Preparando entrega", delivered: "Entregado", invoiced: "Facturado", closed: "Cerrado" };
+    return labels[status] || status;
   }
 
   itemStatusLabel(status: string) {
-    return status === "pending" ? "Pendiente" : status;
+    const labels: Record<string, string> = { pending: "Pendiente", purchased: "Comprado", shipped: "Enviado", received: "Recibido", delivered: "Entregado" };
+    return labels[status] || status;
   }
 }

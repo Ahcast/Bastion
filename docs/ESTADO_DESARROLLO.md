@@ -147,6 +147,14 @@ No están certificadas todavía por las pruebas actuales:
 
 Estas validaciones externas son gates de producción; no deben falsearse con fixtures de CI.
 
+## Unidad 2 — seguimiento de estados y entrega en validación
+
+El contrato normativo `contracts/purchase-orders-states.md` está congelado. Base de grafo/historial/permisos publicada en `a18ed6b8074fd111746fd84431ee47d26019037c`, Core checks `38150855851` aprobado.
+
+Implementación nueva: transiciones humanas adyacentes de cabecera/ítem, historial paginado, lock agregado, versión/idempotencia y auditoría/eventos atómicos. Entrega exige permiso específico, reauth y todos los ítems entregados. PATCH no reinicia avances: sólo Recibida con todos los ítems Pendiente. Interfaz española muestra acción siguiente/historial, conserva claves ante timeout y estado confirmado ante fallo de recarga. Filtros canónicos y OpenAPI/paridad actualizados.
+
+Pruebas: build Angular/60 pruebas anteriores aprobados; nuevos casos y regresión final pendientes de ejecución. Backend Go/MySQL5.7/race y Playwright nuevos pendientes de CI. No declarar esta unidad cerrada todavía.
+
 ## Próximo paso exacto
 
-Cerrar el **contrato normativo de estados de Órdenes de Compra de clientes** antes de modificar el runtime. Comparar las dos nomenclaturas existentes, definir el grafo vigente y dejar explícito cómo se tratarán los estados legacy. Después implementar la siguiente unidad con migración/servicio/REST/UI/pruebas propias, sin iniciar todavía Facturas ni órdenes a proveedores.
+Ejecutar y cerrar CI de Unidad 2. Resolver cualquier fallo antes de conversiones/documentos de OC. No iniciar Facturas/pagos ni módulos posteriores hasta completar OC por sus unidades. Ningún despliegue, envío ni migración productiva realizado.
