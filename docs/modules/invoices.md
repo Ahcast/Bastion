@@ -76,7 +76,7 @@ invoices
 invoice_items
 payments
 invoice_expenses
-invoice_counter
+document_counters
 invoice_status_history
 documents
 document_links
@@ -388,3 +388,5 @@ Anulada
 Unidad 2 Borradores implementada, en validación: contrato/OpenAPI, migración 0021, REST/UI y scopes/evidencia; no emisión fiscal ni pagos reales. Se cierra tras CI verde.
 
 Unidad 2 cerrada en 88577fa0fa810958a65589beda3d9e331b8c3317 / Core checks 38179176643: Go/MySQL/race/builds, Angular 86 pruebas y navegador 11/11 aprobados. Continúa unidad 3; emisión y pagos reales no implementados todavía.
+
+Unidad 3: política pura de correlativo en validación; configuración persistente y emisión siguen pendientes. document_counters es el contador canónico, no invoice_counter.
