@@ -43,8 +43,10 @@ function setup(
   permissions = ["facturas.view", "facturas.create", "facturas.update"],
 ) {
   const api = {
+    moduleEnabled: vi.fn(() => true),
+    profile: vi.fn(() => null),
     has: vi.fn((p: string) => permissions.includes(p)),
-    get: vi.fn(async (path: string) =>
+    get: vi.fn(async (path: string): Promise<unknown> =>
       path.includes("?") ? { data: [], total: 0 } : invoice(),
     ),
     write: vi.fn(),
@@ -143,5 +145,64 @@ describe("Facturas Borradores", () => {
     expect(api.write.mock.calls[0][2].version).toBe("1");
     expect(api.write.mock.calls[0][2].items[0].id).toBe(invoice().items[0].id);
     expect(c.form.version).toBe("2");
+  });
+  it("etiqueta los selectores sin incluir las opciones y permite elegir Crédito", async () => {
+    setup();
+    const fixture = TestBed.createComponent(Invoices);
+    fixture.componentInstance.newDraft();
+    fixture.detectChanges();
+    await fixture.whenStable();
+    const select = fixture.nativeElement.querySelector(
+      "#invoice-term",
+    ) as HTMLSelectElement;
+    expect(select.labels![0].textContent).toBe("Condición de pago");
+    select.value = "credito";
+    select.dispatchEvent(new Event("change"));
+    await fixture.whenStable();
+    expect(fixture.componentInstance.form.payment_term_type).toBe("credito");
+    expect(fixture.componentInstance.form.credit_days).toBe(30);
+  });
+
+  it("consulta clientes autorizados, conserva la identidad seleccionada y no refresca el mismo snapshot", async () => {
+    const { api, component: c } = setup([
+      "facturas.view",
+      "facturas.create",
+      "clientes.view",
+    ]);
+    c.newDraft();
+    c.customerSearch = "Cliente autorizado";
+    api.get.mockResolvedValueOnce({
+      data: [{ id: "9", name: "Cliente autorizado" }],
+      total: 1,
+    });
+    await c.findCustomers();
+    expect(api.get.mock.calls[0][0]).toContain("is_active=true");
+    api.get.mockResolvedValueOnce({
+      id: "9",
+      name: "Cliente autorizado",
+      rtn: "",
+      contact_name: "Compras",
+      phone: "",
+      email: "contact@example.test",
+      address: "Dirección sintética",
+    });
+    c.chosenCustomerID = "9";
+    await c.chooseCustomer();
+    expect(c.form.customer.name).toBe("Cliente autorizado");
+    expect(c.form.customer.contact).toBe("Compras");
+    const calls = api.get.mock.calls.length;
+    await c.chooseCustomer();
+    expect(api.get.mock.calls.length).toBe(calls);
+    api.get.mockRejectedValueOnce(new Error("acceso revocado"));
+    c.chosenCustomerID = "10";
+    await c.chooseCustomer();
+    expect(c.form.customer.id).toBe("9");
+    expect(c.chosenCustomerID).toBe("9");
+  });
+  it("no consulta catálogos ni equipos sin permisos", async () => {
+    const { api, component: c } = setup();
+    await c.findCustomers();
+    await c.loadTeams();
+    expect(api.get).not.toHaveBeenCalled();
   });
 });

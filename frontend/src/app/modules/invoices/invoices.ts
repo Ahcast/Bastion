@@ -72,9 +72,14 @@ interface Summary {
   version: string;
 }
 const businessDate = () => {
- const parts = new Intl.DateTimeFormat("en", { timeZone:"America/Tegucigalpa", year:"numeric", month:"2-digit", day:"2-digit" }).formatToParts(new Date());
- const field = (name:string) => parts.find(p => p.type === name)!.value;
- return [field("year"),field("month"),field("day")].join("-");
+  const parts = new Intl.DateTimeFormat("en", {
+    timeZone: "America/Tegucigalpa",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date());
+  const field = (name: string) => parts.find((p) => p.type === name)!.value;
+  return [field("year"), field("month"), field("day")].join("-");
 };
 export const emptyInvoice = (): DraftInput => ({
   customer: {
@@ -122,6 +127,10 @@ export class Invoices implements OnInit {
   page = 1;
   search = "";
   customerFilter = "";
+  customerSearch = "";
+  chosenCustomerID = "";
+  customerChoices = signal<{ id: string; name: string }[]>([]);
+  teams = signal<{ id: string; name: string; members: string[] }[]>([]);
   selected = signal<Invoice | null>(null);
   editing = signal(false);
   form = emptyInvoice();
@@ -135,7 +144,109 @@ export class Invoices implements OnInit {
   private pending = new Map<string, { body: string; key: string }>();
   private baseline = "";
   async ngOnInit() {
-    await this.load();
+    await Promise.all([this.load(), this.loadTeams()]);
+  }
+  catalogEnabled() {
+    return this.api.has("clientes.view") && this.api.moduleEnabled("customers");
+  }
+  async findCustomers() {
+    if (!this.catalogEnabled() || this.busy()) return;
+    this.busy.set(true);
+    try {
+      const q = new URLSearchParams({
+        page: "1",
+        per_page: "100",
+        search: this.customerSearch,
+        is_active: "true",
+      });
+      this.customerChoices.set(
+        (
+          await this.api.get<{ data: { id: string; name: string }[] }>(
+            "/customers?" + q,
+          )
+        ).data,
+      );
+    } catch (e) {
+      this.error.set(this.api.message(e));
+    } finally {
+      this.busy.set(false);
+    }
+  }
+  async chooseCustomer() {
+    if (!this.catalogEnabled() || this.busy() || !this.writable()) return;
+    if (this.chosenCustomerID === this.form.customer.id) return;
+    if (!this.chosenCustomerID) {
+      this.form.customer = { ...this.form.customer, id: "" };
+      return;
+    }
+    this.busy.set(true);
+    try {
+      const c = await this.api.get<{
+        id: string;
+        name: string;
+        rtn: string;
+        contact_name: string;
+        phone: string;
+        email: string;
+        address: string;
+      }>("/customers/" + this.chosenCustomerID);
+      this.form.customer = {
+        id: c.id,
+        name: c.name,
+        rtn: c.rtn,
+        contact: c.contact_name,
+        phone: c.phone,
+        email: c.email,
+        address: c.address,
+      };
+    } catch (e) {
+      this.chosenCustomerID = this.form.customer.id;
+      this.error.set(this.api.message(e));
+    } finally {
+      this.busy.set(false);
+    }
+  }
+  async loadTeams() {
+    if (!this.api.has("core.teams.read")) return;
+    try {
+      this.teams.set(
+        (
+          await this.api.get<{
+            data: { id: string; name: string; members: string[] }[];
+          }>("/teams")
+        ).data,
+      );
+    } catch (e) {
+      this.error.set(this.api.message(e));
+    }
+  }
+  allowedTeams() {
+    const profile = this.api.profile();
+    if (!profile) return [];
+    const action = this.selected() ? "facturas.update" : "facturas.create";
+    const all = profile.grants.some(
+      (g) => g.permission === action && g.scope === "all",
+    );
+    const owner = this.selected()?.created_by ?? profile.user.id;
+    const view = profile.grants.some(
+      (g) =>
+        g.permission === "facturas.view" &&
+        (g.scope === "all" ||
+          (g.scope === "self" && owner === profile.user.id)),
+    );
+    return this.teams().filter(
+      (t) => (all && view) || t.members.includes(profile.user.id),
+    );
+  }
+  canTransferTeam() {
+    return (
+      !this.selected() ||
+      this.api
+        .profile()
+        ?.grants.some(
+          (g) => g.permission === "facturas.update" && g.scope === "all",
+        )
+    );
   }
   writable() {
     if (this.needsReload()) return false;
@@ -151,6 +262,7 @@ export class Invoices implements OnInit {
     this.selected.set(null);
     this.needsReload.set(false);
     this.form = emptyInvoice();
+    this.chosenCustomerID = "";
     this.baseline = JSON.stringify(this.form);
     this.calculation.set(null);
     this.confirmed.set(null);
@@ -237,6 +349,7 @@ export class Invoices implements OnInit {
     };
     this.baseline = JSON.stringify(this.form);
     this.calculation.set(o.calculation);
+    this.chosenCustomerID = o.customer.id;
     this.calculatedFor = JSON.stringify(this.financialInput());
     this.needsReload.set(false);
     this.editing.set(true);
