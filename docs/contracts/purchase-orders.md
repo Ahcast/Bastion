@@ -170,3 +170,7 @@ No desplegar ni migrar producción por aprobar esta unidad.
 ## Unidad 3 — conversión desde Cotizaciones
 
 Implementación y reglas en el [contrato único de conversión](quote-purchase-order-conversion.md). Esta unidad incorpora Cotización→OC mediante propietarios, sin rutas de conversión en `/purchase-orders`. La ficha añade `source_quote_version` nullable string e inmutable junto a `source_quote_id`. Edición posterior conserva ambos campos. Documentos/clonación de OC e Invoices siguen pendientes.
+
+## Documentos privados OC e identidad de ítems
+
+Contrato propietario vigente: [documentos privados OC](purchase-order-documents.md). Migración 0018 y vínculos durables a IDs de ítem; edición/reordenamiento preserva identidad, papelera no permite eliminar el ítem vinculado.

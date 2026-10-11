@@ -1,3 +1,4 @@
+import { OrderDocuments } from "./order-documents";
 import { Component, inject, signal, OnInit } from "@angular/core";
 import { ActivatedRoute, RouterLink } from "@angular/router";
 import { DatePipe } from "@angular/common";
@@ -20,6 +21,7 @@ export interface PurchaseOrderCustomer {
 }
 
 export interface PurchaseOrderItemInput {
+  id?: string;
   description: string;
   unit: string;
   quantity: string;
@@ -135,7 +137,7 @@ export function emptyPurchaseOrder(): PurchaseOrderInput {
 }
 
 @Component({
-  imports: [RouterLink, FormsModule, DatePipe, Reauthentication],
+  imports: [OrderDocuments, RouterLink, FormsModule, DatePipe, Reauthentication],
   templateUrl: "./purchase-orders.html",
   styles: [
     `fieldset { display:grid; gap:.8rem; border:1px solid #d6e1e8; margin:.7rem 0; padding:1rem; min-width:0 }
@@ -257,6 +259,7 @@ export class PurchaseOrders implements OnInit {
       team_id: order.team_id,
       version: order.version,
       items: order.items.map((item) => ({
+        ...(item.id ? { id: item.id } : {}),
         description: item.description,
         unit: item.unit,
         quantity: item.quantity,
@@ -271,6 +274,10 @@ export class PurchaseOrders implements OnInit {
         comments: item.comments,
       })),
     };
+  }
+
+  documentLinked(version:string) {
+    const order=this.selected();if(!order)return;this.selected.set({...order,version});this.form.version=version;
   }
 
   writable() {

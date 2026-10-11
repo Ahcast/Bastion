@@ -150,6 +150,10 @@ func RegisterFiles(s *core.Service, r *registry.Registry, logger *slog.Logger, o
 	}
 	if purchaseOrderEnabled {
 		s.RegisterPermissions(purchaseorders.Permissions, []string{"ordenes.view"})
+		s.DocumentPolicies["purchase_orders"] = purchaseOrderService.DocumentPolicy
+	}
+	if !purchaseOrderEnabled {
+		delete(s.DocumentPolicies, "purchase_orders")
 	}
 	if e := r.Register(purchaseOrderService.Module(logger, purchaseOrderEnabled)); e != nil {
 		return e

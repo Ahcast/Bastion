@@ -235,6 +235,11 @@
       </fieldset>
     </form>
 
+    @if (selected(); as savedOrder) {
+      @if(api.has('core.documents.read')) {
+        <app-order-documents [order]="savedOrder" [changesPending]="dirty() || busy()" (linked)="documentLinked($event)" />
+      }
+    }
     @if (preview(); as calculation) {
       <section>
         <h3>{{ selected() ? 'Cálculo de la orden' : 'Vista previa del cálculo' }}</h3>

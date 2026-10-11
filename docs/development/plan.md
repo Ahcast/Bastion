@@ -63,3 +63,7 @@ La Unidad 3 siguiente incorporó conversión Cotización → OC; consultar su ci
 Contrato normativo `../contracts/quote-purchase-order-conversion.md`. Código/UI certificados en `541bb101db51b391265b95ca9a8acd0ff0a3ae85`, Core checks `38159858594` aprobado: Go/race/MySQL5.7/builds, Angular build/68 pruebas y navegador 10/10. Evidencia completa en checkpoint.
 
 Siguiente unidad: documentos privados OC de cabecera/ítems mediante Core.Files, con contrato/política/metadata y descargas autorizadas. Luego clonación de OC y aceptación integral. Facturas permanece después del cierre correspondiente.
+
+## 2026-10-11 — Unidad 4 OC: documentos privados en validación
+
+Contrato `../contracts/purchase-order-documents.md`, migración 0018, política propietaria, enlaces a cabecera/IDs estables de ítems y Angular implementados. Se conservan filas/IDs en edición y reordenamiento; FK y servicio impiden eliminar ítems con adjuntos incluso en papelera. Core controla carga/integridad/cuarentena/análisis/descarga/preview/papelera. Replay reautoriza ambos registros y reauth. Build Angular y 71 pruebas locales aprobados; Go/MySQL/race/navegador pendientes de CI antes del cierre. Clonación sigue posterior; Facturas no iniciada. Sin despliegue ni migración productiva.

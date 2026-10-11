@@ -7,6 +7,7 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
 	"os"
@@ -24,8 +25,10 @@ import (
 )
 
 type download struct {
-	key, name string
-	expires   time.Time
+	key, name       string
+	media, checksum string
+	size            int64
+	expires         time.Time
 }
 type objects struct {
 	mu    sync.Mutex
@@ -45,8 +48,44 @@ func (f *objects) PutImmutable(ctx context.Context, key string, b []byte, hash s
 	f.data[key] = append([]byte{}, b...)
 	return nil
 }
-func (f *objects) UploadURL(context.Context, string, string, int64, string) (string, error) {
-	return "", core.Disabled
+func (f *objects) UploadURL(ctx context.Context, key, media string, size int64, checksum string) (string, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	token := security.ID() + security.ID()
+	f.links[token] = download{key: key, media: media, size: size, checksum: checksum, expires: time.Now().Add(5 * time.Minute)}
+	return "http://localhost:8080/synthetic-uploads/" + token, nil
+}
+func (f *objects) upload(w http.ResponseWriter, r *http.Request) {
+	if r.Header.Get("Origin") != "http://localhost:4200" {
+		http.Error(w, "synthetic origin denied", 403)
+		return
+	}
+	w.Header().Set("Access-Control-Allow-Origin", "http://localhost:4200")
+	w.Header().Set("Access-Control-Allow-Methods", "PUT, OPTIONS")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, x-amz-checksum-sha256")
+	if r.Method == "OPTIONS" {
+		w.WriteHeader(204)
+		return
+	}
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	d, ok := f.links[r.PathValue("token")]
+	if !ok || !d.expires.After(time.Now()) || d.size < 1 {
+		http.NotFound(w, r)
+		return
+	}
+	b, e := io.ReadAll(http.MaxBytesReader(w, r.Body, 20*1024*1024))
+	if e != nil || int64(len(b)) != d.size || r.Header.Get("Content-Type") != d.media || r.Header.Get("x-amz-checksum-sha256") != d.checksum {
+		http.Error(w, "synthetic invalid upload", 422)
+		return
+	}
+	raw, _ := hex.DecodeString(security.Hash(string(b)))
+	if base64.StdEncoding.EncodeToString(raw) != d.checksum {
+		http.Error(w, "synthetic checksum mismatch", 422)
+		return
+	}
+	f.data[d.key] = b
+	w.WriteHeader(204)
 }
 func (f *objects) Info(ctx context.Context, key string) (core.ObjectInfo, error) {
 	f.mu.Lock()
@@ -65,7 +104,7 @@ func (f *objects) DownloadURL(ctx context.Context, key, name string) (string, er
 		return "", core.Missing
 	}
 	token := security.ID() + security.ID()
-	f.links[token] = download{key, name, time.Now().Add(5 * time.Minute)}
+	f.links[token] = download{key: key, name: name, expires: time.Now().Add(5 * time.Minute)}
 	return "http://localhost:8080/synthetic-objects/" + token, nil
 }
 func (f *objects) serve(w http.ResponseWriter, r *http.Request) {
@@ -132,6 +171,8 @@ func main() {
 	}()
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /synthetic-objects/{token}", f.serve)
+	mux.HandleFunc("PUT /synthetic-uploads/{token}", f.upload)
+	mux.HandleFunc("OPTIONS /synthetic-uploads/{token}", f.upload)
 	mux.Handle("/", api.New(s, r, f, logger))
 	server := &http.Server{Addr: s.Config.Listen, Handler: mux, ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 15 * time.Second, WriteTimeout: 30 * time.Second, IdleTimeout: 60 * time.Second}
 	logger.Info("test-only server started")

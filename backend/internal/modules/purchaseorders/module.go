@@ -145,7 +145,7 @@ func (s *Service) Module(logger *slog.Logger, enabled bool) registry.Module {
 	return registry.Module{
 		ID:           "purchase-orders",
 		Label:        "Órdenes de Compra",
-		Version:      "0.2.0",
+		Version:      "0.4.0",
 		Enabled:      enabled,
 		Dependencies: []string{"core"},
 		Permissions:  Permissions,
@@ -179,6 +179,28 @@ func (s *Service) Module(logger *slog.Logger, enabled bool) registry.Module {
 					return nil, e
 				}
 				return s.StatusHistory(ctx, a, r.PathValue("id"), page, perPage)
+			})
+			register("GET /api/v1/purchase-orders/{id}/documents", func(ctx context.Context, a core.Actor, r *http.Request) (any, error) {
+				page, limit, e := orderPage(r)
+				if e != nil {
+					return nil, e
+				}
+				deleted := r.URL.Query().Get("deleted")
+				if deleted != "" && deleted != "false" && deleted != "true" {
+					return nil, core.Invalid
+				}
+				return s.Documents(ctx, a, r.PathValue("id"), r.URL.Query().Get("item_id"), page, limit, deleted == "true")
+			})
+			register("POST /api/v1/purchase-orders/{id}/documents", func(ctx context.Context, a core.Actor, r *http.Request) (any, error) {
+				key, e := requireIdempotency(r)
+				if e != nil {
+					return nil, e
+				}
+				var p DocumentInput
+				if _, e = strictRequired(r, &p, map[string]bool{"item_id": true}, "document_id", "document_version", "version", "item_id"); e != nil {
+					return nil, e
+				}
+				return s.LinkDocument(ctx, a, r.PathValue("id"), key, p)
 			})
 			transition := func(ctx context.Context, a core.Actor, r *http.Request) (any, error) {
 				key, e := requireIdempotency(r)

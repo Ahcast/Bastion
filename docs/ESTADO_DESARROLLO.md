@@ -167,3 +167,7 @@ CI intermedio detectó dependencia de números fijos y datos globales en el esce
 ## Próximo paso exacto
 
 Continuar dentro de OC con documentos privados de cabecera/ítems mediante Core.Files: contrato, permisos/política propietaria, metadata y enlaces durables, cuarentena y descarga autorizada; nunca bytes en webroot. Después clonación de OC y aceptación integral. OC→Factura/utilidad requieren sus propietarios/reglas; no iniciar Facturas/pagos antes del cierre correspondiente. Ningún despliegue, envío ni migración productiva realizado.
+
+## 2026-10-11 — Unidad 4 OC: documentos privados en validación
+
+Contrato `contracts/purchase-order-documents.md`, migración 0018, política propietaria, enlaces a cabecera/IDs estables de ítems y Angular implementados. Se conservan filas/IDs en edición y reordenamiento; FK y servicio impiden eliminar ítems con adjuntos incluso en papelera. Core controla carga/integridad/cuarentena/análisis/descarga/preview/papelera. Replay reautoriza ambos registros y reauth. Build Angular y 71 pruebas locales aprobados; Go/MySQL/race/navegador pendientes de CI antes del cierre. Clonación sigue posterior; Facturas no iniciada. Sin despliegue ni migración productiva.

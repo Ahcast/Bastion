@@ -132,3 +132,7 @@ Emisión Quotes en 0010 amplía quote_pdf_snapshots: kind draft/issued, approval
 Programación Core en 0011 agrega outbox_events.available_at nullable UTC con precisión de microsegundos. PublishOutbox conserva la fecha efectiva al crear jobs; eventos anteriores usan created_at. No se crean tablas comerciales de correo ni se convierten hechos de dominio en envíos automáticos. Ver [contrato de transporte](contracts/mail-transport.md).
 
 Conversión Quotes→OC en 0017: customer_purchase_orders.source_quote_id único nullable y source_quote_version FK a quote_versions; quotes.purchase_order_id único nullable/FK al destino. Los propietarios escriben sus agregados dentro de la misma TX; Quote converted y snapshot/versiones conservan destino. No copia documentos ni cambia estados sin efecto.
+
+## Documentos privados OC e identidad de ítems
+
+Contrato propietario vigente: [documentos privados OC](contracts/purchase-order-documents.md). Migración 0018 y vínculos durables a IDs de ítem; edición/reordenamiento preserva identidad, papelera no permite eliminar el ítem vinculado.

@@ -17,6 +17,7 @@ var Permissions = []string{
 	"ordenes.transition",
 	"ordenes.items.transition",
 	"ordenes.deliver",
+	"ordenes.documents.write",
 }
 
 type CustomerInput struct {
@@ -121,6 +122,9 @@ func Validate(p *Input) (CalculationResult, error) {
 	}
 	for i := range p.Items {
 		x := &p.Items[i]
+		if x.ID != "" && core.ID(x.ID) != nil {
+			return zero, core.Invalid
+		}
 		if x.SupplierID != "" && core.ID(x.SupplierID) != nil {
 			return zero, core.Invalid
 		}

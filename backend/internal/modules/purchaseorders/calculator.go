@@ -9,6 +9,7 @@ import (
 var investmentLimit = decimal.RequireFromString("9999999999999999.99")
 
 type Item struct {
+	ID            string `json:"id,omitempty"`
 	Description   string `json:"description"`
 	Unit          string `json:"unit"`
 	Quantity      string `json:"quantity"`

@@ -112,7 +112,7 @@ func (s *Service) access(ctx context.Context, q core.Querier, a core.Actor, id, 
 }
 
 func (s *Service) items(ctx context.Context, q core.Querier, o *PurchaseOrder) error {
-	rows, e := q.QueryContext(ctx, `SELECT description,unit,CAST(quantity AS CHAR),CAST(unit_sale_price AS CHAR),CAST(unit_cost AS CHAR),discount_type,CAST(discount AS CHAR),tax_type,COALESCE(CAST(supplier_id AS CHAR),''),supplier_version,supplier_name_snapshot,status,tracking,comments,CAST(unit_discount AS CHAR),CAST(gross AS CHAR),CAST(item_discount AS CHAR),CAST(allocated_discount AS CHAR),CAST(base AS CHAR),CAST(line_investment AS CHAR) FROM customer_purchase_order_items WHERE purchase_order_id=? ORDER BY position`, o.ID)
+	rows, e := q.QueryContext(ctx, `SELECT CAST(id AS CHAR),description,unit,CAST(quantity AS CHAR),CAST(unit_sale_price AS CHAR),CAST(unit_cost AS CHAR),discount_type,CAST(discount AS CHAR),tax_type,COALESCE(CAST(supplier_id AS CHAR),''),supplier_version,supplier_name_snapshot,status,tracking,comments,CAST(unit_discount AS CHAR),CAST(gross AS CHAR),CAST(item_discount AS CHAR),CAST(allocated_discount AS CHAR),CAST(base AS CHAR),CAST(line_investment AS CHAR) FROM customer_purchase_order_items WHERE purchase_order_id=? ORDER BY position`, o.ID)
 	if e != nil {
 		return e
 	}
@@ -120,7 +120,7 @@ func (s *Service) items(ctx context.Context, q core.Querier, o *PurchaseOrder) e
 	for rows.Next() {
 		var x PurchaseOrderItem
 		if e = rows.Scan(
-			&x.Description, &x.Unit, &x.Quantity, &x.UnitSalePrice, &x.UnitCost, &x.DiscountType, &x.Discount, &x.TaxType,
+			&x.ID, &x.Description, &x.Unit, &x.Quantity, &x.UnitSalePrice, &x.UnitCost, &x.DiscountType, &x.Discount, &x.TaxType,
 			&x.SupplierID, &x.SupplierVersion, &x.SupplierName, &x.Status, &x.Tracking, &x.Comments,
 			&x.UnitDiscount, &x.Gross, &x.ItemDiscount, &x.AllocatedDiscount, &x.Base, &x.LineInvestment,
 		); e != nil {
@@ -182,10 +182,20 @@ func (s *Service) resolveItems(ctx context.Context, tx *sql.Tx, a core.Actor, ca
 		}
 	}
 	usedBySupplier := map[string]int{}
+	oldByID := map[string]PurchaseOrderItem{}
+	for _, x := range old.Items {
+		oldByID[x.ID] = x
+	}
 
 	for _, x := range calculated.Items {
 		item := PurchaseOrderItem{CalculatedItem: x, Status: "pending"}
 		if x.SupplierID == "" {
+			out = append(out, item)
+			continue
+		}
+		if previous, ok := oldByID[x.ID]; ok && previous.SupplierID == x.SupplierID {
+			item.SupplierName = previous.SupplierName
+			item.SupplierVersion = previous.SupplierVersion
 			out = append(out, item)
 			continue
 		}
@@ -286,6 +296,9 @@ func (s *Service) Save(ctx context.Context, a core.Actor, id, key string, p Inpu
 			if e != nil {
 				return nil, e
 			}
+			if e := validateItemIDs(p.Items, old.Items); e != nil {
+				return nil, e
+			}
 			resolvedItems, e := s.resolveItems(ctx, tx, a, calculated, old)
 			if e != nil {
 				return nil, e
@@ -351,12 +364,54 @@ func (s *Service) persist(ctx context.Context, tx *sql.Tx, a core.Actor, o *Purc
 		)); e != nil {
 			return nil, orderDBError(e)
 		}
-		if _, e := tx.ExecContext(ctx, `DELETE FROM customer_purchase_order_items WHERE purchase_order_id=?`, o.ID); e != nil {
+		if _, e := tx.ExecContext(ctx, `UPDATE customer_purchase_order_items SET position=position+1000 WHERE purchase_order_id=?`, o.ID); e != nil {
 			return nil, e
+		}
+		rows, e := tx.QueryContext(ctx, `SELECT CAST(id AS CHAR) FROM customer_purchase_order_items WHERE purchase_order_id=?`, o.ID)
+		if e != nil {
+			return nil, e
+		}
+		var obsolete []string
+		retained := map[string]bool{}
+		for _, x := range o.Items {
+			retained[x.ID] = true
+		}
+		for rows.Next() {
+			var id string
+			if e = rows.Scan(&id); e != nil {
+				rows.Close()
+				return nil, e
+			}
+			if !retained[id] {
+				obsolete = append(obsolete, id)
+			}
+		}
+		e = rows.Err()
+		rows.Close()
+		if e != nil {
+			return nil, e
+		}
+		for _, id := range obsolete {
+			var count int
+			if e = tx.QueryRowContext(ctx, `SELECT COUNT(*) FROM customer_purchase_order_documents WHERE purchase_order_id=? AND item_id=?`, o.ID, id).Scan(&count); e != nil {
+				return nil, e
+			}
+			if count > 0 {
+				return nil, core.Conflict
+			}
+			if _, e = tx.ExecContext(ctx, `DELETE FROM customer_purchase_order_items WHERE purchase_order_id=? AND id=?`, o.ID, id); e != nil {
+				return nil, e
+			}
 		}
 	}
 
 	for i, x := range o.Items {
+		if x.ID != "" {
+			if e := core.Changed(tx.ExecContext(ctx, `UPDATE customer_purchase_order_items SET position=?,description=?,unit=?,quantity=?,unit_sale_price=?,unit_cost=?,discount_type=?,discount=?,tax_type=?,supplier_id=?,supplier_version=?,supplier_name_snapshot=?,status=?,tracking=?,comments=?,unit_discount=?,gross=?,item_discount=?,allocated_discount=?,base=?,line_investment=?,updated_at=UTC_TIMESTAMP(6) WHERE purchase_order_id=? AND id=?`, i, x.Description, x.Unit, x.Quantity, x.UnitSalePrice, x.UnitCost, x.DiscountType, x.Discount, x.TaxType, nullable(x.SupplierID), x.SupplierVersion, x.SupplierName, x.Status, x.Tracking, x.Comments, x.UnitDiscount, x.Gross, x.ItemDiscount, x.AllocatedDiscount, x.Base, x.LineInvestment, o.ID, x.ID)); e != nil {
+				return nil, e
+			}
+			continue
+		}
 		if _, e := tx.ExecContext(ctx, `INSERT INTO customer_purchase_order_items(purchase_order_id,position,description,unit,quantity,unit_sale_price,unit_cost,discount_type,discount,tax_type,supplier_id,supplier_version,supplier_name_snapshot,status,tracking,comments,unit_discount,gross,item_discount,allocated_discount,base,line_investment,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,UTC_TIMESTAMP(6),UTC_TIMESTAMP(6))`,
 			o.ID, i, x.Description, x.Unit, x.Quantity, x.UnitSalePrice, x.UnitCost, x.DiscountType, x.Discount, x.TaxType, nullable(x.SupplierID), x.SupplierVersion, x.SupplierName, x.Status, x.Tracking, x.Comments,
 			x.UnitDiscount, x.Gross, x.ItemDiscount, x.AllocatedDiscount, x.Base, x.LineInvestment,
@@ -371,4 +426,25 @@ func (s *Service) persist(ctx context.Context, tx *sql.Tx, a core.Actor, o *Purc
 		return nil, e
 	}
 	return map[string]string{"id": o.ID, "version": fmt.Sprint(o.Version)}, nil
+}
+
+func validateItemIDs(items []Item, old []PurchaseOrderItem) error {
+	allowed := map[string]bool{}
+	seen := map[string]bool{}
+	for _, x := range old {
+		allowed[x.ID] = true
+	}
+	for _, x := range items {
+		if x.ID == "" {
+			continue
+		}
+		if !allowed[x.ID] {
+			return core.Missing
+		}
+		if seen[x.ID] {
+			return core.Conflict
+		}
+		seen[x.ID] = true
+	}
+	return nil
 }

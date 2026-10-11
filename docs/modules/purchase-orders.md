@@ -460,3 +460,7 @@ para órdenes emitidas por Castillo IT a proveedores.
 
 
 
+
+## Documentos privados OC e identidad de ítems
+
+Contrato propietario vigente: [documentos privados OC](../contracts/purchase-order-documents.md). Migración 0018 y vínculos durables a IDs de ítem; edición/reordenamiento preserva identidad, papelera no permite eliminar el ítem vinculado.
