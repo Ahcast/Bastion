@@ -13,7 +13,7 @@ test('Cotizaciones: origen, cálculo exacto, persistencia, versión, clonación 
  mark('login:done');
  await page.getByRole('link',{name:'Procesos',exact:true}).click();await page.getByRole('button',{name:'Ver proceso HC-TEST-001',exact:true}).click();await page.getByRole('button',{name:'Crear cotización borrador',exact:true}).click();await expect(page.getByLabel('Nombre del cliente',{exact:true})).toHaveValue('Entidad sintética');await expect(page.getByLabel('Expediente o referencia',{exact:true})).toHaveValue('HC-TEST-001');await expect(page.getByLabel('Descripción 1',{exact:true})).toHaveCount(0);
  mark('from-process:done');
- const editorHeading=page.locator('section.card > h2');
+ const editorHeading=page.locator('section.card > h2').filter({hasText:/^COT-[0-9]+$/});
  const quoteNumber=await editorHeading.innerText();expect(quoteNumber).toMatch(/^COT-[0-9]+$/);
  await page.getByRole('button',{name:'Agregar ítem',exact:true}).click();await page.getByLabel('Descripción 1',{exact:true}).fill('Equipo sintético');await page.getByLabel('Cantidad 1',{exact:true}).fill('2');await page.getByLabel('Precio unitario 1',{exact:true}).fill('100');await page.getByLabel('Costo unitario interno 1',{exact:true}).fill('50');await page.getByLabel('Descuento 1',{exact:true}).fill('10');await page.getByLabel('Descuento general',{exact:true}).fill('5');await page.getByLabel('Notas privadas',{exact:true}).fill('Nota interna');await page.getByRole('button',{name:'Calcular vista previa',exact:true}).click();await expect(page.getByText('Total calculado: HNL 201.25',{exact:true})).toBeVisible();
  mark('calculate:done');
