@@ -43,7 +43,7 @@ func validCurrency(currency string) bool { return currency == "HNL" || currency 
 
 func Calculate(p CalculationInput) (CalculationResult, error) {
 	var out CalculationResult
-	if !validCurrency(p.Currency) {
+	if !validCurrency(p.Currency) || len(p.Items) == 0 || len(p.Items) > 200 {
 		return out, core.Invalid
 	}
 	sales, e := finance.Calculate(p.CalculationInput)
