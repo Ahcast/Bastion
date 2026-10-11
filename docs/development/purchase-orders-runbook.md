@@ -1,6 +1,6 @@
 # Ejecutar Órdenes de Compra de clientes
 
-Requiere Core, migraciones globales hasta `0017_quote_purchase_order_conversion.sql` en MySQL 5.7 aislado y Angular. Seguir [Core](core-runbook.md). No ejecutar seeds, pruebas ni migraciones contra datos reales.
+Requiere Core, migraciones globales hasta `0019_customer_purchase_order_clones.sql` en MySQL 5.7 aislado y Angular. Seguir [Core](core-runbook.md). No ejecutar seeds, pruebas ni migraciones contra datos reales.
 
 `BASTION_PURCHASE_ORDERS_ENABLED=true` registra el módulo; deshabilitarlo retira todas sus rutas y conserva los datos. Clientes/Proveedores son opcionales: los snapshots manuales funcionan sin sus permisos; un ID requiere el propietario habilitado y acceso autorizado.
 
@@ -16,7 +16,7 @@ Guardar o descartar cambios antes de transicionar. Completar el avance de cada �
 
 Timeout: repetir misma intención/payload. Conflicto: consultar la versión actual. La UI conserva la clave ante fallo y la versión/estado confirmados si falla la recarga. Los replays se reautorizan y la entrega vuelve a exigir identidad reciente. Historial conserva actor/fecha UTC, versión, origen/destino y posición 1-based; la UI presenta hora de Honduras y página de 25 entradas.
 
-Facturado/Cerrado son vocabulario reservado; no existen acciones para simular sus efectos. OC→Factura, entrega parcial, reapertura, utilidad, clonación de OC y OC a proveedores siguen pendientes. La conversión desde Cotizaciones se explica más abajo.
+Facturado/Cerrado son vocabulario reservado; no existen acciones para simular sus efectos. OC→Factura, entrega parcial, reapertura, utilidad y OC a proveedores siguen pendientes. La conversión desde Cotizaciones se explica más abajo.
 
 ## Validación
 
@@ -26,7 +26,7 @@ S3, SMTP, Percona Bluehost, DNS y despliegue productivos mantienen sus validacio
 
 ## Conversión desde Cotizaciones
 
-Ambos módulos habilitados; permisos explícitos `cotizaciones.view/convert` y `ordenes.create/view` con scopes actuales. Abrir una cotización **Aceptada**, indicar número externo OC, fechas, destino, gastos y comentarios; confirmar la conversión. No existe conversión de Borrador/Aprobada internamente ni alta vacía. La fuente queda **Convertida a OC** y enlaza el destino; la OC conserva ID/versión de fuente. Revisar ambos con sus permisos independientes. No se copian PDFs/adjuntos ni notas privadas; documentos de OC tendrán su propia unidad.
+Ambos módulos habilitados; permisos explícitos `cotizaciones.view/convert` y `ordenes.create/view` con scopes actuales. Abrir una cotización **Aceptada**, indicar número externo OC, fechas, destino, gastos y comentarios; confirmar la conversión. No existe conversión de Borrador/Aprobada internamente ni alta vacía. La fuente queda **Convertida a OC** y enlaza el destino; la OC conserva ID/versión de fuente. Revisar ambos con sus permisos independientes. No se copian PDFs/adjuntos ni notas privadas; documentos de OC se gestionan mediante Core.Files en su contrato propietario.
 
 Si se pierde el ACK, repetir la misma intención y datos. Otra intención tras convertir devuelve conflicto; no otra OC. La migración añade unicidad del origen: datos legacy con orígenes duplicados deben revisarse antes de una migración productiva; no se depuran automáticamente. Playwright incluye conversión USD 201.25, inversión 83.50, recarga y navegación cruzada con usuario sin permisos de catálogos.
 
@@ -38,8 +38,14 @@ Filtros por ítem y papelera, paginación de 25. Papelera conserva el vínculo; 
 
 Unidad 4 certificada en `1073c261de0c8f7ab12aed0ff6bb7b6a5f361e7c`; [Core checks 38163339892](https://github.com/Ahcast/Bastion/actions/runs/38163339892) aprobado. Clonación y cierre integral son el siguiente paso.
 
-## 2026-10-11 — Unidad 5 OC: clonación en validación
+## 2026-10-11 — Unidad 5 OC: clonación cerrada
 
-Contrato `purchase-order-cloning.md`, migración 0019 y POST clone con DTO estricto. Snapshots comerciales, impuestos/descuentos y moneda conservados; nueva cabecera Recibida/ítems Pendiente, identidad nueva, sin documentos/entrega/vínculo Quote. Fuente inmutable y relación durable al origen/versión. Permisos view/create vigentes y scopes del equipo; replay reautoriza también destino. TX única incluye idempotencia, cabecera/ítems, trazabilidad, auditoría y eventos; UI conserva clave/destino ante fallos. No capacidades nuevas asignadas automáticamente.
+Contrato `purchase-order-cloning.md`, migración 0019 y POST clone estricto. Copia snapshots históricos de cliente/proveedor y versiones, moneda HNL/USD, cantidades, impuestos y descuentos. Número, fechas, destino, comentarios y gastos nuevos explícitos. OC independiente en Recibida/ítems Pendiente con identidad nueva, sin documentos, entrega, historial operativo ni vínculo Quote directo. La fuente conserva su versión/estado y el destino registra origen/versión durable. Permisos view/create y equipo actuales; replay reautoriza también lectura del destino. Idempotencia, cabecera/ítems, relación, auditoría/eventos comparten TX. Sin grants automáticos ni escritura técnica/MCP.
 
-Pruebas añadidas: vectores HNL/USD con 15/18/exento/exonerado y descuentos, reinicio operacional/snapshots, 12 replays concurrentes, fuente inmutable, documentos aislados, intención/versión obsoleta, autorización fuente/destino/revocación, identidad técnica denegada, rollback de evento y retry, HTTP estricto/CSRF, UI reintento y navegación confirmada, navegador clonando OC entregada con documentos. Build/pruebas Angular y regresión en curso; no marcar cerrada antes del CI verde. Después: aceptación integral OC antes de Facturas/pagos. Sin despliegue ni conexiones productivas.
+HEAD certificado `6667fe62f952fd1702c627ae88138bab9924a522`. [Core checks 38165562083](https://github.com/Ahcast/Bastion/actions/runs/38165562083), [documentación 38165562010](https://github.com/Ahcast/Bastion/actions/runs/38165562010) y [rama única 38165561926](https://github.com/Ahcast/Bastion/actions/runs/38165561926): success. Go fmt/vet, race/MySQL 5.7 y builds server/worker/admin; Angular build/**75 pruebas**; navegador **10/10** con clonación de OC entregada y adjuntos, cálculo preservado, reinicio operacional, adjuntos aislados y recarga.
+
+Pruebas nuevas: vectores mixtos HNL/USD 15/18/exento/exonerado y descuentos, 12 replays concurrentes, versión/intención conflictivas, fuente inmutable, estados/IDs nuevos, documentos/historial no copiados, scopes de fuente/destino/revocación, catálogo actualizado y acceso de catálogo retirado con snapshots históricos conservados, creación en equipo ajeno y membresía perdida, concurrencia con transición y orden uniforme de locks, rollback de evento y retry, DTO/CSRF estricto, UI clave/destino conservados ante fallo. Local: build/75 pruebas Angular, compilación 10 escenarios, paridad/enlaces y diff. Go/MySQL/navegador acreditados por CI.
+
+CI intermedio identificó formato de plantilla que separaba una expresión monetaria y fallos del buffer CDP al leer respuestas comerciales. Plantilla anterior conservada; pruebas de conversión/clonación capturan la respuesta del servidor mediante forwarding real sin alterar petición/cuerpo, y la devuelven al navegador. No datos simulados, aserciones retiradas ni timeouts ampliados. Regresión completa final aprobada. Sin despliegue, correo, migración productiva ni certificación S3/escáner/Bluehost.
+
+Siguiente unidad: aceptación integral OC, incluyendo política de eliminación reversible y utilidad canónica, antes de Facturas/pagos.

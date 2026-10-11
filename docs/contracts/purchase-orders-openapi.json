@@ -2,8 +2,8 @@
   "openapi": "3.0.3",
   "info": {
     "title": "Bastion Órdenes de Compra de clientes",
-    "version": "0.4.0",
-    "description": "Órdenes recibidas de clientes: agregado, cálculo, estados, historial, origen Quotes y documentos privados. Facturación/cierre pendientes."
+    "version": "0.5.0",
+    "description": "Órdenes recibidas de clientes: agregado, cálculo, estados, historial, origen Quotes, documentos privados y clonación. Facturación/cierre pendientes."
   },
   "paths": {
     "/api/v1/purchase-orders": {
@@ -641,7 +641,7 @@
         },
         "responses": {
           "200": {
-            "description": "Vínculo confirmado o replay",
+            "description": "OC independiente creada o resultado idempotente confirmado",
             "content": {
               "application/json": {
                 "schema": {
@@ -660,14 +660,25 @@
             "description": "No visible"
           },
           "409": {
-            "description": "Conflicto de versión/vínculo"
+            "description": "Versión, número o intención conflictiva"
           },
           "422": {
             "description": "Entrada inválida"
           }
         },
-        "operationId": "clonePurchaseOrder"
-      }
+        "operationId": "clonePurchaseOrder",
+        "description": "Actor humano; lectura de fuente/destino y creación autorizada en equipo. Número y metadata nuevos explícitos. Clona snapshots históricos, reinicia estados/IDs operativos y no copia adjuntos ni entrega. Replay reautoriza el destino actual."
+      },
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "$ref": "#/components/schemas/ID"
+          }
+        }
+      ]
     }
   },
   "components": {
@@ -1442,7 +1453,9 @@
           "created_by",
           "team_id",
           "items",
-          "source_quote_version"
+          "source_quote_version",
+          "cloned_from_id",
+          "cloned_from_version"
         ],
         "properties": {
           "id": {
