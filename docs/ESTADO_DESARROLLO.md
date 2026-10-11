@@ -2,7 +2,7 @@
 
 Este archivo es el **checkpoint corto para reanudar desarrollo**. La documentación de arquitectura, contratos, decisiones y runbooks sigue siendo normativa; este archivo indica dónde quedó el trabajo real y qué debe hacerse después.
 
-Actualizado: 2026-10-10.
+Actualizado: 2026-10-11.
 
 ## Regla para reanudar
 
@@ -20,7 +20,7 @@ Actualizado: 2026-10-10.
 - Proveedores: unidad cerrada y validada.
 - Procesos/receptor crawler: unidad base cerrada y validada.
 - Cotizaciones: **cerrado y validado en CI para el alcance monomoneda HNL/USD**.
-- OC de clientes: **módulo activo siguiente**.
+- OC de clientes: **Unidad 1 cerrada y validada en CI; módulo activo para la siguiente unidad**.
 - Facturas/pagos y módulos posteriores: pendientes; no iniciar antes de cerrar OC por unidades.
 - Producción: no desplegada ni migrada.
 
@@ -39,14 +39,6 @@ Alcance cerrado:
 - observaciones FX append-only como registro auxiliar, sin conversión automática de cotizaciones;
 - HNL y USD permanecen monedas explícitas y separadas.
 
-Correcciones de cierre:
-
-- el namespace FX quedó separado en `/quote-fx/observations` para evitar colisión de rutas;
-- reautenticación/ARIA del ledger FX y pruebas navegador quedaron estabilizadas;
-- bulk conserva selección válida al refrescar filas y usa la versión recargada;
-- integración MySQL prueba dos lotes de estado consecutivos: primero exitoso y segundo con conflictos controlados, sin bloqueo;
-- Playwright espera el reset real de la selección entre acciones bulk, sin sleeps ni reducción de aserciones.
-
 ### HEAD final certificado de Cotizaciones
 
 HEAD: `0a98bf756c4e7a3965b7b625473258509fbaa571`.
@@ -57,10 +49,6 @@ Core checks: run `38094367694`, conclusión `success`:
 - builds Go: aprobados;
 - Angular build/tests: aprobados;
 - Playwright contra API + Angular + MySQL reales de CI: aprobado.
-
-También aprobados para el mismo HEAD:
-- Documentation checks: run `38094367696`;
-- Single branch policy: run `38094367728`.
 
 Este CI sustituye como evidencia de cierre a los checkpoints anteriores de Cotizaciones. No acredita S3, SMTP, Percona/Bluehost ni despliegue productivo reales.
 
@@ -74,19 +62,68 @@ Fuente funcional: `docs/modules/purchase-orders.md`. El maestro y `development/d
 - las futuras órdenes emitidas por Castillo IT a proveedores pertenecen a `supplier_purchase_orders` y no se mezclan en este módulo;
 - no crear tablas genéricas `orders`/`order_items`.
 
-El documento de módulo conserva estados legacy y una secuencia actual más amplia. Para no mezclar grafos incompatibles, la primera unidad implementará únicamente el agregado íntegro de OC de cliente con estado inicial `Recibida`; las transiciones se cerrarán en una unidad posterior con contrato/pruebas propios.
+### Unidad 1 — cerrada y certificada
 
-### Primera unidad a implementar
+Alcance implementado:
 
-1. Definir contrato exacto de cabecera/ítems, permisos, índices y DTO.
-2. Crear migración global siguiente, compatible con MySQL 5.7.
-3. Implementar servicio Go para alta, consulta, listado y edición versionada; una OC y sus ítems se guardan en una sola transacción.
-4. Implementar cálculo canónico exacto en Go usando DECIMAL/cadenas, sin `float64` financiero.
-5. Registrar auditoría/hecho e idempotencia; IDs JSON como cadenas y `409` en versión obsoleta.
-6. Exponer REST y contrato OpenAPI; Angular en español después de cerrar backend de la unidad.
-7. Probar unitarias, integración MySQL, autorización, navegador y CI antes de añadir estados, conversiones, documentos o factura.
+- migración MySQL 5.7 de `customer_purchase_orders` y `customer_purchase_order_items`;
+- estado inicial único `received` / **Recibida**; los ítems nacen `pending` / **Pendiente**;
+- agregado completo de cabecera + ítems guardado transaccionalmente;
+- cliente manual o snapshot autorizado del módulo Clientes;
+- proveedor por ítem manual o snapshot autorizado del módulo Proveedores;
+- snapshots históricos preservados aunque cambie el maestro o se reordenen ítems;
+- cálculo exacto compartido con la infraestructura fiscal canónica: subtotal/bruto, descuentos, ISV 15/18, exento, exonerado y total;
+- costo de productos, gastos adicionales e inversión total exactos, sin definir utilidad todavía;
+- HNL o USD explícitos por OC, sin mezcla ni conversión implícita;
+- alta, consulta, edición versionada y listado paginado con filtros;
+- scopes `self/team/all`, autorización por recurso y sin fuga de `COUNT` fuera del scope;
+- idempotencia, control optimista, auditoría/hecho y rollback atómico;
+- REST estricto con cinco operaciones: calculate, list, get, create y update;
+- `Idempotency-Key` obligatorio en create/update, campos desconocidos rechazados y `required_delivery_date` presente pero nullable;
+- contrato OpenAPI machine-readable y guard bidireccional Go ↔ OpenAPI;
+- composición global con `BASTION_PURCHASE_ORDERS_ENABLED`; Clientes/Proveedores son integraciones opcionales y un ID sin propietario disponible falla cerrado;
+- Angular en español: listado, filtros, alta, edición, detalle y vista previa de cálculo;
+- pruebas unitarias, integración MySQL, HTTP real, composición, Angular y Playwright completo contra API + Angular + MySQL reales de CI.
 
-Fuera de esta primera unidad: grafo completo de estados, entrega, cotización→OC, OC→factura, documentos, clone, AI y OC a proveedores.
+Fuera de Unidad 1 y aún pendiente:
+
+- grafo completo de estados y transiciones;
+- entrega/logística avanzada;
+- cotización → OC;
+- documentos/evidencia;
+- OC → factura;
+- utilidad/margen comercial;
+- conversión FX automática;
+- clone/AI;
+- órdenes emitidas por Castillo IT a proveedores.
+
+### HEAD certificado de Unidad 1
+
+HEAD: `bd95df744119ada1e0ee68ed644e44b953ea38b5`.
+
+Core checks: run `38150153611`, conclusión `success`:
+- Angular build/tests: aprobado;
+- Playwright: **9/9 escenarios aprobados**, incluido el flujo real de OC;
+- Go vet/formato: aprobado;
+- `go test -race`: aprobado;
+- builds Go: aprobados.
+
+Documentation checks del mismo HEAD: run `38150153697`, conclusión `success`.
+
+El escenario E2E de OC valida cálculo HNL 201.25, inversión HNL 83.00, alta manual sin permisos de catálogos, persistencia de fecha requerida `null`, recarga, edición de versión 1 → 2 y búsqueda por descripción del ítem.
+
+Este cierre certifica la Unidad 1 en CI, no las integraciones productivas externas listadas más abajo.
+
+## Próxima unidad — contrato de estados de OC
+
+La documentación histórica contiene **dos grafos incompatibles** y no deben coexistir implícitamente en código:
+
+- legacy de cabecera: `Pendiente → Listo → Entregado`, con `Facturado` y `Converted`;
+- secuencia actual de OC de cliente: `Recibida → Confirmada → Comprando → En tránsito → Recibido → Preparando entrega → Entregado → Facturado → Cerrado`.
+
+También existe nomenclatura legacy de ítems (`Pendiente`, `Comprado`, `Received`, `Entregado`) frente a la secuencia más reciente (`pendiente`, `comprado`, `enviado`, `recibido`, `entregado`).
+
+**Regla:** no implementar ninguna transición adicional hasta congelar un contrato normativo que defina estados, transiciones permitidas, permisos, reautenticación, invariantes, eventos y tratamiento de valores legacy. La Unidad 1 permanece limitada a `Recibida`/`Pendiente`.
 
 ## Integraciones cruzadas posteriores
 
@@ -112,4 +149,4 @@ Estas validaciones externas son gates de producción; no deben falsearse con fix
 
 ## Próximo paso exacto
 
-Cerrar el **contrato mínimo de la unidad 1 de OC de clientes** a partir del maestro, modelo de datos, decisiones y spec `purchase-orders.md`; después implementar migración + servicio Go + pruebas de invariantes. No implementar todavía transiciones, conversiones, documentos ni Facturas.
+Cerrar el **contrato normativo de estados de Órdenes de Compra de clientes** antes de modificar el runtime. Comparar las dos nomenclaturas existentes, definir el grafo vigente y dejar explícito cómo se tratarán los estados legacy. Después implementar la siguiente unidad con migración/servicio/REST/UI/pruebas propias, sin iniciar todavía Facturas ni órdenes a proveedores.
