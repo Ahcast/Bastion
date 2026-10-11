@@ -7,7 +7,7 @@
 | Cotización aceptada → OC, snapshots/origen, atomicidad | quote_purchase_order_conversion_test y zzzzquote-conversion | Unidad 3 certificada |
 | Archivos privados, cuarentena, scopes, IDs estables | purchase_order_documents_test, OrderDocuments.spec y escenario purchase-orders | Unidad 4 certificada |
 | Clonación independiente, historial de origen, replay autorizado | cloning_test, purchase_order_cloning_test, PurchaseOrders.spec y escenario purchase-orders | Unidad 5 certificada en 6667fe62f952fd1702c627ae88138bab9924a522 |
-| Eliminación reversible y utilidad canónica | Contrato de aceptación integral, migración 0020 y pruebas propietarias | Unidad 6 implementada, en validación |
+| Eliminación reversible y utilidad canónica | Contrato de aceptación integral, migración 0020 y pruebas propietarias | Unidad 6 certificada en a36de697a4c0d39d16f7095a76d443258deec3f5; Core checks 38175683879 |
 | OC → Factura, búsqueda por factura y número asociado | Servicio Invoices + contrato de conversión | Fase siguiente; no simulado |
 | Facturado → Cerrado con pagos | Contrato Invoices/Payments | Pendiente; transición manual denegada |
 | Reportes e Inicio concilian utilidad | Función canónica y lectura autorizada de propietarios | Fase Reportes; sin agregados ficticios |

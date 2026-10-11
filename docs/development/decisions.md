@@ -119,3 +119,11 @@ Backend/UI implementados; pruebas de preservación, revocación/reauth/replay/ro
 ## 2026-10-11 — Numeración externa y aceptación OC
 
 El número externo de OC no tiene unicidad global conforme a purchase-orders.md y migración 0015. Se corrigieron el contrato de clonación, papelera, OpenAPI y la prueba que suponía una reserva global; la restauración conserva ID, número, ítems y cálculo aun cuando otra OC comparte el número. No se modifica la regla de persistencia ni se introduce un índice único. La prueba de navegador del clon descuenta sus gastos explícitos: ventas netas 175.00 − productos 80.00 − gastos 9.99 = utilidad 85.01 HNL. La consulta de cotizaciones captura la respuesta real mediante route.fetch/fulfill para evitar pérdida del buffer Chromium, sin alterar su contenido.
+
+## 2026-10-11 — OC: aceptación integral cerrada
+
+HEAD certificado `a36de697a4c0d39d16f7095a76d443258deec3f5`. [Core checks 38175683879](https://github.com/Ahcast/Bastion/actions/runs/38175683879), [documentación 38175683895](https://github.com/Ahcast/Bastion/actions/runs/38175683895) y [rama única 38175683826](https://github.com/Ahcast/Bastion/actions/runs/38175683826): success. Go fmt/vet, pruebas race contra MySQL 5.7 y builds server/worker/admin aprobados; Angular build y **77 pruebas**; navegador **10/10**.
+
+Papelera/restauración preserva identidad, número externo, ítems, snapshots y cálculo; bloquea cambios operativos, documentos, conversión e historial protegidos; replay reautoriza permiso/reauth vigente y rollback conserva versión. Número externo sin unicidad global. Utilidad exacta sin ISV menos inversión total, negativa permitida y monedas separadas; backfill 0020 validado. En navegador, clon independiente con gastos 9.99 conserva utilidad 85.01 HNL tras eliminar, recargar y restaurar. Fixture sintético posee ordenes.delete explícito; no grants productivos automáticos.
+
+Unidades 1..6 y alcance operativo propietario de OC cerrados. OC→Factura/Facturado/Cerrado, búsqueda fiscal, Reportes/Inicio e IA se incorporan con sus propietarios según matriz de aceptación. Siguiente módulo: **Facturas/pagos**, comenzando por contrato financiero y borradores; emisión fiscal exige contrato de series/SAR y configuración validada. No producción ni integraciones externas certificadas.
