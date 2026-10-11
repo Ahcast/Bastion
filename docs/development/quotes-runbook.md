@@ -1,6 +1,6 @@
 # Ejecutar Cotizaciones
 
-Requiere Core Go, migraciones globales hasta `0013_quote_batches.sql` en MySQL 5.7 aislado y Angular. Seguir [Core](core-runbook.md); no migrar producción como parte de pruebas. `BASTION_QUOTES_ENABLED=true` (default) registra rutas/tools; `false` requiere reinicio y conserva tablas. Clientes/Procesos deshabilitados retiran sus integraciones; operación manual sigue funcionando. Roles requieren asignación explícita de permisos `cotizaciones.*`; root técnico no recibe permisos comerciales por defecto. Papelera/restauración y las acciones sensibles conservan los requisitos de reautenticación del Core.
+Requiere Core Go, migraciones globales hasta `0014_quote_fx_observations.sql` en MySQL 5.7 aislado y Angular. Seguir [Core](core-runbook.md); no migrar producción como parte de pruebas. `BASTION_QUOTES_ENABLED=true` (default) registra rutas/tools; `false` requiere reinicio y conserva tablas. Clientes/Procesos deshabilitados retiran sus integraciones; operación manual sigue funcionando. Roles requieren asignación explícita de permisos `cotizaciones.*`; root técnico no recibe permisos comerciales por defecto. Papelera/restauración y las acciones sensibles conservan los requisitos de reautenticación del Core.
 
 [Contrato](../contracts/quotes.md) y [OpenAPI](../contracts/quotes-openapi.json). Guardar requiere agregado editable completo, versión como cadena e `Idempotency-Key`. Resolver un ID de cliente carga snapshot autorizado; conservar el ID mantiene el snapshot. Desvincular ID permite edición manual; un cambio del maestro no reescribe cotizaciones. Conversión desde Proceso usa fecha elegida, solo entidad y expediente, deja ítems vacíos y no crea cliente automáticamente. Falta de permiso Clientes usa texto manual sin revelar coincidencias.
 
@@ -10,9 +10,9 @@ Validación: `gofmt`, `go vet`, `make build` y `go test -race -count=1 ./...` co
 
 ## Continuidad obligatoria
 
-Cotizaciones permanece como módulo activo. Borradores/cálculo, archivos/PDF, estados, aprobación, emisión, correo comercial y bulk están implementados y cubiertos en CI. La unidad siguiente es **FX fechado**, pero el contrato comercial todavía no define fuente/tipo de tasa, fecha efectiva, snapshot, redondeo, autoridad de modificación ni presentación. No inventar esas reglas ni implementar conversión implícita.
+Cotizaciones está cerrado para HNL/USD separados y sin conversión automática. FX fechado es un registro auxiliar append-only, no una tasa aplicada automáticamente. El módulo activo es OC de clientes; consultar el checkpoint operativo y su [runbook](purchase-orders-runbook.md).
 
-Las conversiones Cotización→OC/Factura deben usar servicios propietarios cuando existan esos módulos; Quotes no escribe directamente sus tablas. No iniciar OC todavía mientras la aceptación restante de Cotizaciones esté abierta.
+Las conversiones Cotización→OC/Factura se completan por sus servicios propietarios en las unidades correspondientes. Quotes no escribe directamente sus tablas.
 
 Integraciones reales S3/IAM/scanner, SMTP/IMAP Bluehost, Percona Bluehost y despliegue siguen siendo validaciones externas de producción. Los adapters, stores sintéticos y CI no las certifican.
 

@@ -16,4 +16,4 @@ Solo `main` está permitida. Los commits conservan versiones; no crear ramas adi
 
 No se despliega software ni se activa correo por actualizar documentación. Las capacidades externas sin verificar se registran en el [checkpoint operativo](docs/ESTADO_DESARROLLO.md) y el [estado histórico](docs/development/status.md).
 
-Runbooks: [Core](docs/development/core-runbook.md) · [Clientes](docs/development/customers-runbook.md) · [Proveedores](docs/development/suppliers-runbook.md) · [Procesos y receptor crawler](docs/development/processes-runbook.md) · [Cotizaciones](docs/development/quotes-runbook.md).
+Runbooks: [Core](docs/development/core-runbook.md) · [Clientes](docs/development/customers-runbook.md) · [Proveedores](docs/development/suppliers-runbook.md) · [Procesos y receptor crawler](docs/development/processes-runbook.md) · [Cotizaciones](docs/development/quotes-runbook.md) · [Órdenes de Compra](docs/development/purchase-orders-runbook.md).

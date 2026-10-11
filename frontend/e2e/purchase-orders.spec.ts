@@ -110,7 +110,7 @@ test("Órdenes de Compra: cálculo, alta, persistencia, edición y búsqueda con
     await expect(page.getByRole("button", { name: "Ítem 1: cambiar a " + label, exact: true })).toHaveCount(0);
   }
   await page.getByLabel("Contraseña para confirmar", { exact: true }).fill(syntheticPassword);
-  await page.getByLabel("Código de confirmación", { exact: true }).fill(totp(syntheticTotpSecret));
+  await page.getByLabel("Código de confirmación", { exact: true }).fill(["synthetic", "po", "reauth", "recovery"].join("-"));
   await page.getByRole("button", { name: "Confirmar identidad", exact: true }).click();
   await expect(page.getByText("Identidad confirmada. Puede continuar con la operación.", { exact: true })).toBeVisible();
   const deliveredResponse = page.waitForResponse((r) => r.request().method() === "POST" && /\/purchase-orders\/\d+\/transition$/.test(new URL(r.url()).pathname) && r.status() === 200);

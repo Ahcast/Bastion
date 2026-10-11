@@ -145,6 +145,10 @@ func main() {
 		log.Fatal(e)
 	}
 
+	if _, e = db.Exec(`INSERT INTO recovery_codes SELECT id,? FROM users WHERE email='purchase-orders@example.test'`, security.Hash("synthetic-po-reauth-recovery")); e != nil {
+		log.Fatal(e)
+	}
+
 	// Synthetic quarantined metadata only: no S3 request, bytes or scanner bypass.
 	if _, e = db.Exec(`INSERT INTO documents(id,owner_id,created_at) VALUES(900,5,UTC_TIMESTAMP(6))`); e != nil {
 		log.Fatal(e)
