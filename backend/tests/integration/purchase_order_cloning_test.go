@@ -217,3 +217,97 @@ func TestOrderCloneHTTPStrictContractAndCSRF(t *testing.T) {
 		t.Fatal(status, out)
 	}
 }
+
+func TestOrderCloneConcurrentWithSourceTransitionUsesConsistentLocks(t *testing.T) {
+	s, _, _, a := purchaseOrdersFixture(t)
+	grantPurchaseOrders(t, s.Core, a, "all")
+	v, e := s.Save(ctx, a, "", "clone-race-source", purchaseOrderInput("", ""))
+	id := customerResult(t, v, e)["id"]
+	start := make(chan struct{})
+	errs := make(chan error, 2)
+	var wg sync.WaitGroup
+	wg.Add(2)
+	go func() {
+		defer wg.Done()
+		<-start
+		_, e := s.Clone(ctx, a, id, "clone-transition-race", cloneInput())
+		errs <- e
+	}()
+	go func() {
+		defer wg.Done()
+		<-start
+		_, e := s.Transition(ctx, a, id, "transition-clone-race", 0, purchaseorders.TransitionInput{Version: 1, ToStatus: "confirmed"})
+		errs <- e
+	}()
+	close(start)
+	wg.Wait()
+	close(errs)
+	for e := range errs {
+		if e != nil && e != core.Conflict {
+			t.Fatal("lock order failure", e)
+		}
+	}
+	source, e := s.Get(ctx, a, id)
+	if e != nil || source.Status != "confirmed" || source.Version != 2 {
+		t.Fatal(source, e)
+	}
+}
+
+func TestOrderCloneHistoricalCatalogSnapshotsAndTeamAccess(t *testing.T) {
+	s, cs, ss, a := purchaseOrdersFixture(t)
+	grantPurchaseOrders(t, s.Core, a, "all")
+	grantCustomer(t, s.Core, a, "all")
+	grantSupplier(t, s.Core, a, "all")
+	customer := makeCustomer(t, cs, a, "clone-customer", customerInput("Cliente histórico"))
+	supplier := makeSupplier(t, ss, a, "clone-supplier", supplierInput("Proveedor histórico"))
+	v, e := s.Save(ctx, a, "", "clone-history-source", purchaseOrderInput(customer, supplier))
+	id := customerResult(t, v, e)["id"]
+	for _, q := range []string{`UPDATE customers SET name='Cliente actual',version=2 WHERE id=?`, `UPDATE suppliers SET name='Proveedor actual',version=2 WHERE id=?`} {
+		target := customer
+		if q == `UPDATE suppliers SET name='Proveedor actual',version=2 WHERE id=?` {
+			target = supplier
+		}
+		if _, e = s.Core.DB.Exec(q, target); e != nil {
+			t.Fatal(e)
+		}
+	}
+	if _, e = s.Core.DB.Exec(`DELETE ur FROM user_roles ur JOIN roles r ON r.id=ur.role_id WHERE ur.user_id=? AND r.name IN ('customers-all','suppliers-all')`, a.UserID); e != nil {
+		t.Fatal(e)
+	}
+	res, e := s.Core.DB.Exec(`INSERT INTO teams(name) VALUES('Clone team')`)
+	if e != nil {
+		t.Fatal(e)
+	}
+	n, e := res.LastInsertId()
+	if e != nil {
+		t.Fatal(e)
+	}
+	team := core.WrapID(n)
+	if _, e = s.Core.DB.Exec(`UPDATE customer_purchase_orders SET team_id=? WHERE id=?`, team, id); e != nil {
+		t.Fatal(e)
+	}
+	if _, e = s.Core.DB.Exec(`UPDATE role_permissions rp JOIN roles r ON r.id=rp.role_id SET rp.scope='self' WHERE r.name='purchase-orders-all' AND rp.permission='ordenes.create'`); e != nil {
+		t.Fatal(e)
+	}
+	if _, e = s.Clone(ctx, a, id, "clone-team-denied", cloneInput()); e != core.Forbidden {
+		t.Fatal(e)
+	}
+	if _, e = s.Core.DB.Exec(`INSERT INTO team_members VALUES(?,?)`, team, a.UserID); e != nil {
+		t.Fatal(e)
+	}
+	if _, e = s.Core.DB.Exec(`UPDATE role_permissions rp JOIN roles r ON r.id=rp.role_id SET rp.scope='team' WHERE r.name='purchase-orders-all' AND rp.permission IN ('ordenes.create','ordenes.view')`); e != nil {
+		t.Fatal(e)
+	}
+	v, e = s.Clone(ctx, a, id, "clone-team-history", cloneInput())
+	target := customerResult(t, v, e)["id"]
+	o, e := s.Get(ctx, a, target)
+	if e != nil || o.Customer.Name != "Cliente histórico" || o.CustomerVersion != 1 || o.Items[0].SupplierName != "Proveedor histórico" || o.Items[0].SupplierVersion != 1 || o.TeamID != team {
+		t.Fatal(o, e)
+	}
+	if _, e = s.Core.DB.Exec(`DELETE FROM team_members WHERE team_id=? AND user_id=?`, team, a.UserID); e != nil {
+		t.Fatal(e)
+	}
+	if _, e = s.Clone(ctx, a, id, "clone-team-history", cloneInput()); e == nil {
+		t.Fatal("lost membership replay")
+	}
+}

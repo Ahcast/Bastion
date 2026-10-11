@@ -48,6 +48,9 @@ func (s *Service) Clone(ctx context.Context, a core.Actor, id, key string, p Clo
 	}
 	var out any
 	e := s.Core.Transact(ctx, func(tx *sql.Tx) error {
+		if e := s.gate(ctx, tx, a, "ordenes.create"); e != nil {
+			return e
+		}
 		source, e := s.access(ctx, tx, a, id, "ordenes.view", true)
 		if e != nil {
 			return e
