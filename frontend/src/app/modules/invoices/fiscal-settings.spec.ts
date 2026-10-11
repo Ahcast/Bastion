@@ -10,6 +10,11 @@ describe('Configuración fiscal de facturas',()=>{
  expect(c.form.cai).toBe('');expect(c.form.number_width).toBeNull();expect(c.form.range_start).toBe('');expect(c.next()).toBe('');
  api.has.mockReturnValue(false);await c.load();c.loaded.set(true);c.reason='Cambio';await c.save();expect(api.get).not.toHaveBeenCalled();expect(api.write).not.toHaveBeenCalled();
  });
+ it('muestra el estado consultado sin redondear el rango ni tratar ediciones como confirmadas',async()=>{
+ const saved={...value(),enabled:true,range_end:'9007199254740992'};
+ api.get.mockResolvedValue({value:saved,version:'1',next_value:'9007199254740993'});await c.load();expect(c.state()).toBe('Rango agotado');c.form.range_end='9007199254740994';expect(c.state()).toBe('Rango agotado');
+ api.get.mockResolvedValue({value:{...saved,enabled:false},version:'2',next_value:'9007199254740993'});await c.load();expect(c.state()).toBe('Autorización deshabilitada');
+ });
  it('conserva strings exactos y no permite enviar el contador',async()=>{
  await c.load();c.reason='Rango sintético';await c.save();const [method,path,body,key]=api.write.mock.calls[0];expect(method).toBe('PUT');expect(path).toBe('/invoices/fiscal-settings');expect(body).toEqual({version:'1',value:value(),reason:'Rango sintético'});expect(key).toBeTruthy();expect(c.next()).toBe('9007199254740993');expect(c.version).toBe('2');expect(c.needsReload()).toBe(true);
  await c.save();expect(api.write).toHaveBeenCalledTimes(1);await c.load();expect(c.needsReload()).toBe(false);

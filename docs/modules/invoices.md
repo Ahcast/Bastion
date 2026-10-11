@@ -215,6 +215,8 @@ flowchart LR
 facturas.view
 facturas.create
 facturas.update
+facturas.fiscal.read
+facturas.fiscal.manage
 facturas.cancel
 facturas.payment
 ```

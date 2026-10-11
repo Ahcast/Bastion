@@ -38,6 +38,15 @@ func TestInvoiceFiscalSettingsRoundTripCounterAndPermissions(t *testing.T) {
 	if e != nil || o.Version != 1 || o.Value != p.Value || o.NextValue != 1 {
 		t.Fatal(o, e)
 	}
+	scoped := customerActor(t, s.Core, "self")
+	grantInvoice(t, s.Core, scoped, "self")
+	if _, e := s.FiscalSettings(ctx, scoped); e != core.Forbidden {
+		t.Fatal("fiscal read requires all", e)
+	}
+	if _, e := s.SaveFiscalSettings(ctx, scoped, "fiscal-scoped", p); e == nil {
+		t.Fatal("fiscal manage requires all")
+	}
+
 	if _, e = s.SaveFiscalSettings(ctx, a, "fiscal-create", p); e != nil {
 		t.Fatal(e)
 	}

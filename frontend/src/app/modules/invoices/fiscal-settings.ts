@@ -10,7 +10,7 @@ const empty=():FiscalValue=>({cai:'',prefix:'',number_width:null,range_start:'',
 <p>Configure únicamente datos de una autorización validada. Guardar no emite facturas. El siguiente correlativo no se puede editar desde esta configuración.</p>
 <button type="button" (click)="load()" [disabled]="busy()">Consultar configuración fiscal</button>
 @if(error()){<p role="alert">{{error()}}</p>}
-@if(loaded()){<p>Versión fiscal: {{version}}</p>@if(next()){<p>Siguiente correlativo: {{next()}}</p>}@else{<p>No existe configuración fiscal guardada.</p>}
+@if(loaded()){@if(state()){<p>Última configuración consultada: {{state()}}</p>}<p>Versión fiscal: {{version}}</p>@if(next()){<p>Siguiente correlativo: {{next()}}</p>}@else{<p>No existe configuración fiscal guardada.</p>}
 @if(needsReload()){<p role="status">Configuración guardada. Consulte la configuración fiscal para continuar.</p>}
 @if(api.has('facturas.fiscal.manage')){<bastion-reauthentication />}
 <form (ngSubmit)="save()"><fieldset [disabled]="busy()||needsReload()||!api.has('facturas.fiscal.manage')"><legend>Autorización configurada</legend>
@@ -28,9 +28,9 @@ const empty=():FiscalValue=>({cai:'',prefix:'',number_width:null,range_start:'',
 </fieldset></form>}
 </section>}`})
 export class InvoiceFiscalSettings{
- api=inject(Client);busy=signal(false);loaded=signal(false);error=signal('');next=signal('');needsReload=signal(false);form=empty();version='0';reason='';private pending=new Map<string,string>();
- async load(){if(this.busy()||!this.api.has('facturas.fiscal.read'))return;this.busy.set(true);this.error.set('');try{const r=await this.api.get<Settings>('/invoices/fiscal-settings');this.form=structuredClone(r.value);this.version=r.version;this.next.set(r.next_value);this.loaded.set(true);this.needsReload.set(false)}catch(e){
- if(!this.needsReload()&&typeof e==='object'&&e!==null&&'status' in e&&e.status===404){this.form=empty();this.version='0';this.next.set('');this.loaded.set(true)}else this.error.set(this.api.message(e))
+ api=inject(Client);busy=signal(false);loaded=signal(false);error=signal('');next=signal('');needsReload=signal(false);state=signal('');form=empty();version='0';reason='';private pending=new Map<string,string>();
+ async load(){if(this.busy()||!this.api.has('facturas.fiscal.read'))return;this.busy.set(true);this.error.set('');try{const r=await this.api.get<Settings>('/invoices/fiscal-settings');this.form=structuredClone(r.value);this.version=r.version;this.next.set(r.next_value);this.state.set(!r.value.enabled?'Autorización deshabilitada':BigInt(r.next_value)>BigInt(r.value.range_end)?'Rango agotado':BigInt(r.next_value)<BigInt(r.value.range_start)?'Rango incompatible':'Autorización habilitada');this.loaded.set(true);this.needsReload.set(false)}catch(e){
+ if(!this.needsReload()&&typeof e==='object'&&e!==null&&'status' in e&&e.status===404){this.form=empty();this.version='0';this.next.set('');this.state.set('');this.loaded.set(true)}else this.error.set(this.api.message(e))
  }finally{this.busy.set(false)}}
  async save(){if(this.busy()||this.needsReload()||!this.loaded()||!this.api.has('facturas.fiscal.read')||!this.api.has('facturas.fiscal.manage')||!this.reason.trim())return;
  const body={version:this.version,value:structuredClone(this.form),reason:this.reason};const serialized=JSON.stringify(body);let key=this.pending.get(serialized);if(!key){key=crypto.randomUUID();this.pending.set(serialized,key)}
