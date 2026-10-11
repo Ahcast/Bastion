@@ -9,18 +9,18 @@ import (
 var investmentLimit = decimal.RequireFromString("9999999999999999.99")
 
 type Item struct {
-	Description  string `json:"description"`
-	Unit         string `json:"unit"`
-	Quantity     string `json:"quantity"`
+	Description   string `json:"description"`
+	Unit          string `json:"unit"`
+	Quantity      string `json:"quantity"`
 	UnitSalePrice string `json:"unit_sale_price"`
-	UnitCost     string `json:"unit_cost"`
-	DiscountType string `json:"discount_type"`
-	Discount     string `json:"discount"`
-	TaxType      string `json:"tax_type"`
-	SupplierID   string `json:"supplier_id"`
-	SupplierName string `json:"supplier_name_snapshot"`
-	Tracking     string `json:"tracking"`
-	Comments     string `json:"comments"`
+	UnitCost      string `json:"unit_cost"`
+	DiscountType  string `json:"discount_type"`
+	Discount      string `json:"discount"`
+	TaxType       string `json:"tax_type"`
+	SupplierID    string `json:"supplier_id"`
+	SupplierName  string `json:"supplier_name_snapshot"`
+	Tracking      string `json:"tracking"`
+	Comments      string `json:"comments"`
 }
 
 type CalculatedItem struct {
