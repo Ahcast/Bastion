@@ -277,4 +277,18 @@ func main() {
 		log.Fatal(e)
 	}
 
+	// Company reviewer is isolated from the administrator's MFA enrollment scenario.
+	if _, e = db.Exec(`INSERT INTO users(email,name,password_hash,totp_secret,active,created_at,updated_at) SELECT 'invoice-company@example.test','Empresa emisión sintética',password_hash,?,TRUE,UTC_TIMESTAMP(6),UTC_TIMESTAMP(6) FROM users WHERE id=1`, secret); e != nil {
+		log.Fatal(e)
+	}
+	if _, e = db.Exec(`INSERT INTO roles(name) VALUES('Empresa emisión sintética')`); e != nil {
+		log.Fatal(e)
+	}
+	if _, e = db.Exec(`INSERT INTO role_permissions SELECT r.id,p.name,'all' FROM roles r JOIN permissions p ON p.name IN ('core.settings.read','core.settings.manage') WHERE r.name='Empresa emisión sintética'`); e != nil {
+		log.Fatal(e)
+	}
+	if _, e = db.Exec(`INSERT INTO user_roles SELECT u.id,r.id FROM users u JOIN roles r ON r.name='Empresa emisión sintética' WHERE u.email='invoice-company@example.test'`); e != nil {
+		log.Fatal(e)
+	}
+
 }
