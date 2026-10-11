@@ -81,7 +81,7 @@ export class Client {
     return firstValueFrom(this.http.get<T>(this.apiUrl + "/api/v1" + path));
   }
   async write<T>(
-    method: "POST" | "PATCH" | "DELETE",
+    method: "POST" | "PUT" | "PATCH" | "DELETE",
     path: string,
     body: unknown = {},
     idempotencyKey?: string,

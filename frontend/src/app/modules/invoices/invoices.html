@@ -1,4 +1,4 @@
-<section><h1>Facturas</h1><p role="alert">{{ error() }}</p><p role="status">{{ message() }}</p>
+<section><h1>Facturas</h1>@if(api.has('facturas.fiscal.read')){<bastion-invoice-fiscal-settings/>}<p role="alert">{{ error() }}</p><p role="status">{{ message() }}</p>
   @if(api.has('facturas.create')){<button type="button" (click)="newDraft()" [disabled]="busy()">Nuevo borrador de factura</button>}
   <form (ngSubmit)="page=1;load()"><label>Buscar facturas<input name="search" [(ngModel)]="search"></label><button type="submit" [disabled]="busy()">Buscar facturas</button></form>
   <p>{{ total() }} facturas · Página {{ page }}</p>

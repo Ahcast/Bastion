@@ -136,7 +136,7 @@ func TestInvoicesDraftModuleFlagAndExplicitPermissions(t *testing.T) {
 			if m.Enabled != enabled || len(m.Dependencies) != 1 || m.Dependencies[0] != "core" {
 				t.Fatal(m)
 			}
-			for _, permission := range []string{"facturas.view", "facturas.create", "facturas.update"} {
+			for _, permission := range []string{"facturas.view", "facturas.create", "facturas.update", "facturas.fiscal.read", "facturas.fiscal.manage"} {
 				if hasPermission(s.PermissionCatalog(), permission) != enabled {
 					t.Fatal(permission, enabled)
 				}

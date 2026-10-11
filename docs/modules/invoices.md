@@ -390,3 +390,5 @@ Unidad 2 Borradores implementada, en validación: contrato/OpenAPI, migración 0
 Unidad 2 cerrada en 88577fa0fa810958a65589beda3d9e331b8c3317 / Core checks 38179176643: Go/MySQL/race/builds, Angular 86 pruebas y navegador 11/11 aprobados. Continúa unidad 3; emisión y pagos reales no implementados todavía.
 
 Unidad 3: política pura de correlativo en validación; configuración persistente y emisión siguen pendientes. document_counters es el contador canónico, no invoice_counter.
+
+Unidad 3 configuración persistente implementada en validación: migración 0022, GET/PUT con permisos fiscal.read/manage globales y reauth, contador protegido, UI y evidencia atómica. Emisión continúa pendiente.

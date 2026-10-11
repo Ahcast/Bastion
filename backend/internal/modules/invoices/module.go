@@ -83,8 +83,17 @@ func invoiceFilter(r *http.Request) (Filter, error) {
 	return f, nil
 }
 func (s *Service) Module(logger *slog.Logger, enabled bool) registry.Module {
-	return registry.Module{ID: "invoices", Label: "Facturas", Version: "0.2.0", Enabled: enabled, Dependencies: []string{"core"}, Permissions: Permissions, Routes: func(mux *http.ServeMux) {
+	return registry.Module{ID: "invoices", Label: "Facturas", Version: "0.3.0", Enabled: enabled, Dependencies: []string{"core"}, Permissions: Permissions, Routes: func(mux *http.ServeMux) {
 		register := func(pattern string, action api.Action) { mux.Handle(pattern, api.Operation(s.Core, logger, action)) }
+
+		register("GET /api/v1/invoices/fiscal-settings", func(ctx context.Context, a core.Actor, r *http.Request) (any, error) { return s.FiscalSettings(ctx, a) })
+		register("PUT /api/v1/invoices/fiscal-settings", func(ctx context.Context, a core.Actor, r *http.Request) (any, error) {
+			var p FiscalSettingsInput
+			if e := decodeFiscalSettings(r, &p); e != nil {
+				return nil, e
+			}
+			return s.SaveFiscalSettings(ctx, a, r.Header.Get("Idempotency-Key"), p)
+		})
 		register("POST /api/v1/invoices/calculate", func(ctx context.Context, a core.Actor, r *http.Request) (any, error) {
 			if e := s.gate(ctx, s.Core.DB, a, "facturas.view"); e != nil {
 				return nil, e
@@ -123,4 +132,27 @@ func (s *Service) Module(logger *slog.Logger, enabled bool) registry.Module {
 			})
 		}
 	}}
+}
+
+func decodeFiscalSettings(r *http.Request, p *FiscalSettingsInput) error {
+	body, e := io.ReadAll(r.Body)
+	if e != nil {
+		return core.Invalid
+	}
+	r.Body = io.NopCloser(bytes.NewReader(body))
+	if e = api.Decode(r, p); e != nil {
+		return e
+	}
+	var fields map[string]json.RawMessage
+	if json.Unmarshal(body, &fields) != nil {
+		return core.Invalid
+	}
+	if e = required(fields, "", "version", "value", "reason"); e != nil {
+		return e
+	}
+	var value map[string]json.RawMessage
+	if json.Unmarshal(fields["value"], &value) != nil {
+		return core.Invalid
+	}
+	return required(value, "", "cai", "prefix", "number_width", "range_start", "range_end", "valid_from", "valid_until", "currency", "enabled")
 }

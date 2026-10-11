@@ -1,8 +1,8 @@
 {
   "openapi": "3.1.0",
   "info": {
-    "title": "Bastion Facturas — Borradores",
-    "version": "0.2.0"
+    "title": "Bastion Facturas — Borradores y configuración fiscal",
+    "version": "0.3.0"
   },
   "paths": {
     "/api/v1/invoices": {
@@ -260,6 +260,91 @@
                 "$ref": "#/components/schemas/CalculationInput"
               }
             }
+          }
+        }
+      }
+    },
+    "/api/v1/invoices/fiscal-settings": {
+      "get": {
+        "description": "Configuración singleton y contador consistente; fiscal.read global. 404 si no existe. No emite ni valida autorización legal.",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Configuración autorizada",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FiscalSettings"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sesión inválida"
+          },
+          "403": {
+            "description": "Permiso/CSRF/reauth insuficiente"
+          },
+          "404": {
+            "description": "Recurso fuera de scope"
+          },
+          "409": {
+            "description": "Versión/intención/estado conflictivo"
+          },
+          "422": {
+            "description": "DTO/formatos inválidos"
+          }
+        }
+      },
+      "put": {
+        "description": "Humano fiscal.manage/read global, reauth, CSRF e idempotencia. Contador inicial atómico; editar no adelanta ni retrocede. Protege formato consumido.",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FiscalSettingsInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Resultado autorizado"
+          },
+          "401": {
+            "description": "Sesión inválida"
+          },
+          "403": {
+            "description": "Permiso/CSRF/reauth insuficiente"
+          },
+          "404": {
+            "description": "Recurso fuera de scope"
+          },
+          "409": {
+            "description": "Versión/intención/estado conflictivo"
+          },
+          "422": {
+            "description": "DTO/formatos inválidos"
           }
         }
       }
@@ -521,6 +606,106 @@
           "version": {
             "type": "string",
             "pattern": "^[0-9]+$"
+          }
+        }
+      },
+      "FiscalAuthorization": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "cai",
+          "prefix",
+          "number_width",
+          "range_start",
+          "range_end",
+          "valid_from",
+          "valid_until",
+          "currency",
+          "enabled"
+        ],
+        "properties": {
+          "cai": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80
+          },
+          "prefix": {
+            "type": "string",
+            "maxLength": 60
+          },
+          "number_width": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 20
+          },
+          "range_start": {
+            "type": "string",
+            "pattern": "^[1-9][0-9]*$"
+          },
+          "range_end": {
+            "type": "string",
+            "pattern": "^[1-9][0-9]*$"
+          },
+          "valid_from": {
+            "type": "string",
+            "format": "date"
+          },
+          "valid_until": {
+            "type": "string",
+            "format": "date"
+          },
+          "currency": {
+            "type": "string",
+            "enum": [
+              "HNL",
+              "USD"
+            ]
+          },
+          "enabled": {
+            "type": "boolean"
+          }
+        },
+        "description": "Valores explícitos de configuración; límites técnicos, sin acreditación legal SAR."
+      },
+      "FiscalSettingsInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "version",
+          "value",
+          "reason"
+        ],
+        "properties": {
+          "version": {
+            "type": "string",
+            "pattern": "^(0|[1-9][0-9]*)$"
+          },
+          "value": {
+            "$ref": "#/components/schemas/FiscalAuthorization"
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000
+          }
+        }
+      },
+      "FiscalSettings": {
+        "type": "object",
+        "required": [
+          "version",
+          "value",
+          "next_value"
+        ],
+        "properties": {
+          "version": {
+            "type": "string"
+          },
+          "value": {
+            "$ref": "#/components/schemas/FiscalAuthorization"
+          },
+          "next_value": {
+            "type": "string"
           }
         }
       }

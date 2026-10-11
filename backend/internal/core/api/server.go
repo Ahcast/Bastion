@@ -162,7 +162,7 @@ func (s *Server) middleware(next http.Handler) http.Handler {
 				s.error(w, r, core.Forbidden)
 				return
 			}
-			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PATCH, DELETE, OPTIONS")
+			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
 			w.Header().Set("Access-Control-Allow-Headers", "Content-Type, X-CSRF-Token, Idempotency-Key, X-Bastion-Activity, MCP-Protocol-Version, Authorization")
 			w.WriteHeader(204)
 			return

@@ -1,3 +1,4 @@
+import {InvoiceFiscalSettings} from "./fiscal-settings";
 import { Component, OnInit, inject, signal } from "@angular/core";
 import { FormsModule } from "@angular/forms";
 import { Reauthentication } from "../../core/security/reauthentication";
@@ -117,7 +118,7 @@ export const emptyInvoice = (): DraftInput => ({
 });
 @Component({
   selector: "bastion-invoices",
-  imports: [FormsModule, Reauthentication],
+  imports: [FormsModule, Reauthentication, InvoiceFiscalSettings],
   templateUrl: "./invoices.html",
 })
 export class Invoices implements OnInit {
