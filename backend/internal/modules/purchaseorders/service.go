@@ -174,15 +174,25 @@ func (s *Service) resolveCustomer(ctx context.Context, tx *sql.Tx, a core.Actor,
 
 func (s *Service) resolveItems(ctx context.Context, tx *sql.Tx, a core.Actor, calculated CalculationResult, old PurchaseOrder) ([]PurchaseOrderItem, error) {
 	out := make([]PurchaseOrderItem, 0, len(calculated.Items))
-	for i, x := range calculated.Items {
+	oldBySupplier := map[string][]PurchaseOrderItem{}
+	for _, oldItem := range old.Items {
+		if oldItem.SupplierID != "" {
+			oldBySupplier[oldItem.SupplierID] = append(oldBySupplier[oldItem.SupplierID], oldItem)
+		}
+	}
+	usedBySupplier := map[string]int{}
+
+	for _, x := range calculated.Items {
 		item := PurchaseOrderItem{CalculatedItem: x, Status: "pending"}
 		if x.SupplierID == "" {
 			out = append(out, item)
 			continue
 		}
-		if old.ID != "" && i < len(old.Items) && old.Items[i].SupplierID == x.SupplierID {
-			item.SupplierName = old.Items[i].SupplierName
-			item.SupplierVersion = old.Items[i].SupplierVersion
+		if snapshots := oldBySupplier[x.SupplierID]; usedBySupplier[x.SupplierID] < len(snapshots) {
+			oldItem := snapshots[usedBySupplier[x.SupplierID]]
+			usedBySupplier[x.SupplierID]++
+			item.SupplierName = oldItem.SupplierName
+			item.SupplierVersion = oldItem.SupplierVersion
 			out = append(out, item)
 			continue
 		}
