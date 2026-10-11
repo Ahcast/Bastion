@@ -276,8 +276,8 @@ export class PurchaseOrders implements OnInit {
     };
   }
 
-  documentLinked(version:string) {
-    const order=this.selected();if(!order)return;this.selected.set({...order,version});this.form.version=version;
+  documentLinked(result:{id:string;version:string}) {
+    const order=this.selected();if(!order||order.id!==result.id)return;this.selected.set({...order,version:result.version});this.form.version=result.version;
   }
 
   writable() {

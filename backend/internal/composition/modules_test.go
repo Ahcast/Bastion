@@ -115,3 +115,14 @@ func TestRegisterPurchaseOrdersCanBeDisabled(t *testing.T) {
 		}
 	}
 }
+
+func TestPurchaseOrderDocumentPolicyFollowsModuleFlag(t *testing.T) {
+	s, _ := compositionFixture(t, "true")
+	if s.DocumentPolicies["purchase_orders"] == nil {
+		t.Fatal("enabled owner policy missing")
+	}
+	s, _ = compositionFixture(t, "false")
+	if s.DocumentPolicies["purchase_orders"] != nil {
+		t.Fatal("disabled owner policy remains")
+	}
+}

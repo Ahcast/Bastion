@@ -29,8 +29,12 @@ func (s *Service) DocumentPolicy(ctx context.Context, q core.Querier, a core.Act
 	if e = s.Core.Authorize(ctx, q, a, "ordenes.view", o.CreatedBy, o.TeamID, false); e != nil {
 		return e
 	}
-	if write && (o.Status == "invoiced" || o.Status == "closed") {
-		return core.Forbidden
+	if write {
+		switch o.Status {
+		case "received", "confirmed", "purchasing", "in_transit", "goods_received", "preparing_delivery", "delivered":
+		default:
+			return core.Forbidden
+		}
 	}
 	return nil
 }

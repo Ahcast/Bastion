@@ -26,7 +26,7 @@ interface Document { id:string; version:string; filename:string; status:string; 
  }</section>`
 })
 export class OrderDocuments {
- api=inject(Client); order=input.required<PurchaseOrder>(); changesPending=input(false); linked=output<string>();
+ api=inject(Client); order=input.required<PurchaseOrder>(); changesPending=input(false); linked=output<{id:string;version:string}>();
  documents=signal<Document[]>([]); total=signal(0); busy=signal(false); error=signal('');
  showReauth=false; page=1; trash=false; filterItem=''; target=''; documentId=''; documentVersion='1'; file:File|null=null;
  private pending=new Map<string,{payload:string;key:string}>();
@@ -36,17 +36,20 @@ export class OrderDocuments {
  writable(){return this.api.has('ordenes.documents.write')&&this.api.has('core.documents.write')&&!['invoiced','closed'].includes(this.order().status)}
  status(s:string){return ({pending:'Carga pendiente',quarantined:'En cuarentena',available:'Disponible',rejected:'Rechazado'} as Record<string,string>)[s]||s}
  private key(path:string,body:unknown){const payload=JSON.stringify(body),old=this.pending.get(path);if(old?.payload===payload)return old.key;const key=crypto.randomUUID();this.pending.set(path,{payload,key});return key}
- async load(){try{const r=await this.api.get<{data:Document[];total:number}>(`/purchase-orders/${this.order().id}/documents?page=${this.page}&per_page=25&deleted=${this.trash}&item_id=${encodeURIComponent(this.filterItem)}`);this.documents.set(r.data);this.total.set(r.total)}catch(e){this.error.set(this.api.message(e))}}
+ async load(){const id=this.order().id;try{const r=await this.api.get<{data:Document[];total:number}>(`/purchase-orders/${this.order().id}/documents?page=${this.page}&per_page=25&deleted=${this.trash}&item_id=${encodeURIComponent(this.filterItem)}`);if(this.order().id===id){this.documents.set(r.data);this.total.set(r.total)}}catch(e){this.error.set(this.api.message(e))}}
  selectFile(e:Event){this.file=(e.target as HTMLInputElement).files?.[0]||null;if(this.file!==this.uploadState?.file)this.uploadState=null}
  async link(){if(this.busy()||this.changesPending())return;this.busy.set(true);this.error.set('');try{await this.bind()}catch(e){this.error.set(this.api.message(e))}finally{this.busy.set(false)}}
- private async bind(){const path=`/purchase-orders/${this.order().id}/documents`,body={document_id:this.documentId,document_version:this.documentVersion,version:this.order().version,item_id:this.target||null};const r=await this.api.write<{version:string}>('POST',path,body,this.key(path,body));this.pending.delete(path);this.linked.emit(r.version);await this.load()}
- async upload(){const f=this.file;if(!f||this.busy()||this.changesPending())return;this.busy.set(true);this.error.set('');try{
+ private async bind(){const id=this.order().id;const path=`/purchase-orders/${this.order().id}/documents`,body={document_id:this.documentId,document_version:this.documentVersion,version:this.order().version,item_id:this.target||null};const r=await this.api.write<{version:string}>('POST',path,body,this.key(path,body));this.pending.delete(path);if(this.order().id===id){this.linked.emit({id,version:r.version});await this.load()}}
+ async upload(){const id=this.order().id;const f=this.file;if(!f||this.busy()||this.changesPending())return;this.busy.set(true);this.error.set('');try{
  if(f.size<1||f.size>20*1024*1024)throw new Error('Archivo debe tener entre 1 byte y 20 MB.');
  const buffer=await f.arrayBuffer(),hash=await crypto.subtle.digest('SHA-256',buffer),checksum=Array.from(new Uint8Array(hash)).map(x=>x.toString(16).padStart(2,'0')).join('');
  const media=f.type||({pdf:'application/pdf',png:'image/png',jpg:'image/jpeg',jpeg:'image/jpeg',txt:'text/plain'} as Record<string,string>)[f.name.split('.').pop()?.toLowerCase()||''];
+ if(this.order().id!==id)return;
  const body={filename:f.name,media_type:media,size_bytes:f.size,checksum,version:'0'},op='order-upload:'+this.order().id;
  if(!this.uploadState||this.uploadState.stage==='created'){const r=await this.api.write<{id:string;upload_url:string;checksum_base64:string}>('POST','/documents',body,this.key(op,body));this.uploadState={file:f,id:r.id,stage:'created'};const response=await fetch(r.upload_url,{method:'PUT',credentials:'omit',headers:{'Content-Type':media,'x-amz-checksum-sha256':r.checksum_base64},body:buffer});if(!response.ok)throw new Error('No se confirmó la carga privada.');this.uploadState.stage='uploaded'}
+ if(this.order().id!==id)return;
  if(this.uploadState.stage==='uploaded'){await this.api.write('POST',`/documents/${this.uploadState.id}/finalize`);this.uploadState.stage='verified'}
+ if(this.order().id!==id)return;
  this.documentId=this.uploadState.id;this.documentVersion='1';await this.bind();this.pending.delete(op);this.uploadState=null;this.file=null;
  }catch(e){this.error.set(this.api.message(e))}finally{this.busy.set(false)}}
  async remove(d:Document){if(this.busy()||this.changesPending())return;this.busy.set(true);this.error.set('');const path=`/documents/${d.id}`+(this.trash?'/restore':''),body={version:d.version};try{await this.api.write(this.trash?'POST':'DELETE',path,body,this.key(path,body));this.pending.delete(path);await this.load()}catch(e){this.error.set(this.api.message(e))}finally{this.busy.set(false)}}
