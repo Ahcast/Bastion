@@ -49,8 +49,8 @@ test("Órdenes de Compra: cálculo, alta, persistencia, edición y búsqueda con
   );
   await page.getByRole("button", { name: "Calcular vista previa", exact: true }).click();
   await calculateResponse;
-  await expect(page.getByText("Total:", { exact: false })).toContainText("HNL 201.25");
-  await expect(page.getByText("Inversión total:", { exact: false })).toContainText("HNL 83.00");
+  await expect(page.locator("p").filter({ hasText: /^Total: HNL 201\.25$/ })).toBeVisible();
+  await expect(page.locator("p").filter({ hasText: /^Inversión total: HNL 83\.00$/ })).toBeVisible();
   mark("calculate:done");
 
   const createResponse = page.waitForResponse(
@@ -69,7 +69,7 @@ test("Órdenes de Compra: cálculo, alta, persistencia, edición y búsqueda con
   await expect(page.getByLabel("Nombre del cliente", { exact: true })).toHaveValue("Cliente OC sintético");
   await expect(page.getByLabel("Descripción", { exact: true })).toHaveValue("Generador sintético");
   await expect(page.getByLabel("Fecha requerida de entrega", { exact: true })).toHaveValue("");
-  await expect(page.getByText("Total:", { exact: false })).toContainText("HNL 201.25");
+  await expect(page.locator("p").filter({ hasText: /^Total: HNL 201\.25$/ })).toBeVisible();
   mark("reload:done");
 
   await page.getByLabel("Comentarios de la orden", { exact: true }).fill("Orden actualizada por navegador");
