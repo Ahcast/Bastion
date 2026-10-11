@@ -307,13 +307,11 @@ test("Órdenes de Compra: cálculo, alta, persistencia, edición y búsqueda con
   const docs = page.getByRole("region", {
     name: "Documentos privados de la orden",
   });
-  await docs
-    .getByLabel("Archivo de la orden")
-    .setInputFiles({
-      name: "cabecera.pdf",
-      mimeType: "application/pdf",
-      buffer: Buffer.from("%PDF-1.7\nsynthetic header"),
-    });
+  await docs.getByLabel("Archivo de la orden").setInputFiles({
+    name: "cabecera.pdf",
+    mimeType: "application/pdf",
+    buffer: Buffer.from("%PDF-1.7\nsynthetic header"),
+  });
   await docs
     .getByRole("button", { name: "Subir documento de la orden", exact: true })
     .click();
@@ -328,13 +326,11 @@ test("Órdenes de Compra: cálculo, alta, persistencia, edición y búsqueda con
   await docs
     .getByLabel("Destino del adjunto")
     .selectOption({ label: "Ítem 1: Generador sintético" });
-  await docs
-    .getByLabel("Archivo de la orden")
-    .setInputFiles({
-      name: "item.pdf",
-      mimeType: "application/pdf",
-      buffer: Buffer.from("%PDF-1.7\nsynthetic item"),
-    });
+  await docs.getByLabel("Archivo de la orden").setInputFiles({
+    name: "item.pdf",
+    mimeType: "application/pdf",
+    buffer: Buffer.from("%PDF-1.7\nsynthetic item"),
+  });
   await docs
     .getByRole("button", { name: "Subir documento de la orden", exact: true })
     .click();
@@ -391,13 +387,23 @@ test("Órdenes de Compra: cálculo, alta, persistencia, edición y búsqueda con
   await cloning
     .getByLabel("Gastos adicionales de la nueva OC", { exact: true })
     .fill("9.99");
-  const cloneResponse = page
-    .waitForResponse(
-      (r) =>
-        r.request().method() === "POST" &&
-        /\/purchase-orders\/\d+\/clone$/.test(new URL(r.url()).pathname),
-    )
-    .then(async (r) => ({ status: r.status(), body: await r.json() }));
+  // Capture the actual API response before Chromium discards its protocol buffer.
+  let resolveClone!: (value: {
+    status: number;
+    body: { id: string; version: string };
+  }) => void;
+  const cloneResponse = new Promise<{
+    status: number;
+    body: { id: string; version: string };
+  }>((resolve) => {
+    resolveClone = resolve;
+  });
+  await page.route("**/purchase-orders/*/clone", async (route) => {
+    const actual = await route.fetch();
+    const body = await actual.json();
+    await route.fulfill({ response: actual });
+    resolveClone({ status: actual.status(), body });
+  });
   await cloning
     .getByRole("button", { name: "Crear clon de OC", exact: true })
     .click();
