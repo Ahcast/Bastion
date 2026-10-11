@@ -10,7 +10,14 @@ import (
 	"github.com/Ahcast/Bastion/backend/internal/modules/customers"
 )
 
-var Permissions = []string{"ordenes.view", "ordenes.create", "ordenes.update"}
+var Permissions = []string{
+	"ordenes.view",
+	"ordenes.create",
+	"ordenes.update",
+	"ordenes.transition",
+	"ordenes.items.transition",
+	"ordenes.deliver",
+}
 
 type CustomerInput struct {
 	ID      string `json:"id"`
