@@ -197,7 +197,10 @@ describe("Órdenes de Compra", () => {
     fixture.detectChanges();
 
     const html = fixture.nativeElement as HTMLElement;
-    expect(html.textContent).not.toContain("Nueva orden de compra");
+    const creationButton = Array.from(html.querySelectorAll("button")).find(
+      (button) => button.textContent?.trim() === "Nueva orden de compra",
+    );
+    expect(creationButton).toBeUndefined();
     const editorFieldsets = Array.from(html.querySelectorAll("section form fieldset")) as HTMLFieldSetElement[];
     expect(editorFieldsets.length).toBeGreaterThan(0);
     expect(editorFieldsets.every((field) => field.disabled)).toBe(true);
