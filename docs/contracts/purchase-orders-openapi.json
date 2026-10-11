@@ -2,8 +2,8 @@
   "openapi": "3.0.3",
   "info": {
     "title": "Bastion Órdenes de Compra de clientes",
-    "version": "0.5.0",
-    "description": "Órdenes recibidas de clientes: agregado, cálculo, estados, historial, origen Quotes, documentos privados y clonación. Facturación/cierre pendientes."
+    "version": "0.6.0",
+    "description": "OC recibidas de clientes: agregado, utilidad decimal, estados, historial, origen Quotes, documentos privados, clonación y eliminación reversible. Facturación/cierre requieren Invoices."
   },
   "paths": {
     "/api/v1/purchase-orders": {
@@ -76,6 +76,15 @@
               "maximum": 100,
               "default": 25
             }
+          },
+          {
+            "name": "deleted",
+            "in": "query",
+            "schema": {
+              "type": "boolean",
+              "default": false
+            },
+            "description": "Papelera exige scopes ordenes.view y ordenes.delete independientes."
           }
         ],
         "responses": {
@@ -252,6 +261,68 @@
             "description": "Entrada inválida"
           }
         }
+      },
+      "delete": {
+        "summary": "Enviar OC a papelera",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 100
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ID"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TrashInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Eliminación/restauración confirmada o replay reautorizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TrashResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sesión requerida"
+          },
+          "403": {
+            "description": "Acceso denegado"
+          },
+          "404": {
+            "description": "No visible"
+          },
+          "409": {
+            "description": "Versión, intención, estado o evidencia protegida"
+          },
+          "422": {
+            "description": "Entrada inválida"
+          }
+        },
+        "operationId": "trashPurchaseOrder",
+        "description": "Humano con ordenes.delete/view, scope y reauth vigente. Razón explícita y TX/idempotencia. Eliminación lógica protege documentos, conversiones, historial y clones de origen; número reservado."
       }
     },
     "/api/v1/purchase-orders/calculate": {
@@ -668,6 +739,72 @@
         },
         "operationId": "clonePurchaseOrder",
         "description": "Actor humano; lectura de fuente/destino y creación autorizada en equipo. Número y metadata nuevos explícitos. Clona snapshots históricos, reinicia estados/IDs operativos y no copia adjuntos ni entrega. Replay reautoriza el destino actual."
+      },
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "$ref": "#/components/schemas/ID"
+          }
+        }
+      ]
+    },
+    "/api/v1/purchase-orders/{id}/restore": {
+      "post": {
+        "summary": "Restaurar OC sin perder snapshots",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 100
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TrashInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Eliminación/restauración confirmada o replay reautorizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TrashResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sesión requerida"
+          },
+          "403": {
+            "description": "Acceso denegado"
+          },
+          "404": {
+            "description": "No visible"
+          },
+          "409": {
+            "description": "Versión, intención, estado o evidencia protegida"
+          },
+          "422": {
+            "description": "Entrada inválida"
+          }
+        },
+        "operationId": "restorePurchaseOrder",
+        "description": "Humano con ordenes.delete/view, scope y reauth vigente. Razón explícita y TX/idempotencia. Eliminación lógica protege documentos, conversiones, historial y clones de origen; número reservado."
       },
       "parameters": [
         {
@@ -1258,7 +1395,9 @@
           "products_investment",
           "additional_expenses",
           "investment_total",
-          "calculator_version"
+          "calculator_version",
+          "profit",
+          "profit_version"
         ],
         "properties": {
           "gross": {
@@ -1305,6 +1444,14 @@
             "enum": [
               1
             ]
+          },
+          "profit": {
+            "type": "string",
+            "pattern": "^-?(0|[1-9][0-9]*)(\\.[0-9]{2})$"
+          },
+          "profit_version": {
+            "type": "integer",
+            "const": 1
           }
         }
       },
@@ -1354,7 +1501,8 @@
           "currency",
           "total",
           "status",
-          "version"
+          "version",
+          "deleted_at"
         ],
         "properties": {
           "id": {
@@ -1396,6 +1544,13 @@
           },
           "version": {
             "$ref": "#/components/schemas/Version"
+          },
+          "deleted_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
           }
         }
       },
@@ -1455,7 +1610,8 @@
           "items",
           "source_quote_version",
           "cloned_from_id",
-          "cloned_from_version"
+          "cloned_from_version",
+          "deleted_at"
         ],
         "properties": {
           "id": {
@@ -1563,6 +1719,13 @@
               "null"
             ],
             "pattern": "^[1-9][0-9]*$"
+          },
+          "deleted_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
           }
         }
       },
@@ -1900,6 +2063,48 @@
           "additional_expenses": {
             "type": "string",
             "pattern": "^[0-9]+(\\.[0-9]{1,2})?$"
+          }
+        }
+      },
+      "TrashInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "version",
+          "reason"
+        ],
+        "properties": {
+          "version": {
+            "$ref": "#/components/schemas/Version"
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000
+          }
+        }
+      },
+      "TrashResult": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "version",
+          "deleted_at"
+        ],
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/ID"
+          },
+          "version": {
+            "$ref": "#/components/schemas/Version"
+          },
+          "deleted_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
           }
         }
       }

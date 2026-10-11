@@ -369,4 +369,62 @@ describe("Órdenes de Compra", () => {
     await component.open("99");
     expect(component.cloned()?.id).toBe("99");
   });
+  it("elimina con motivo y conserva respuesta servidor ante fallo de recarga", async () => {
+    const component = TestBed.createComponent(PurchaseOrders).componentInstance;
+    const source = record();
+    component.selected.set(source);
+    component.form = component.editable(source);
+    component.trashReason = "Duplicado";
+    api.write
+      .mockRejectedValueOnce(new Error("lost ACK"))
+      .mockResolvedValueOnce({
+        id: source.id,
+        version: "2",
+        deleted_at: "2026-10-11T18:00:00Z",
+      });
+    api.get.mockRejectedValue(new Error("reload"));
+    await component.trash();
+    await component.trash();
+    const first = api.write.mock.calls[0],
+      second = api.write.mock.calls[1];
+    expect(first[0]).toBe("DELETE");
+    expect(first[2]).toEqual({ version: "1", reason: "Duplicado" });
+    expect(first[3]).toBe(second[3]);
+    expect(component.selected()?.deleted_at).toBe("2026-10-11T18:00:00Z");
+    expect(component.selected()?.version).toBe("2");
+    expect(component.writable()).toBe(false);
+    expect(component.nextOrderStatus()).toBeNull();
+    expect(component.nextItemStatus(0)).toBeNull();
+    component.beginClone();
+    expect(component.cloneForm).toBeNull();
+  });
+  it("restaura con versión vigente y exige motivo/cambios guardados", async () => {
+    const component = TestBed.createComponent(PurchaseOrders).componentInstance;
+    const source = {
+      ...record(),
+      deleted_at: "2026-10-11T18:00:00Z",
+      version: "2",
+    };
+    component.selected.set(source);
+    component.form = component.editable(source);
+    await component.trash();
+    expect(api.write).not.toHaveBeenCalled();
+    component.trashReason = "Corrección";
+    component.form.comments = "Sin guardar";
+    await component.trash();
+    expect(api.write).not.toHaveBeenCalled();
+    component.form = component.editable(source);
+    api.write.mockResolvedValue({
+      id: source.id,
+      version: "3",
+      deleted_at: null,
+    });
+    api.get.mockResolvedValue({ ...source, version: "3", deleted_at: null });
+    await component.trash();
+    expect(api.write.mock.calls[0][0]).toBe("POST");
+    expect(api.write.mock.calls[0][1]).toBe(
+      "/purchase-orders/" + source.id + "/restore",
+    );
+    expect(component.selected()?.deleted_at).toBeNull();
+  });
 });

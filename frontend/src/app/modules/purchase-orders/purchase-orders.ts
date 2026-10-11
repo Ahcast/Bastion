@@ -86,10 +86,13 @@ export interface PurchaseOrderCalculation {
   additional_expenses: string;
   investment_total: string;
   calculator_version: number;
+  profit?: string;
+  profit_version?: number;
 }
 
 export interface PurchaseOrder extends Omit<PurchaseOrderInput, "items"> {
   id: string;
+  deleted_at?: string | null;
   status: OrderStatus;
   customer_version: string;
   source_quote_id: string | null;
@@ -111,6 +114,7 @@ export interface PurchaseOrder extends Omit<PurchaseOrderInput, "items"> {
 }
 
 interface Summary {
+  deleted_at?: string | null;
   id: string;
   order_number: string;
   customer: { id: string; name: string };
@@ -235,6 +239,8 @@ export class PurchaseOrders implements OnInit {
     "invoiced",
     "closed",
   ];
+  deleted = false;
+  trashReason = "";
   search = "";
   customerId = "";
   totalMin = "";
@@ -254,6 +260,7 @@ export class PurchaseOrders implements OnInit {
     const source = this.selected();
     if (
       !source ||
+      source.deleted_at ||
       this.busy() ||
       this.dirty() ||
       !this.api.has("ordenes.create")
@@ -273,6 +280,7 @@ export class PurchaseOrders implements OnInit {
     const source = this.selected();
     if (
       !source ||
+      source.deleted_at ||
       !this.cloneForm ||
       this.busy() ||
       this.dirty() ||
@@ -325,6 +333,7 @@ export class PurchaseOrders implements OnInit {
         page: String(this.page),
         per_page: String(this.perPage),
       });
+      if (this.deleted) q.set("deleted", "true");
       if (this.statusFilter) q.set("status", this.statusFilter);
       if (this.search) q.set("search", this.search);
       if (this.customerId) q.set("customer_id", this.customerId);
@@ -417,6 +426,47 @@ export class PurchaseOrders implements OnInit {
     };
   }
 
+  async trash() {
+    const saved = this.selected();
+    if (
+      !saved ||
+      this.busy() ||
+      this.dirty() ||
+      !this.api.has("ordenes.delete") ||
+      !this.trashReason.trim()
+    )
+      return;
+    const restore = !!saved.deleted_at;
+    const path = "/purchase-orders/" + saved.id + (restore ? "/restore" : "");
+    const body = { version: saved.version, reason: this.trashReason };
+    this.busy.set(true);
+    this.error.set("");
+    this.message.set("");
+    try {
+      const result = await this.api.write<{
+        id: string;
+        version: string;
+        deleted_at: string | null;
+      }>(restore ? "POST" : "DELETE", path, body, this.key(path, body));
+      this.pending.delete(path);
+      this.selected.set({
+        ...saved,
+        version: result.version,
+        deleted_at: result.deleted_at,
+      });
+      this.form.version = result.version;
+      this.trashReason = "";
+      this.message.set(
+        restore ? "Orden restaurada." : "Orden enviada a la papelera.",
+      );
+      await this.openAfterSave(result.id);
+      await this.load();
+    } catch (e) {
+      this.error.set(this.api.message(e));
+    } finally {
+      this.busy.set(false);
+    }
+  }
   documentLinked(result: { id: string; version: string }) {
     const order = this.selected();
     if (!order || order.id !== result.id) return;
@@ -426,6 +476,7 @@ export class PurchaseOrders implements OnInit {
 
   writable() {
     const saved = this.selected();
+    if (saved?.deleted_at) return false;
     return (
       this.api.has(saved ? "ordenes.update" : "ordenes.create") &&
       (!saved ||
@@ -444,7 +495,7 @@ export class PurchaseOrders implements OnInit {
 
   nextOrderStatus(): OrderStatus | null {
     const saved = this.selected();
-    if (!saved) return null;
+    if (!saved || saved.deleted_at) return null;
     const index = this.orderStatuses.indexOf(saved.status);
     if (index < 0 || index >= 6) return null;
     const next = this.orderStatuses[index + 1];
@@ -457,6 +508,7 @@ export class PurchaseOrders implements OnInit {
     const saved = this.selected();
     if (
       !saved ||
+      saved.deleted_at ||
       !this.api.has("ordenes.items.transition") ||
       ["delivered", "invoiced", "closed"].includes(saved.status)
     )

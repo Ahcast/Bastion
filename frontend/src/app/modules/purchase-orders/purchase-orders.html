@@ -24,6 +24,7 @@
     <label>Total máximo
       <input name="totalMax" [(ngModel)]="totalMax" inputmode="decimal">
     </label>
+    @if(api.has('ordenes.delete')) { <label><input type="checkbox" name="deletedOrders" [(ngModel)]="deleted">Papelera de órdenes</label> }
     <button>Buscar</button>
   </fieldset>
 </form>
@@ -73,7 +74,7 @@
     Clonada de OC #{{ saved.cloned_from_id }} · versión {{
     saved.cloned_from_version }}
   </p>
-  } @if(api.has('ordenes.create')) {
+  } @if(api.has('ordenes.create') && !saved.deleted_at) {
   <button type="button" (click)="beginClone()" [disabled]="busy() || dirty()">
     Clonar orden
   </button>
@@ -140,12 +141,22 @@
     >}
   </section>
   }
-        <section aria-label="Seguimiento de la orden">
+        @if(saved.deleted_at){<p>Orden en papelera. No admite cambios operativos.</p>}
+      @if(api.has('ordenes.delete') || nextOrderStatus() === 'delivered') { <bastion-reauthentication /> }
+      @if(api.has('ordenes.delete')) {
+        <section aria-label="Eliminación reversible de la orden">
+          <p>Solo OC recibidas sin avance, conversión ni evidencia vinculada pueden eliminarse. El número queda reservado.</p>
+
+          <label>Motivo de eliminación o restauración<textarea [(ngModel)]="trashReason" name="trashReason" maxlength="1000"></textarea></label>
+          <button type="button" (click)="trash()" [disabled]="busy() || dirty() || !trashReason.trim()">{{ saved.deleted_at ? 'Restaurar orden' : 'Enviar orden a papelera' }}</button>
+        </section>
+      }
+      <section aria-label="Seguimiento de la orden">
         @if (nextOrderStatus(); as next) {
           <button type="button" (click)="transition(next)" [disabled]="busy() || dirty() || (next === 'delivered' && !deliveryReady())">Cambiar a {{ statusLabel(next) }}</button>
           @if (next === 'delivered') {
             <p>La entrega requiere todos los ítems entregados y confirmación de identidad vigente.</p>
-            <bastion-reauthentication />
+
           }
         }
         @for (item of saved.items; track $index; let i = $index) {
@@ -308,7 +319,7 @@
     </form>
 
     @if (selected(); as savedOrder) {
-      @if(api.has('core.documents.read')) {
+      @if(api.has('core.documents.read') && !savedOrder.deleted_at) {
         <app-order-documents [order]="savedOrder" [changesPending]="dirty() || busy()" (linked)="documentLinked($event)" />
       }
     }
@@ -329,8 +340,9 @@
           <p><strong>Inversión en productos:</strong> {{ form.currency }} {{ calculation.products_investment }}</p>
           <p><strong>Gastos adicionales:</strong> {{ form.currency }} {{ calculation.additional_expenses }}</p>
           <p><strong>Inversión total:</strong> {{ form.currency }} {{ calculation.investment_total }}</p>
+          <p><strong>Utilidad antes de impuestos:</strong> {{ form.currency }} {{ calculation.profit }}</p>
         </div>
-        <p class="muted">La Unidad 1 no calcula utilidad; sólo conserva venta e inversión exactas.</p>
+        <p class="muted">Utilidad = ventas netas sin ISV − inversión total. HNL y USD permanecen separados.</p>
       </section>
     }
   </section>

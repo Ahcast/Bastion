@@ -468,3 +468,7 @@ Contrato propietario vigente: [documentos privados OC](../contracts/purchase-ord
 ## Clonación OC
 
 Contrato vigente: [clonación OC](../contracts/purchase-order-cloning.md). Migración 0019 conserva origen/versión, reinicio operacional y relación inmutable sin copiar adjuntos.
+
+## Aceptación integral OC
+
+[Contrato vigente](../contracts/purchase-orders-acceptance.md): utilidad neta sin ISV menos inversión total; profit/profit_version persistidos y eliminación reversible con evidencia protegida. Migración 0020 y permisos explícitos. Integraciones posteriores conservan sus propietarios.

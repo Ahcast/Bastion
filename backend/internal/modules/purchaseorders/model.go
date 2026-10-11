@@ -18,6 +18,7 @@ var Permissions = []string{
 	"ordenes.items.transition",
 	"ordenes.deliver",
 	"ordenes.documents.write",
+	"ordenes.delete",
 }
 
 type CustomerInput struct {
@@ -50,6 +51,7 @@ type PurchaseOrderItem struct {
 }
 
 type PurchaseOrder struct {
+	Deleted              *time.Time          `json:"deleted_at"`
 	ClonedFromID         *string             `json:"cloned_from_id"`
 	ClonedFromVersion    *uint64             `json:"cloned_from_version,string"`
 	ID                   string              `json:"id"`

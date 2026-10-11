@@ -43,6 +43,8 @@ type CalculationInput struct {
 }
 
 type Calculation struct {
+	Profit             string `json:"profit"`
+	ProfitVersion      int    `json:"profit_version"`
 	Gross              string `json:"gross"`
 	ItemDiscount       string `json:"item_discount"`
 	GeneralDiscount    string `json:"general_discount"`
@@ -125,7 +127,12 @@ func Calculate(p CalculationInput) (CalculationResult, error) {
 	}
 
 	c := sales.Calculation
+	profit, e := finance.Profit(c.Base15, c.Base18, c.Exempt, c.Exonerated, investment.StringFixed(2))
+	if e != nil {
+		return out, e
+	}
 	out.Calculation = Calculation{
+		Profit: profit, ProfitVersion: 1,
 		Gross:              c.Gross,
 		ItemDiscount:       c.ItemDiscount,
 		GeneralDiscount:    c.GeneralDiscount,

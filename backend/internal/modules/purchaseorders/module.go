@@ -43,7 +43,12 @@ func orderFilter(r *http.Request) (Filter, error) {
 		return Filter{}, e
 	}
 	q := r.URL.Query()
+	deleted := q.Get("deleted")
+	if deleted != "" && deleted != "false" && deleted != "true" {
+		return Filter{}, core.Invalid
+	}
 	return Filter{
+		Deleted:    deleted == "true",
 		Search:     q.Get("search"),
 		CustomerID: q.Get("customer_id"),
 		Status:     q.Get("status"),
@@ -145,7 +150,7 @@ func (s *Service) Module(logger *slog.Logger, enabled bool) registry.Module {
 	return registry.Module{
 		ID:           "purchase-orders",
 		Label:        "Órdenes de Compra",
-		Version:      "0.5.0",
+		Version:      "0.6.0",
 		Enabled:      enabled,
 		Dependencies: []string{"core"},
 		Permissions:  Permissions,
@@ -173,6 +178,21 @@ func (s *Service) Module(logger *slog.Logger, enabled bool) registry.Module {
 			register("GET /api/v1/purchase-orders/{id}", func(ctx context.Context, a core.Actor, r *http.Request) (any, error) {
 				return s.Get(ctx, a, r.PathValue("id"))
 			})
+			trash := func(restore bool) api.Action {
+				return func(ctx context.Context, a core.Actor, r *http.Request) (any, error) {
+					key, e := requireIdempotency(r)
+					if e != nil {
+						return nil, e
+					}
+					var p TrashInput
+					if _, e = strictRequired(r, &p, nil, "version", "reason"); e != nil {
+						return nil, e
+					}
+					return s.Trash(ctx, a, r.PathValue("id"), key, p, restore)
+				}
+			}
+			register("DELETE /api/v1/purchase-orders/{id}", trash(false))
+			register("POST /api/v1/purchase-orders/{id}/restore", trash(true))
 			register("POST /api/v1/purchase-orders/{id}/clone", func(ctx context.Context, a core.Actor, r *http.Request) (any, error) {
 				key, e := requireIdempotency(r)
 				if e != nil {

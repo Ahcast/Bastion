@@ -29,6 +29,9 @@ func (s *Service) DocumentPolicy(ctx context.Context, q core.Querier, a core.Act
 	if e = s.Core.Authorize(ctx, q, a, "ordenes.view", o.CreatedBy, o.TeamID, false); e != nil {
 		return e
 	}
+	if o.Deleted != nil {
+		return core.Missing
+	}
 	if write {
 		switch o.Status {
 		case "received", "confirmed", "purchasing", "in_transit", "goods_received", "preparing_delivery", "delivered":

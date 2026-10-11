@@ -446,6 +446,70 @@ test("Órdenes de Compra: cálculo, alta, persistencia, edición y búsqueda con
     page.locator("p").filter({ hasText: /^Estado: Recibida$/ }),
   ).toBeVisible();
 
+  await expect(
+    page
+      .locator("p")
+      .filter({ hasText: /^Utilidad antes de impuestos: HNL 92\.00$/ }),
+  ).toBeVisible();
+  // The independently cloned order has no linked evidence or operational history.
+  await page
+    .getByLabel("Motivo de eliminación o restauración", { exact: true })
+    .fill("Clon sintético duplicado");
+  const deletedResponse = page.waitForResponse(
+    (r) =>
+      r.request().method() === "DELETE" &&
+      /\/purchase-orders\/\d+$/.test(new URL(r.url()).pathname),
+  );
+  await page
+    .getByRole("button", { name: "Enviar orden a papelera", exact: true })
+    .click();
+  expect((await deletedResponse).status()).toBe(200);
+  await expect(
+    page.getByText("Orden en papelera. No admite cambios operativos.", {
+      exact: true,
+    }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Clonar orden", exact: true }),
+  ).toHaveCount(0);
+  await page.getByLabel("Papelera de órdenes", { exact: true }).check();
+  await page.getByRole("button", { name: "Buscar", exact: true }).click();
+  await page.reload();
+  await page.getByLabel("Papelera de órdenes", { exact: true }).check();
+  await page.getByRole("button", { name: "Buscar", exact: true }).click();
+  await page
+    .getByRole("button", {
+      name: "Ver orden OC-BROWSER-CLONE-001",
+      exact: true,
+    })
+    .click();
+  await expect(
+    page.getByText("Orden en papelera. No admite cambios operativos.", {
+      exact: true,
+    }),
+  ).toBeVisible();
+  await page
+    .getByLabel("Motivo de eliminación o restauración", { exact: true })
+    .fill("Restauración sintética");
+  const restoredResponse = page.waitForResponse(
+    (r) =>
+      r.request().method() === "POST" &&
+      /\/purchase-orders\/\d+\/restore$/.test(new URL(r.url()).pathname),
+  );
+  await page
+    .getByRole("button", { name: "Restaurar orden", exact: true })
+    .click();
+  expect((await restoredResponse).status()).toBe(200);
+  await expect(
+    page.getByText("Orden en papelera. No admite cambios operativos.", {
+      exact: true,
+    }),
+  ).toHaveCount(0);
+  await expect(
+    page
+      .locator("p")
+      .filter({ hasText: /^Utilidad antes de impuestos: HNL 92\.00$/ }),
+  ).toBeVisible();
   await page.screenshot({
     path: "/tmp/bastion-purchase-orders.png",
     fullPage: true,

@@ -58,7 +58,7 @@ func (s *Service) gate(ctx context.Context, q core.Querier, a core.Actor, permis
 	return s.Core.Authorize(ctx, q, a, permission, a.UserID, team, false)
 }
 
-const orderColumns = `o.id,o.order_number,o.status,COALESCE(CAST(o.source_quote_id AS CHAR),''),COALESCE(CAST(o.customer_id AS CHAR),''),o.customer_version,o.customer_name_snapshot,o.customer_rtn_snapshot,o.customer_contact_snapshot,o.customer_phone_snapshot,o.customer_email_snapshot,o.customer_address_snapshot,o.destination,CAST(o.order_date AS CHAR),COALESCE(CAST(o.required_delivery_date AS CHAR),''),o.currency,o.comments,o.exoneration_reference,o.general_discount_type,CAST(o.general_discount AS CHAR),CAST(o.gross AS CHAR),CAST(o.item_discount AS CHAR),CAST(o.allocated_discount AS CHAR),CAST(o.base_15 AS CHAR),CAST(o.base_18 AS CHAR),CAST(o.exempt AS CHAR),CAST(o.exonerated AS CHAR),CAST(o.isv_15 AS CHAR),CAST(o.isv_18 AS CHAR),CAST(o.total AS CHAR),CAST(o.products_investment AS CHAR),CAST(o.additional_expenses AS CHAR),CAST(o.investment_total AS CHAR),o.calculator_version,o.version,CAST(o.created_by AS CHAR),COALESCE(CAST(o.team_id AS CHAR),''),o.source_quote_version,(SELECT CAST(source_purchase_order_id AS CHAR) FROM customer_purchase_order_clones WHERE purchase_order_id=o.id),(SELECT source_version FROM customer_purchase_order_clones WHERE purchase_order_id=o.id)`
+const orderColumns = `o.id,o.order_number,o.status,COALESCE(CAST(o.source_quote_id AS CHAR),''),COALESCE(CAST(o.customer_id AS CHAR),''),o.customer_version,o.customer_name_snapshot,o.customer_rtn_snapshot,o.customer_contact_snapshot,o.customer_phone_snapshot,o.customer_email_snapshot,o.customer_address_snapshot,o.destination,CAST(o.order_date AS CHAR),COALESCE(CAST(o.required_delivery_date AS CHAR),''),o.currency,o.comments,o.exoneration_reference,o.general_discount_type,CAST(o.general_discount AS CHAR),CAST(o.gross AS CHAR),CAST(o.item_discount AS CHAR),CAST(o.allocated_discount AS CHAR),CAST(o.base_15 AS CHAR),CAST(o.base_18 AS CHAR),CAST(o.exempt AS CHAR),CAST(o.exonerated AS CHAR),CAST(o.isv_15 AS CHAR),CAST(o.isv_18 AS CHAR),CAST(o.total AS CHAR),CAST(o.products_investment AS CHAR),CAST(o.additional_expenses AS CHAR),CAST(o.investment_total AS CHAR),o.calculator_version,o.version,CAST(o.created_by AS CHAR),COALESCE(CAST(o.team_id AS CHAR),''),o.source_quote_version,(SELECT CAST(source_purchase_order_id AS CHAR) FROM customer_purchase_order_clones WHERE purchase_order_id=o.id),(SELECT source_version FROM customer_purchase_order_clones WHERE purchase_order_id=o.id),o.deleted_at,CAST(o.profit AS CHAR),o.profit_version`
 
 func scanOrder(row interface{ Scan(...any) error }) (PurchaseOrder, error) {
 	var o PurchaseOrder
@@ -71,7 +71,7 @@ func scanOrder(row interface{ Scan(...any) error }) (PurchaseOrder, error) {
 		&o.Destination, &o.OrderDate, &delivery, &o.Currency, &o.Comments, &o.Exoneration, &o.DiscountType, &o.Discount,
 		&c.Gross, &c.ItemDiscount, &allocated, &c.Base15, &c.Base18, &c.Exempt, &c.Exonerated, &c.ISV15, &c.ISV18, &c.Total,
 		&c.ProductsInvestment, &c.AdditionalExpenses, &c.InvestmentTotal, &c.CalculatorVersion,
-		&o.Version, &o.CreatedBy, &o.TeamID, &o.SourceQuoteVersion, &o.ClonedFromID, &o.ClonedFromVersion,
+		&o.Version, &o.CreatedBy, &o.TeamID, &o.SourceQuoteVersion, &o.ClonedFromID, &o.ClonedFromVersion, &o.Deleted, &c.Profit, &c.ProfitVersion,
 	)
 	if e != nil {
 		return o, e
@@ -107,6 +107,19 @@ func (s *Service) access(ctx context.Context, q core.Querier, a core.Actor, id, 
 			return PurchaseOrder{}, core.Missing
 		}
 		return PurchaseOrder{}, e
+	}
+	if o.Deleted != nil {
+		if permission != "ordenes.view" && permission != "ordenes.delete" {
+			return PurchaseOrder{}, core.Conflict
+		}
+		if permission == "ordenes.view" {
+			if e = s.Core.Authorize(ctx, q, a, "ordenes.delete", o.CreatedBy, o.TeamID, false); e != nil {
+				if e == core.Forbidden {
+					return PurchaseOrder{}, core.Missing
+				}
+				return PurchaseOrder{}, e
+			}
+		}
 	}
 	return o, nil
 }
@@ -418,6 +431,9 @@ func (s *Service) persist(ctx context.Context, tx *sql.Tx, a core.Actor, o *Purc
 		); e != nil {
 			return nil, orderDBError(e)
 		}
+	}
+	if _, e := tx.ExecContext(ctx, `UPDATE customer_purchase_orders SET profit=?,profit_version=? WHERE id=?`, c.Profit, c.ProfitVersion, o.ID); e != nil {
+		return nil, e
 	}
 	if e := s.Core.Audit(ctx, tx, a, topic, "customer_purchase_orders", o.ID, "success", map[string]any{"version": fmt.Sprint(o.Version), "items": len(o.Items)}); e != nil {
 		return nil, e

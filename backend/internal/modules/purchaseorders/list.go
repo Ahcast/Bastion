@@ -3,6 +3,7 @@ package purchaseorders
 import (
 	"context"
 	"regexp"
+	"time"
 
 	"github.com/Ahcast/Bastion/backend/internal/core"
 	"github.com/Ahcast/Bastion/backend/internal/finance"
@@ -12,6 +13,7 @@ import (
 var listMoneyPattern = regexp.MustCompile(`^(0|[1-9][0-9]{0,15})(\.[0-9]{1,2})?$`)
 
 type Filter struct {
+	Deleted    bool   `json:"deleted,omitempty"`
 	Search     string `json:"search,omitempty"`
 	CustomerID string `json:"customer_id,omitempty"`
 	Status     string `json:"status,omitempty"`
@@ -27,6 +29,7 @@ type CustomerSummary struct {
 }
 
 type Summary struct {
+	Deleted     *time.Time      `json:"deleted_at"`
 	ID          string          `json:"id"`
 	OrderNumber string          `json:"order_number"`
 	Customer    CustomerSummary `json:"customer"`
@@ -91,6 +94,17 @@ func (s *Service) List(ctx context.Context, a core.Actor, f Filter) (Page, error
 	}
 
 	where, args := orderScope(a, "ordenes.view")
+	if f.Deleted {
+		if e = s.gate(ctx, s.Core.DB, a, "ordenes.delete"); e != nil {
+			return out, e
+		}
+		scope, values := orderScope(a, "ordenes.delete")
+		where += " AND o.deleted_at IS NOT NULL AND " + scope
+		args = append(args, values...)
+	} else {
+		where += " AND o.deleted_at IS NULL"
+	}
+
 	if f.Search != "" {
 		where += ` AND (LOCATE(?,o.order_number)>0 OR LOCATE(?,o.customer_name_snapshot)>0 OR LOCATE(?,o.comments)>0 OR EXISTS(SELECT 1 FROM customer_purchase_order_items oi WHERE oi.purchase_order_id=o.id AND (LOCATE(?,oi.description)>0 OR LOCATE(?,oi.comments)>0)))`
 		args = append(args, f.Search, f.Search, f.Search, f.Search, f.Search)
@@ -115,14 +129,14 @@ func (s *Service) List(ctx context.Context, a core.Actor, f Filter) (Page, error
 	if e = s.Core.DB.QueryRowContext(ctx, `SELECT COUNT(*) FROM customer_purchase_orders o WHERE `+where, args...).Scan(&out.Total); e != nil {
 		return out, e
 	}
-	rows, e := s.Core.DB.QueryContext(ctx, `SELECT CAST(o.id AS CHAR),o.order_number,COALESCE(CAST(o.customer_id AS CHAR),''),o.customer_name_snapshot,CAST(o.order_date AS CHAR),o.currency,CAST(o.total AS CHAR),o.status,o.version FROM customer_purchase_orders o WHERE `+where+` ORDER BY o.order_date DESC,o.id DESC LIMIT ? OFFSET ?`, append(args, f.PerPage, (f.Page-1)*f.PerPage)...)
+	rows, e := s.Core.DB.QueryContext(ctx, `SELECT CAST(o.id AS CHAR),o.order_number,COALESCE(CAST(o.customer_id AS CHAR),''),o.customer_name_snapshot,CAST(o.order_date AS CHAR),o.currency,CAST(o.total AS CHAR),o.status,o.version,o.deleted_at FROM customer_purchase_orders o WHERE `+where+` ORDER BY o.order_date DESC,o.id DESC LIMIT ? OFFSET ?`, append(args, f.PerPage, (f.Page-1)*f.PerPage)...)
 	if e != nil {
 		return out, e
 	}
 	defer rows.Close()
 	for rows.Next() {
 		var v Summary
-		if e = rows.Scan(&v.ID, &v.OrderNumber, &v.Customer.ID, &v.Customer.Name, &v.OrderDate, &v.Currency, &v.Total, &v.Status, &v.Version); e != nil {
+		if e = rows.Scan(&v.ID, &v.OrderNumber, &v.Customer.ID, &v.Customer.Name, &v.OrderDate, &v.Currency, &v.Total, &v.Status, &v.Version, &v.Deleted); e != nil {
 			return out, e
 		}
 		v.Total = decimal.RequireFromString(v.Total).StringFixed(2)

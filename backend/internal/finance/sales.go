@@ -232,7 +232,11 @@ func Calculate(p CalculationInput) (Result, error) {
 	t15 := b15.Mul(decimal.RequireFromString("0.15")).Round(2)
 	t18 := b18.Mul(decimal.RequireFromString("0.18")).Round(2)
 	total := net.Sub(gd).Add(t15).Add(t18)
-	margin := net.Sub(gd).Sub(cost)
+	profit, e := Profit(b15.StringFixed(2), b18.StringFixed(2), ex.StringFixed(2), exo.StringFixed(2), cost.StringFixed(2))
+	if e != nil {
+		return out, e
+	}
+	margin := decimal.RequireFromString(profit)
 	for _, d := range []decimal.Decimal{gross, discount, net, cost, gd, total, b15, b18, ex, exo, t15, t18, margin.Abs()} {
 		if d.GreaterThan(moneyLimit) {
 			return out, core.Invalid

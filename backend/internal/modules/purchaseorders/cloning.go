@@ -55,6 +55,9 @@ func (s *Service) Clone(ctx context.Context, a core.Actor, id, key string, p Clo
 		if e != nil {
 			return e
 		}
+		if source.Deleted != nil {
+			return core.Conflict
+		}
 		if e = s.AuthorizeQuoteConversion(ctx, tx, a, source.TeamID, nil); e != nil {
 			return e
 		}
