@@ -394,3 +394,5 @@ Unidad 2 cerrada en 88577fa0fa810958a65589beda3d9e331b8c3317 / Core checks 38179
 Unidad 3: política pura de correlativo en validación; configuración persistente y emisión siguen pendientes. document_counters es el contador canónico, no invoice_counter.
 
 Unidad 3 configuración persistente implementada en validación: migración 0022, GET/PUT con permisos fiscal.read/manage globales y reauth, contador protegido, UI y evidencia atómica. Emisión continúa pendiente.
+
+Configuración fiscal certificada en 133b9dc05ef5c5465d13e50550437c86a1bdb940 / Core checks 38180883877: Go/MySQL/race/builds, Angular 91 y navegador 12/12. Continúa emisión de unidad 3 según contrato previo; sin factura fiscal productiva ni pagos/PDF en este cierre.

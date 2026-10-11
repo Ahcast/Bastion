@@ -18,4 +18,6 @@ Proveedores: internal/modules/suppliers, migración 0003_suppliers.sql y composi
 
 Cotizaciones cerrado para alcance HNL/USD separado: cálculo, PDF/adjuntos, aprobación/emisión, correo, estados/bulk y FX auxiliar. [Runbook](../docs/development/quotes-runbook.md). OC de clientes es el módulo activo: [runbook](../docs/development/purchase-orders-runbook.md). Conversiones comerciales se completan mediante sus propietarios en sus unidades.
 
-Facturas Borradores: BASTION_INVOICES_ENABLED=true|false (true predeterminado), permisos explícitos facturas.view/create/update, sin concesiones automáticas; solo borrador/cálculo en esta unidad. Migración 0021 de desarrollo y pruebas; no activar series/pagos/emisión por habilitar el módulo.
+Facturas Borradores: BASTION_INVOICES_ENABLED=true|false (true predeterminado), permisos explícitos facturas.view/create/update, sin concesiones automáticas; borrador/cálculo y configuración fiscal autorizada, sin emisión/pagos todavía. Migración 0021 de desarrollo y pruebas; no activar series/pagos/emisión por habilitar el módulo.
+
+Configuración fiscal de Facturas: migración 0022, GET/PUT /invoices/fiscal-settings, permisos fiscal.read/manage globales y reauth para writes. Sin grants/configuración precargada. Primer contador invoice se crea atómicamente; editar configuración no modifica el correlativo. CI 38180883877 certificado.

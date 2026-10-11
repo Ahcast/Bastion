@@ -105,3 +105,5 @@ Templates en backend/deploy: servicio server, timer worker y proxy nginx. Editar
 ## Facturas Borradores
 
 BASTION_INVOICES_ENABLED=true|false (true predeterminado). Migración 0021 y permisos facturas.view/create/update sin grants automáticos. UI y REST solo Borradores/cálculo; número/SAR NULL y pagos cero. Cambiar equipo exige update all y reauth. CI 38179176643 certificado; no aplicar migración productiva ni activar emisión/pagos con este flag.
+
+Configuración fiscal de desarrollo: migración 0022 y facturas.fiscal.read/manage globales explícitos. Guardado requiere reauth/CSRF/idempotencia; no configura series automáticamente, adelanta contador ni emite facturas. Primera configuración crea document_counters.invoice en la misma TX. CI 38180883877 aprobado (91 Angular/12 navegador). Autorización real y activación productiva pendientes.

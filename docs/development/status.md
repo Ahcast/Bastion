@@ -247,3 +247,11 @@ Cuatro integraciones MySQL nuevas: scopes/revocación/reauth y versión, 12 repl
 Configuración fiscal: UI distingue autorización deshabilitada/rango agotado usando enteros exactos; conserva estado de última consulta al editar. Prueba adicional cubre límite 2^53 y edición pendiente. Scopes self no habilitan configuración global. **91 pruebas Angular** locales aprobadas; nueva revisión requiere CI completo antes de cierre.
 
 Prueba de configuración fiscal: el login contraseña+MFA ya constituye reauth reciente, como establece Core; el recorrido ejerce confirmación explícita con código de recuperación sintético independiente. Rechazo de sesión sin reauth y replay tras revocación siguen cubiertos en MySQL/HTTP. Primera ejecución 38180612222: Angular success y navegador 11/12; fallo era la expectativa incorrecta sobre login, no omisión del control backend. Repetir CI sobre la corrección antes de cerrar.
+
+## 2026-10-11 — Facturas, unidad 3: configuración persistente certificada
+
+HEAD `133b9dc05ef5c5465d13e50550437c86a1bdb940`: [Core checks 38180883877](https://github.com/Ahcast/Bastion/actions/runs/38180883877), [documentación 38180883969](https://github.com/Ahcast/Bastion/actions/runs/38180883969) y [rama única 38180883848](https://github.com/Ahcast/Bastion/actions/runs/38180883848): success. Go fmt/vet/race/MySQL 5.7 y builds server/worker/admin aprobados; Angular build/**91 pruebas**; navegador **12/12**. Cuatro integraciones nuevas validan configuración/counter atómicos, rollback alta/edición, 12 replays, versión/scopes/revocación/reauth, formato consumido, agotamiento y HTTP/CSRF/CORS.
+
+La UI distingue estado consultado/edición pendiente, conserva clave ante ACK incierto y bloquea nuevo guardado tras confirmación hasta recargar. Operador de configuración sintético separado no crea/cobra/emite facturas. Login con contraseña+MFA cuenta como confirmación reciente; navegador también usa confirmación explícita de recuperación y backend rechaza sesiones sin reauth.
+
+Bloque de configuración cerrado; unidad 3 sigue activa y continúa emisión. Contrato de emisión previo definido en contracts/invoices.md: migración 0023, versiones/snapshots de empresa y autorización, vencimiento y correlativo/evidencia en una TX. Aún sin código de emisión/pagos/PDF. Autorización/modalidad/moneda fiscal reales y despliegue productivo siguen pendientes.
