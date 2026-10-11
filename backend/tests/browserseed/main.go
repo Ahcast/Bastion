@@ -130,6 +130,21 @@ func main() {
 		log.Fatal(e)
 	}
 
+	// Dedicated customer purchase-order operator. It has no customer/supplier catalog grants:
+	// this browser scenario proves Unit 1 can operate with authorized manual snapshots.
+	if _, e = db.Exec(`INSERT INTO users(email,name,password_hash,totp_secret,active,created_at,updated_at) SELECT 'purchase-orders@example.test','Operador Órdenes sintético',password_hash,?,TRUE,UTC_TIMESTAMP(6),UTC_TIMESTAMP(6) FROM users WHERE id=1`, secret); e != nil {
+		log.Fatal(e)
+	}
+	if _, e = db.Exec(`INSERT INTO roles(id,name) VALUES(7,'Órdenes sintético')`); e != nil {
+		log.Fatal(e)
+	}
+	if _, e = db.Exec(`INSERT INTO role_permissions SELECT 7,name,'all' FROM permissions WHERE name IN ('ordenes.view','ordenes.create','ordenes.update')`); e != nil {
+		log.Fatal(e)
+	}
+	if _, e = db.Exec(`INSERT INTO user_roles SELECT id,7 FROM users WHERE email='purchase-orders@example.test'`); e != nil {
+		log.Fatal(e)
+	}
+
 	// Synthetic quarantined metadata only: no S3 request, bytes or scanner bypass.
 	if _, e = db.Exec(`INSERT INTO documents(id,owner_id,created_at) VALUES(900,5,UTC_TIMESTAMP(6))`); e != nil {
 		log.Fatal(e)
