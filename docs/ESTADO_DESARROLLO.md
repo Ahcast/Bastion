@@ -20,7 +20,7 @@ Actualizado: 2026-10-11.
 - Proveedores: unidad cerrada y validada.
 - Procesos/receptor crawler: unidad base cerrada y validada.
 - Cotizaciones: **cerrado y validado en CI para el alcance monomoneda HNL/USD**.
-- OC de clientes: **Unidad 1 cerrada y validada en CI; módulo activo para la siguiente unidad**.
+- OC de clientes: **Unidades 1 y 2 cerradas y validadas en CI; módulo activo para conversión Cotización → OC**.
 - Facturas/pagos y módulos posteriores: pendientes; no iniciar antes de cerrar OC por unidades.
 - Producción: no desplegada ni migrada.
 
@@ -114,16 +114,9 @@ El escenario E2E de OC valida cálculo HNL 201.25, inversión HNL 83.00, alta ma
 
 Este cierre certifica la Unidad 1 en CI, no las integraciones productivas externas listadas más abajo.
 
-## Próxima unidad — contrato de estados de OC
+## Contrato vigente de estados de OC
 
-La documentación histórica contiene **dos grafos incompatibles** y no deben coexistir implícitamente en código:
-
-- legacy de cabecera: `Pendiente → Listo → Entregado`, con `Facturado` y `Converted`;
-- secuencia actual de OC de cliente: `Recibida → Confirmada → Comprando → En tránsito → Recibido → Preparando entrega → Entregado → Facturado → Cerrado`.
-
-También existe nomenclatura legacy de ítems (`Pendiente`, `Comprado`, `Received`, `Entregado`) frente a la secuencia más reciente (`pendiente`, `comprado`, `enviado`, `recibido`, `entregado`).
-
-**Regla:** no implementar ninguna transición adicional hasta congelar un contrato normativo que defina estados, transiciones permitidas, permisos, reautenticación, invariantes, eventos y tratamiento de valores legacy. La Unidad 1 permanece limitada a `Recibida`/`Pendiente`.
+El contrato único `contracts/purchase-orders-states.md` está congelado e implementado. Cabecera: Recibida → Confirmada → Comprando → En tránsito → Recibido → Preparando entrega → Entregado. Ítems: Pendiente → Comprado → Enviado → Recibido → Entregado. Facturado/Cerrado quedan reservados a sus futuros propietarios. No se aceptan alias ni transiciones del grafo legacy; cualquier tratamiento de datos legacy reales exige revisión explícita antes de migración productiva.
 
 ## Integraciones cruzadas posteriores
 
@@ -147,14 +140,18 @@ No están certificadas todavía por las pruebas actuales:
 
 Estas validaciones externas son gates de producción; no deben falsearse con fixtures de CI.
 
-## Unidad 2 — seguimiento de estados y entrega en validación
+## Unidad 2 — seguimiento de estados y entrega cerrada
 
 El contrato normativo `contracts/purchase-orders-states.md` está congelado. Base de grafo/historial/permisos publicada en `a18ed6b8074fd111746fd84431ee47d26019037c`, Core checks `38150855851` aprobado.
 
-Implementación nueva: transiciones humanas adyacentes de cabecera/ítem, historial paginado, lock agregado, versión/idempotencia y auditoría/eventos atómicos. Entrega exige permiso específico, reauth y todos los ítems entregados. PATCH no reinicia avances: sólo Recibida con todos los ítems Pendiente. Interfaz española muestra acción siguiente/historial, conserva claves ante timeout y estado confirmado ante fallo de recarga. Filtros canónicos y OpenAPI/paridad actualizados.
+Implementación: transiciones humanas adyacentes de cabecera/ítem, historial paginado, lock agregado, versión/idempotencia y auditoría/eventos atómicos. Entrega exige permiso específico, reauth y todos los ítems entregados. PATCH sólo permite Recibida con todos los ítems Pendiente. Interfaz española muestra acción siguiente/historial, conserva claves ante timeout y estado confirmado ante fallo de recarga. Filtros canónicos y OpenAPI/paridad actualizados.
 
-Pruebas: build Angular/60 pruebas anteriores aprobados; nuevos casos y regresión final pendientes de ejecución. Backend Go/MySQL5.7/race y Playwright nuevos pendientes de CI. No declarar esta unidad cerrada todavía.
+Corregida la lectura del descuento general desde persistencia: guardar, recargar y avanzar estados preserva su importe. La regresión verifica descuento 5.00 y total 201.25.
+
+HEAD de código certificado: `0fa94796ffee0c248035f94a9166f22c0a955b42`. [Core checks 38154939036](https://github.com/Ahcast/Bastion/actions/runs/38154939036), [documentación 38154939037](https://github.com/Ahcast/Bastion/actions/runs/38154939037) y [rama única 38154939034](https://github.com/Ahcast/Bastion/actions/runs/38154939034): success. Backend: formato/vet, pruebas con MySQL 5.7 y race detector, builds. Frontend: build y 64 pruebas. Navegador: 9/9 escenarios contra API/Angular/MySQL, incluido ciclo completo de OC, historial, entrega con reauth y conservación financiera. Localmente: 17 pruebas offline del crawler con dependencias fijadas, build/64 pruebas Angular y paridad documental. Go/MySQL y navegador se certifican por CI; no se ejecutaron localmente en esta sesión.
+
+Las pruebas intermedias corrigieron el uso de TOTP ya consumido sustituyéndolo por recovery sintético de un uso para reauth. El escenario de emisión existente recibió diagnóstico por etapas y un presupuesto total mayor tras agotar 30 segundos; conserva sus aserciones acotadas y aprobó las ejecuciones finales.
 
 ## Próximo paso exacto
 
-Ejecutar y cerrar CI de Unidad 2. Resolver cualquier fallo antes de conversiones/documentos de OC. No iniciar Facturas/pagos ni módulos posteriores hasta completar OC por sus unidades. Ningún despliegue, envío ni migración productiva realizado.
+Continuar dentro de OC con el contrato de conversión Cotización → OC y su implementación server-side, transaccional/idempotente por PurchaseOrders, conservando `source_quote_id`. Luego cerrar las unidades pendientes de documentos/clonación y aceptación integral. No iniciar Facturas/pagos ni módulos posteriores hasta completar OC. Ningún despliegue, envío ni migración productiva realizado.

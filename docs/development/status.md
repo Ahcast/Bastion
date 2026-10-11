@@ -1,6 +1,6 @@
 # Estado del proyecto
 
-Actualizado el 10 de octubre de 2026. Core 0.1.0 publicado y validado en CI; Clientes 0.1.0 publicado y validado en pruebas locales y CI; unidad 1 cerrada. Proveedores 0.1.0 publicado y validado en pruebas locales y CI; unidad 2 cerrada. Catálogo de fuente y receptor de Procesos publicados y validados en pruebas locales y CI; unidad 3 de base cerrada. Producción no desplegada.
+Actualizado el 11 de octubre de 2026. Core 0.1.0 publicado y validado en CI; Clientes 0.1.0 publicado y validado en pruebas locales y CI; unidad 1 cerrada. Proveedores 0.1.0 publicado y validado en pruebas locales y CI; unidad 2 cerrada. Catálogo de fuente y receptor de Procesos publicados y validados en pruebas locales y CI; unidad 3 de base cerrada. Producción no desplegada.
 
 | Área | Estado real |
 | --- | --- |
@@ -17,15 +17,16 @@ Actualizado el 10 de octubre de 2026. Core 0.1.0 publicado y validado en CI; Cli
 | Clientes | Ficha/catálogo Go y Angular, contactos/direcciones/notas, historial, snapshots/resolución exacta, permisos y documentos implementados; pruebas locales y CI aprobados |
 | Proveedores | Catálogo, contactos/etiquetas/productos, condiciones/evaluación manual, evidencia de precios, historial/notas/documentos y REST/MCP implementados; pruebas locales y CI aprobados |
 | Procesos | Ingestión transaccional, observaciones/versiones, consultas, marcas/notas, CSV y REST/MCP/Angular implementados; catálogo/ingestión validados en pruebas y CI; funciones cruzadas pendientes |
-| Cotizaciones | Borradores/cálculo, conversión, PDF de borrador/adjuntos, estados/revisiones, aprobación humana y emisión segura de PDF implementados y validados en CI; correo/bulk pendientes |
+| Cotizaciones | Alcance monomoneda HNL/USD cerrado y validado en CI; incluye correo/bulk y estados finales |
+| OC de clientes | Unidades 1 y 2 cerradas: agregado, cálculo, estados, historial y entrega; conversión/documentos/clonación pendientes |
 | Demás módulos comerciales | Pendientes; se implementan de uno en uno tras cerrar pruebas y CI del anterior |
 | Despliegue | Templates systemd/nginx/Bluehost preparados; no instalados ni desplegados |
 | Infraestructura real | MySQL TLS/túnel/hosting, DNS/HTTPS, S3/IAM, SMTP y memoria conjunta con crawler pendientes |
 | Git | Solo main; limpieza reactiva vigente; prevención GitHub requiere plan Pro |
 
-## Cierre vigente de Cotizaciones — 2026-10-10
+## Cierre vigente — 2026-10-11
 
-Prevalece sobre las notas históricas inferiores: correo/bulk ya estaban publicados. El usuario decidió HNL y USD separados, sin FX automático. Se completa cierre de estados comerciales y se corrigen atomicidad/reautorización bulk y replay/revalidación de correo. No se modifica infraestructura ni se envían mensajes reales. Backend/MySQL5.7/race y navegador del nuevo código pendientes de CI; Angular build/47 pruebas locales aprobados antes de la regresión final. Resultado definitivo y SHA se registrarán tras completar ejecución.
+Prevalece sobre las notas históricas inferiores. Cotizaciones está cerrado para HNL/USD separados, sin FX automático, certificado en `0a98bf756c4e7a3965b7b625473258509fbaa571`. OC unidades 1 y 2 están cerradas; el módulo permanece activo. Evidencia y próximo paso exacto en `../ESTADO_DESARROLLO.md`.
 
 ## Verificación del Core (unidad anterior)
 
@@ -141,6 +142,8 @@ Migración 0011 y EnqueueAt conservan fecha UTC/microsegundos entre intención t
 
 Validación cerrada: [código 996a9d8](https://github.com/Ahcast/Bastion/commit/996a9d846127823634a1f8cef1bd200aaefb5dda) y [Core checks 38059653268](https://github.com/Ahcast/Bastion/actions/runs/38059653268) aprobados: 100 pruebas Go con race detector/MySQL5.7 real, formato/vet/builds, build/38 pruebas Angular y siete recorridos reales API/Angular/MySQL. [Documentación 38059653296](https://github.com/Ahcast/Bastion/actions/runs/38059653296) y [rama única 38059653287](https://github.com/Ahcast/Bastion/actions/runs/38059653287) aprobadas. Las 17 pruebas crawler offline aprobaron localmente con requirements.lock; crawler y migraciones 0001..0010 conservados byte a byte. Localmente aprobaron formato/vet/build Go y 35 pruebas sin BD; 65 integraciones se omitieron por DSN ausente y no se contaron como aprobadas. MySQL 5.7.44 recuperado no arrancó localmente porque el entorno rechazó bind de socket Unix (Operation not permitted); las 65 integraciones sí se ejecutaron y aprobaron en CI, sin SQLite. No hay nuevas rutas comerciales, estados sent, destinatarios inventados ni envíos reales. Unidad técnica 4c.4a cerrada. La solicitud/decisión de autorización vinculada a destinatarios/contenido, ledger y formulario de correo Quotes siguen en la próxima unidad propietaria; Cotizaciones completo y OC no se declaran terminados.
 
-## 2026-10-11 — OC Unidad 2 en validación
+## 2026-10-11 — OC Unidad 2 cerrada
 
-Prevalece el checkpoint operativo: Cotizaciones cerrado, OC unidad 1 cerrada. El HEAD a18ed6b certifica grafo/permisos/migración de historial. Continuación implementa transiciones/historial/REST/UI y casos de integridad/concurrencia/reauth/revocación; pendiente CI final antes de cierre. No se inicia Facturas ni se despliega producción.
+Transiciones adyacentes de cabecera/ítems, historial, versión/idempotencia, permisos/scopes y entrega con reauth implementados en API y UI española. Auditoría/eventos atómicos, concurrencia, rollback, revocación y rechazo de máquina cubiertos. Edición íntegra bloqueada tras cualquier avance; descuento general corregido al recargar.
+
+Código certificado `0fa94796ffee0c248035f94a9166f22c0a955b42`; [Core checks 38154939036](https://github.com/Ahcast/Bastion/actions/runs/38154939036), documentación `38154939037` y rama única `38154939034` aprobados. Go/MySQL5.7/race/formato/vet/builds, Angular build/64 pruebas y navegador 9/9 aprobados en CI. Las 17 pruebas offline crawler aprobaron localmente. No se acredita infraestructura productiva. Próxima unidad: conversión Cotización → OC por PurchaseOrders; después documentos/clonación y cierre integral, antes de Facturas.

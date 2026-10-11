@@ -52,6 +52,8 @@ El maestro y `development/decisions.md` resuelven la nomenclatura: el menú OC r
 
 Fuera de la primera unidad: Cotización→OC, OC→Factura, entrega, clonación, documentos, AI, OC a proveedores y cualquier estado distinto de `Recibida`.
 
-## Unidad 2 activa — estados de OC
+## Unidad 2 cerrada — estados de OC
 
-Contrato congelado en `../contracts/purchase-orders-states.md`: un solo grafo vigente. Base/migración/permisos certificados en a18ed6b; implementación transaccional, REST, historial, Angular y regresión completa en validación. No comenzar conversiones ni Facturas hasta CI verde de esta unidad.
+Contrato congelado en `../contracts/purchase-orders-states.md`: un solo grafo vigente. Transiciones transaccionales, REST, historial, entrega con reauth y Angular certificados en `0fa94796ffee0c248035f94a9166f22c0a955b42`, Core checks `38154939036` aprobado. Consultar checkpoint para evidencia completa.
+
+Siguiente unidad dentro de OC: definir e implementar conversión Cotización → OC por el servicio propietario, transaccional/idempotente y con `source_quote_id`. Después documentos/clonación y aceptación integral de OC; Facturas sigue posterior a ese cierre.
