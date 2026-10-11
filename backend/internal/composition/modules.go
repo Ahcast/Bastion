@@ -7,6 +7,7 @@ import (
 	"github.com/Ahcast/Bastion/backend/internal/core/registry"
 	"github.com/Ahcast/Bastion/backend/internal/modules/customers"
 	"github.com/Ahcast/Bastion/backend/internal/modules/processes"
+	"github.com/Ahcast/Bastion/backend/internal/modules/purchaseorders"
 	"github.com/Ahcast/Bastion/backend/internal/modules/quotes"
 	"github.com/Ahcast/Bastion/backend/internal/modules/suppliers"
 	"github.com/Ahcast/Bastion/backend/internal/modules/workflow"
@@ -127,6 +128,27 @@ func RegisterFiles(s *core.Service, r *registry.Registry, logger *slog.Logger, o
 		delete(s.DocumentPolicies, "quotes")
 	}
 	if e := r.Register(quoteService.ModuleFiles(logger, quoteEnabled, objects)); e != nil {
+		return e
+	}
+
+	purchaseOrderEnabled := true
+	if v := os.Getenv("BASTION_PURCHASE_ORDERS_ENABLED"); v != "" {
+		if v != "true" && v != "false" {
+			return fmt.Errorf("invalid purchase orders enable flag")
+		}
+		purchaseOrderEnabled = v == "true"
+	}
+	purchaseOrderService := &purchaseorders.Service{Core: s}
+	if enabled {
+		purchaseOrderService.Customers = service
+	}
+	if supplierEnabled {
+		purchaseOrderService.Suppliers = supplierService
+	}
+	if purchaseOrderEnabled {
+		s.RegisterPermissions(purchaseorders.Permissions, []string{"ordenes.view"})
+	}
+	if e := r.Register(purchaseOrderService.Module(logger, purchaseOrderEnabled)); e != nil {
 		return e
 	}
 	return r.Validate()
