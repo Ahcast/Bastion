@@ -401,3 +401,5 @@ Configuración fiscal certificada en 133b9dc05ef5c5465d13e50550437c86a1bdb940 / 
 Unidad 3 emisión implementada en validación: 0023 y facturas.emit, contexto de revisión, snapshots/versiones y correlativo transaccional, GET/listado/REST/UI. Producción, pagos/PDF y aceptación completa de Facturas siguen pendientes; cierre tras CI verde.
 
 Unidad 3 emisión certificada en fa8670bcf68c11a07a2ed9ff7aedc7d23a4bc890 / Core checks 38183414256: Go/MySQL/race/builds, Angular 97 y navegador 13/13. Continúa unidad 4 bajo contrato previo; módulo completo y fiscalidad productiva no cerrados.
+
+Unidad 4 pagos implementada en validación bajo contrato previo: ledger normalizado, anulación sin borrar, proyección comercial, REST/UI y pruebas. Pendiente CI completo; sin recibos ni conversiones implementados en este bloque.

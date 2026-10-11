@@ -1,3 +1,4 @@
+import {InvoicePayments,PaymentResult,collectionLabel} from "./invoice-payments";
 import {InvoiceEmission,InvoiceEmissionResult} from "./invoice-emission";
 import {InvoiceFiscalSettings} from "./fiscal-settings";
 import { Component, OnInit, inject, signal } from "@angular/core";
@@ -55,6 +56,7 @@ export interface Financials {
 export interface Invoice extends Omit<DraftInput, "additional_expenses"> {
   id: string;
   status: string;
+ commercial_status?:string|null;
   invoice_number: string | null;
   sar_snapshot_json: {configuration:{cai:string;currency:string};configuration_version:string} | null;
   customer_version: string;
@@ -76,6 +78,7 @@ interface Summary {
   currency: string;
   total: string;
   status: string;
+ commercial_status?:string|null;
   version: string;
 }
 const businessDate = () => {
@@ -124,10 +127,12 @@ export const emptyInvoice = (): DraftInput => ({
 });
 @Component({
   selector: "bastion-invoices",
-  imports: [FormsModule, Reauthentication, InvoiceFiscalSettings, InvoiceEmission],
+  imports: [InvoicePayments,FormsModule, Reauthentication, InvoiceFiscalSettings, InvoiceEmission],
   templateUrl: "./invoices.html",
 })
 export class Invoices implements OnInit {
+ collectionLabel=collectionLabel;
+ commercialFilter="";
   api = inject(Client);
   emissionBusy=signal(false);
   rows = signal<Summary[]>([]);
@@ -305,6 +310,7 @@ export class Invoices implements OnInit {
         per_page: "25",
         search: this.search,
         customer_id: this.customerFilter,
+ commercial_status:this.commercialFilter,
       });
       const r = await this.api.get<{ data: Summary[]; total: number }>(
         "/invoices?" + q,
@@ -332,6 +338,9 @@ export class Invoices implements OnInit {
     this.message.set('Emisión confirmada: '+r.invoice_number+'. Abra la factura confirmada para consultar su ficha.');
     this.busy.set(true);try{await this.openConfirmed(r.id);this.message.set('Emisión confirmada: '+r.invoice_number);await this.load()}catch(e){this.error.set(this.api.message(e))}finally{this.busy.set(false)}
   }
+  async paymentConfirmed(r:PaymentResult){
+ this.confirmed.set({id:r.invoice_id,version:r.version});this.needsReload.set(true);this.form.version=r.version;this.message.set('Pago confirmado #'+r.payment_id+' · saldo '+r.currency+' '+r.balance);this.busy.set(true);try{await this.openConfirmed(r.invoice_id);await this.load()}catch(e){this.error.set(this.api.message(e))}finally{this.busy.set(false)}
+ }
   private async openConfirmed(id: string) {
     const o = await this.api.get<Invoice>("/invoices/" + id);
     this.selected.set(o);

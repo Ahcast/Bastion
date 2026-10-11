@@ -131,7 +131,10 @@ func (s *Service) Get(ctx context.Context, a core.Actor, id string) (Invoice, er
 		if e != nil {
 			return e
 		}
-		return s.items(ctx, tx, &out)
+		if e = s.items(ctx, tx, &out); e != nil {
+			return e
+		}
+		return invoiceCommercial(&out, time.Now().UTC())
 	})
 	return out, e
 }

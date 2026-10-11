@@ -66,7 +66,7 @@ func decode(r *http.Request, target any, aggregate bool) error {
 }
 func invoiceFilter(r *http.Request) (Filter, error) {
 	q := r.URL.Query()
-	f := Filter{Page: 1, PerPage: 25, Search: q.Get("search"), CustomerID: q.Get("customer_id"), Status: q.Get("status")}
+	f := Filter{Page: 1, PerPage: 25, Search: q.Get("search"), CustomerID: q.Get("customer_id"), Status: q.Get("status"), CommercialStatus: q.Get("commercial_status")}
 	var e error
 	if q.Get("page") != "" {
 		f.Page, e = strconv.Atoi(q.Get("page"))
@@ -83,8 +83,30 @@ func invoiceFilter(r *http.Request) (Filter, error) {
 	return f, nil
 }
 func (s *Service) Module(logger *slog.Logger, enabled bool) registry.Module {
-	return registry.Module{ID: "invoices", Label: "Facturas", Version: "0.3.1", Enabled: enabled, Dependencies: []string{"core"}, Permissions: Permissions, Routes: func(mux *http.ServeMux) {
+	return registry.Module{ID: "invoices", Label: "Facturas", Version: "0.4.0", Enabled: enabled, Dependencies: []string{"core"}, Permissions: Permissions, Routes: func(mux *http.ServeMux) {
 		register := func(pattern string, action api.Action) { mux.Handle(pattern, api.Operation(s.Core, logger, action)) }
+
+		register("GET /api/v1/invoices/{id}/payments", func(ctx context.Context, a core.Actor, r *http.Request) (any, error) {
+			f, e := invoiceFilter(r)
+			if e != nil {
+				return nil, e
+			}
+			return s.Payments(ctx, a, r.PathValue("id"), f.Page, f.PerPage)
+		})
+		register("POST /api/v1/invoices/{id}/payments", func(ctx context.Context, a core.Actor, r *http.Request) (any, error) {
+			var p PaymentInput
+			if e := decodePayment(r, &p, "version", "date", "method", "currency", "amount", "reference", "reason"); e != nil {
+				return nil, e
+			}
+			return s.RegisterPayment(ctx, a, r.PathValue("id"), r.Header.Get("Idempotency-Key"), p)
+		})
+		register("POST /api/v1/invoices/{id}/payments/{payment}/void", func(ctx context.Context, a core.Actor, r *http.Request) (any, error) {
+			var p VoidPaymentInput
+			if e := decodePayment(r, &p, "version", "payment_version", "reason"); e != nil {
+				return nil, e
+			}
+			return s.VoidPayment(ctx, a, r.PathValue("id"), r.PathValue("payment"), r.Header.Get("Idempotency-Key"), p)
+		})
 
 		register("GET /api/v1/invoices/{id}/emission-context", func(ctx context.Context, a core.Actor, r *http.Request) (any, error) {
 			return s.EmissionContext(ctx, a, r.PathValue("id"))
@@ -178,4 +200,20 @@ func decodeFiscalSettings(r *http.Request, p *FiscalSettingsInput) error {
 		return core.Invalid
 	}
 	return required(value, "", "cai", "prefix", "number_width", "range_start", "range_end", "valid_from", "valid_until", "currency", "enabled")
+}
+
+func decodePayment(r *http.Request, p any, names ...string) error {
+	body, e := io.ReadAll(r.Body)
+	if e != nil {
+		return core.Invalid
+	}
+	r.Body = io.NopCloser(bytes.NewReader(body))
+	if e = api.Decode(r, p); e != nil {
+		return e
+	}
+	var fields map[string]json.RawMessage
+	if json.Unmarshal(body, &fields) != nil {
+		return core.Invalid
+	}
+	return required(fields, "", names...)
 }

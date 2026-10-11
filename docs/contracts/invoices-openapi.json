@@ -1,8 +1,8 @@
 {
   "openapi": "3.1.0",
   "info": {
-    "title": "Bastion Facturas — Borradores, configuración y emisión",
-    "version": "0.3.1"
+    "title": "Bastion Facturas: borradores, configuración, emisión y pagos",
+    "version": "0.4.0"
   },
   "paths": {
     "/api/v1/invoices": {
@@ -469,7 +469,7 @@
     },
     "/api/v1/invoices/{id}/payments": {
       "get": {
-        "description": "Contrato previo de unidad 4. Ledger paginado incluido anulado, versión/proyección de factura consistentes y autorización view por registro. No recibo hasta unidad 6.",
+        "description": "Ledger paginado incluido anulado, versión/proyección de factura consistentes y autorización view por registro. No recibo hasta unidad 6.",
         "security": [
           {
             "session": []
@@ -522,7 +522,7 @@
         }
       },
       "post": {
-        "description": "Contrato previo de unidad 4; disponible tras implementar/certificar. Humano view/payment por registro, reauth/CSRF/idempotencia/version. Solo issued, moneda exacta, importe positivo sin sobrepago, fecha invoice_date..hoy Honduras; ledger/proyección/audit/event atómicos.",
+        "description": "Humano view/payment por registro, reauth/CSRF/idempotencia/version. Solo issued, moneda exacta, importe positivo sin sobrepago, fecha invoice_date..hoy Honduras; ledger/proyección/audit/event atómicos.",
         "security": [
           {
             "session": []
@@ -587,7 +587,7 @@
     },
     "/api/v1/invoices/{id}/payments/{payment}/void": {
       "post": {
-        "description": "Contrato previo de unidad 4. Humano view/payment.void, reauth/CSRF/idempotencia/versiones. Conserva datos, marca anulación y recalcula excluyendo fila en la misma TX; no borrar ni editar importe.",
+        "description": "Humano view/payment.void, reauth/CSRF/idempotencia/versiones. Conserva datos, marca anulación y recalcula excluyendo fila en la misma TX; no borrar ni editar importe.",
         "security": [
           {
             "session": []

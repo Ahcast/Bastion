@@ -211,4 +211,8 @@ describe("Facturas Borradores", () => {
  c.emissionBusy.set(false);api.get.mockRejectedValue(new Error('Recarga perdida'));await c.emissionConfirmed({id:invoice().id,version:'2',status:'issued',invoice_number:'TEST-00000002',issued_at:'2026-10-11T22:00:00Z',due_date:'2026-11-10'});expect(c.needsReload()).toBe(true);expect(c.writable()).toBe(false);expect(c.form.version).toBe('2');expect(c.message()).toContain('TEST-00000002');await c.save();expect(api.write).not.toHaveBeenCalled();
  });
 
+ it('conserva pago y versión confirmados si falla la recarga del agregado',async()=>{
+ const {api,component:c}=setup();await c.open(invoice().id);api.get.mockRejectedValue(new Error('Recarga perdida'));await c.paymentConfirmed({invoice_id:invoice().id,payment_id:'9007199254740995',version:'9007199254740994',payment_version:'1',currency:'HNL',paid_total:'50.00',balance:'151.25',commercial_status:'partially_paid'});expect(c.needsReload()).toBe(true);expect(c.confirmed()).toEqual({id:invoice().id,version:'9007199254740994'});expect(c.form.version).toBe('9007199254740994');expect(c.message()).toContain('151.25');await c.save();expect(api.write).not.toHaveBeenCalled();
+ });
+
 });

@@ -263,14 +263,14 @@ func main() {
 		log.Fatal(e)
 	}
 
-	// Separate synthetic issuer with self scope, without fiscal-settings administration.
+	// Separate synthetic issuer/payment operator with self scope, without fiscal-settings administration.
 	if _, e = db.Exec(`INSERT INTO users(email,name,password_hash,totp_secret,active,created_at,updated_at) SELECT 'invoice-emitter@example.test','Emisor factura sintético',password_hash,?,TRUE,UTC_TIMESTAMP(6),UTC_TIMESTAMP(6) FROM users WHERE id=1`, secret); e != nil {
 		log.Fatal(e)
 	}
 	if _, e = db.Exec(`INSERT INTO roles(name) VALUES('Facturas emisión sintética')`); e != nil {
 		log.Fatal(e)
 	}
-	if _, e = db.Exec(`INSERT INTO role_permissions SELECT r.id,p.name,'self' FROM roles r JOIN permissions p ON p.name IN ('facturas.view','facturas.create','facturas.update','facturas.emit') WHERE r.name='Facturas emisión sintética'`); e != nil {
+	if _, e = db.Exec(`INSERT INTO role_permissions SELECT r.id,p.name,'self' FROM roles r JOIN permissions p ON p.name IN ('facturas.view','facturas.create','facturas.update','facturas.emit','facturas.payment','facturas.payment.void') WHERE r.name='Facturas emisión sintética'`); e != nil {
 		log.Fatal(e)
 	}
 	if _, e = db.Exec(`INSERT INTO user_roles SELECT u.id,r.id FROM users u JOIN roles r ON r.name='Facturas emisión sintética' WHERE u.email='invoice-emitter@example.test'`); e != nil {
