@@ -1,13 +1,13 @@
 {
   "openapi": "3.1.0",
   "info": {
-    "title": "Bastion Facturas — Borradores y configuración fiscal",
-    "version": "0.3.0"
+    "title": "Bastion Facturas — Borradores, configuración y emisión",
+    "version": "0.3.1"
   },
   "paths": {
     "/api/v1/invoices": {
       "get": {
-        "description": "Listado paginado, búsqueda literal y scopes facturas.view. Solo draft en esta unidad.",
+        "description": "Listado paginado por scopes facturas.view, filtros draft/issued, número fiscal nullable y monedas separadas.",
         "responses": {
           "200": {
             "description": "Resultado autorizado"
@@ -345,6 +345,124 @@
           },
           "422": {
             "description": "DTO/formatos inválidos"
+          }
+        }
+      }
+    },
+    "/api/v1/invoices/{id}/emission-context": {
+      "get": {
+        "description": "Revisión humana autorizada view/emit del registro. Validación de borrador, configuración, moneda, vigencia, cálculo y empresa. Número estimado sin reserva.",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Resultado autorizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EmissionContext"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sesión inválida"
+          },
+          "403": {
+            "description": "Permiso/CSRF/reauth insuficiente"
+          },
+          "404": {
+            "description": "Recurso fuera de scope"
+          },
+          "409": {
+            "description": "Versión/intención/estado conflictivo"
+          },
+          "422": {
+            "description": "DTO/formatos inválidos"
+          },
+          "503": {
+            "description": "Empresa no configurada"
+          }
+        }
+      }
+    },
+    "/api/v1/invoices/{id}/emit": {
+      "post": {
+        "description": "Humano view/emit, reauth, CSRF, versiones e idempotencia. Número, empresa/SAR/vencimiento/estado y contador/evidencia atómicos; no pagos, PDF ni acreditación fiscal productiva.",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Resultado autorizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EmissionResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sesión inválida"
+          },
+          "403": {
+            "description": "Permiso/CSRF/reauth insuficiente"
+          },
+          "404": {
+            "description": "Recurso fuera de scope"
+          },
+          "409": {
+            "description": "Versión/intención/estado conflictivo"
+          },
+          "422": {
+            "description": "DTO/formatos inválidos"
+          },
+          "503": {
+            "description": "Empresa no configurada"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EmitInput"
+              }
+            }
           }
         }
       }
@@ -706,6 +824,124 @@
           },
           "next_value": {
             "type": "string"
+          }
+        }
+      },
+      "EmitInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "version",
+          "fiscal_version",
+          "company_version",
+          "reason"
+        ],
+        "properties": {
+          "version": {
+            "type": "string",
+            "pattern": "^[1-9][0-9]*$"
+          },
+          "fiscal_version": {
+            "type": "string",
+            "pattern": "^[1-9][0-9]*$"
+          },
+          "company_version": {
+            "type": "string",
+            "pattern": "^[1-9][0-9]*$"
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000
+          }
+        }
+      },
+      "CompanySnapshot": {
+        "type": "object",
+        "required": [
+          "name",
+          "tax_id",
+          "address"
+        ],
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "tax_id": {
+            "type": "string"
+          },
+          "address": {
+            "type": "string"
+          }
+        }
+      },
+      "EmissionContext": {
+        "type": "object",
+        "required": [
+          "invoice_version",
+          "fiscal_version",
+          "company_version",
+          "fiscal",
+          "company",
+          "estimated_number",
+          "due_date"
+        ],
+        "properties": {
+          "invoice_version": {
+            "type": "string"
+          },
+          "fiscal_version": {
+            "type": "string"
+          },
+          "company_version": {
+            "type": "string"
+          },
+          "estimated_number": {
+            "type": "string"
+          },
+          "fiscal": {
+            "$ref": "#/components/schemas/FiscalAuthorization"
+          },
+          "company": {
+            "$ref": "#/components/schemas/CompanySnapshot"
+          },
+          "due_date": {
+            "type": "string",
+            "format": "date"
+          }
+        }
+      },
+      "EmissionResult": {
+        "type": "object",
+        "required": [
+          "id",
+          "version",
+          "status",
+          "invoice_number",
+          "issued_at",
+          "due_date"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "version": {
+            "type": "string"
+          },
+          "invoice_number": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "const": "issued"
+          },
+          "issued_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "due_date": {
+            "type": "string",
+            "format": "date"
           }
         }
       }

@@ -148,3 +148,5 @@ Contrato vigente: [clonación OC](contracts/purchase-order-cloning.md). Migraci�
 Facturas Borradores (0021): invoices e invoice_items propietarios, campos DECIMAL y snapshots de cliente, condiciones contado/crédito, número/SAR NULL, saldo/pagado iniciales e IDs estables de ítems. Permisos facturas.view/create/update sin grants. No payments ni correlativo en esta unidad; contratos en contracts/invoices.md e invoices-openapi.json.
 
 Facturas configuración fiscal (0022): invoice_fiscal_settings singleton, configuración/version y actualización auditada; contador único document_counters.invoice creado junto a primera configuración, sin adelantar/retroceder al editar. No emisión ni payments en este bloque.
+
+Facturas emisión (0023): issued_at/issued_by/due_date y snapshot/versión pública de empresa; número/SAR previamente nullable se congelan al emitir junto a correlativo document_counters.invoice. Fechas de negocio Honduras, timestamps UTC; pago y saldo conservados sin crear payments. Contrato propietario invoices.md.

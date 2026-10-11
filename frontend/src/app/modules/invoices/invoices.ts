@@ -1,3 +1,4 @@
+import {InvoiceEmission,InvoiceEmissionResult} from "./invoice-emission";
 import {InvoiceFiscalSettings} from "./fiscal-settings";
 import { Component, OnInit, inject, signal } from "@angular/core";
 import { FormsModule } from "@angular/forms";
@@ -55,8 +56,13 @@ export interface Invoice extends Omit<DraftInput, "additional_expenses"> {
   id: string;
   status: string;
   invoice_number: string | null;
-  sar_snapshot_json: unknown | null;
+  sar_snapshot_json: {configuration:{cai:string;currency:string};configuration_version:string} | null;
   customer_version: string;
+  issued_at:string|null;
+  issued_by:string|null;
+  due_date:string|null;
+  company_snapshot_json:{name:string;tax_id:string;address:string}|null;
+  company_version:string|null;
   calculation: Financials;
   paid_total: string;
   balance: string;
@@ -118,11 +124,12 @@ export const emptyInvoice = (): DraftInput => ({
 });
 @Component({
   selector: "bastion-invoices",
-  imports: [FormsModule, Reauthentication, InvoiceFiscalSettings],
+  imports: [FormsModule, Reauthentication, InvoiceFiscalSettings, InvoiceEmission],
   templateUrl: "./invoices.html",
 })
 export class Invoices implements OnInit {
   api = inject(Client);
+  emissionBusy=signal(false);
   rows = signal<Summary[]>([]);
   total = signal(0);
   page = 1;
@@ -250,7 +257,7 @@ export class Invoices implements OnInit {
     );
   }
   writable() {
-    if (this.needsReload()) return false;
+    if (this.needsReload() || this.emissionBusy()) return false;
     return this.selected()
       ? this.selected()?.status === "draft" && this.api.has("facturas.update")
       : this.api.has("facturas.create");
@@ -259,7 +266,7 @@ export class Invoices implements OnInit {
     return this.editing() && JSON.stringify(this.form) !== this.baseline;
   }
   newDraft() {
-    if (this.busy() || !this.api.has("facturas.create")) return;
+    if (this.busy() || this.emissionBusy() || !this.api.has("facturas.create")) return;
     this.selected.set(null);
     this.needsReload.set(false);
     this.form = emptyInvoice();
@@ -272,7 +279,7 @@ export class Invoices implements OnInit {
     this.message.set("");
   }
   close() {
-    if (this.busy()) return;
+    if (this.busy() || this.emissionBusy()) return;
     this.editing.set(false);
     this.selected.set(null);
     this.calculation.set(null);
@@ -309,7 +316,7 @@ export class Invoices implements OnInit {
     }
   }
   async open(id: string) {
-    if (this.busy()) return;
+    if (this.busy() || this.emissionBusy()) return;
     this.busy.set(true);
     this.error.set("");
     try {
@@ -319,6 +326,11 @@ export class Invoices implements OnInit {
     } finally {
       this.busy.set(false);
     }
+  }
+  async emissionConfirmed(r:InvoiceEmissionResult){
+    this.confirmed.set({id:r.id,version:r.version});this.needsReload.set(true);this.form.version=r.version;
+    this.message.set('Emisión confirmada: '+r.invoice_number+'. Abra la factura confirmada para consultar su ficha.');
+    this.busy.set(true);try{await this.openConfirmed(r.id);this.message.set('Emisión confirmada: '+r.invoice_number);await this.load()}catch(e){this.error.set(this.api.message(e))}finally{this.busy.set(false)}
   }
   private async openConfirmed(id: string) {
     const o = await this.api.get<Invoice>("/invoices/" + id);
@@ -379,7 +391,7 @@ export class Invoices implements OnInit {
       : null;
   }
   async preview() {
-    if (this.busy()) return;
+    if (this.busy() || this.emissionBusy()) return;
     this.busy.set(true);
     this.error.set("");
     try {
@@ -398,7 +410,7 @@ export class Invoices implements OnInit {
     }
   }
   async save() {
-    if (this.busy() || !this.writable()) return;
+    if (this.busy() || this.emissionBusy() || !this.writable()) return;
     const id = this.selected()?.id ?? "";
     const path = "/invoices" + (id ? "/" + id : "");
     const body = structuredClone(this.form);

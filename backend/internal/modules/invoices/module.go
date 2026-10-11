@@ -83,8 +83,31 @@ func invoiceFilter(r *http.Request) (Filter, error) {
 	return f, nil
 }
 func (s *Service) Module(logger *slog.Logger, enabled bool) registry.Module {
-	return registry.Module{ID: "invoices", Label: "Facturas", Version: "0.3.0", Enabled: enabled, Dependencies: []string{"core"}, Permissions: Permissions, Routes: func(mux *http.ServeMux) {
+	return registry.Module{ID: "invoices", Label: "Facturas", Version: "0.3.1", Enabled: enabled, Dependencies: []string{"core"}, Permissions: Permissions, Routes: func(mux *http.ServeMux) {
 		register := func(pattern string, action api.Action) { mux.Handle(pattern, api.Operation(s.Core, logger, action)) }
+
+		register("GET /api/v1/invoices/{id}/emission-context", func(ctx context.Context, a core.Actor, r *http.Request) (any, error) {
+			return s.EmissionContext(ctx, a, r.PathValue("id"))
+		})
+		register("POST /api/v1/invoices/{id}/emit", func(ctx context.Context, a core.Actor, r *http.Request) (any, error) {
+			var p EmitInput
+			body, e := io.ReadAll(r.Body)
+			if e != nil {
+				return nil, core.Invalid
+			}
+			r.Body = io.NopCloser(bytes.NewReader(body))
+			if e = api.Decode(r, &p); e != nil {
+				return nil, e
+			}
+			var fields map[string]json.RawMessage
+			if json.Unmarshal(body, &fields) != nil {
+				return nil, core.Invalid
+			}
+			if e = required(fields, "", "version", "fiscal_version", "company_version", "reason"); e != nil {
+				return nil, e
+			}
+			return s.Emit(ctx, a, r.PathValue("id"), r.Header.Get("Idempotency-Key"), p)
+		})
 
 		register("GET /api/v1/invoices/fiscal-settings", func(ctx context.Context, a core.Actor, r *http.Request) (any, error) { return s.FiscalSettings(ctx, a) })
 		register("PUT /api/v1/invoices/fiscal-settings", func(ctx context.Context, a core.Actor, r *http.Request) (any, error) {

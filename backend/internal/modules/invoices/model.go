@@ -9,7 +9,7 @@ import (
 	"time"
 )
 
-var Permissions = []string{"facturas.view", "facturas.create", "facturas.update", "facturas.fiscal.read", "facturas.fiscal.manage"}
+var Permissions = []string{"facturas.view", "facturas.create", "facturas.update", "facturas.fiscal.read", "facturas.fiscal.manage", "facturas.emit"}
 
 type CustomerInput struct {
 	ID      string `json:"id"`
@@ -44,27 +44,33 @@ type Item struct {
 	finance.CalculatedItem
 }
 type Invoice struct {
-	ID              string          `json:"id"`
-	Number          *string         `json:"invoice_number"`
-	SAR             json.RawMessage `json:"sar_snapshot_json"`
-	Status          string          `json:"status"`
-	Customer        CustomerInput   `json:"customer"`
-	CustomerVersion uint64          `json:"customer_version,string"`
-	InvoiceDate     string          `json:"invoice_date"`
-	PaymentTerm     string          `json:"payment_term_type"`
-	CreditDays      *uint16         `json:"credit_days"`
-	Currency        string          `json:"currency"`
-	PublicNotes     string          `json:"public_notes"`
-	DiscountType    string          `json:"general_discount_type"`
-	Discount        string          `json:"general_discount"`
-	Exoneration     string          `json:"exoneration_reference"`
-	Calculation     Financials      `json:"calculation"`
-	PaidTotal       string          `json:"paid_total"`
-	Balance         string          `json:"balance"`
-	Version         uint64          `json:"version,string"`
-	CreatedBy       string          `json:"created_by"`
-	TeamID          string          `json:"team_id"`
-	Items           []Item          `json:"items"`
+	ID             string          `json:"id"`
+	Number         *string         `json:"invoice_number"`
+	SAR            json.RawMessage `json:"sar_snapshot_json"`
+	IssuedAt       *time.Time      `json:"issued_at"`
+	IssuedBy       *string         `json:"issued_by"`
+	DueDate        *string         `json:"due_date"`
+	Company        json.RawMessage `json:"company_snapshot_json"`
+	CompanyVersion *uint64         `json:"company_version,string"`
+
+	Status          string        `json:"status"`
+	Customer        CustomerInput `json:"customer"`
+	CustomerVersion uint64        `json:"customer_version,string"`
+	InvoiceDate     string        `json:"invoice_date"`
+	PaymentTerm     string        `json:"payment_term_type"`
+	CreditDays      *uint16       `json:"credit_days"`
+	Currency        string        `json:"currency"`
+	PublicNotes     string        `json:"public_notes"`
+	DiscountType    string        `json:"general_discount_type"`
+	Discount        string        `json:"general_discount"`
+	Exoneration     string        `json:"exoneration_reference"`
+	Calculation     Financials    `json:"calculation"`
+	PaidTotal       string        `json:"paid_total"`
+	Balance         string        `json:"balance"`
+	Version         uint64        `json:"version,string"`
+	CreatedBy       string        `json:"created_by"`
+	TeamID          string        `json:"team_id"`
+	Items           []Item        `json:"items"`
 }
 
 func Validate(p Input) (CalculationResult, error) {

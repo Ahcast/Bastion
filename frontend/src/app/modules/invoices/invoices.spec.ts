@@ -23,6 +23,7 @@ const invoice = (): Invoice => {
     status: "draft",
     invoice_number: null,
     sar_snapshot_json: null,
+    issued_at:null,issued_by:null,due_date:null,company_snapshot_json:null,company_version:null,
     customer_version: "0",
     customer: { ...p.customer, name: "Cliente sintético" },
     calculation: financials(),
@@ -205,4 +206,9 @@ describe("Facturas Borradores", () => {
     await c.loadTeams();
     expect(api.get).not.toHaveBeenCalled();
   });
+ it('congela la ficha durante emisión y conserva evidencia confirmada si falla recarga',async()=>{
+ const {api,component:c}=setup();await c.open(invoice().id);const selected=c.selected();c.emissionBusy.set(true);c.newDraft();c.close();await c.save();expect(c.selected()).toBe(selected);expect(c.editing()).toBe(true);expect(api.write).not.toHaveBeenCalled();
+ c.emissionBusy.set(false);api.get.mockRejectedValue(new Error('Recarga perdida'));await c.emissionConfirmed({id:invoice().id,version:'2',status:'issued',invoice_number:'TEST-00000002',issued_at:'2026-10-11T22:00:00Z',due_date:'2026-11-10'});expect(c.needsReload()).toBe(true);expect(c.writable()).toBe(false);expect(c.form.version).toBe('2');expect(c.message()).toContain('TEST-00000002');await c.save();expect(api.write).not.toHaveBeenCalled();
+ });
+
 });
