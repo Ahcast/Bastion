@@ -16,7 +16,7 @@ Guardar o descartar cambios antes de transicionar. Completar el avance de cada �
 
 Timeout: repetir misma intención/payload. Conflicto: consultar la versión actual. La UI conserva la clave ante fallo y la versión/estado confirmados si falla la recarga. Los replays se reautorizan y la entrega vuelve a exigir identidad reciente. Historial conserva actor/fecha UTC, versión, origen/destino y posición 1-based; la UI presenta hora de Honduras y página de 25 entradas.
 
-Facturado/Cerrado son vocabulario reservado; no existen acciones para simular sus efectos. Documentos, OC→Factura, entrega parcial, reapertura, utilidad, clonación de OC y OC a proveedores siguen pendientes. La conversión desde Cotizaciones se explica más abajo.
+Facturado/Cerrado son vocabulario reservado; no existen acciones para simular sus efectos. OC→Factura, entrega parcial, reapertura, utilidad, clonación de OC y OC a proveedores siguen pendientes. La conversión desde Cotizaciones se explica más abajo.
 
 ## Validación
 
@@ -35,3 +35,5 @@ Si se pierde el ACK, repetir la misma intención y datos. Otra intención tras c
 Permisos explícitos: ordenes.view, ordenes.documents.write, core.documents.read/write con scope correspondiente; no se otorgan automáticamente. Abra una OC guardada, consulte Documentos privados y elija Cabecera o un ítem como destino. Guarde/descarte ediciones y confirme identidad para vincular, eliminar o restaurar. Carga PDF/PNG/JPEG/TXT hasta 20 MB; permanece en cuarentena hasta análisis autorizado. Disponible habilita preview y descarga Core.
 
 Filtros por ítem y papelera, paginación de 25. Papelera conserva el vínculo; no se puede eliminar de la OC un ítem con documento incluso eliminado. Reordenar conserva el ID y el adjunto. API de edición debe enviar los IDs retornados para conservar ítems. Timeout: repetir misma intención, no crear otro documento; la UI conserva etapa de carga/clave. Permisos se reevalúan en cada petición. No se acredita S3/escáner productivo con el adapter sintético de CI.
+
+Unidad 4 certificada en `1073c261de0c8f7ab12aed0ff6bb7b6a5f361e7c`; [Core checks 38163339892](https://github.com/Ahcast/Bastion/actions/runs/38163339892) aprobado. Clonación y cierre integral son el siguiente paso.

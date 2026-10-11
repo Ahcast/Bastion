@@ -20,7 +20,7 @@ Actualizado: 2026-10-11.
 - Proveedores: unidad cerrada y validada.
 - Procesos/receptor crawler: unidad base cerrada y validada.
 - Cotizaciones: **cerrado y validado en CI para el alcance monomoneda HNL/USD**.
-- OC de clientes: **Unidades 1, 2 y 3 cerradas y validadas en CI; módulo activo para documentos privados**.
+- OC de clientes: **Unidades 1, 2, 3 y 4 cerradas y validadas en CI; módulo activo para clonación**.
 - Facturas/pagos y módulos posteriores: pendientes; no iniciar antes de cerrar OC por unidades.
 - Producción: no desplegada ni migrada.
 
@@ -166,8 +166,18 @@ CI intermedio detectó dependencia de números fijos y datos globales en el esce
 
 ## Próximo paso exacto
 
-Continuar dentro de OC con documentos privados de cabecera/ítems mediante Core.Files: contrato, permisos/política propietaria, metadata y enlaces durables, cuarentena y descarga autorizada; nunca bytes en webroot. Después clonación de OC y aceptación integral. OC→Factura/utilidad requieren sus propietarios/reglas; no iniciar Facturas/pagos antes del cierre correspondiente. Ningún despliegue, envío ni migración productiva realizado.
+Continuar dentro de OC con clonación por servicio propietario: contrato, reinicio de estados/origen/vínculos, snapshots, permisos, idempotencia, auditoría, UI y aceptación integral. Documentos privados de cabecera/ítems cerrados; no copiar vínculos ni bytes automáticamente al clonar. OC→Factura/utilidad requieren sus propietarios/reglas; no iniciar Facturas/pagos antes del cierre correspondiente. Ningún despliegue, envío ni migración productiva realizado.
 
-## 2026-10-11 — Unidad 4 OC: documentos privados en validación
+## 2026-10-11 — Unidad 4 OC: documentos privados cerrada
 
-Contrato `contracts/purchase-order-documents.md`, migración 0018, política propietaria, enlaces a cabecera/IDs estables de ítems y Angular implementados. Se conservan filas/IDs en edición y reordenamiento; FK y servicio impiden eliminar ítems con adjuntos incluso en papelera. Core controla carga/integridad/cuarentena/análisis/descarga/preview/papelera. Replay reautoriza ambos registros y reauth. Build Angular y 73 pruebas locales aprobados; Go/MySQL/race/navegador pendientes de CI antes del cierre. Clonación sigue posterior; Facturas no iniciada. Sin despliegue ni migración productiva.
+Contrato único `purchase-order-documents.md`, migración 0018 y política propietaria mediante Core.Files. Documentos privados de cabecera/ítems; tabla de vínculos con FK compuesto, ID estable de ítem conservado al editar/reordenar, actor/fecha y documento único. Core conserva versiones, checksum/MIME/tamaño, cuarentena/análisis, preview/descarga autorizada y papelera/restauración sin borrar vínculos ni bytes. Permiso explícito ordenes.documents.write sin concesión automática; scopes de OC y documento independientes, actor humano/reauth, replay reautorizado, versión OC/idempotencia/auditoría/evento en una TX. Writes operativos hasta entregada; estados protegidos denegados.
+
+Angular español: destino cabecera/ítem, upload privado con etapa/clave conservada tras fallo, vínculo de documento existente, filtros/paginación/papelera, reauth y controles por estado/permiso. Versión confirmada conservada tras fallo de recarga; respuestas tardías no afectan otra OC abierta. No copia adjuntos de la cotización origen.
+
+HEAD de código certificado: `1073c261de0c8f7ab12aed0ff6bb7b6a5f361e7c`. [Core checks 38163339892](https://github.com/Ahcast/Bastion/actions/runs/38163339892), [documentación 38163339970](https://github.com/Ahcast/Bastion/actions/runs/38163339970) y [rama única 38163339924](https://github.com/Ahcast/Bastion/actions/runs/38163339924): success. Backend: gofmt/vet, `go test -race -count=1 ./...` con MySQL 5.7 y builds server/worker/admin. Angular: build/**73 pruebas**. Navegador: **10/10 escenarios**, incluidos upload/finalize real contra adapter sintético privado, adjuntos de cabecera/ítem en cuarentena, filtro, papelera/restauración y recarga.
+
+Local: build/73 pruebas Angular, compilación de 10 escenarios Playwright, paridad/enlaces y diff sin errores. Go/BD/navegador certificados por CI, no por ejecución local. Pruebas nuevas: identidad estable al reordenar/editar, eliminación de ítem vinculado bloqueada incluso en papelera, IDs duplicados/ajenos, FK/pertenencia, cuarentena/scan/preview/descarga, 12 replays concurrentes, autorización de ambos propietarios/revocación, scopes técnicos self/team y membresía, estados protegidos, rollback del vínculo/versiones ante fallo de evento, DTO HTTP estricto/CSRF y flag de composición.
+
+CI intermedio detectó sincronización pendiente al volver al listado Quotes: ahora el escenario espera navegación/carga inicial antes del filtro y verifica respuesta filtrada/total. Se agregó además defensa de producción contra respuestas de listado fuera de orden y su prueba. El escenario de conversión captura el cuerpo HTTP al recibirlo para impedir que navegación lo descarte. Suite completa final aprobada; sin omitir comprobaciones ni ampliar timeouts para estas correcciones. CI conserva contexto de navegador sólo ante fallo. Crawler y migraciones 0001..0017 intactos. S3/escáner productivo no certificados; no despliegue, envío ni migración productiva.
+
+Próximo: clonación de OC y aceptación integral, antes de Facturas/pagos.

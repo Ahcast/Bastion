@@ -18,7 +18,7 @@ Actualizado el 11 de octubre de 2026. Core 0.1.0 publicado y validado en CI; Cli
 | Proveedores | Catálogo, contactos/etiquetas/productos, condiciones/evaluación manual, evidencia de precios, historial/notas/documentos y REST/MCP implementados; pruebas locales y CI aprobados |
 | Procesos | Ingestión transaccional, observaciones/versiones, consultas, marcas/notas, CSV y REST/MCP/Angular implementados; catálogo/ingestión validados en pruebas y CI; funciones cruzadas pendientes |
 | Cotizaciones | Alcance monomoneda HNL/USD cerrado y validado en CI; incluye correo/bulk y estados finales |
-| OC de clientes | Unidades 1, 2 y 3 cerradas: agregado, cálculo, estados, historial, entrega y conversión Quotes→OC; documentos/clonación pendientes |
+| OC de clientes | Unidades 1, 2, 3 y 4 cerradas: agregado, cálculo, estados, entrega, conversión y documentos privados; clonación pendiente |
 | Demás módulos comerciales | Pendientes; se implementan de uno en uno tras cerrar pruebas y CI del anterior |
 | Despliegue | Templates systemd/nginx/Bluehost preparados; no instalados ni desplegados |
 | Infraestructura real | MySQL TLS/túnel/hosting, DNS/HTTPS, S3/IAM, SMTP y memoria conjunta con crawler pendientes |
@@ -26,7 +26,7 @@ Actualizado el 11 de octubre de 2026. Core 0.1.0 publicado y validado en CI; Cli
 
 ## Cierre vigente — 2026-10-11
 
-Prevalece sobre las notas históricas inferiores. Cotizaciones está cerrado para HNL/USD separados, sin FX automático, certificado en `0a98bf756c4e7a3965b7b625473258509fbaa571`. OC unidades 1, 2 y 3 están cerradas; el módulo permanece activo. Evidencia y próximo paso exacto en `../ESTADO_DESARROLLO.md`.
+Prevalece sobre las notas históricas inferiores. Cotizaciones está cerrado para HNL/USD separados, sin FX automático, certificado en `0a98bf756c4e7a3965b7b625473258509fbaa571`. OC unidades 1, 2, 3 y 4 están cerradas; el módulo permanece activo. Evidencia y próximo paso exacto en `../ESTADO_DESARROLLO.md`.
 
 ## Verificación del Core (unidad anterior)
 
@@ -154,6 +154,16 @@ Conversión de Cotización Aceptada a OC recibida por servicios propietarios, un
 
 [HEAD 541bb101](https://github.com/Ahcast/Bastion/commit/541bb101db51b391265b95ca9a8acd0ff0a3ae85), [Core checks 38159858594](https://github.com/Ahcast/Bastion/actions/runs/38159858594), documentación `38159858792` y rama única `38159858687` aprobados. Backend formato/vet/race/MySQL5.7/builds; Angular build/68 pruebas; navegador **10/10** aprobado. Local: Angular build/68 pruebas, listado compilado de 10 escenarios y documentación. Go/BD/navegador certificados por CI, no por ejecución local. Concurrencia de 12 replays/ocho actores, rollback, snapshots/finanzas y scopes/revocación cubiertos. Selectores de prueba y aislamiento del expediente corregidos tras CI intermedio; regresión completa final aprobada. Crawler/migraciones anteriores intactos. Próxima unidad: documentos privados OC; después clonación y cierre integral, antes de Facturas. No producción.
 
-## 2026-10-11 — Unidad 4 OC: documentos privados en validación
+## 2026-10-11 — Unidad 4 OC: documentos privados cerrada
 
-Contrato `../contracts/purchase-order-documents.md`, migración 0018, política propietaria, enlaces a cabecera/IDs estables de ítems y Angular implementados. Se conservan filas/IDs en edición y reordenamiento; FK y servicio impiden eliminar ítems con adjuntos incluso en papelera. Core controla carga/integridad/cuarentena/análisis/descarga/preview/papelera. Replay reautoriza ambos registros y reauth. Build Angular y 73 pruebas locales aprobados; Go/MySQL/race/navegador pendientes de CI antes del cierre. Clonación sigue posterior; Facturas no iniciada. Sin despliegue ni migración productiva.
+Contrato único `purchase-order-documents.md`, migración 0018 y política propietaria mediante Core.Files. Documentos privados de cabecera/ítems; tabla de vínculos con FK compuesto, ID estable de ítem conservado al editar/reordenar, actor/fecha y documento único. Core conserva versiones, checksum/MIME/tamaño, cuarentena/análisis, preview/descarga autorizada y papelera/restauración sin borrar vínculos ni bytes. Permiso explícito ordenes.documents.write sin concesión automática; scopes de OC y documento independientes, actor humano/reauth, replay reautorizado, versión OC/idempotencia/auditoría/evento en una TX. Writes operativos hasta entregada; estados protegidos denegados.
+
+Angular español: destino cabecera/ítem, upload privado con etapa/clave conservada tras fallo, vínculo de documento existente, filtros/paginación/papelera, reauth y controles por estado/permiso. Versión confirmada conservada tras fallo de recarga; respuestas tardías no afectan otra OC abierta. No copia adjuntos de la cotización origen.
+
+HEAD de código certificado: `1073c261de0c8f7ab12aed0ff6bb7b6a5f361e7c`. [Core checks 38163339892](https://github.com/Ahcast/Bastion/actions/runs/38163339892), [documentación 38163339970](https://github.com/Ahcast/Bastion/actions/runs/38163339970) y [rama única 38163339924](https://github.com/Ahcast/Bastion/actions/runs/38163339924): success. Backend: gofmt/vet, `go test -race -count=1 ./...` con MySQL 5.7 y builds server/worker/admin. Angular: build/**73 pruebas**. Navegador: **10/10 escenarios**, incluidos upload/finalize real contra adapter sintético privado, adjuntos de cabecera/ítem en cuarentena, filtro, papelera/restauración y recarga.
+
+Local: build/73 pruebas Angular, compilación de 10 escenarios Playwright, paridad/enlaces y diff sin errores. Go/BD/navegador certificados por CI, no por ejecución local. Pruebas nuevas: identidad estable al reordenar/editar, eliminación de ítem vinculado bloqueada incluso en papelera, IDs duplicados/ajenos, FK/pertenencia, cuarentena/scan/preview/descarga, 12 replays concurrentes, autorización de ambos propietarios/revocación, scopes técnicos self/team y membresía, estados protegidos, rollback del vínculo/versiones ante fallo de evento, DTO HTTP estricto/CSRF y flag de composición.
+
+CI intermedio detectó sincronización pendiente al volver al listado Quotes: ahora el escenario espera navegación/carga inicial antes del filtro y verifica respuesta filtrada/total. Se agregó además defensa de producción contra respuestas de listado fuera de orden y su prueba. El escenario de conversión captura el cuerpo HTTP al recibirlo para impedir que navegación lo descarte. Suite completa final aprobada; sin omitir comprobaciones ni ampliar timeouts para estas correcciones. CI conserva contexto de navegador sólo ante fallo. Crawler y migraciones 0001..0017 intactos. S3/escáner productivo no certificados; no despliegue, envío ni migración productiva.
+
+Próximo: clonación de OC y aceptación integral, antes de Facturas/pagos.

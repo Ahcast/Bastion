@@ -93,3 +93,7 @@ El usuario escogió explícitamente HNL y USD separados sin conversión automát
 ## 2026-10-11 — Conversión propietaria Quotes→OC
 
 La regla legacy «cambiar estado después del commit» se sustituye por una transacción compartida entre servicios propietarios: OC completa y Quote converted con vínculo/versiones/evidencia atómicos. Sólo Aceptada, una OC por fuente y número explícito; sin borradores vacíos ni aceptación interna confundida con aceptación comercial. El contrato único `../contracts/quote-purchase-order-conversion.md` fija permisos de ambos registros y replay. Se copian snapshots históricos autorizados sin refrescar maestros; documentos permanecen en su propietario. Fuente convertida inmutable; clonar cotización permite una nueva intención comercial sin vínculo heredado.
+
+## 2026-10-11 — Identidad estable para documentos de OC
+
+La edición conserva los IDs enviados de ítems y actualiza sus filas; reordenar mueve posiciones sin cambiar identidad. IDs nuevos vacíos; duplicados/ajenos se rechazan. Una FK compuesta y el propietario impiden eliminar ítems con vínculos documentales, también en papelera. No reutilizar posiciones para adjuntos ni eliminar binarios como efecto de edición. DTO previo sin IDs sigue permitido para reemplazar ítems sin documentos; si omite un ítem vinculado, conflicto/rollback. Core posee archivos; PurchaseOrders posee destino y evidencia, con política registrada según flag. Contrato único `../contracts/purchase-order-documents.md`.
