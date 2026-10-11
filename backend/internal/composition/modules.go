@@ -6,6 +6,7 @@ import (
 	"github.com/Ahcast/Bastion/backend/internal/core"
 	"github.com/Ahcast/Bastion/backend/internal/core/registry"
 	"github.com/Ahcast/Bastion/backend/internal/modules/customers"
+	"github.com/Ahcast/Bastion/backend/internal/modules/invoices"
 	"github.com/Ahcast/Bastion/backend/internal/modules/processes"
 	"github.com/Ahcast/Bastion/backend/internal/modules/purchaseorders"
 	"github.com/Ahcast/Bastion/backend/internal/modules/quotes"
@@ -156,6 +157,23 @@ func RegisterFiles(s *core.Service, r *registry.Registry, logger *slog.Logger, o
 		delete(s.DocumentPolicies, "purchase_orders")
 	}
 	if e := r.Register(purchaseOrderService.Module(logger, purchaseOrderEnabled)); e != nil {
+		return e
+	}
+	invoiceEnabled := true
+	if v := os.Getenv("BASTION_INVOICES_ENABLED"); v != "" {
+		if v != "true" && v != "false" {
+			return fmt.Errorf("invalid invoices enable flag")
+		}
+		invoiceEnabled = v == "true"
+	}
+	invoiceService := &invoices.Service{Core: s}
+	if enabled {
+		invoiceService.Customers = service
+	}
+	if invoiceEnabled {
+		s.RegisterPermissions(invoices.Permissions, []string{"facturas.view"})
+	}
+	if e := r.Register(invoiceService.Module(logger, invoiceEnabled)); e != nil {
 		return e
 	}
 	return r.Validate()

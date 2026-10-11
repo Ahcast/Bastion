@@ -126,3 +126,27 @@ func TestPurchaseOrderDocumentPolicyFollowsModuleFlag(t *testing.T) {
 		t.Fatal("disabled owner policy remains")
 	}
 }
+
+func TestInvoicesDraftModuleFlagAndExplicitPermissions(t *testing.T) {
+	for _, enabled := range []bool{false, true} {
+		t.Run(fmt.Sprint(enabled), func(t *testing.T) {
+			t.Setenv("BASTION_INVOICES_ENABLED", fmt.Sprint(enabled))
+			s, r := compositionFixture(t, "false")
+			m := moduleByID(t, r, "invoices")
+			if m.Enabled != enabled || len(m.Dependencies) != 1 || m.Dependencies[0] != "core" {
+				t.Fatal(m)
+			}
+			for _, permission := range []string{"facturas.view", "facturas.create", "facturas.update"} {
+				if hasPermission(s.PermissionCatalog(), permission) != enabled {
+					t.Fatal(permission, enabled)
+				}
+			}
+		})
+	}
+	t.Setenv("BASTION_INVOICES_ENABLED", "invalid")
+	s := &core.Service{DocumentPolicies: map[string]core.DocumentPolicy{}}
+	r := registry.New()
+	if e := Register(s, r, slog.New(slog.NewTextHandler(io.Discard, nil))); e == nil || e.Error() != "invalid invoices enable flag" {
+		t.Fatal("invalid invoice flag", e)
+	}
+}

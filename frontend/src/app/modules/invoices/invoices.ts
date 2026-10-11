@@ -1,0 +1,323 @@
+import { Component, OnInit, inject, signal } from "@angular/core";
+import { FormsModule } from "@angular/forms";
+import { Reauthentication } from "../../core/security/reauthentication";
+import { Client } from "../../core/api/client";
+
+export interface InvoiceItem {
+  id?: string;
+  description: string;
+  unit: string;
+  quantity: string;
+  unit_price: string;
+  unit_cost: string;
+  discount_type: "amount" | "percent";
+  discount: string;
+  tax: "isv15" | "isv18" | "exempt" | "exonerated";
+}
+export interface DraftInput {
+  customer: {
+    id: string;
+    name: string;
+    rtn: string;
+    contact: string;
+    phone: string;
+    email: string;
+    address: string;
+  };
+  invoice_date: string;
+  payment_term_type: "contado" | "credito";
+  credit_days: number | null;
+  currency: "HNL" | "USD";
+  public_notes: string;
+  general_discount_type: "amount" | "percent";
+  general_discount: string;
+  exoneration_reference: string;
+  additional_expenses: string;
+  team_id: string;
+  version: string;
+  items: InvoiceItem[];
+}
+export interface Financials {
+  total: string;
+  profit: string;
+  investment_total: string;
+  products_investment: string;
+  additional_expenses: string;
+  base_15: string;
+  base_18: string;
+  exempt: string;
+  exonerated: string;
+  isv_15: string;
+  isv_18: string;
+}
+export interface Invoice extends Omit<DraftInput, "additional_expenses"> {
+  id: string;
+  status: string;
+  invoice_number: string | null;
+  sar_snapshot_json: unknown | null;
+  customer_version: string;
+  calculation: Financials;
+  paid_total: string;
+  balance: string;
+  created_by: string;
+}
+interface Summary {
+  id: string;
+  invoice_number: string | null;
+  customer: { id: string; name: string };
+  invoice_date: string;
+  currency: string;
+  total: string;
+  status: string;
+  version: string;
+}
+const businessDate = () => {
+ const parts = new Intl.DateTimeFormat("en", { timeZone:"America/Tegucigalpa", year:"numeric", month:"2-digit", day:"2-digit" }).formatToParts(new Date());
+ const field = (name:string) => parts.find(p => p.type === name)!.value;
+ return [field("year"),field("month"),field("day")].join("-");
+};
+export const emptyInvoice = (): DraftInput => ({
+  customer: {
+    id: "",
+    name: "",
+    rtn: "",
+    contact: "",
+    phone: "",
+    email: "",
+    address: "",
+  },
+  invoice_date: businessDate(),
+  payment_term_type: "contado",
+  credit_days: null,
+  currency: "HNL",
+  public_notes: "",
+  general_discount_type: "amount",
+  general_discount: "0",
+  exoneration_reference: "",
+  additional_expenses: "0",
+  team_id: "",
+  version: "0",
+  items: [
+    {
+      description: "",
+      unit: "u",
+      quantity: "1",
+      unit_price: "0",
+      unit_cost: "0",
+      discount_type: "amount",
+      discount: "0",
+      tax: "isv15",
+    },
+  ],
+});
+@Component({
+  selector: "bastion-invoices",
+  imports: [FormsModule, Reauthentication],
+  templateUrl: "./invoices.html",
+})
+export class Invoices implements OnInit {
+  api = inject(Client);
+  rows = signal<Summary[]>([]);
+  total = signal(0);
+  page = 1;
+  search = "";
+  customerFilter = "";
+  selected = signal<Invoice | null>(null);
+  editing = signal(false);
+  form = emptyInvoice();
+  calculation = signal<Financials | null>(null);
+  busy = signal(false);
+  error = signal("");
+  message = signal("");
+  confirmed = signal<{ id: string; version: string } | null>(null);
+  needsReload = signal(false);
+  private calculatedFor = "";
+  private pending = new Map<string, { body: string; key: string }>();
+  private baseline = "";
+  async ngOnInit() {
+    await this.load();
+  }
+  writable() {
+    if (this.needsReload()) return false;
+    return this.selected()
+      ? this.selected()?.status === "draft" && this.api.has("facturas.update")
+      : this.api.has("facturas.create");
+  }
+  dirty() {
+    return this.editing() && JSON.stringify(this.form) !== this.baseline;
+  }
+  newDraft() {
+    if (this.busy() || !this.api.has("facturas.create")) return;
+    this.selected.set(null);
+    this.needsReload.set(false);
+    this.form = emptyInvoice();
+    this.baseline = JSON.stringify(this.form);
+    this.calculation.set(null);
+    this.confirmed.set(null);
+    this.editing.set(true);
+    this.error.set("");
+    this.message.set("");
+  }
+  close() {
+    if (this.busy()) return;
+    this.editing.set(false);
+    this.selected.set(null);
+    this.calculation.set(null);
+  }
+  addItem() {
+    if (this.writable() && !this.busy() && this.form.items.length < 200)
+      this.form.items.push({ ...emptyInvoice().items[0] });
+  }
+  removeItem(i: number) {
+    if (this.writable() && !this.busy() && this.form.items.length > 1)
+      this.form.items.splice(i, 1);
+  }
+  terms() {
+    this.form.credit_days =
+      this.form.payment_term_type === "contado"
+        ? null
+        : this.form.credit_days || 30;
+  }
+  async load() {
+    try {
+      const q = new URLSearchParams({
+        page: String(this.page),
+        per_page: "25",
+        search: this.search,
+        customer_id: this.customerFilter,
+      });
+      const r = await this.api.get<{ data: Summary[]; total: number }>(
+        "/invoices?" + q,
+      );
+      this.rows.set(r.data);
+      this.total.set(r.total);
+    } catch (e) {
+      this.error.set(this.api.message(e));
+    }
+  }
+  async open(id: string) {
+    if (this.busy()) return;
+    this.busy.set(true);
+    this.error.set("");
+    try {
+      await this.openConfirmed(id);
+    } catch (e) {
+      this.error.set(this.api.message(e));
+    } finally {
+      this.busy.set(false);
+    }
+  }
+  private async openConfirmed(id: string) {
+    const o = await this.api.get<Invoice>("/invoices/" + id);
+    this.selected.set(o);
+    this.form = {
+      customer: { ...o.customer },
+      invoice_date: o.invoice_date,
+      payment_term_type: o.payment_term_type,
+      credit_days: o.credit_days,
+      currency: o.currency,
+      public_notes: o.public_notes,
+      general_discount_type: o.general_discount_type,
+      general_discount: o.general_discount,
+      exoneration_reference: o.exoneration_reference,
+      additional_expenses: o.calculation.additional_expenses,
+      team_id: o.team_id,
+      version: o.version,
+      items: o.items.map((x) => ({
+        id: x.id,
+        description: x.description,
+        unit: x.unit,
+        quantity: x.quantity,
+        unit_price: x.unit_price,
+        unit_cost: x.unit_cost,
+        discount_type: x.discount_type,
+        discount: x.discount,
+        tax: x.tax,
+      })),
+    };
+    this.baseline = JSON.stringify(this.form);
+    this.calculation.set(o.calculation);
+    this.calculatedFor = JSON.stringify(this.financialInput());
+    this.needsReload.set(false);
+    this.editing.set(true);
+  }
+  financialInput() {
+    const {
+      currency,
+      general_discount_type,
+      general_discount,
+      exoneration_reference,
+      additional_expenses,
+    } = this.form;
+    const items = this.form.items.map(({ id, ...item }) => item);
+    return {
+      currency,
+      general_discount_type,
+      general_discount,
+      exoneration_reference,
+      additional_expenses,
+      items,
+    };
+  }
+  currentCalculation() {
+    return this.calculatedFor === JSON.stringify(this.financialInput())
+      ? this.calculation()
+      : null;
+  }
+  async preview() {
+    if (this.busy()) return;
+    this.busy.set(true);
+    this.error.set("");
+    try {
+      const body = this.financialInput();
+      const r = await this.api.write<{ calculation: Financials }>(
+        "POST",
+        "/invoices/calculate",
+        body,
+      );
+      this.calculation.set(r.calculation);
+      this.calculatedFor = JSON.stringify(body);
+    } catch (e) {
+      this.error.set(this.api.message(e));
+    } finally {
+      this.busy.set(false);
+    }
+  }
+  async save() {
+    if (this.busy() || !this.writable()) return;
+    const id = this.selected()?.id ?? "";
+    const path = "/invoices" + (id ? "/" + id : "");
+    const body = structuredClone(this.form);
+    const serialized = JSON.stringify(body);
+    let intent = this.pending.get(path);
+    if (!intent || intent.body !== serialized) {
+      intent = { body: serialized, key: crypto.randomUUID() };
+      this.pending.set(path, intent);
+    }
+    this.busy.set(true);
+    this.error.set("");
+    this.message.set("");
+    try {
+      const result = await this.api.write<{ id: string; version: string }>(
+        id ? "PATCH" : "POST",
+        path,
+        body,
+        intent.key,
+      );
+      this.pending.delete(path);
+      this.confirmed.set(result);
+      this.needsReload.set(true);
+      this.form.version = result.version;
+      this.baseline = JSON.stringify(this.form);
+      this.message.set(id ? "Borrador actualizado." : "Borrador registrado.");
+      const saved = this.selected();
+      if (saved) this.selected.set({ ...saved, version: result.version });
+      await this.openConfirmed(result.id);
+      await this.load();
+    } catch (e) {
+      this.error.set(this.api.message(e));
+    } finally {
+      this.busy.set(false);
+    }
+  }
+}

@@ -17,3 +17,5 @@ Frontend Angular/MySQL/correo permanecen en Bluehost. Core/API/MCP/crawler/worke
 Proveedores: internal/modules/suppliers, migración 0003_suppliers.sql y composición independiente de Clientes. [Ejecutar y validar](../docs/development/suppliers-runbook.md).
 
 Cotizaciones cerrado para alcance HNL/USD separado: cálculo, PDF/adjuntos, aprobación/emisión, correo, estados/bulk y FX auxiliar. [Runbook](../docs/development/quotes-runbook.md). OC de clientes es el módulo activo: [runbook](../docs/development/purchase-orders-runbook.md). Conversiones comerciales se completan mediante sus propietarios en sus unidades.
+
+Facturas Borradores: BASTION_INVOICES_ENABLED=true|false (true predeterminado), permisos explícitos facturas.view/create/update, sin concesiones automáticas; solo borrador/cálculo en esta unidad. Migración 0021 de desarrollo y pruebas; no activar series/pagos/emisión por habilitar el módulo.

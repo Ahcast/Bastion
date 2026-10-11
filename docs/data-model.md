@@ -144,3 +144,5 @@ Contrato vigente: [clonación OC](contracts/purchase-order-cloning.md). Migraci�
 ## Aceptación integral OC
 
 [Contrato vigente](contracts/purchase-orders-acceptance.md): utilidad neta sin ISV menos inversión total; profit/profit_version persistidos y eliminación reversible con evidencia protegida. Migración 0020 y permisos explícitos. Integraciones posteriores conservan sus propietarios.
+
+Facturas Borradores (0021): invoices e invoice_items propietarios, campos DECIMAL y snapshots de cliente, condiciones contado/crédito, número/SAR NULL, saldo/pagado iniciales e IDs estables de ítems. Permisos facturas.view/create/update sin grants. No payments ni correlativo en esta unidad; contratos en contracts/invoices.md e invoices-openapi.json.

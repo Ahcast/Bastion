@@ -231,4 +231,18 @@ func main() {
 		log.Fatal(e)
 	}
 
+	// Invoice operator has explicit draft grants only; no fiscal/payment authority.
+	if _, e = db.Exec(`INSERT INTO users(email,name,password_hash,totp_secret,active,created_at,updated_at) SELECT 'invoices@example.test','Operador Facturas sintético',password_hash,?,TRUE,UTC_TIMESTAMP(6),UTC_TIMESTAMP(6) FROM users WHERE id=1`, secret); e != nil {
+		log.Fatal(e)
+	}
+	if _, e = db.Exec(`INSERT INTO roles(name) VALUES('Facturas borradores sintético')`); e != nil {
+		log.Fatal(e)
+	}
+	if _, e = db.Exec(`INSERT INTO role_permissions SELECT r.id,p.name,'all' FROM roles r JOIN permissions p ON p.name IN ('facturas.view','facturas.create','facturas.update') WHERE r.name='Facturas borradores sintético'`); e != nil {
+		log.Fatal(e)
+	}
+	if _, e = db.Exec(`INSERT INTO user_roles SELECT u.id,r.id FROM users u JOIN roles r ON r.name='Facturas borradores sintético' WHERE u.email='invoices@example.test'`); e != nil {
+		log.Fatal(e)
+	}
+
 }
