@@ -30,11 +30,9 @@ test('Cotizaciones: origen, cálculo exacto, persistencia, versión, clonación 
  await expect(page).toHaveURL(/\/quotes(?:\?|$)/);await initialList;
  await expect(page.getByRole('heading',{name:'Cotizaciones',exact:true})).toBeVisible();
  await expect(page.getByRole('button',{name:'Ver cotización '+quoteNumber,exact:true})).toBeVisible();
- const filteredResponse=page.waitForResponse(r=>r.request().method()==='GET'&&new URL(r.url()).pathname==='/api/v1/quotes'&&new URL(r.url()).searchParams.get('search')==='HC-TEST-001');
+ const filteredResponse=page.waitForResponse(r=>r.request().method()==='GET'&&new URL(r.url()).pathname==='/api/v1/quotes'&&new URL(r.url()).searchParams.get('search')==='HC-TEST-001').then(async r=>({status:r.status(),body:await r.json()}));
  await page.getByLabel('Buscar cotizaciones',{exact:true}).fill('HC-TEST-001');await page.getByRole('button',{name:'Buscar',exact:true}).click();
- console.log('[quotes-e2e] search state',page.url(),await page.getByLabel('Buscar cotizaciones',{exact:true}).inputValue(),await page.locator('p').allTextContents());
- const filtered=await filteredResponse;console.log('[quotes-e2e] filtered list',filtered.status(),await filtered.json());
- console.log('[quotes-e2e] visible list',await page.locator('p').allTextContents());
+ const filtered=await filteredResponse;expect(filtered.status).toBe(200);expect(filtered.body.total).toBe(2);
  await expect(page.getByRole('heading',{name:'Acciones en lote',exact:true})).toBeVisible();
  await expect(page.getByText('2 cotizaciones · Página 1',{exact:true})).toBeVisible();
  const selectAll=page.getByLabel('Seleccionar todas las cotizaciones visibles',{exact:true});
