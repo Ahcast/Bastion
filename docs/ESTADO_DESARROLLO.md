@@ -21,7 +21,7 @@ Actualizado: 2026-10-11.
 - Procesos/receptor crawler: unidad base cerrada y validada.
 - Cotizaciones: **cerrado y validado en CI para el alcance monomoneda HNL/USD**.
 - OC de clientes: **Unidades 1..6 y aceptación integral cerradas y validadas en CI**.
-- Facturas/pagos: módulo activo, unidad 1 financiera cerrada; unidad 2 Borradores implementada y en validación CI. Gastos, Reportes y Colaboración siguen después.
+- Facturas/pagos: módulo activo, unidades 1 financieras, 2 Borradores y 3 emisión certificadas; continúa unidad 4 pagos según contrato previo. Gastos, Reportes y Colaboración siguen después.
 - Producción: no desplegada ni migrada.
 
 ## Cotizaciones — cierre certificado
@@ -277,3 +277,10 @@ Contrato/OpenAPI previos y migración 0023: datos de emisión/empresa/vencimient
 UI revisa datos guardados, etiqueta número estimado sin reservar, conserva claves/respuesta confirmada y congela ficha mientras emite o hasta recuperar recarga fallida. Listado/ficha usan número fiscal y estado Emitida; mostrados CAI/empresa históricos. Dos pruebas de reloj/vencimiento, cinco integraciones MySQL (con subcasos de versiones/vigencia/cálculo/moneda/scopes/HTTP), 12 replays y seis emisiones por dos humanos concurrentes/rollback. Seis pruebas Angular nuevas (97 totales), compilación local aprobada y escenario navegador de emisión con operadores separados y API real. CI Go fmt/vet/race/MySQL/builds, Angular y **13 recorridos** pendientes; no cerrar emisión ni empezar pagos hasta verde.
 
 Navegador usa datos sintéticos: empresa con RTN configurado por administrador, autorización configurada por fiscal, emisor self independiente, lectura después de cambiar CAI conservando snapshot. No activación productiva, validación legal de RTN/CAI ni envío al SAR. Producción requiere autorización real/rango/modalidad/moneda y revisión fiscal.
+
+
+## 2026-10-11 — Facturas, unidad 3 emisión certificada; continúa unidad 4
+
+Código certificado `fa8670bcf68c11a07a2ed9ff7aedc7d23a4bc890`: [Core checks 38183414256](https://github.com/Ahcast/Bastion/actions/runs/38183414256), [documentación 38183414230](https://github.com/Ahcast/Bastion/actions/runs/38183414230) y [rama única 38183414289](https://github.com/Ahcast/Bastion/actions/runs/38183414289): success. Go fmt/vet/race con MySQL 5.7 y builds server/worker/admin aprobados; Angular build y **97 pruebas**, navegador **13/13 en 44.4 s**. Emisión conserva snapshots fiscal/empresa, valida tres versiones/cálculo/vigencia/moneda/fecha Honduras, asigna correlativo con evidencia atómica y protege replays/scopes/reauth/rollback/concurrencia. Recorrido sintético verifica RTN persistido antes de revisión y CAI histórico tras modificar configuración.
+
+Unidad 3 cerrada para desarrollo sintético. Continúa unidad 4 bajo contrato previo y OpenAPI de payments: cobros auditables, anulación sin borrado y proyección comercial exacta. Unidad 4 aún sin implementación; conversiones, documentos/anulación/clonación y aceptación integral siguen en orden. Ningún recibo/pago bancario/Siafi externo ni validación fiscal/despliegue productivo acreditados.

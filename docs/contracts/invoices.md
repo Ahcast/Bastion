@@ -64,7 +64,7 @@ El contador existente jamás se actualiza mediante configuración. Reconfigurar 
 
 Aceptación previa a cierre del bloque: MySQL 5.7 configuración/counter atómicos, lectura antes/después, versión, replays concurrentes y payload discordante, permisos/revocación/reauth, contador inmutable, agotamiento/nuevo rango, formato protegido tras numeración, rollback de audit/event, HTTP DTO/CSRF y Angular/navegador con datos sintéticos. Emisión REST/UI y snapshot de empresa/factura se contratan e implementan después; no exponer botón Emitir por completar configuración.
 
-### Emisión de unidad 3 (contrato previo; no implementada aún)
+### Emisión de unidad 3 (certificada en fa8670bcf68c11a07a2ed9ff7aedc7d23a4bc890)
 
 Migración siguiente 0023 agrega a invoices issued_at DATETIME(6), issued_by FK users, due_date DATE, company_snapshot_json JSON y company_version BIGINT UNSIGNED, nullable en Borrador. Número y snapshot SAR existentes siguen NULL hasta emitir. Permiso facturas.emit explícito, sin grants ni escritura técnica. No payments/PDF/convertir/anular en esta unidad. Estado draft → issued (UI Emitida); issued conserva pago cero y saldo total hasta la unidad de pagos. Ediciones solo draft; emisión no sustituye estado de cobro ni acredita factura fiscal productiva.
 

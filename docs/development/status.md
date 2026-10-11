@@ -266,3 +266,10 @@ Navegador usa datos sintéticos: empresa con RTN configurado por administrador, 
 
 
 Validación de emisión: fuente 2f92e78405fa8043110fa27346df859418ae1ecd / Core 38182746385 pasó backend Go/MySQL/race/builds y frontend 97, navegador 12/13. Causa del nuevo recorrido: administrador con TOTP enrolado dinámicamente por Core, distinto al secreto estático de otros actores. Se añadió operador de empresa sintético separado y se reutiliza sesión fiscal para evitar doble login/TOTP. Revisión 924be75e81aea276ccebcb6f7919b783273cac2e llegó a revisión fiscal; la prueba editaba RTN antes de completar consulta de empresa. Corrección espera datos y verifica RTN persistido; el backend rechazó datos incompletos. Emisión todavía requiere CI completo verde; unidad 4 solo tiene contrato previo, sin código de pagos.
+
+
+## 2026-10-11 — Facturas, unidad 3 emisión certificada; continúa unidad 4
+
+Código certificado `fa8670bcf68c11a07a2ed9ff7aedc7d23a4bc890`: [Core checks 38183414256](https://github.com/Ahcast/Bastion/actions/runs/38183414256), [documentación 38183414230](https://github.com/Ahcast/Bastion/actions/runs/38183414230) y [rama única 38183414289](https://github.com/Ahcast/Bastion/actions/runs/38183414289): success. Go fmt/vet/race con MySQL 5.7 y builds server/worker/admin aprobados; Angular build y **97 pruebas**, navegador **13/13 en 44.4 s**. Emisión conserva snapshots fiscal/empresa, valida tres versiones/cálculo/vigencia/moneda/fecha Honduras, asigna correlativo con evidencia atómica y protege replays/scopes/reauth/rollback/concurrencia. Recorrido sintético verifica RTN persistido antes de revisión y CAI histórico tras modificar configuración.
+
+Unidad 3 cerrada para desarrollo sintético. Continúa unidad 4 bajo contrato previo y OpenAPI de payments: cobros auditables, anulación sin borrado y proyección comercial exacta. Unidad 4 aún sin implementación; conversiones, documentos/anulación/clonación y aceptación integral siguen en orden. Ningún recibo/pago bancario/Siafi externo ni validación fiscal/despliegue productivo acreditados.

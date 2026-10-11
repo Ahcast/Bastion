@@ -399,3 +399,5 @@ Unidad 3 configuración persistente implementada en validación: migración 0022
 Configuración fiscal certificada en 133b9dc05ef5c5465d13e50550437c86a1bdb940 / Core checks 38180883877: Go/MySQL/race/builds, Angular 91 y navegador 12/12. Continúa emisión de unidad 3 según contrato previo; sin factura fiscal productiva ni pagos/PDF en este cierre.
 
 Unidad 3 emisión implementada en validación: 0023 y facturas.emit, contexto de revisión, snapshots/versiones y correlativo transaccional, GET/listado/REST/UI. Producción, pagos/PDF y aceptación completa de Facturas siguen pendientes; cierre tras CI verde.
+
+Unidad 3 emisión certificada en fa8670bcf68c11a07a2ed9ff7aedc7d23a4bc890 / Core checks 38183414256: Go/MySQL/race/builds, Angular 97 y navegador 13/13. Continúa unidad 4 bajo contrato previo; módulo completo y fiscalidad productiva no cerrados.

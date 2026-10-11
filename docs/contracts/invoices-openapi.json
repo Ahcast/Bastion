@@ -466,6 +466,197 @@
           }
         }
       }
+    },
+    "/api/v1/invoices/{id}/payments": {
+      "get": {
+        "description": "Contrato previo de unidad 4. Ledger paginado incluido anulado, versión/proyección de factura consistentes y autorización view por registro. No recibo hasta unidad 6.",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100000
+            }
+          },
+          {
+            "name": "per_page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "data/total/page/per_page y proyección/version actual"
+          },
+          "401": {
+            "description": "Sesión inválida"
+          },
+          "403": {
+            "description": "Permiso/CSRF/reauth insuficiente"
+          },
+          "404": {
+            "description": "Recurso fuera de scope"
+          },
+          "422": {
+            "description": "DTO/formatos inválidos"
+          }
+        }
+      },
+      "post": {
+        "description": "Contrato previo de unidad 4; disponible tras implementar/certificar. Humano view/payment por registro, reauth/CSRF/idempotencia/version. Solo issued, moneda exacta, importe positivo sin sobrepago, fecha invoice_date..hoy Honduras; ledger/proyección/audit/event atómicos.",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Resultado autorizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaymentResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sesión inválida"
+          },
+          "403": {
+            "description": "Permiso/CSRF/reauth insuficiente"
+          },
+          "404": {
+            "description": "Recurso fuera de scope"
+          },
+          "409": {
+            "description": "Versión/intención/estado conflictivo"
+          },
+          "422": {
+            "description": "DTO/formatos inválidos"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PaymentInput"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/invoices/{id}/payments/{payment}/void": {
+      "post": {
+        "description": "Contrato previo de unidad 4. Humano view/payment.void, reauth/CSRF/idempotencia/versiones. Conserva datos, marca anulación y recalcula excluyendo fila en la misma TX; no borrar ni editar importe.",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "payment",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Resultado autorizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaymentResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sesión inválida"
+          },
+          "403": {
+            "description": "Permiso/CSRF/reauth insuficiente"
+          },
+          "404": {
+            "description": "Recurso fuera de scope"
+          },
+          "409": {
+            "description": "Versión/intención/estado conflictivo"
+          },
+          "422": {
+            "description": "DTO/formatos inválidos"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VoidPaymentInput"
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -942,6 +1133,120 @@
           "due_date": {
             "type": "string",
             "format": "date"
+          }
+        }
+      },
+      "PaymentInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "version",
+          "date",
+          "method",
+          "currency",
+          "amount",
+          "reference",
+          "reason"
+        ],
+        "properties": {
+          "version": {
+            "type": "string",
+            "pattern": "^[1-9][0-9]*$"
+          },
+          "date": {
+            "type": "string",
+            "format": "date"
+          },
+          "method": {
+            "type": "string",
+            "enum": [
+              "Siafi",
+              "Cheque",
+              "Transferencia",
+              "Efectivo"
+            ]
+          },
+          "currency": {
+            "type": "string",
+            "enum": [
+              "HNL",
+              "USD"
+            ]
+          },
+          "amount": {
+            "type": "string"
+          },
+          "reference": {
+            "type": "string",
+            "maxLength": 500
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000
+          }
+        }
+      },
+      "VoidPaymentInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "version",
+          "payment_version",
+          "reason"
+        ],
+        "properties": {
+          "version": {
+            "type": "string",
+            "pattern": "^[1-9][0-9]*$"
+          },
+          "payment_version": {
+            "type": "string",
+            "pattern": "^[1-9][0-9]*$"
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000
+          }
+        }
+      },
+      "PaymentResult": {
+        "type": "object",
+        "required": [
+          "invoice_id",
+          "payment_id",
+          "version",
+          "payment_version",
+          "currency",
+          "paid_total",
+          "balance",
+          "commercial_status"
+        ],
+        "properties": {
+          "invoice_id": {
+            "type": "string"
+          },
+          "payment_id": {
+            "type": "string"
+          },
+          "version": {
+            "type": "string"
+          },
+          "payment_version": {
+            "type": "string"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "paid_total": {
+            "type": "string"
+          },
+          "balance": {
+            "type": "string"
+          },
+          "commercial_status": {
+            "type": "string"
           }
         }
       }
