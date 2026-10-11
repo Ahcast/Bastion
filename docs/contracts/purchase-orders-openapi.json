@@ -322,7 +322,7 @@
           }
         },
         "operationId": "trashPurchaseOrder",
-        "description": "Humano con ordenes.delete/view, scope y reauth vigente. Razón explícita y TX/idempotencia. Eliminación lógica protege documentos, conversiones, historial y clones de origen; número reservado."
+        "description": "Humano con ordenes.delete/view, scope y reauth vigente. Razón explícita y TX/idempotencia. Eliminación lógica protege documentos, conversiones, historial y clones de origen; identidad y número originales conservados, sin unicidad global."
       }
     },
     "/api/v1/purchase-orders/calculate": {
@@ -731,7 +731,7 @@
             "description": "No visible"
           },
           "409": {
-            "description": "Versión, número o intención conflictiva"
+            "description": "Versión o intención conflictiva"
           },
           "422": {
             "description": "Entrada inválida"
@@ -804,7 +804,7 @@
           }
         },
         "operationId": "restorePurchaseOrder",
-        "description": "Humano con ordenes.delete/view, scope y reauth vigente. Razón explícita y TX/idempotencia. Eliminación lógica protege documentos, conversiones, historial y clones de origen; número reservado."
+        "description": "Humano con ordenes.delete/view, scope y reauth vigente. Razón explícita y TX/idempotencia. Eliminación lógica protege documentos, conversiones, historial y clones de origen; identidad y número originales conservados, sin unicidad global."
       },
       "parameters": [
         {

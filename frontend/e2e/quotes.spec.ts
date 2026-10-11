@@ -30,7 +30,12 @@ test('Cotizaciones: origen, cálculo exacto, persistencia, versión, clonación 
  await expect(page).toHaveURL(/\/quotes(?:\?|$)/);await initialList;
  await expect(page.getByRole('heading',{name:'Cotizaciones',exact:true})).toBeVisible();
  await expect(page.getByRole('button',{name:'Ver cotización '+quoteNumber,exact:true})).toBeVisible();
- const filteredResponse=page.waitForResponse(r=>r.request().method()==='GET'&&new URL(r.url()).pathname==='/api/v1/quotes'&&new URL(r.url()).searchParams.get('search')==='HC-TEST-001').then(async r=>({status:r.status(),body:await r.json()}));
+ let resolveFiltered!: (value:{status:number;body:{total:number}})=>void;
+ const filteredResponse=new Promise<{status:number;body:{total:number}}>(resolve=>{resolveFiltered=resolve});
+ await page.route('**/api/v1/quotes?**',async route=>{
+  if(new URL(route.request().url()).searchParams.get('search')!=='HC-TEST-001'){await route.continue();return}
+  const actual=await route.fetch();const body=await actual.json();await route.fulfill({response:actual});resolveFiltered({status:actual.status(),body});
+ });
  await page.getByLabel('Buscar cotizaciones',{exact:true}).fill('HC-TEST-001');await page.getByRole('button',{name:'Buscar',exact:true}).click();
  const filtered=await filteredResponse;expect(filtered.status).toBe(200);expect(filtered.body.total).toBe(2);
  await expect(page.getByRole('heading',{name:'Acciones en lote',exact:true})).toBeVisible();

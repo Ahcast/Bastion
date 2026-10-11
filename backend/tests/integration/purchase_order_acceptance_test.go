@@ -14,7 +14,7 @@ import (
 	"testing"
 )
 
-func TestOrderTrashRestorePreservesDataReservesNumberAndBlocksMutations(t *testing.T) {
+func TestOrderTrashRestorePreservesIdentityAllowsExternalNumberReuseAndBlocksMutations(t *testing.T) {
 	s, _, _, a := purchaseOrdersFixture(t)
 	grantPurchaseOrders(t, s.Core, a, "all")
 	p := purchaseOrderInput("", "")
@@ -62,15 +62,18 @@ func TestOrderTrashRestorePreservesDataReservesNumberAndBlocksMutations(t *testi
 		t.Fatal(e)
 	}
 	p.Version = 0
-	if _, e = s.Save(ctx, a, "", "order-number-reserved", p); e != core.Conflict {
-		t.Fatal(e)
+	v, e = s.Save(ctx, a, "", "order-same-external-number", p)
+	otherID := customerResult(t, v, e)["id"]
+	other, e := s.Get(ctx, a, otherID)
+	if e != nil || otherID == id || other.OrderNumber != source.OrderNumber {
+		t.Fatal(other, e)
 	}
 	v, e = s.Trash(ctx, a, id, "order-restore", purchaseorders.TrashInput{Version: 2, Reason: "Corrección"}, true)
 	if customerResult(t, v, e)["version"] != "3" {
 		t.Fatal(v, e)
 	}
 	o, e = s.Get(ctx, a, id)
-	if e != nil || o.Deleted != nil || o.Items[0].ID != source.Items[0].ID || o.Calculation != source.Calculation {
+	if e != nil || o.ID != source.ID || o.OrderNumber != source.OrderNumber || o.Deleted != nil || o.Items[0].ID != source.Items[0].ID || o.Calculation != source.Calculation {
 		t.Fatal(o, e)
 	}
 	if _, e = s.Core.DB.Exec(`UPDATE sessions SET reauthenticated_at=NULL WHERE token_hash=?`, a.SessionHash); e != nil {

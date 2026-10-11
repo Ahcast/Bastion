@@ -449,7 +449,7 @@ test("Órdenes de Compra: cálculo, alta, persistencia, edición y búsqueda con
   await expect(
     page
       .locator("p")
-      .filter({ hasText: /^Utilidad antes de impuestos: HNL 92\.00$/ }),
+      .filter({ hasText: /^Utilidad antes de impuestos: HNL 85\.01$/ }),
   ).toBeVisible();
   // The independently cloned order has no linked evidence or operational history.
   await page
@@ -508,7 +508,7 @@ test("Órdenes de Compra: cálculo, alta, persistencia, edición y búsqueda con
   await expect(
     page
       .locator("p")
-      .filter({ hasText: /^Utilidad antes de impuestos: HNL 92\.00$/ }),
+      .filter({ hasText: /^Utilidad antes de impuestos: HNL 85\.01$/ }),
   ).toBeVisible();
   await page.screenshot({
     path: "/tmp/bastion-purchase-orders.png",

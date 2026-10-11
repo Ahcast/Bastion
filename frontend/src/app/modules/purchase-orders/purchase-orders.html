@@ -145,7 +145,7 @@
       @if(api.has('ordenes.delete') || nextOrderStatus() === 'delivered') { <bastion-reauthentication /> }
       @if(api.has('ordenes.delete')) {
         <section aria-label="Eliminación reversible de la orden">
-          <p>Solo OC recibidas sin avance, conversión ni evidencia vinculada pueden eliminarse. El número queda reservado.</p>
+          <p>Solo OC recibidas sin avance, conversión ni evidencia vinculada pueden eliminarse. Se conservan la identidad y el número originales.</p>
 
           <label>Motivo de eliminación o restauración<textarea [(ngModel)]="trashReason" name="trashReason" maxlength="1000"></textarea></label>
           <button type="button" (click)="trash()" [disabled]="busy() || dirty() || !trashReason.trim()">{{ saved.deleted_at ? 'Restaurar orden' : 'Enviar orden a papelera' }}</button>
