@@ -3,6 +3,7 @@ package invoices
 import (
 	"github.com/Ahcast/Bastion/backend/internal/core"
 	"math"
+	"strings"
 	"testing"
 )
 
@@ -37,7 +38,7 @@ func TestFiscalAllocationInclusiveExactAndImmutable(t *testing.T) {
 	}
 }
 func TestFiscalAuthorizationRejectsInvalidConfiguration(t *testing.T) {
-	cases := []func(*FiscalAuthorization){func(p *FiscalAuthorization) { p.CAI = "" }, func(p *FiscalAuthorization) { p.Width = 0 }, func(p *FiscalAuthorization) { p.Width = 21 }, func(p *FiscalAuthorization) { p.Width = 2 }, func(p *FiscalAuthorization) { p.Prefix = "TEST \n" }, func(p *FiscalAuthorization) { p.Prefix = "ñ" }, func(p *FiscalAuthorization) { p.RangeStart = 0 }, func(p *FiscalAuthorization) { p.RangeStart = 101 }, func(p *FiscalAuthorization) { p.RangeEnd = math.MaxUint64 }, func(p *FiscalAuthorization) { p.ValidFrom = "2026-10-32" }, func(p *FiscalAuthorization) { p.ValidFrom = "2026-10-1" }, func(p *FiscalAuthorization) { p.ValidUntil = "2026-09-30" }, func(p *FiscalAuthorization) { p.Currency = "EUR" }}
+	cases := []func(*FiscalAuthorization){func(p *FiscalAuthorization) { p.CAI = "" }, func(p *FiscalAuthorization) { p.CAI = strings.Repeat("ñ", 41) }, func(p *FiscalAuthorization) { p.CAI = "CAI\nTEST" }, func(p *FiscalAuthorization) { p.Width = 0 }, func(p *FiscalAuthorization) { p.Width = 21 }, func(p *FiscalAuthorization) { p.Width = 2 }, func(p *FiscalAuthorization) { p.Prefix = "TEST \n" }, func(p *FiscalAuthorization) { p.Prefix = "ñ" }, func(p *FiscalAuthorization) { p.RangeStart = 0 }, func(p *FiscalAuthorization) { p.RangeStart = 101 }, func(p *FiscalAuthorization) { p.RangeEnd = math.MaxUint64 }, func(p *FiscalAuthorization) { p.ValidFrom = "2026-10-32" }, func(p *FiscalAuthorization) { p.ValidFrom = "2026-10-1" }, func(p *FiscalAuthorization) { p.ValidUntil = "2026-09-30" }, func(p *FiscalAuthorization) { p.Currency = "EUR" }}
 	for i, change := range cases {
 		p := syntheticFiscal()
 		change(&p)

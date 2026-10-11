@@ -5,7 +5,9 @@ import (
 	"github.com/Ahcast/Bastion/backend/internal/core"
 	"github.com/Ahcast/Bastion/backend/internal/finance"
 	"math"
+	"strings"
 	"time"
+	"unicode"
 )
 
 // FiscalAuthorization carries configured values, not a claim of SAR validation.
@@ -31,7 +33,7 @@ func fiscalDate(v string) bool {
 	return e == nil && d.Year() >= 1900 && d.Year() <= 9999 && d.Format("2006-01-02") == v
 }
 func ValidateFiscalAuthorization(p FiscalAuthorization) error {
-	if !finance.ValidText(p.CAI, 80, true) || len(p.Prefix) > 60 || p.Width < 1 || p.Width > 20 || p.RangeStart == 0 || p.RangeEnd < p.RangeStart || p.RangeEnd == math.MaxUint64 || !validCurrency(p.Currency) || !fiscalDate(p.ValidFrom) || !fiscalDate(p.ValidUntil) || p.ValidFrom > p.ValidUntil {
+	if !finance.ValidText(p.CAI, 80, true) || len(p.CAI) > 80 || strings.IndexFunc(p.CAI, unicode.IsControl) >= 0 || len(p.Prefix) > 60 || p.Width < 1 || p.Width > 20 || p.RangeStart == 0 || p.RangeEnd < p.RangeStart || p.RangeEnd == math.MaxUint64 || !validCurrency(p.Currency) || !fiscalDate(p.ValidFrom) || !fiscalDate(p.ValidUntil) || p.ValidFrom > p.ValidUntil {
 		return core.Invalid
 	}
 	for _, c := range p.Prefix {
