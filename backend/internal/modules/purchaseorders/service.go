@@ -82,6 +82,7 @@ func scanOrder(row interface{ Scan(...any) error }) (PurchaseOrder, error) {
 	if delivery != "" {
 		o.RequiredDeliveryDate = &delivery
 	}
+	c.GeneralDiscount = allocated
 	o.Discount = decimal.RequireFromString(o.Discount).String()
 	return o, nil
 }

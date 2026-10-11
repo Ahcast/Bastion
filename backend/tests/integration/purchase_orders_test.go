@@ -126,7 +126,7 @@ func TestPurchaseOrdersTransactionalSaveGetSnapshotsIdempotencyAndRollback(t *te
 	if o.Status != "received" || o.SourceQuoteID != nil || o.Customer.ID != customerID || o.Customer.Name != "Cliente OC" || o.CustomerVersion != 1 || o.Version != 1 {
 		t.Fatal(o)
 	}
-	if o.Calculation.Total != "207.00" || o.Calculation.ProductsInvestment != "60.01" || o.Calculation.InvestmentTotal != "70.00" {
+	if o.Calculation.GeneralDiscount != "0.00" || o.Calculation.Total != "207.00" || o.Calculation.ProductsInvestment != "60.01" || o.Calculation.InvestmentTotal != "70.00" {
 		t.Fatal(o.Calculation)
 	}
 	if len(o.Items) != 1 || o.Items[0].Status != "pending" || o.Items[0].SupplierID != supplierID || o.Items[0].SupplierName != "Proveedor OC" || o.Items[0].SupplierVersion != 1 || o.Items[0].LineInvestment != "60.01" {
@@ -135,6 +135,7 @@ func TestPurchaseOrdersTransactionalSaveGetSnapshotsIdempotencyAndRollback(t *te
 
 	edit := editPurchaseOrder(o)
 	edit.Comments = "Comentario actualizado"
+	edit.Discount = "5"
 	updated, e := s.Save(ctx, a, id, "po-update", edit)
 	if customerResult(t, updated, e)["version"] != "2" {
 		t.Fatal(updated, e)
@@ -146,7 +147,7 @@ func TestPurchaseOrdersTransactionalSaveGetSnapshotsIdempotencyAndRollback(t *te
 		t.Fatal("update replay", e)
 	}
 	o, e = s.Get(ctx, a, id)
-	if e != nil || o.Version != 2 || o.Comments != "Comentario actualizado" || o.Customer.Name != "Cliente OC" || o.Items[0].SupplierName != "Proveedor OC" {
+	if e != nil || o.Version != 2 || o.Comments != "Comentario actualizado" || o.Calculation.GeneralDiscount != "5.00" || o.Calculation.Total != "201.25" || o.Customer.Name != "Cliente OC" || o.Items[0].SupplierName != "Proveedor OC" {
 		t.Fatal(o, e)
 	}
 

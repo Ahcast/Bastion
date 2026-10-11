@@ -89,7 +89,7 @@ func TestPurchaseOrderStateFlowDeliveryHistoryAndEditProtection(t *testing.T) {
 		t.Fatal(e)
 	}
 	o, e = s.Get(ctx, a, id)
-	if e != nil || o.Version != 11 || o.Calculation.Total != "207.00" || o.Calculation.InvestmentTotal != "70.00" {
+	if e != nil || o.Version != 11 || o.Calculation.Total != "207.00" || o.Calculation.GeneralDiscount != "0.00" || o.Calculation.InvestmentTotal != "70.00" {
 		t.Fatal("status changed financials", o, e)
 	}
 	for _, to := range []string{"invoiced", "closed", "received"} {
