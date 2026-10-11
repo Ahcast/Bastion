@@ -20,7 +20,7 @@ Actualizado: 2026-10-11.
 - Proveedores: unidad cerrada y validada.
 - Procesos/receptor crawler: unidad base cerrada y validada.
 - Cotizaciones: **cerrado y validado en CI para el alcance monomoneda HNL/USD**.
-- OC de clientes: **Unidades 1 y 2 cerradas y validadas en CI; módulo activo con conversión Cotización → OC en validación**.
+- OC de clientes: **Unidades 1, 2 y 3 cerradas y validadas en CI; módulo activo para documentos privados**.
 - Facturas/pagos y módulos posteriores: pendientes; no iniciar antes de cerrar OC por unidades.
 - Producción: no desplegada ni migrada.
 
@@ -85,7 +85,7 @@ Alcance implementado:
 - Angular en español: listado, filtros, alta, edición, detalle y vista previa de cálculo;
 - pruebas unitarias, integración MySQL, HTTP real, composición, Angular y Playwright completo contra API + Angular + MySQL reales de CI.
 
-Fuera de Unidad 1 y aún pendiente:
+Fuera de Unidad 1 (consultar los cierres posteriores; no es la lista vigente de pendientes):
 
 - grafo completo de estados y transiciones;
 - entrega/logística avanzada;
@@ -152,10 +152,18 @@ HEAD de código certificado: `0fa94796ffee0c248035f94a9166f22c0a955b42`. [Core c
 
 Las pruebas intermedias corrigieron el uso de TOTP ya consumido sustituyéndolo por recovery sintético de un uso para reauth. El escenario de emisión existente recibió diagnóstico por etapas y un presupuesto total mayor tras agotar 30 segundos; conserva sus aserciones acotadas y aprobó las ejecuciones finales.
 
-## Unidad 3 — conversión Cotización → OC en validación
+## Unidad 3 — conversión Cotización → OC cerrada
 
-Contrato `contracts/quote-purchase-order-conversion.md`, migración 0017 y servicio propietario implementados. Conversión de Aceptada en una TX, snapshot/versión de origen, vínculo durable, estado Convertida, auditoría/hechos y restricción de una OC por fuente. REST estricto y UI española con navegación cruzada. Angular build/68 pruebas locales aprobados; compilación de 10 escenarios Playwright aprobada. Go/MySQL5.7/race/builds y navegador nuevo pendientes de CI; unidad no cerrada todavía.
+Contrato único `contracts/quote-purchase-order-conversion.md`, migración 0017 y servicios propietarios implementados. Una Cotización Aceptada produce una OC íntegra en una TX: snapshots históricos de cliente/versión, moneda, ítems, precios/costos, descuentos, impuestos y exoneración preservados. Número OC/destino/fechas/gastos/comentarios se confirman explícitamente. Fuente única, `source_quote_id/source_quote_version`, `purchase_order_id`, estado Convertida a OC, versiones, auditoría y hechos durables. No refresca catálogos ni copia documentos/notas privadas automáticamente. OC recibida/ítems pendientes; Quote convertida no se reabre; clonar Quote reinicia su vínculo.
+
+REST estricto registrado sólo con ambos propietarios habilitados. Permisos de fuente y destino, scopes self/team/all y replay reautorizado. UI española conserva intención tras timeout y resultado confirmado tras fallo de recarga; navegación cruzada mediante permisos independientes.
+
+HEAD de código certificado: `541bb101db51b391265b95ca9a8acd0ff0a3ae85`. [Core checks 38159858594](https://github.com/Ahcast/Bastion/actions/runs/38159858594), [documentación 38159858792](https://github.com/Ahcast/Bastion/actions/runs/38159858792) y [rama única 38159858687](https://github.com/Ahcast/Bastion/actions/runs/38159858687): success. Backend: gofmt/vet, `go test -race -count=1 ./...` con MySQL 5.7 y builds server/worker/admin. Angular: build/68 pruebas. Navegador: **10/10 escenarios aprobados**, incluida conversión USD 201.25/inversión 83.50, recarga y ambos vínculos.
+
+Nuevas integraciones cubren cálculo mixto ISV15/18/exento/exonerado, descuentos generales/por ítem, snapshot de cliente preservado tras cambiar maestro/revocar catálogo, inmutabilidad/origen/versiones, 12 replays concurrentes y ocho actores/intenciones distintos, rollback de auditoría/eventos/snapshot, acceso ajeno/equipos/revocación, estados inválidos, DTO estricto y flag. El backend y navegador se ejecutaron en CI; localmente aprobaron Angular build/68 pruebas, compilación de los 10 escenarios y paridad/enlaces. Crawler y migraciones 0001..0016 permanecen sin cambios.
+
+CI intermedio detectó dependencia de números fijos y datos globales en el escenario Quotes, y un selector de Moneda incompatible con el texto accesible del select. Corregidos números capturados del servidor, filtro por expediente y select por nombre; se acotó además el título al documento comercial. La suite completa final aprobó; no se extendieron timeouts ni se omitieron aserciones para resolver estos fallos.
 
 ## Próximo paso exacto
 
-Cerrar CI de Unidad 3 y corregir fallos antes de avanzar. Luego documentos/clonación y aceptación integral de OC. No iniciar Facturas/pagos antes de completar OC. Ningún despliegue, envío ni migración productiva realizado.
+Continuar dentro de OC con documentos privados de cabecera/ítems mediante Core.Files: contrato, permisos/política propietaria, metadata y enlaces durables, cuarentena y descarga autorizada; nunca bytes en webroot. Después clonación de OC y aceptación integral. OC→Factura/utilidad requieren sus propietarios/reglas; no iniciar Facturas/pagos antes del cierre correspondiente. Ningún despliegue, envío ni migración productiva realizado.

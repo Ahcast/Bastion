@@ -18,7 +18,7 @@ Actualizado el 11 de octubre de 2026. Core 0.1.0 publicado y validado en CI; Cli
 | Proveedores | Catálogo, contactos/etiquetas/productos, condiciones/evaluación manual, evidencia de precios, historial/notas/documentos y REST/MCP implementados; pruebas locales y CI aprobados |
 | Procesos | Ingestión transaccional, observaciones/versiones, consultas, marcas/notas, CSV y REST/MCP/Angular implementados; catálogo/ingestión validados en pruebas y CI; funciones cruzadas pendientes |
 | Cotizaciones | Alcance monomoneda HNL/USD cerrado y validado en CI; incluye correo/bulk y estados finales |
-| OC de clientes | Unidades 1 y 2 cerradas: agregado, cálculo, estados, historial y entrega; conversión/documentos/clonación pendientes |
+| OC de clientes | Unidades 1, 2 y 3 cerradas: agregado, cálculo, estados, historial, entrega y conversión Quotes→OC; documentos/clonación pendientes |
 | Demás módulos comerciales | Pendientes; se implementan de uno en uno tras cerrar pruebas y CI del anterior |
 | Despliegue | Templates systemd/nginx/Bluehost preparados; no instalados ni desplegados |
 | Infraestructura real | MySQL TLS/túnel/hosting, DNS/HTTPS, S3/IAM, SMTP y memoria conjunta con crawler pendientes |
@@ -26,7 +26,7 @@ Actualizado el 11 de octubre de 2026. Core 0.1.0 publicado y validado en CI; Cli
 
 ## Cierre vigente — 2026-10-11
 
-Prevalece sobre las notas históricas inferiores. Cotizaciones está cerrado para HNL/USD separados, sin FX automático, certificado en `0a98bf756c4e7a3965b7b625473258509fbaa571`. OC unidades 1 y 2 están cerradas; el módulo permanece activo. Evidencia y próximo paso exacto en `../ESTADO_DESARROLLO.md`.
+Prevalece sobre las notas históricas inferiores. Cotizaciones está cerrado para HNL/USD separados, sin FX automático, certificado en `0a98bf756c4e7a3965b7b625473258509fbaa571`. OC unidades 1, 2 y 3 están cerradas; el módulo permanece activo. Evidencia y próximo paso exacto en `../ESTADO_DESARROLLO.md`.
 
 ## Verificación del Core (unidad anterior)
 
@@ -148,6 +148,8 @@ Transiciones adyacentes de cabecera/ítems, historial, versión/idempotencia, pe
 
 Código certificado `0fa94796ffee0c248035f94a9166f22c0a955b42`; [Core checks 38154939036](https://github.com/Ahcast/Bastion/actions/runs/38154939036), documentación `38154939037` y rama única `38154939034` aprobados. Go/MySQL5.7/race/formato/vet/builds, Angular build/64 pruebas y navegador 9/9 aprobados en CI. Las 17 pruebas offline crawler aprobaron localmente. No se acredita infraestructura productiva. Próxima unidad: conversión Cotización → OC por PurchaseOrders; después documentos/clonación y cierre integral, antes de Facturas.
 
-## 2026-10-11 — OC Unidad 3 en validación
+## 2026-10-11 — OC Unidad 3 cerrada
 
-Conversión Quotes→OC implementada por propietarios con contrato único, migración 0017, trazabilidad/versiones y efectos atómicos. UI conserva intención y resultado; navegación cruzada mediante permisos. Angular build/68 pruebas y listado Playwright 10 escenarios locales aprobados. Backend/MySQL5.7/race/builds y navegador pendientes de CI antes de certificar. No producción.
+Conversión de Cotización Aceptada a OC recibida por servicios propietarios, una TX y una OC por fuente. Copia snapshots/finanzas sin refrescar catálogos, preserva ID/versión de origen, vínculo inverso y Quote convertida/versionada; evidencia e idempotencia atómicas. UI española con confirmación explícita y vínculos independientes. No copia documentos/notas privadas ni activa correo.
+
+[HEAD 541bb101](https://github.com/Ahcast/Bastion/commit/541bb101db51b391265b95ca9a8acd0ff0a3ae85), [Core checks 38159858594](https://github.com/Ahcast/Bastion/actions/runs/38159858594), documentación `38159858792` y rama única `38159858687` aprobados. Backend formato/vet/race/MySQL5.7/builds; Angular build/68 pruebas; navegador **10/10** aprobado. Local: Angular build/68 pruebas, listado compilado de 10 escenarios y documentación. Go/BD/navegador certificados por CI, no por ejecución local. Concurrencia de 12 replays/ocho actores, rollback, snapshots/finanzas y scopes/revocación cubiertos. Selectores de prueba y aislamiento del expediente corregidos tras CI intermedio; regresión completa final aprobada. Crawler/migraciones anteriores intactos. Próxima unidad: documentos privados OC; después clonación y cierre integral, antes de Facturas. No producción.

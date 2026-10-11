@@ -16,7 +16,7 @@ Guardar o descartar cambios antes de transicionar. Completar el avance de cada �
 
 Timeout: repetir misma intención/payload. Conflicto: consultar la versión actual. La UI conserva la clave ante fallo y la versión/estado confirmados si falla la recarga. Los replays se reautorizan y la entrega vuelve a exigir identidad reciente. Historial conserva actor/fecha UTC, versión, origen/destino y posición 1-based; la UI presenta hora de Honduras y página de 25 entradas.
 
-Facturado/Cerrado son vocabulario reservado; no existen acciones para simular sus efectos. Conversiones, documentos, entrega parcial, reapertura, utilidad, clonación y OC a proveedores siguen fuera de esta unidad.
+Facturado/Cerrado son vocabulario reservado; no existen acciones para simular sus efectos. Documentos, OC→Factura, entrega parcial, reapertura, utilidad, clonación de OC y OC a proveedores siguen pendientes. La conversión desde Cotizaciones se explica más abajo.
 
 ## Validación
 

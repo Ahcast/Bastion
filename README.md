@@ -1,6 +1,6 @@
 # Bastion
 
-Aplicación operativa de Castillo IT. Core, Clientes, Proveedores, Procesos/receptor crawler y Cotizaciones tienen su alcance implementado y validado en CI. El módulo activo es Órdenes de Compra de clientes: base, seguimiento de estados y entrega cerrados; conversión y documentos pendientes. Los demás módulos se desarrollan en orden según el checkpoint. Producción e integraciones externas siguen pendientes.
+Aplicación operativa de Castillo IT. Core, Clientes, Proveedores, Procesos/receptor crawler y Cotizaciones tienen su alcance implementado y validado en CI. El módulo activo es Órdenes de Compra de clientes: base, seguimiento de estados, entrega y conversión desde Cotizaciones cerrados; documentos y clonación pendientes. Los demás módulos se desarrollan en orden según el checkpoint. Producción e integraciones externas siguen pendientes.
 
 **Entrada del agente:** [AGENTS.md](AGENTS.md) → [checkpoint operativo](docs/ESTADO_DESARROLLO.md) → [maestro](docs/Proyecto_Bastion_Documento_Maestro.md) → [plan](docs/development/plan.md).
 

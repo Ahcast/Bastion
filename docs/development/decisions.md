@@ -89,3 +89,7 @@ La fecha programada pertenece a la intención durable outbox, no al momento del 
 ## 2026-10-10 — Alcance de cierre Cotizaciones
 
 El usuario escogió explícitamente HNL y USD separados sin conversión automática. FX queda fuera del cierre actual; no se elige una tasa BCH ni se inventa política cambiaria. Conversiones OC/Factura se incorporan mediante propietarios futuros. Se completa flujo comercial posterior al SMTP; estados finales y reapertura requieren motivo y versión. La fecha de vencimiento se evalúa en Honduras después del día fecha+validez completo. Lotes comparten transacción entre efecto e ítem; la aprobación consumida se revalida antes de enviar. Sin dependencias ni migraciones nuevas.
+
+## 2026-10-11 — Conversión propietaria Quotes→OC
+
+La regla legacy «cambiar estado después del commit» se sustituye por una transacción compartida entre servicios propietarios: OC completa y Quote converted con vínculo/versiones/evidencia atómicos. Sólo Aceptada, una OC por fuente y número explícito; sin borradores vacíos ni aceptación interna confundida con aceptación comercial. El contrato único `../contracts/quote-purchase-order-conversion.md` fija permisos de ambos registros y replay. Se copian snapshots históricos autorizados sin refrescar maestros; documentos permanecen en su propietario. Fuente convertida inmutable; clonar cotización permite una nueva intención comercial sin vínculo heredado.
