@@ -17,8 +17,11 @@ test('Cotizaciones: emisión aprobada, descarga real, recarga e historial tras r
  // Commercial send exercises the real queue/worker with a network-free SMTP adapter.
  await page.reload();await page.getByRole('button',{name:/^Ver cotización COT-/}).first().click();
  await page.getByRole('button',{name:'Actualizar correo y ledger',exact:true}).click();
+ await expect(page.getByRole('button',{name:'Actualizar correo y ledger',exact:true})).toBeEnabled();
  await page.getByLabel('Para',{exact:true}).fill('cliente@example.test');
+ await expect(page.getByLabel('Para',{exact:true})).toHaveValue('cliente@example.test');
  await page.getByLabel('Motivo de autorización',{exact:true}).fill('Enviar PDF revisado');
+ await expect(page.getByLabel('Para',{exact:true})).toHaveValue('cliente@example.test');
  await page.getByRole('button',{name:'Solicitar autorización de envío',exact:true}).click();
  await expect(page.getByText('Pendiente de aprobación',{exact:true})).toBeVisible();
  await reviewer.getByRole('button',{name:'Actualizar correo y ledger',exact:true}).click();

@@ -20,7 +20,7 @@ interface EmailIntent {id:string;quote_version:string;pdf_snapshot_id:string;cre
   @if(quote.status==='approved'&&!quote.deleted_at&&api.has('cotizaciones.send')&&api.has('cotizaciones.request_approval')){
    <fieldset [disabled]="busy()"><legend>Nueva autorización de correo</legend>
     <label>PDF emitido<select [(ngModel)]="pdfSnapshotId"><option value="">Seleccione</option>@for(p of issuedPDFs();track p.id){<option [value]="p.id">PDF emitido · versión {{p.quote_version}} · {{p.id}}</option>}</select></label>
-    <label>Para<input [(ngModel)]="to" autocomplete="off" placeholder="cliente@ejemplo.com"></label>
+    <label>Para<input [value]="to" (input)="to=$any($event.target).value" autocomplete="off" placeholder="cliente@ejemplo.com"></label>
     <label>CC<input [(ngModel)]="cc" autocomplete="off" placeholder="correo1@ejemplo.com, correo2@ejemplo.com"></label>
     <label>BCC<input [(ngModel)]="bcc" autocomplete="off"></label>
     <p>Separe múltiples direcciones con coma, punto y coma o salto de línea.</p>

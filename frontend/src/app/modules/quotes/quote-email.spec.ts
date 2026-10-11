@@ -14,6 +14,18 @@ describe('Correo comercial de cotizaciones',()=>{
   component=TestBed.runInInjectionContext(()=>new QuoteEmail());
   component.quote=quote;
  });
+ it('conserva el destinatario introducido mientras finaliza la actualización del ledger',async()=>{
+  api.has.mockImplementation((p:string)=>p!=='core.documents.read');
+  const fixture=TestBed.createComponent(QuoteEmail);
+  fixture.componentInstance.quote=quote;
+  fixture.componentInstance.resetForm();
+  fixture.detectChanges();
+  const input=fixture.nativeElement.querySelector('input[placeholder="cliente@ejemplo.com"]') as HTMLInputElement;
+  input.value='destino@example.test';input.dispatchEvent(new Event('input',{bubbles:true}));
+  expect(fixture.componentInstance.to).toBe('destino@example.test');
+  await fixture.whenStable();fixture.detectChanges();
+  expect(input.value).toBe('destino@example.test');
+ });
  it('solicita autorización exacta y no envía automáticamente',async()=>{
   component.pdfSnapshotId='15';component.to='cliente@example.com; compras@example.com';component.cc='copia@example.com';component.bcc='';component.subject='Cotización COT-2026-9';component.message='Adjuntamos la cotización aprobada.';component.scheduledAt='2026-10-11T09:30';component.expiresAt='2026-10-11T12:00';component.reason='Revisión previa al envío';component.attachmentIds=['21'];
   await component.requestAuthorization();
