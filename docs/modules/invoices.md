@@ -380,3 +380,7 @@ Anulada
 
 
 
+
+## Implementación incremental vigente
+
+[Contrato propietario](../contracts/invoices.md). Unidad 1: motor financiero y proyección de saldos, en validación; sin API, persistencia de facturas/pagos ni emisión. Las funciones y estados objetivo anteriores conservan su alcance y se implementan en las siguientes unidades, tras CI verde.
