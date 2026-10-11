@@ -92,6 +92,49 @@ if all(name in openapi_docs for name in quotes_contract_names) and quotes_dir.is
             f'documents nonexistent Quotes route {method.upper()} {path}'
         )
 
+# PurchaseOrders Unit 1 has one machine-readable REST contract. Its registered
+# routes and documented operations must remain bidirectionally identical so a
+# future handler cannot silently escape the reviewed commercial contract.
+purchase_orders_contract_name = 'purchase-orders-openapi.json'
+purchase_orders_dir = ROOT / 'backend' / 'internal' / 'modules' / 'purchaseorders'
+if purchase_orders_contract_name in openapi_docs and purchase_orders_dir.is_dir():
+    route_pattern = re.compile(
+        r'register\("(GET|POST|PATCH|PUT|DELETE) (/api/v1/[^"\\]+)"'
+    )
+    registered: set[tuple[str, str]] = set()
+    for source in purchase_orders_dir.glob('*.go'):
+        text = source.read_text()
+        registered.update((method.lower(), path) for method, path in route_pattern.findall(text))
+    # Save routes are constructed by the POST/PATCH loop in module.go.
+    registered.update({
+        ('post', '/api/v1/purchase-orders'),
+        ('patch', '/api/v1/purchase-orders/{id}'),
+    })
+
+    documented: set[tuple[str, str]] = set()
+    contract = openapi_docs[purchase_orders_contract_name]
+    for path, operations in contract['paths'].items():
+        if not isinstance(operations, dict):
+            errors.append(
+                f'docs/contracts/{purchase_orders_contract_name}: invalid operations for {path}'
+            )
+            continue
+        for method in operations:
+            operation = (method.lower(), path)
+            if operation[0] in {'get', 'post', 'patch', 'put', 'delete'}:
+                documented.add(operation)
+
+    for method, path in sorted(registered - documented):
+        errors.append(
+            'PurchaseOrders OpenAPI contract: '
+            f'missing registered route {method.upper()} {path}'
+        )
+    for method, path in sorted(documented - registered):
+        errors.append(
+            f'docs/contracts/{purchase_orders_contract_name}: '
+            f'documents nonexistent PurchaseOrders route {method.upper()} {path}'
+        )
+
 if errors:
     print('\n'.join(errors))
     sys.exit(1)
