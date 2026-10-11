@@ -59,8 +59,8 @@ test("Órdenes de Compra: cálculo, alta, persistencia, edición y búsqueda con
   await page.getByRole("button", { name: "Registrar orden", exact: true }).click();
   await createResponse;
   await expect(page.getByRole("status").filter({ hasText: "Orden de compra registrada." })).toBeVisible();
-  await expect(page.getByText("Estado:", { exact: false })).toContainText("Recibida");
-  await expect(page.getByText("Versión:", { exact: false })).toContainText("1");
+  await expect(page.locator("p").filter({ hasText: /^Estado: Recibida$/ })).toBeVisible();
+  await expect(page.locator("p").filter({ hasText: /^Versión: 1$/ })).toBeVisible();
   mark("create:done");
 
   await page.reload();
@@ -79,7 +79,7 @@ test("Órdenes de Compra: cálculo, alta, persistencia, edición y búsqueda con
   await page.getByRole("button", { name: "Guardar cambios", exact: true }).click();
   await updateResponse;
   await expect(page.getByRole("status").filter({ hasText: "Orden de compra actualizada." })).toBeVisible();
-  await expect(page.getByText("Versión:", { exact: false })).toContainText("2");
+  await expect(page.locator("p").filter({ hasText: /^Versión: 2$/ })).toBeVisible();
   mark("update:done");
 
   await page.reload();
