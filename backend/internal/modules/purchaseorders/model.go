@@ -23,13 +23,13 @@ type CustomerInput struct {
 }
 
 type Input struct {
-	OrderNumber          string  `json:"order_number"`
+	OrderNumber          string        `json:"order_number"`
 	Customer             CustomerInput `json:"customer"`
-	Destination          string  `json:"destination"`
-	OrderDate            string  `json:"order_date"`
-	RequiredDeliveryDate *string `json:"required_delivery_date"`
-	Currency             string  `json:"currency"`
-	Comments             string  `json:"comments"`
+	Destination          string        `json:"destination"`
+	OrderDate            string        `json:"order_date"`
+	RequiredDeliveryDate *string       `json:"required_delivery_date"`
+	Currency             string        `json:"currency"`
+	Comments             string        `json:"comments"`
 	CalculationInput
 	TeamID  string `json:"team_id"`
 	Version uint64 `json:"version,string"`
@@ -42,24 +42,24 @@ type PurchaseOrderItem struct {
 }
 
 type PurchaseOrder struct {
-	ID                   string  `json:"id"`
-	OrderNumber          string  `json:"order_number"`
-	Status               string  `json:"status"`
-	Customer             CustomerInput `json:"customer"`
-	CustomerVersion      uint64  `json:"customer_version,string"`
-	SourceQuoteID        *string `json:"source_quote_id"`
-	Destination          string  `json:"destination"`
-	OrderDate            string  `json:"order_date"`
-	RequiredDeliveryDate *string `json:"required_delivery_date"`
-	Currency             string  `json:"currency"`
-	Comments             string  `json:"comments"`
-	DiscountType         string  `json:"general_discount_type"`
-	Discount             string  `json:"general_discount"`
-	Exoneration          string  `json:"exoneration_reference"`
-	Calculation          Calculation `json:"calculation"`
-	Version              uint64  `json:"version,string"`
-	CreatedBy            string  `json:"created_by"`
-	TeamID               string  `json:"team_id"`
+	ID                   string              `json:"id"`
+	OrderNumber          string              `json:"order_number"`
+	Status               string              `json:"status"`
+	Customer             CustomerInput       `json:"customer"`
+	CustomerVersion      uint64              `json:"customer_version,string"`
+	SourceQuoteID        *string             `json:"source_quote_id"`
+	Destination          string              `json:"destination"`
+	OrderDate            string              `json:"order_date"`
+	RequiredDeliveryDate *string             `json:"required_delivery_date"`
+	Currency             string              `json:"currency"`
+	Comments             string              `json:"comments"`
+	DiscountType         string              `json:"general_discount_type"`
+	Discount             string              `json:"general_discount"`
+	Exoneration          string              `json:"exoneration_reference"`
+	Calculation          Calculation         `json:"calculation"`
+	Version              uint64              `json:"version,string"`
+	CreatedBy            string              `json:"created_by"`
+	TeamID               string              `json:"team_id"`
 	Items                []PurchaseOrderItem `json:"items"`
 }
 
