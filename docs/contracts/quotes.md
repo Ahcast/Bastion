@@ -2,11 +2,11 @@
 
 ## Unidades implementadas y unidad activa
 
-Quotes posee el agregado comercial y sus extensiones mediante las migraciones 0006–0013: quotes/quote_items/quote_versions/document_counters, snapshots PDF, estados, aprobaciones Workflow, emisión, programación de outbox, autorizaciones de correo y lotes bulk. Core no importa negocio. Composición inyecta servicios públicos transaccionales de Clientes y Procesos.
+Quotes posee el agregado comercial y sus extensiones mediante las migraciones 0006–0014: quotes/quote_items/quote_versions/document_counters, snapshots PDF, estados, aprobaciones Workflow, emisión, programación de outbox, autorizaciones de correo y lotes bulk. Core no importa negocio. Composición inyecta servicios públicos transaccionales de Clientes y Procesos.
 
 Están implementados y cubiertos en CI: borradores manuales o desde proceso, editor, consulta paginada, cálculo canónico, clonación, historial, papelera/restauración, estados/revisiones, PDF/adjuntos, aprobación humana, emisión segura de PDF, correo comercial inmediato/programado y bulk trazable. S3/IAM/scanner y SMTP/IMAP reales siguen siendo validaciones externas de producción; los stores/fakes de prueba no los certifican.
 
-La unidad funcional siguiente es FX fechado. El sistema admite HNL o USD como moneda explícita pero no convierte entre ellas. No existe todavía contrato normativo para fuente/tipo de tasa, fecha efectiva, snapshot/historial, precisión/redondeo, autoridad de modificación ni representación. No implementar conversión implícita inventando esas reglas. Las conversiones a OC/Facturas se completarán mediante sus servicios propietarios cuando existan; Quotes no escribe sus tablas privadas. No avanzar a OC mientras la aceptación restante de Cotizaciones siga abierta.
+Cotizaciones está cerrado para el alcance aprobado HNL/USD separados. FX fechado es un registro auxiliar append-only y no convierte importes automáticamente; su contrato está en `quotes-fx.md`. Las conversiones a OC/Facturas se completarán mediante sus servicios propietarios en sus unidades. OC de clientes es el módulo activo según el checkpoint vigente; Quotes no escribe sus tablas privadas.
 
 ## DTO y rutas base
 
@@ -14,7 +14,7 @@ IDs/versiones son cadenas JSON. Input reemplaza todos los campos editables: cust
 
 Rutas base: GET/POST /api/v1/quotes; GET/PATCH /api/v1/quotes/{id}; POST /api/v1/quotes/calculate; POST /api/v1/quotes/{id}/clone; GET /api/v1/quotes/{id}/versions; DELETE /api/v1/quotes/{id}; POST /api/v1/quotes/{id}/restore. GET list acepta search literal (número/referencia/cliente/descripciones), deleted=true/false y page/per_page máximo 100. GET versions paginado. POST /api/v1/processes/{id}/create-quote con {date,version:"0"} usa fecha comercial explícita, copia solo entidad/expediente y deja ítems vacíos. GET /api/v1/processes/{id}/quotes devuelve cotizaciones visibles (incluida papelera si solicitado), sin filtrar permisos por navegación solamente.
 
-Salida Quote contiene id, number, status=draft/costing/review/approved, source_process_id, customer snapshot, campos editables, version, created_by/team_id, deleted_at, items con resultado por línea y calculation; List solo summaries. Migración mantiene cabecera e ítems como fuente maestra relacional y versiones JSON append-only de agregado/calculador (calculator_version=1); JSON no sustituye tablas actuales. Resultados de escrituras {id,version}. Idempotency-Key obligatorio en escrituras, normalizado antes de hash; replay reautoriza y nunca refresca un snapshot ni consume otro consecutivo. Clonar genera nuevo número, conserva origen y snapshots, devuelve borrador; no copia adjuntos ni aprobaciones.
+Salida Quote contiene id, number, status=draft/costing/review/approved/sent/accepted/rejected/expired, source_process_id, customer snapshot, campos editables, version, created_by/team_id, deleted_at, items con resultado por línea y calculation; List solo summaries. Migración mantiene cabecera e ítems como fuente maestra relacional y versiones JSON append-only de agregado/calculador (calculator_version=1); JSON no sustituye tablas actuales. Resultados de escrituras {id,version}. Idempotency-Key obligatorio en escrituras, normalizado antes de hash; replay reautoriza y nunca refresca un snapshot ni consume otro consecutivo. Clonar genera nuevo número, conserva origen y snapshots, devuelve borrador; no copia adjuntos ni aprobaciones.
 
 ## Cálculo exacto v1
 
@@ -30,7 +30,7 @@ Permisos base: cotizaciones.view/create/update/delete; scopes all/self/team y RB
 
 Crear desde proceso exige procesos.view y cotizaciones.create, comprobados dentro de TX antes de replay. Resolver exacto aplica clientes.view; falta de grant no bloquea snapshot manual ni revela existencia. Entidad hasta 1000 caracteres; no autocrear maestro, no copiar descripción/documentos/notas/fecha/items. Varias intenciones crean varias cotizaciones. Numeración lock transaccional document_counters, UNIQUE number; fallo de auditoría revierte agregado/version/contador/eventos/intención. Eventos quote.created/updated/cloned/deleted/restored y process.quote_created transaccionales, sin jobs AI implícitos.
 
-Aceptación ya cubierta por unidades implementadas: descuentos absolutos por unidad, porcentajes, cuatro impuestos, residuo exacto, límites/redondeos; MySQL5.7 migración/repetición, contador concurrente, intención concurrente, rollback, versión/IDOR/scopes/revocación, snapshots y conversión múltiple desde Procesos; PDF/adjuntos, estados, aprobación, emisión, correo comercial y bulk tienen sus pruebas específicas de integración/UI/navegador. El módulo completo sigue abierto por FX y por conversiones hacia módulos propietarios aún inexistentes. Las validaciones externas de producción no se sustituyen por CI.
+Aceptación ya cubierta por unidades implementadas: descuentos absolutos por unidad, porcentajes, cuatro impuestos, residuo exacto, límites/redondeos; MySQL5.7 migración/repetición, contador concurrente, intención concurrente, rollback, versión/IDOR/scopes/revocación, snapshots y conversión múltiple desde Procesos; PDF/adjuntos, estados, aprobación, emisión, correo comercial y bulk tienen sus pruebas específicas de integración/UI/navegador. El alcance monomoneda está cerrado. Las conversiones cruzadas permanecen pendientes de sus unidades propietarias. Las validaciones externas de producción no se sustituyen por CI.
 
 ## Unidad de archivos y PDF
 
@@ -143,7 +143,7 @@ Hasta que esas decisiones estén cerradas, una cotización puede crearse y opera
 
 Estas conversiones son server-side, transaccionales e idempotentes y deben conservar referencia de origen. Se implementan cuando existan los módulos propietarios. Quotes entrega un snapshot/DTO público autorizado al servicio destino; OC/Factura valida sus propias reglas y persiste en su transacción/composición definida. Quotes no debe importar ni escribir directamente tablas privadas de OC/Facturas.
 
-No crear endpoints simulados ni tablas temporales en Quotes para adelantar estas conversiones. La ausencia actual de OC/Factura no invalida las unidades ya cerradas, pero impide declarar la integración cruzada terminada.
+No crear endpoints simulados ni tablas temporales en Quotes para adelantar estas conversiones. La base de OC ya existe; su conversión desde Quotes todavía está pendiente. Invoices aún no existe. Estas dependencias no invalidan las unidades cerradas ni acreditan una integración cruzada todavía ausente.
 
 
 ## Cierre comercial y alcance aprobado — 2026-10-10
