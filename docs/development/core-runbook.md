@@ -101,3 +101,7 @@ Opcional BASTION_BROWSER_EXECUTABLE selecciona Chrome instalado. Test contra API
 ## Despliegue autorizado posterior
 
 Templates en backend/deploy: servicio server, timer worker y proxy nginx. Editar rutas/usuarios/certificados/env en entorno autorizado; no instalar automáticamente. Angular assets en Bluehost con fallback index.html y headers de seguridad/CSP adaptados. MySQL sigue Bluehost. TLS/DNS/túnel, restore y memoria total con crawler requieren prueba operativa previa. No publicar fuentes, claves ni ejemplos de prueba. WAF/protección perimetral pendiente de configuración real.
+
+## Facturas Borradores
+
+BASTION_INVOICES_ENABLED=true|false (true predeterminado). Migración 0021 y permisos facturas.view/create/update sin grants automáticos. UI y REST solo Borradores/cálculo; número/SAR NULL y pagos cero. Cambiar equipo exige update all y reauth. CI 38179176643 certificado; no aplicar migración productiva ni activar emisión/pagos con este flag.

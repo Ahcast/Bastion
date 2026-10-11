@@ -231,3 +231,11 @@ Pruebas: cuatro financieras certificadas; validación DTO/condiciones, cinco int
 ## 2026-10-11 — Borradores: corrección de accesibilidad y selección
 
 Primera ejecución 11f9dae5fa7a09b3afb4b7519f30c563dcfa2369 / Core checks 38177764409: backend y frontend success; navegador 10/11, falla únicamente al localizar etiqueta exacta del selector de condición de pago. Etiquetas for/id separan opciones del nombre accesible; nueva prueba DOM elige Crédito. Selección de cliente por nombre consulta Customers solo con permisos/flag, conserva snapshot al repetir identidad y recupera anterior ante revocación; selector de equipo por nombre solo con core.teams.read y elecciones filtradas por membresía/scopes. Sin pedir IDs en el formulario. Tres pruebas Angular adicionales: accesibilidad, catálogo/snapshot/revocación y consultas denegadas. Build y **85 pruebas** locales aprobados; repetir CI completo sobre el commit corregido antes de cierre.
+
+## 2026-10-11 — Facturas/pagos, unidad 2 Borradores certificada
+
+HEAD `88577fa0fa810958a65589beda3d9e331b8c3317`: [Core checks 38179176643](https://github.com/Ahcast/Bastion/actions/runs/38179176643), [documentación 38179176704](https://github.com/Ahcast/Bastion/actions/runs/38179176704) y [rama única 38179176676](https://github.com/Ahcast/Bastion/actions/runs/38179176676): success. Go fmt/vet/race, MySQL 5.7 y builds server/worker/admin aprobados; Angular build y **86 pruebas**; navegador **11/11** (32.5 s).
+
+Borradores persistentes con REST/UI, contado/crédito, snapshots históricos, ítems estables, cálculo y saldos exactos, permisos/scopes, reauth al cambiar equipo, idempotencia concurrente, rollback y recuperación de respuesta confirmada validados. Facturas no asigna número/SAR, cobra ni cambia estados fiscales. Se corrigió la actualización del destinatario de correo Quotes y se comprueba su valor antes de autorizar; regresión real de PDF, aprobación y worker/SMTP sintético aprobada. Ninguna prueba acredita correo real ni facturación productiva.
+
+Unidad 2 cerrada. Siguiente: unidad 3, configuración fiscal/correlativo/emisión, empezando por política interna de rango, vigencia y formato; después persistencia transaccional, permisos, REST/UI y emisión. Configuración SAR real, autorización del rango, formato legacy y validación fiscal productiva continúan pendientes; no inventar datos ni reglas legales.
