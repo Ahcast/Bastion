@@ -58,7 +58,7 @@ func (s *Service) gate(ctx context.Context, q core.Querier, a core.Actor, permis
 	return s.Core.Authorize(ctx, q, a, permission, a.UserID, team, false)
 }
 
-const orderColumns = `o.id,o.order_number,o.status,COALESCE(CAST(o.source_quote_id AS CHAR),''),COALESCE(CAST(o.customer_id AS CHAR),''),o.customer_version,o.customer_name_snapshot,o.customer_rtn_snapshot,o.customer_contact_snapshot,o.customer_phone_snapshot,o.customer_email_snapshot,o.customer_address_snapshot,o.destination,CAST(o.order_date AS CHAR),COALESCE(CAST(o.required_delivery_date AS CHAR),''),o.currency,o.comments,o.exoneration_reference,o.general_discount_type,CAST(o.general_discount AS CHAR),CAST(o.gross AS CHAR),CAST(o.item_discount AS CHAR),CAST(o.allocated_discount AS CHAR),CAST(o.base_15 AS CHAR),CAST(o.base_18 AS CHAR),CAST(o.exempt AS CHAR),CAST(o.exonerated AS CHAR),CAST(o.isv_15 AS CHAR),CAST(o.isv_18 AS CHAR),CAST(o.total AS CHAR),CAST(o.products_investment AS CHAR),CAST(o.additional_expenses AS CHAR),CAST(o.investment_total AS CHAR),o.calculator_version,o.version,CAST(o.created_by AS CHAR),COALESCE(CAST(o.team_id AS CHAR),''),o.source_quote_version`
+const orderColumns = `o.id,o.order_number,o.status,COALESCE(CAST(o.source_quote_id AS CHAR),''),COALESCE(CAST(o.customer_id AS CHAR),''),o.customer_version,o.customer_name_snapshot,o.customer_rtn_snapshot,o.customer_contact_snapshot,o.customer_phone_snapshot,o.customer_email_snapshot,o.customer_address_snapshot,o.destination,CAST(o.order_date AS CHAR),COALESCE(CAST(o.required_delivery_date AS CHAR),''),o.currency,o.comments,o.exoneration_reference,o.general_discount_type,CAST(o.general_discount AS CHAR),CAST(o.gross AS CHAR),CAST(o.item_discount AS CHAR),CAST(o.allocated_discount AS CHAR),CAST(o.base_15 AS CHAR),CAST(o.base_18 AS CHAR),CAST(o.exempt AS CHAR),CAST(o.exonerated AS CHAR),CAST(o.isv_15 AS CHAR),CAST(o.isv_18 AS CHAR),CAST(o.total AS CHAR),CAST(o.products_investment AS CHAR),CAST(o.additional_expenses AS CHAR),CAST(o.investment_total AS CHAR),o.calculator_version,o.version,CAST(o.created_by AS CHAR),COALESCE(CAST(o.team_id AS CHAR),''),o.source_quote_version,(SELECT CAST(source_purchase_order_id AS CHAR) FROM customer_purchase_order_clones WHERE purchase_order_id=o.id),(SELECT source_version FROM customer_purchase_order_clones WHERE purchase_order_id=o.id)`
 
 func scanOrder(row interface{ Scan(...any) error }) (PurchaseOrder, error) {
 	var o PurchaseOrder
@@ -71,7 +71,7 @@ func scanOrder(row interface{ Scan(...any) error }) (PurchaseOrder, error) {
 		&o.Destination, &o.OrderDate, &delivery, &o.Currency, &o.Comments, &o.Exoneration, &o.DiscountType, &o.Discount,
 		&c.Gross, &c.ItemDiscount, &allocated, &c.Base15, &c.Base18, &c.Exempt, &c.Exonerated, &c.ISV15, &c.ISV18, &c.Total,
 		&c.ProductsInvestment, &c.AdditionalExpenses, &c.InvestmentTotal, &c.CalculatorVersion,
-		&o.Version, &o.CreatedBy, &o.TeamID, &o.SourceQuoteVersion,
+		&o.Version, &o.CreatedBy, &o.TeamID, &o.SourceQuoteVersion, &o.ClonedFromID, &o.ClonedFromVersion,
 	)
 	if e != nil {
 		return o, e

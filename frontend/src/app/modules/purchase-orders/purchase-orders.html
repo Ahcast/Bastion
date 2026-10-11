@@ -1,28 +1,46 @@
 <h1>Órdenes de Compra</h1>
 <p class="muted">Órdenes de compra recibidas de clientes.</p>
 <p role="alert">{{ error() }}</p>
-@if (message()) { <p role="status">{{ message() }}</p> }
+@if (message()) {
+<p role="status">{{ message() }}</p>
+}
 
 <form (ngSubmit)="load(true)" class="card">
   <fieldset [disabled]="loading() || busy()">
     <legend>Filtros</legend>
-    <label>Buscar
-      <input name="search" [(ngModel)]="search" maxlength="1000" placeholder="Número, cliente, descripción o comentario">
+    <label
+      >Buscar
+      <input
+        name="search"
+        [(ngModel)]="search"
+        maxlength="1000"
+        placeholder="Número, cliente, descripción o comentario"
+      />
     </label>
-    <label>Estado de la orden
+    <label
+      >Estado de la orden
       <select name="statusFilter" [(ngModel)]="statusFilter">
         <option value="">Todos</option>
-        @for (status of orderStatuses; track status) { <option [value]="status">{{ statusLabel(status) }}</option> }
+        @for (status of orderStatuses; track status) {
+        <option [value]="status">{{ statusLabel(status) }}</option>
+        }
       </select>
     </label>
-    <label>ID de cliente
-      <input name="customerIdFilter" [(ngModel)]="customerId" inputmode="numeric">
+    <label
+      >ID de cliente
+      <input
+        name="customerIdFilter"
+        [(ngModel)]="customerId"
+        inputmode="numeric"
+      />
     </label>
-    <label>Total mínimo
-      <input name="totalMin" [(ngModel)]="totalMin" inputmode="decimal">
+    <label
+      >Total mínimo
+      <input name="totalMin" [(ngModel)]="totalMin" inputmode="decimal" />
     </label>
-    <label>Total máximo
-      <input name="totalMax" [(ngModel)]="totalMax" inputmode="decimal">
+    <label
+      >Total máximo
+      <input name="totalMax" [(ngModel)]="totalMax" inputmode="decimal" />
     </label>
     <button>Buscar</button>
   </fieldset>
@@ -30,236 +48,557 @@
 
 <div class="actions">
   @if (api.has('ordenes.create')) {
-    <button type="button" (click)="create()" [disabled]="busy()">Nueva orden de compra</button>
+  <button type="button" (click)="create()" [disabled]="busy()">
+    Nueva orden de compra
+  </button>
   }
   <span>{{ total() }} órdenes · Página {{ page }}</span>
-  <button type="button" [disabled]="page <= 1 || loading() || busy()" (click)="page = page - 1; load()">Anterior</button>
-  <button type="button" [disabled]="page * perPage >= total() || loading() || busy()" (click)="page = page + 1; load()">Siguiente</button>
+  <button
+    type="button"
+    [disabled]="page <= 1 || loading() || busy()"
+    (click)="page = page - 1; load()"
+  >
+    Anterior
+  </button>
+  <button
+    type="button"
+    [disabled]="page * perPage >= total() || loading() || busy()"
+    (click)="page = page + 1; load()"
+  >
+    Siguiente
+  </button>
 </div>
 
 @for (order of rows(); track order.id) {
-  <article class="card">
-    <h2>{{ order.order_number }}</h2>
-    <p>{{ order.customer.name || 'Cliente sin nombre' }}</p>
-    <p>{{ statusLabel(order.status) }} · {{ order.order_date }} · {{ order.currency }} {{ order.total }}</p>
-    <button type="button" (click)="open(order.id)" [disabled]="busy()">Ver orden {{ order.order_number }}</button>
-  </article>
-} @empty {
-  @if (!loading()) { <p>No hay órdenes de compra para estos filtros.</p> }
-}
+<article class="card">
+  <h2>{{ order.order_number }}</h2>
+  <p>{{ order.customer.name || 'Cliente sin nombre' }}</p>
+  <p>
+    {{ statusLabel(order.status) }} · {{ order.order_date }} · {{ order.currency
+    }} {{ order.total }}
+  </p>
+  <button type="button" (click)="open(order.id)" [disabled]="busy()">
+    Ver orden {{ order.order_number }}
+  </button>
+</article>
+} @empty { @if (!loading()) {
+<p>No hay órdenes de compra para estos filtros.</p>
+} } @if (editorOpen()) {
+<section class="card">
+  <div class="actions">
+    <h2>{{ selected()?.order_number || 'Nueva orden de compra' }}</h2>
+    <button type="button" (click)="close()" [disabled]="busy()">
+      Cerrar ficha
+    </button>
+  </div>
 
-@if (editorOpen()) {
-  <section class="card">
-    <div class="actions">
-      <h2>{{ selected()?.order_number || 'Nueva orden de compra' }}</h2>
-      <button type="button" (click)="close()" [disabled]="busy()">Cerrar ficha</button>
-    </div>
-
-    @if (selected(); as saved) {
-      <div class="summary">
-        <p><strong>Estado:</strong> {{ statusLabel(saved.status) }}</p>
-        <p><strong>Versión:</strong> {{ saved.version }}</p>
-        <p><strong>Creada por:</strong> {{ saved.created_by }}</p>
-        @if (saved.source_quote_id) {
-          <p><strong>Cotización de origen:</strong> {{ saved.source_quote_id }} · Versión {{saved.source_quote_version}}</p>
-          @if(api.moduleEnabled('quotes')&&api.has('cotizaciones.view')){<a routerLink="/quotes" [queryParams]="{id:saved.source_quote_id}">Ver cotización de origen</a>}
-        }
-      </div>
+  @if (selected(); as saved) {
+  <div class="summary">
+    <p><strong>Estado:</strong> {{ statusLabel(saved.status) }}</p>
+    <p><strong>Versión:</strong> {{ saved.version }}</p>
+    <p><strong>Creada por:</strong> {{ saved.created_by }}</p>
+    @if (saved.source_quote_id) {
+    <p>
+      <strong>Cotización de origen:</strong> {{ saved.source_quote_id }} ·
+      Versión {{saved.source_quote_version}}
+    </p>
+    @if(api.moduleEnabled('quotes')&&api.has('cotizaciones.view')){<a
+      routerLink="/quotes"
+      [queryParams]="{id:saved.source_quote_id}"
+      >Ver cotización de origen</a
+    >} }
+  </div>
+  } @if (selected(); as saved) { @if(saved.cloned_from_id) {
+  <p>
+    Clonada de OC #{{ saved.cloned_from_id }} · versión {{
+    saved.cloned_from_version }}
+  </p>
+  } @if(api.has('ordenes.create')) {
+  <button type="button" (click)="beginClone()" [disabled]="busy() || dirty()">
+    Clonar orden
+  </button>
+  } @if(cloneForm; as draft) {
+  <section aria-label="Clonación de la orden">
+    <p>
+      Conserva datos comerciales. Inicia Recibida, con ítems Pendiente y sin
+      adjuntos ni entrega.
+    </p>
+    <fieldset [disabled]="busy() || !!cloned()">
+      <legend>Nueva orden independiente</legend>
+      <label
+        >Número de la nueva OC<input
+          [(ngModel)]="draft.order_number"
+          name="cloneNumber"
+          maxlength="160"
+      /></label>
+      <label
+        >Fecha de la nueva OC<input
+          type="date"
+          [(ngModel)]="draft.order_date"
+          name="cloneDate"
+      /></label>
+      <label
+        >Entrega requerida de la nueva OC<input
+          type="date"
+          [ngModel]="draft.required_delivery_date"
+          (ngModelChange)="draft.required_delivery_date=$event || null"
+          name="cloneDelivery"
+      /></label>
+      <label
+        >Destino de la nueva OC<input
+          [(ngModel)]="draft.destination"
+          name="cloneDestination"
+          maxlength="1000"
+      /></label>
+      <label
+        >Comentarios de la nueva OC<textarea
+          [(ngModel)]="draft.comments"
+          name="cloneComments"
+          maxlength="12000"
+        ></textarea>
+      </label>
+      <label
+        >Gastos adicionales de la nueva OC<input
+          [(ngModel)]="draft.additional_expenses"
+          name="cloneExpenses"
+          inputmode="decimal"
+      /></label>
+      <button
+        type="button"
+        (click)="clone()"
+        [disabled]="dirty() || !draft.order_number.trim()"
+      >
+        Crear clon de OC
+      </button>
+    </fieldset>
+    @if(cloned(); as result){<button
+      type="button"
+      (click)="open(result.id)"
+      [disabled]="busy()"
+    >
+      Abrir OC clonada #{{ result.id }}</button
+    >}
+  </section>
+  }
+  <section aria-label="Seguimiento de la orden">
+    @if (nextOrderStatus(); as next) {
+    <button
+      type="button"
+      (click)="transition(next)"
+      [disabled]="busy() || dirty() || (next === 'delivered' && !deliveryReady())"
+    >
+      Cambiar a {{ statusLabel(next) }}
+    </button>
+    @if (next === 'delivered') {
+    <p>
+      La entrega requiere todos los ítems entregados y confirmación de identidad
+      vigente.
+    </p>
+    <bastion-reauthentication />
+    } } @for (item of saved.items; track $index; let i = $index) {
+    <p>Ítem {{ i + 1 }}: {{ itemStatusLabel(item.status) }}</p>
+    @if (nextItemStatus(i); as next) {
+    <button
+      type="button"
+      (click)="transition(next, i + 1)"
+      [disabled]="busy() || dirty()"
+    >
+      Ítem {{ i + 1 }}: cambiar a {{ itemStatusLabel(next) }}
+    </button>
+    } }
+    <button type="button" (click)="loadHistory(1)" [disabled]="busy()">
+      Ver historial de estados
+    </button>
+    @if (historyTotal()) {
+    <h3>Historial de estados</h3>
+    @for (entry of history(); track entry.id) {
+    <p>
+      {{ entry.item_position === null ? 'Orden' : 'Ítem ' + entry.item_position
+      }}: {{ entry.item_position === null ? statusLabel(entry.from_status) :
+      itemStatusLabel(entry.from_status) }} → {{ entry.item_position === null ?
+      statusLabel(entry.to_status) : itemStatusLabel(entry.to_status) }} ·
+      Versión {{ entry.purchase_order_version }} · Usuario {{ entry.actor_id }}
+      · {{ entry.created_at | date:'short':'-0600' }}
+    </p>
     }
-
-    @if (selected(); as saved) {
-      <section aria-label="Seguimiento de la orden">
-        @if (nextOrderStatus(); as next) {
-          <button type="button" (click)="transition(next)" [disabled]="busy() || dirty() || (next === 'delivered' && !deliveryReady())">Cambiar a {{ statusLabel(next) }}</button>
-          @if (next === 'delivered') {
-            <p>La entrega requiere todos los ítems entregados y confirmación de identidad vigente.</p>
-            <bastion-reauthentication />
-          }
-        }
-        @for (item of saved.items; track $index; let i = $index) {
-          <p>Ítem {{ i + 1 }}: {{ itemStatusLabel(item.status) }}</p>
-          @if (nextItemStatus(i); as next) {
-            <button type="button" (click)="transition(next, i + 1)" [disabled]="busy() || dirty()">Ítem {{ i + 1 }}: cambiar a {{ itemStatusLabel(next) }}</button>
-          }
-        }
-        <button type="button" (click)="loadHistory(1)" [disabled]="busy()">Ver historial de estados</button>
-        @if (historyTotal()) {
-          <h3>Historial de estados</h3>
-          @for (entry of history(); track entry.id) {
-            <p>{{ entry.item_position === null ? 'Orden' : 'Ítem ' + entry.item_position }}:
-              {{ entry.item_position === null ? statusLabel(entry.from_status) : itemStatusLabel(entry.from_status) }} →
-              {{ entry.item_position === null ? statusLabel(entry.to_status) : itemStatusLabel(entry.to_status) }} ·
-              Versión {{ entry.purchase_order_version }} · Usuario {{ entry.actor_id }} · {{ entry.created_at | date:'short':'-0600' }}</p>
-          }
-          <button type="button" (click)="loadHistory(historyPage - 1)" [disabled]="busy() || historyPage <= 1">Historial anterior</button>
-          <button type="button" (click)="loadHistory(historyPage + 1)" [disabled]="busy() || historyPage * 25 >= historyTotal()">Historial siguiente</button>
-        }
-      </section>
-    }
-
-    <form (ngSubmit)="save()">
-      <fieldset [disabled]="!writable() || busy()">
-        <legend>Datos de la orden</legend>
-        <label>Número de orden
-          <input name="orderNumber" [(ngModel)]="form.order_number" required maxlength="160">
-        </label>
-        <label>Fecha de orden
-          <input type="date" name="orderDate" [(ngModel)]="form.order_date" required>
-        </label>
-        <label>Fecha requerida de entrega
-          <input type="date" name="requiredDeliveryDate"
-            [ngModel]="form.required_delivery_date || ''"
-            (ngModelChange)="form.required_delivery_date = $event || null">
-        </label>
-        <label>Moneda
-          <select name="currency" [(ngModel)]="form.currency">
-            <option value="HNL">HNL</option>
-            <option value="USD">USD</option>
-          </select>
-        </label>
-        <label>Destino de entrega
-          <textarea name="destination" [(ngModel)]="form.destination" maxlength="1000"></textarea>
-        </label>
-        <label>ID de equipo (opcional)
-          <input name="teamId" [(ngModel)]="form.team_id" inputmode="numeric">
-        </label>
-        <label>Comentarios de la orden
-          <textarea name="orderComments" [(ngModel)]="form.comments" maxlength="12000"></textarea>
-        </label>
-      </fieldset>
-
-      <fieldset [disabled]="!writable() || busy()">
-        <legend>Cliente</legend>
-        <label>ID del cliente registrado (opcional)
-          <input name="customerId" [(ngModel)]="form.customer.id" inputmode="numeric">
-        </label>
-        <p class="muted">Con ID se conserva un snapshot autorizado del maestro de Clientes. Sin ID, los datos se registran manualmente.</p>
-        <label>Nombre del cliente
-          <input name="customerName" [(ngModel)]="form.customer.name" required maxlength="1000">
-        </label>
-        <label>RTN
-          <input name="customerRtn" [(ngModel)]="form.customer.rtn" maxlength="30">
-        </label>
-        <label>Contacto
-          <input name="customerContact" [(ngModel)]="form.customer.contact" maxlength="120">
-        </label>
-        <label>Teléfono
-          <input name="customerPhone" [(ngModel)]="form.customer.phone" maxlength="50">
-        </label>
-        <label>Correo
-          <input type="email" name="customerEmail" [(ngModel)]="form.customer.email" maxlength="254">
-        </label>
-        <label>Dirección
-          <textarea name="customerAddress" [(ngModel)]="form.customer.address" maxlength="1000"></textarea>
-        </label>
-      </fieldset>
-
-      <h3>Ítems</h3>
-      @for (item of form.items; track $index; let i = $index) {
-        <fieldset [disabled]="!writable() || busy()">
-          <legend>Ítem {{ i + 1 }}</legend>
-          <label>Descripción
-            <textarea [name]="'description' + i" [(ngModel)]="item.description" required maxlength="4000"></textarea>
-          </label>
-          <label>Unidad
-            <input [name]="'unit' + i" [(ngModel)]="item.unit" maxlength="40">
-          </label>
-          <label>Cantidad
-            <input [name]="'quantity' + i" [(ngModel)]="item.quantity" inputmode="decimal" required>
-          </label>
-          <label>Precio unitario de venta
-            <input [name]="'salePrice' + i" [(ngModel)]="item.unit_sale_price" inputmode="decimal" required>
-          </label>
-          <label>Costo unitario
-            <input [name]="'unitCost' + i" [(ngModel)]="item.unit_cost" inputmode="decimal" required>
-          </label>
-          <label>Tipo de descuento
-            <select [name]="'discountType' + i" [(ngModel)]="item.discount_type">
-              <option value="amount">Valor por unidad</option>
-              <option value="percent">Porcentaje</option>
-            </select>
-          </label>
-          <label>Descuento
-            <input [name]="'discount' + i" [(ngModel)]="item.discount" inputmode="decimal" required>
-          </label>
-          <label>Impuesto
-            <select [name]="'taxType' + i" [(ngModel)]="item.tax_type">
-              <option value="isv15">ISV 15%</option>
-              <option value="isv18">ISV 18%</option>
-              <option value="exempt">Exento</option>
-              <option value="exonerated">Exonerado</option>
-            </select>
-          </label>
-          <label>ID del proveedor registrado (opcional)
-            <input [name]="'supplierId' + i" [(ngModel)]="item.supplier_id" inputmode="numeric">
-          </label>
-          <label>Proveedor / snapshot manual
-            <input [name]="'supplierName' + i" [(ngModel)]="item.supplier_name_snapshot" maxlength="180">
-          </label>
-          <p class="muted">Con ID se usa el snapshot autorizado del maestro de Proveedores; sin ID puede indicarse el proveedor manualmente.</p>
-          <label>Seguimiento
-            <textarea [name]="'tracking' + i" [(ngModel)]="item.tracking" maxlength="2000"></textarea>
-          </label>
-          <label>Comentarios del ítem
-            <textarea [name]="'itemComments' + i" [(ngModel)]="item.comments" maxlength="12000"></textarea>
-          </label>
-          @if (selected()?.items?.[i]; as storedItem) {
-            <p><strong>Estado guardado del ítem:</strong> {{ itemStatusLabel(storedItem.status) }}</p>
-          }
-          <button type="button" (click)="removeItem(i)">Quitar ítem {{ i + 1 }}</button>
-        </fieldset>
-      }
-      <button type="button" (click)="addItem()" [disabled]="!writable() || busy() || form.items.length >= 200">Agregar ítem</button>
-
-      <fieldset [disabled]="!writable() || busy()">
-        <legend>Totales y condiciones fiscales</legend>
-        <label>Tipo de descuento general
-          <select name="generalDiscountType" [(ngModel)]="form.general_discount_type">
-            <option value="amount">Valor</option>
-            <option value="percent">Porcentaje</option>
-          </select>
-        </label>
-        <label>Descuento general
-          <input name="generalDiscount" [(ngModel)]="form.general_discount" inputmode="decimal" required>
-        </label>
-        <label>Referencia de exoneración
-          <input name="exoneration" [(ngModel)]="form.exoneration_reference" maxlength="500">
-        </label>
-        <label>Gastos adicionales
-          <input name="additionalExpenses" [(ngModel)]="form.additional_expenses" inputmode="decimal" required>
-        </label>
-        <div class="actions">
-          <button type="button" (click)="calculate()" [disabled]="busy() || form.items.length === 0">Calcular vista previa</button>
-          <button [disabled]="busy() || form.items.length === 0">{{ selected() ? 'Guardar cambios' : 'Registrar orden' }}</button>
-        </div>
-      </fieldset>
-    </form>
-
-    @if (selected(); as savedOrder) {
-      @if(api.has('core.documents.read')) {
-        <app-order-documents [order]="savedOrder" [changesPending]="dirty() || busy()" (linked)="documentLinked($event)" />
-      }
-    }
-    @if (preview(); as calculation) {
-      <section>
-        <h3>{{ selected() ? 'Cálculo de la orden' : 'Vista previa del cálculo' }}</h3>
-        <div class="summary">
-          <p><strong>Bruto:</strong> {{ form.currency }} {{ calculation.gross }}</p>
-          <p><strong>Descuento de ítems:</strong> {{ form.currency }} {{ calculation.item_discount }}</p>
-          <p><strong>Descuento general:</strong> {{ form.currency }} {{ calculation.general_discount }}</p>
-          <p><strong>Base 15%:</strong> {{ form.currency }} {{ calculation.base_15 }}</p>
-          <p><strong>Base 18%:</strong> {{ form.currency }} {{ calculation.base_18 }}</p>
-          <p><strong>Exento:</strong> {{ form.currency }} {{ calculation.exempt }}</p>
-          <p><strong>Exonerado:</strong> {{ form.currency }} {{ calculation.exonerated }}</p>
-          <p><strong>ISV 15%:</strong> {{ form.currency }} {{ calculation.isv_15 }}</p>
-          <p><strong>ISV 18%:</strong> {{ form.currency }} {{ calculation.isv_18 }}</p>
-          <p><strong>Total:</strong> {{ form.currency }} {{ calculation.total }}</p>
-          <p><strong>Inversión en productos:</strong> {{ form.currency }} {{ calculation.products_investment }}</p>
-          <p><strong>Gastos adicionales:</strong> {{ form.currency }} {{ calculation.additional_expenses }}</p>
-          <p><strong>Inversión total:</strong> {{ form.currency }} {{ calculation.investment_total }}</p>
-        </div>
-        <p class="muted">La Unidad 1 no calcula utilidad; sólo conserva venta e inversión exactas.</p>
-      </section>
+    <button
+      type="button"
+      (click)="loadHistory(historyPage - 1)"
+      [disabled]="busy() || historyPage <= 1"
+    >
+      Historial anterior
+    </button>
+    <button
+      type="button"
+      (click)="loadHistory(historyPage + 1)"
+      [disabled]="busy() || historyPage * 25 >= historyTotal()"
+    >
+      Historial siguiente
+    </button>
     }
   </section>
+  }
+
+  <form (ngSubmit)="save()">
+    <fieldset [disabled]="!writable() || busy()">
+      <legend>Datos de la orden</legend>
+      <label
+        >Número de orden
+        <input
+          name="orderNumber"
+          [(ngModel)]="form.order_number"
+          required
+          maxlength="160"
+        />
+      </label>
+      <label
+        >Fecha de orden
+        <input
+          type="date"
+          name="orderDate"
+          [(ngModel)]="form.order_date"
+          required
+        />
+      </label>
+      <label
+        >Fecha requerida de entrega
+        <input
+          type="date"
+          name="requiredDeliveryDate"
+          [ngModel]="form.required_delivery_date || ''"
+          (ngModelChange)="form.required_delivery_date = $event || null"
+        />
+      </label>
+      <label
+        >Moneda
+        <select name="currency" [(ngModel)]="form.currency">
+          <option value="HNL">HNL</option>
+          <option value="USD">USD</option>
+        </select>
+      </label>
+      <label
+        >Destino de entrega
+        <textarea
+          name="destination"
+          [(ngModel)]="form.destination"
+          maxlength="1000"
+        ></textarea>
+      </label>
+      <label
+        >ID de equipo (opcional)
+        <input name="teamId" [(ngModel)]="form.team_id" inputmode="numeric" />
+      </label>
+      <label
+        >Comentarios de la orden
+        <textarea
+          name="orderComments"
+          [(ngModel)]="form.comments"
+          maxlength="12000"
+        ></textarea>
+      </label>
+    </fieldset>
+
+    <fieldset [disabled]="!writable() || busy()">
+      <legend>Cliente</legend>
+      <label
+        >ID del cliente registrado (opcional)
+        <input
+          name="customerId"
+          [(ngModel)]="form.customer.id"
+          inputmode="numeric"
+        />
+      </label>
+      <p class="muted">
+        Con ID se conserva un snapshot autorizado del maestro de Clientes. Sin
+        ID, los datos se registran manualmente.
+      </p>
+      <label
+        >Nombre del cliente
+        <input
+          name="customerName"
+          [(ngModel)]="form.customer.name"
+          required
+          maxlength="1000"
+        />
+      </label>
+      <label
+        >RTN
+        <input
+          name="customerRtn"
+          [(ngModel)]="form.customer.rtn"
+          maxlength="30"
+        />
+      </label>
+      <label
+        >Contacto
+        <input
+          name="customerContact"
+          [(ngModel)]="form.customer.contact"
+          maxlength="120"
+        />
+      </label>
+      <label
+        >Teléfono
+        <input
+          name="customerPhone"
+          [(ngModel)]="form.customer.phone"
+          maxlength="50"
+        />
+      </label>
+      <label
+        >Correo
+        <input
+          type="email"
+          name="customerEmail"
+          [(ngModel)]="form.customer.email"
+          maxlength="254"
+        />
+      </label>
+      <label
+        >Dirección
+        <textarea
+          name="customerAddress"
+          [(ngModel)]="form.customer.address"
+          maxlength="1000"
+        ></textarea>
+      </label>
+    </fieldset>
+
+    <h3>Ítems</h3>
+    @for (item of form.items; track $index; let i = $index) {
+    <fieldset [disabled]="!writable() || busy()">
+      <legend>Ítem {{ i + 1 }}</legend>
+      <label
+        >Descripción
+        <textarea
+          [name]="'description' + i"
+          [(ngModel)]="item.description"
+          required
+          maxlength="4000"
+        ></textarea>
+      </label>
+      <label
+        >Unidad
+        <input [name]="'unit' + i" [(ngModel)]="item.unit" maxlength="40" />
+      </label>
+      <label
+        >Cantidad
+        <input
+          [name]="'quantity' + i"
+          [(ngModel)]="item.quantity"
+          inputmode="decimal"
+          required
+        />
+      </label>
+      <label
+        >Precio unitario de venta
+        <input
+          [name]="'salePrice' + i"
+          [(ngModel)]="item.unit_sale_price"
+          inputmode="decimal"
+          required
+        />
+      </label>
+      <label
+        >Costo unitario
+        <input
+          [name]="'unitCost' + i"
+          [(ngModel)]="item.unit_cost"
+          inputmode="decimal"
+          required
+        />
+      </label>
+      <label
+        >Tipo de descuento
+        <select [name]="'discountType' + i" [(ngModel)]="item.discount_type">
+          <option value="amount">Valor por unidad</option>
+          <option value="percent">Porcentaje</option>
+        </select>
+      </label>
+      <label
+        >Descuento
+        <input
+          [name]="'discount' + i"
+          [(ngModel)]="item.discount"
+          inputmode="decimal"
+          required
+        />
+      </label>
+      <label
+        >Impuesto
+        <select [name]="'taxType' + i" [(ngModel)]="item.tax_type">
+          <option value="isv15">ISV 15%</option>
+          <option value="isv18">ISV 18%</option>
+          <option value="exempt">Exento</option>
+          <option value="exonerated">Exonerado</option>
+        </select>
+      </label>
+      <label
+        >ID del proveedor registrado (opcional)
+        <input
+          [name]="'supplierId' + i"
+          [(ngModel)]="item.supplier_id"
+          inputmode="numeric"
+        />
+      </label>
+      <label
+        >Proveedor / snapshot manual
+        <input
+          [name]="'supplierName' + i"
+          [(ngModel)]="item.supplier_name_snapshot"
+          maxlength="180"
+        />
+      </label>
+      <p class="muted">
+        Con ID se usa el snapshot autorizado del maestro de Proveedores; sin ID
+        puede indicarse el proveedor manualmente.
+      </p>
+      <label
+        >Seguimiento
+        <textarea
+          [name]="'tracking' + i"
+          [(ngModel)]="item.tracking"
+          maxlength="2000"
+        ></textarea>
+      </label>
+      <label
+        >Comentarios del ítem
+        <textarea
+          [name]="'itemComments' + i"
+          [(ngModel)]="item.comments"
+          maxlength="12000"
+        ></textarea>
+      </label>
+      @if (selected()?.items?.[i]; as storedItem) {
+      <p>
+        <strong>Estado guardado del ítem:</strong> {{
+        itemStatusLabel(storedItem.status) }}
+      </p>
+      }
+      <button type="button" (click)="removeItem(i)">
+        Quitar ítem {{ i + 1 }}
+      </button>
+    </fieldset>
+    }
+    <button
+      type="button"
+      (click)="addItem()"
+      [disabled]="!writable() || busy() || form.items.length >= 200"
+    >
+      Agregar ítem
+    </button>
+
+    <fieldset [disabled]="!writable() || busy()">
+      <legend>Totales y condiciones fiscales</legend>
+      <label
+        >Tipo de descuento general
+        <select
+          name="generalDiscountType"
+          [(ngModel)]="form.general_discount_type"
+        >
+          <option value="amount">Valor</option>
+          <option value="percent">Porcentaje</option>
+        </select>
+      </label>
+      <label
+        >Descuento general
+        <input
+          name="generalDiscount"
+          [(ngModel)]="form.general_discount"
+          inputmode="decimal"
+          required
+        />
+      </label>
+      <label
+        >Referencia de exoneración
+        <input
+          name="exoneration"
+          [(ngModel)]="form.exoneration_reference"
+          maxlength="500"
+        />
+      </label>
+      <label
+        >Gastos adicionales
+        <input
+          name="additionalExpenses"
+          [(ngModel)]="form.additional_expenses"
+          inputmode="decimal"
+          required
+        />
+      </label>
+      <div class="actions">
+        <button
+          type="button"
+          (click)="calculate()"
+          [disabled]="busy() || form.items.length === 0"
+        >
+          Calcular vista previa
+        </button>
+        <button [disabled]="busy() || form.items.length === 0">
+          {{ selected() ? 'Guardar cambios' : 'Registrar orden' }}
+        </button>
+      </div>
+    </fieldset>
+  </form>
+
+  @if (selected(); as savedOrder) { @if(api.has('core.documents.read')) {
+  <app-order-documents
+    [order]="savedOrder"
+    [changesPending]="dirty() || busy()"
+    (linked)="documentLinked($event)"
+  />
+  } } @if (preview(); as calculation) {
+  <section>
+    <h3>
+      {{ selected() ? 'Cálculo de la orden' : 'Vista previa del cálculo' }}
+    </h3>
+    <div class="summary">
+      <p><strong>Bruto:</strong> {{ form.currency }} {{ calculation.gross }}</p>
+      <p>
+        <strong>Descuento de ítems:</strong> {{ form.currency }} {{
+        calculation.item_discount }}
+      </p>
+      <p>
+        <strong>Descuento general:</strong> {{ form.currency }} {{
+        calculation.general_discount }}
+      </p>
+      <p>
+        <strong>Base 15%:</strong> {{ form.currency }} {{ calculation.base_15 }}
+      </p>
+      <p>
+        <strong>Base 18%:</strong> {{ form.currency }} {{ calculation.base_18 }}
+      </p>
+      <p>
+        <strong>Exento:</strong> {{ form.currency }} {{ calculation.exempt }}
+      </p>
+      <p>
+        <strong>Exonerado:</strong> {{ form.currency }} {{
+        calculation.exonerated }}
+      </p>
+      <p>
+        <strong>ISV 15%:</strong> {{ form.currency }} {{ calculation.isv_15 }}
+      </p>
+      <p>
+        <strong>ISV 18%:</strong> {{ form.currency }} {{ calculation.isv_18 }}
+      </p>
+      <p><strong>Total:</strong> {{ form.currency }} {{ calculation.total }}</p>
+      <p>
+        <strong>Inversión en productos:</strong> {{ form.currency }} {{
+        calculation.products_investment }}
+      </p>
+      <p>
+        <strong>Gastos adicionales:</strong> {{ form.currency }} {{
+        calculation.additional_expenses }}
+      </p>
+      <p>
+        <strong>Inversión total:</strong> {{ form.currency }} {{
+        calculation.investment_total }}
+      </p>
+    </div>
+    <p class="muted">
+      La Unidad 1 no calcula utilidad; sólo conserva venta e inversión exactas.
+    </p>
+  </section>
+  }
+</section>
 }

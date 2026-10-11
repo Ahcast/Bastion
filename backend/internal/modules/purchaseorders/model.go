@@ -50,6 +50,8 @@ type PurchaseOrderItem struct {
 }
 
 type PurchaseOrder struct {
+	ClonedFromID         *string             `json:"cloned_from_id"`
+	ClonedFromVersion    *uint64             `json:"cloned_from_version,string"`
 	ID                   string              `json:"id"`
 	OrderNumber          string              `json:"order_number"`
 	Status               string              `json:"status"`

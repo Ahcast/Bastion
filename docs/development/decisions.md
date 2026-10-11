@@ -97,3 +97,9 @@ La regla legacy «cambiar estado después del commit» se sustituye por una tran
 ## 2026-10-11 — Identidad estable para documentos de OC
 
 La edición conserva los IDs enviados de ítems y actualiza sus filas; reordenar mueve posiciones sin cambiar identidad. IDs nuevos vacíos; duplicados/ajenos se rechazan. Una FK compuesta y el propietario impiden eliminar ítems con vínculos documentales, también en papelera. No reutilizar posiciones para adjuntos ni eliminar binarios como efecto de edición. DTO previo sin IDs sigue permitido para reemplazar ítems sin documentos; si omite un ítem vinculado, conflicto/rollback. Core posee archivos; PurchaseOrders posee destino y evidencia, con política registrada según flag. Contrato único `../contracts/purchase-order-documents.md`.
+
+## 2026-10-11 — Unidad 5 OC: clonación en validación
+
+Contrato `purchase-order-cloning.md`, migración 0019 y POST clone con DTO estricto. Snapshots comerciales, impuestos/descuentos y moneda conservados; nueva cabecera Recibida/ítems Pendiente, identidad nueva, sin documentos/entrega/vínculo Quote. Fuente inmutable y relación durable al origen/versión. Permisos view/create vigentes y scopes del equipo; replay reautoriza también destino. TX única incluye idempotencia, cabecera/ítems, trazabilidad, auditoría y eventos; UI conserva clave/destino ante fallos. No capacidades nuevas asignadas automáticamente.
+
+Pruebas añadidas: vectores HNL/USD con 15/18/exento/exonerado y descuentos, reinicio operacional/snapshots, 12 replays concurrentes, fuente inmutable, documentos aislados, intención/versión obsoleta, autorización fuente/destino/revocación, identidad técnica denegada, rollback de evento y retry, HTTP estricto/CSRF, UI reintento y navegación confirmada, navegador clonando OC entregada con documentos. Build/pruebas Angular y regresión en curso; no marcar cerrada antes del CI verde. Después: aceptación integral OC antes de Facturas/pagos. Sin despliegue ni conexiones productivas.

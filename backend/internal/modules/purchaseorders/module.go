@@ -145,7 +145,7 @@ func (s *Service) Module(logger *slog.Logger, enabled bool) registry.Module {
 	return registry.Module{
 		ID:           "purchase-orders",
 		Label:        "Órdenes de Compra",
-		Version:      "0.4.0",
+		Version:      "0.5.0",
 		Enabled:      enabled,
 		Dependencies: []string{"core"},
 		Permissions:  Permissions,
@@ -172,6 +172,17 @@ func (s *Service) Module(logger *slog.Logger, enabled bool) registry.Module {
 			})
 			register("GET /api/v1/purchase-orders/{id}", func(ctx context.Context, a core.Actor, r *http.Request) (any, error) {
 				return s.Get(ctx, a, r.PathValue("id"))
+			})
+			register("POST /api/v1/purchase-orders/{id}/clone", func(ctx context.Context, a core.Actor, r *http.Request) (any, error) {
+				key, e := requireIdempotency(r)
+				if e != nil {
+					return nil, e
+				}
+				var p CloneInput
+				if _, e = strictRequired(r, &p, map[string]bool{"required_delivery_date": true}, "version", "order_number", "order_date", "required_delivery_date", "destination", "comments", "additional_expenses"); e != nil {
+					return nil, e
+				}
+				return s.Clone(ctx, a, r.PathValue("id"), key, p)
 			})
 			register("GET /api/v1/purchase-orders/{id}/status-history", func(ctx context.Context, a core.Actor, r *http.Request) (any, error) {
 				page, perPage, e := orderPage(r)

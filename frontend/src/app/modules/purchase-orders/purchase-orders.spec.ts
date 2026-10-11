@@ -117,7 +117,9 @@ describe("Órdenes de Compra", () => {
       has: vi.fn(() => true),
       message: vi.fn(() => "El registro cambió. Vuelva a abrirlo."),
     };
-    TestBed.configureTestingModule({ providers: [{ provide: Client, useValue: api }] });
+    TestBed.configureTestingModule({
+      providers: [{ provide: Client, useValue: api }],
+    });
   });
 
   it("crea un borrador monomoneda con versión string y entrega nullable", () => {
@@ -143,8 +145,12 @@ describe("Órdenes de Compra", () => {
     expect(path).toBe("/purchase-orders");
     expect(body["version"]).toBe("0");
     expect(body["required_delivery_date"]).toBeNull();
-    expect((body["items"] as Record<string, string>[])[0]["unit_sale_price"]).toBe("100");
-    expect((body["items"] as Record<string, string>[])[0]["unit_cost"]).toBe("60");
+    expect(
+      (body["items"] as Record<string, string>[])[0]["unit_sale_price"],
+    ).toBe("100");
+    expect((body["items"] as Record<string, string>[])[0]["unit_cost"]).toBe(
+      "60",
+    );
     expect(key.length).toBeGreaterThan(8);
     expect(component.selected()?.id).toBe(record().id);
   });
@@ -201,13 +207,20 @@ describe("Órdenes de Compra", () => {
       (button) => button.textContent?.trim() === "Nueva orden de compra",
     );
     expect(creationButton).toBeUndefined();
-    const editorFieldsets = Array.from(html.querySelectorAll("section form fieldset")) as HTMLFieldSetElement[];
+    const editorFieldsets = Array.from(
+      html.querySelectorAll("section form fieldset"),
+    ) as HTMLFieldSetElement[];
     expect(editorFieldsets.length).toBeGreaterThan(0);
     expect(editorFieldsets.every((field) => field.disabled)).toBe(true);
   });
 
   it("envía filtros y paginación al backend y respeta su total", async () => {
-    api.get.mockResolvedValue({ data: [record()], total: 61, page: 2, per_page: 25 });
+    api.get.mockResolvedValue({
+      data: [record()],
+      total: 61,
+      page: 2,
+      per_page: 25,
+    });
     const component = TestBed.createComponent(PurchaseOrders).componentInstance;
     component.page = 2;
     component.search = "Equipo";
@@ -246,7 +259,12 @@ describe("Órdenes de Compra", () => {
     component.form = component.editable(record());
     api.write.mockRejectedValueOnce(new Error("timeout"));
     await component.transition("confirmed");
-    api.write.mockResolvedValueOnce({ id: record().id, version: "2", status: "confirmed", to_status: "confirmed" });
+    api.write.mockResolvedValueOnce({
+      id: record().id,
+      version: "2",
+      status: "confirmed",
+      to_status: "confirmed",
+    });
     api.get.mockRejectedValueOnce(new Error("reload"));
     await component.transition("confirmed");
     expect(api.write.mock.calls[0][3]).toBe(api.write.mock.calls[1][3]);
@@ -278,13 +296,77 @@ describe("Órdenes de Compra", () => {
   it("consulta el historial paginado por ID string sin transformar la ficha", async () => {
     const component = TestBed.createComponent(PurchaseOrders).componentInstance;
     component.selected.set(record());
-    api.get.mockResolvedValueOnce({ data: [{ id: "1", item_position: 1, from_status: "pending", to_status: "purchased", actor_id: "42", purchase_order_version: "2", created_at: "2026-10-11T16:00:00Z" }], total: 26, page: 2, per_page: 25 });
+    api.get.mockResolvedValueOnce({
+      data: [
+        {
+          id: "1",
+          item_position: 1,
+          from_status: "pending",
+          to_status: "purchased",
+          actor_id: "42",
+          purchase_order_version: "2",
+          created_at: "2026-10-11T16:00:00Z",
+        },
+      ],
+      total: 26,
+      page: 2,
+      per_page: 25,
+    });
     await component.loadHistory(2);
-    expect(api.get.mock.calls[0][0]).toBe("/purchase-orders/9007199254740993/status-history?page=2&per_page=25");
+    expect(api.get.mock.calls[0][0]).toBe(
+      "/purchase-orders/9007199254740993/status-history?page=2&per_page=25",
+    );
     expect(component.historyPage).toBe(2);
     expect(component.historyTotal()).toBe(26);
     expect(component.history()[0].item_position).toBe(1);
     expect(component.selected()?.version).toBe("1");
   });
 
+  it("clona una orden entregada con metadata explícita y conserva la clave tras fallo", async () => {
+    const component = TestBed.createComponent(PurchaseOrders).componentInstance;
+    const source = { ...record(), status: "delivered" as const };
+    component.selected.set(source);
+    component.form = component.editable(source);
+    component.beginClone();
+    component.cloneForm!.order_number = "OC-NEW";
+    api.write
+      .mockRejectedValueOnce(new Error("network"))
+      .mockResolvedValueOnce({ id: "9007199254740995", version: "1" });
+    await component.clone();
+    await component.clone();
+    const first = api.write.mock.calls[0],
+      second = api.write.mock.calls[1];
+    expect(first[1]).toBe("/purchase-orders/9007199254740993/clone");
+    expect(first[3]).toBe(second[3]);
+    expect(first[2]).toMatchObject({
+      version: "1",
+      order_number: "OC-NEW",
+      required_delivery_date: null,
+      additional_expenses: "0",
+      comments: "",
+    });
+    expect(first[2]).not.toHaveProperty("items");
+    expect(component.selected()?.status).toBe("delivered");
+    expect(component.cloned()?.id).toBe("9007199254740995");
+    await component.clone();
+    expect(api.write).toHaveBeenCalledTimes(2);
+  });
+  it("conserva el destino confirmado tras fallo de listado y bloquea cambios pendientes", async () => {
+    const component = TestBed.createComponent(PurchaseOrders).componentInstance;
+    const source = record();
+    component.selected.set(source);
+    component.form = component.editable(source);
+    component.form.comments = "sin guardar";
+    component.beginClone();
+    expect(component.cloneForm).toBeNull();
+    component.form = component.editable(source);
+    component.beginClone();
+    component.cloneForm!.order_number = "OC-NEW";
+    api.write.mockResolvedValue({ id: "99", version: "1" });
+    api.get.mockRejectedValue(new Error("reload"));
+    await component.clone();
+    expect(component.cloned()).toEqual({ id: "99", version: "1" });
+    await component.open("99");
+    expect(component.cloned()?.id).toBe("99");
+  });
 });

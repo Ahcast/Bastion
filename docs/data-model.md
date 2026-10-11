@@ -136,3 +136,7 @@ Conversión Quotes→OC en 0017: customer_purchase_orders.source_quote_id único
 ## Documentos privados OC e identidad de ítems
 
 Contrato propietario vigente: [documentos privados OC](contracts/purchase-order-documents.md). Migración 0018 y vínculos durables a IDs de ítem; edición/reordenamiento preserva identidad, papelera no permite eliminar el ítem vinculado.
+
+## Clonación OC
+
+Contrato vigente: [clonación OC](contracts/purchase-order-cloning.md). Migración 0019 conserva origen/versión, reinicio operacional y relación inmutable sin copiar adjuntos.

@@ -37,3 +37,9 @@ Permisos explícitos: ordenes.view, ordenes.documents.write, core.documents.read
 Filtros por ítem y papelera, paginación de 25. Papelera conserva el vínculo; no se puede eliminar de la OC un ítem con documento incluso eliminado. Reordenar conserva el ID y el adjunto. API de edición debe enviar los IDs retornados para conservar ítems. Timeout: repetir misma intención, no crear otro documento; la UI conserva etapa de carga/clave. Permisos se reevalúan en cada petición. No se acredita S3/escáner productivo con el adapter sintético de CI.
 
 Unidad 4 certificada en `1073c261de0c8f7ab12aed0ff6bb7b6a5f361e7c`; [Core checks 38163339892](https://github.com/Ahcast/Bastion/actions/runs/38163339892) aprobado. Clonación y cierre integral son el siguiente paso.
+
+## 2026-10-11 — Unidad 5 OC: clonación en validación
+
+Contrato `purchase-order-cloning.md`, migración 0019 y POST clone con DTO estricto. Snapshots comerciales, impuestos/descuentos y moneda conservados; nueva cabecera Recibida/ítems Pendiente, identidad nueva, sin documentos/entrega/vínculo Quote. Fuente inmutable y relación durable al origen/versión. Permisos view/create vigentes y scopes del equipo; replay reautoriza también destino. TX única incluye idempotencia, cabecera/ítems, trazabilidad, auditoría y eventos; UI conserva clave/destino ante fallos. No capacidades nuevas asignadas automáticamente.
+
+Pruebas añadidas: vectores HNL/USD con 15/18/exento/exonerado y descuentos, reinicio operacional/snapshots, 12 replays concurrentes, fuente inmutable, documentos aislados, intención/versión obsoleta, autorización fuente/destino/revocación, identidad técnica denegada, rollback de evento y retry, HTTP estricto/CSRF, UI reintento y navegación confirmada, navegador clonando OC entregada con documentos. Build/pruebas Angular y regresión en curso; no marcar cerrada antes del CI verde. Después: aceptación integral OC antes de Facturas/pagos. Sin despliegue ni conexiones productivas.
