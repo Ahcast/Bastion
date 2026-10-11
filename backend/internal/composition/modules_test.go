@@ -1,14 +1,43 @@
 package composition
 
 import (
+	"fmt"
 	"io"
 	"log/slog"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	"github.com/Ahcast/Bastion/backend/internal/core"
 	"github.com/Ahcast/Bastion/backend/internal/core/registry"
 	"github.com/Ahcast/Bastion/backend/internal/modules/purchaseorders"
 )
+
+func TestQuotePurchaseOrderConversionRequiresBothOwners(t *testing.T) {
+	for _, enabled := range []bool{false, true} {
+		t.Run(fmt.Sprint(enabled), func(t *testing.T) {
+			for _, name := range []string{"BASTION_CUSTOMERS_ENABLED", "BASTION_SUPPLIERS_ENABLED", "BASTION_PROCESSES_ENABLED", "BASTION_WORKFLOW_ENABLED"} {
+				t.Setenv(name, "false")
+			}
+			t.Setenv("BASTION_QUOTES_ENABLED", "true")
+			t.Setenv("BASTION_PURCHASE_ORDERS_ENABLED", fmt.Sprint(enabled))
+			s := &core.Service{DocumentPolicies: map[string]core.DocumentPolicy{}}
+			r := registry.New()
+			if e := r.Register(registry.Module{ID: "core", Label: "Core", Version: "0.1.0", Enabled: true}); e != nil {
+				t.Fatal(e)
+			}
+			if e := Register(s, r, slog.New(slog.NewTextHandler(io.Discard, nil))); e != nil {
+				t.Fatal(e)
+			}
+			mux := http.NewServeMux()
+			moduleByID(t, r, "quotes").Routes(mux)
+			_, pattern := mux.Handler(httptest.NewRequest("POST", "/api/v1/quotes/1/convert-to-purchase-order", nil))
+			if (pattern != "") != enabled {
+				t.Fatal("conversion route availability", pattern, enabled)
+			}
+		})
+	}
+}
 
 func compositionFixture(t *testing.T, purchaseOrders string) (*core.Service, *registry.Registry) {
 	t.Helper()

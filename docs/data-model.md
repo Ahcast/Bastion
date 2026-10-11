@@ -130,3 +130,5 @@ Aprobaciones humanas en 0009: Workflow posee approvals/approval_events con bindi
 Emisión Quotes en 0010 amplía quote_pdf_snapshots: kind draft/issued, approval_id único, binding_hash e issued_by/issued_at. La emisión conserva la versión aprobada de Quote y consume Workflow en la misma TX del documento/auditoría/hecho. pending no tiene documento descargable; approved no significa sent.
 
 Programación Core en 0011 agrega outbox_events.available_at nullable UTC con precisión de microsegundos. PublishOutbox conserva la fecha efectiva al crear jobs; eventos anteriores usan created_at. No se crean tablas comerciales de correo ni se convierten hechos de dominio en envíos automáticos. Ver [contrato de transporte](contracts/mail-transport.md).
+
+Conversión Quotes→OC en 0017: customer_purchase_orders.source_quote_id único nullable y source_quote_version FK a quote_versions; quotes.purchase_order_id único nullable/FK al destino. Los propietarios escriben sus agregados dentro de la misma TX; Quote converted y snapshot/versiones conservan destino. No copia documentos ni cambia estados sin efecto.

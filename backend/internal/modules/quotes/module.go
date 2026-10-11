@@ -25,7 +25,7 @@ func required(r *http.Request, v any, names ...string) error {
 	}
 	for _, n := range names {
 		f, ok := fields[n]
-		if !ok || bytes.Equal(bytes.TrimSpace(f), []byte("null")) {
+		if !ok || (bytes.Equal(bytes.TrimSpace(f), []byte("null")) && !nullableConversionField(v, n)) {
 			return core.Invalid
 		}
 	}
@@ -132,6 +132,7 @@ func (s *Service) ModuleFiles(logger *slog.Logger, enabled bool, objects core.Ob
 			}
 			return Calculate(p)
 		})
+		s.registerPurchaseOrderConversion(register)
 		s.registerBulk(register)
 		s.registerFX(register)
 		if s.Approvals != nil {

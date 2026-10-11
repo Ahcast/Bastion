@@ -147,3 +147,7 @@ Validación cerrada: [código 996a9d8](https://github.com/Ahcast/Bastion/commit/
 Transiciones adyacentes de cabecera/ítems, historial, versión/idempotencia, permisos/scopes y entrega con reauth implementados en API y UI española. Auditoría/eventos atómicos, concurrencia, rollback, revocación y rechazo de máquina cubiertos. Edición íntegra bloqueada tras cualquier avance; descuento general corregido al recargar.
 
 Código certificado `0fa94796ffee0c248035f94a9166f22c0a955b42`; [Core checks 38154939036](https://github.com/Ahcast/Bastion/actions/runs/38154939036), documentación `38154939037` y rama única `38154939034` aprobados. Go/MySQL5.7/race/formato/vet/builds, Angular build/64 pruebas y navegador 9/9 aprobados en CI. Las 17 pruebas offline crawler aprobaron localmente. No se acredita infraestructura productiva. Próxima unidad: conversión Cotización → OC por PurchaseOrders; después documentos/clonación y cierre integral, antes de Facturas.
+
+## 2026-10-11 — OC Unidad 3 en validación
+
+Conversión Quotes→OC implementada por propietarios con contrato único, migración 0017, trazabilidad/versiones y efectos atómicos. UI conserva intención y resultado; navegación cruzada mediante permisos. Angular build/68 pruebas y listado Playwright 10 escenarios locales aprobados. Backend/MySQL5.7/race/builds y navegador pendientes de CI antes de certificar. No producción.

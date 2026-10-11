@@ -145,6 +145,9 @@ func RegisterFiles(s *core.Service, r *registry.Registry, logger *slog.Logger, o
 	if supplierEnabled {
 		purchaseOrderService.Suppliers = supplierService
 	}
+	if purchaseOrderEnabled && quoteEnabled {
+		quoteService.PurchaseOrders = purchaseOrderService
+	}
 	if purchaseOrderEnabled {
 		s.RegisterPermissions(purchaseorders.Permissions, []string{"ordenes.view"})
 	}

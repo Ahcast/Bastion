@@ -57,3 +57,7 @@ Fuera de la primera unidad: Cotización→OC, OC→Factura, entrega, clonación,
 Contrato congelado en `../contracts/purchase-orders-states.md`: un solo grafo vigente. Transiciones transaccionales, REST, historial, entrega con reauth y Angular certificados en `0fa94796ffee0c248035f94a9166f22c0a955b42`, Core checks `38154939036` aprobado. Consultar checkpoint para evidencia completa.
 
 Siguiente unidad dentro de OC: definir e implementar conversión Cotización → OC por el servicio propietario, transaccional/idempotente y con `source_quote_id`. Después documentos/clonación y aceptación integral de OC; Facturas sigue posterior a ese cierre.
+
+## Unidad 3 activa — conversión Cotización → OC
+
+Contrato normativo `../contracts/quote-purchase-order-conversion.md`. Código y UI implementados; cerrar MySQL/integridad, permisos, navegador, regresión y CI antes de documentos/clonación. Facturas permanece después del cierre integral de OC.

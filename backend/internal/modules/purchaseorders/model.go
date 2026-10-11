@@ -54,6 +54,7 @@ type PurchaseOrder struct {
 	Status               string              `json:"status"`
 	Customer             CustomerInput       `json:"customer"`
 	CustomerVersion      uint64              `json:"customer_version,string"`
+	SourceQuoteVersion   *uint64             `json:"source_quote_version,string"`
 	SourceQuoteID        *string             `json:"source_quote_id"`
 	Destination          string              `json:"destination"`
 	OrderDate            string              `json:"order_date"`

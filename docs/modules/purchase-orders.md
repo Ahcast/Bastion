@@ -188,10 +188,10 @@ Debe:
 4. mapear cliente/items/impuestos;
 5. crear orden e items en transacción;
 6. guardar `source_quote_id`;
-7. cambiar estado de cotización después del commit;
+7. cambiar estado y versionar cotización en la misma transacción del propietario;
 8. publicar evento.
 
-Puede crear borrador si faltan destino/número, pero el borrador debe existir íntegro en backend.
+La unidad vigente exige número explícito y orden íntegra; no crea borradores vacíos. El [contrato de conversión](../contracts/quote-purchase-order-conversion.md) fija aceptación, permisos y atomicidad.
 
 ## Conversión Orden -> Factura
 

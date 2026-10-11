@@ -20,7 +20,7 @@ Actualizado: 2026-10-11.
 - Proveedores: unidad cerrada y validada.
 - Procesos/receptor crawler: unidad base cerrada y validada.
 - Cotizaciones: **cerrado y validado en CI para el alcance monomoneda HNL/USD**.
-- OC de clientes: **Unidades 1 y 2 cerradas y validadas en CI; módulo activo para conversión Cotización → OC**.
+- OC de clientes: **Unidades 1 y 2 cerradas y validadas en CI; módulo activo con conversión Cotización → OC en validación**.
 - Facturas/pagos y módulos posteriores: pendientes; no iniciar antes de cerrar OC por unidades.
 - Producción: no desplegada ni migrada.
 
@@ -152,6 +152,10 @@ HEAD de código certificado: `0fa94796ffee0c248035f94a9166f22c0a955b42`. [Core c
 
 Las pruebas intermedias corrigieron el uso de TOTP ya consumido sustituyéndolo por recovery sintético de un uso para reauth. El escenario de emisión existente recibió diagnóstico por etapas y un presupuesto total mayor tras agotar 30 segundos; conserva sus aserciones acotadas y aprobó las ejecuciones finales.
 
+## Unidad 3 — conversión Cotización → OC en validación
+
+Contrato `contracts/quote-purchase-order-conversion.md`, migración 0017 y servicio propietario implementados. Conversión de Aceptada en una TX, snapshot/versión de origen, vínculo durable, estado Convertida, auditoría/hechos y restricción de una OC por fuente. REST estricto y UI española con navegación cruzada. Angular build/68 pruebas locales aprobados; compilación de 10 escenarios Playwright aprobada. Go/MySQL5.7/race/builds y navegador nuevo pendientes de CI; unidad no cerrada todavía.
+
 ## Próximo paso exacto
 
-Continuar dentro de OC con el contrato de conversión Cotización → OC y su implementación server-side, transaccional/idempotente por PurchaseOrders, conservando `source_quote_id`. Luego cerrar las unidades pendientes de documentos/clonación y aceptación integral. No iniciar Facturas/pagos ni módulos posteriores hasta completar OC. Ningún despliegue, envío ni migración productiva realizado.
+Cerrar CI de Unidad 3 y corregir fallos antes de avanzar. Luego documentos/clonación y aceptación integral de OC. No iniciar Facturas/pagos antes de completar OC. Ningún despliegue, envío ni migración productiva realizado.

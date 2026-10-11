@@ -100,6 +100,7 @@ func (s *Service) cloneInTransaction(ctx context.Context, tx *sql.Tx, a core.Act
 		if q.Deleted != nil || q.Version != version {
 			return nil, core.Conflict
 		}
+		q.PurchaseOrderID = nil
 		q.ID = ""
 		q.Number = ""
 		q.Status = "draft"

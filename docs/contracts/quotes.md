@@ -157,3 +157,7 @@ PATCH /quotes/{id}/status añade reason opcional (máximo 1000 caracteres; oblig
 Lotes: efecto comercial y resultado por ítem comparten TX; fallo del ledger revierte el efecto. Fallos transitorios dejan pendiente; replay reautoriza resultados y redacta los que ya no son visibles. La UI conserva cuerpo/clave originales ante timeout aunque cambie la selección y bloquea lotes con ficha abierta. Bulk conserva destinos preliminares; resultados comerciales finales son individuales y requieren motivo.
 
 Aceptación: concurrencia y rollback de lotes, reanudación/revocación, estados comerciales tras SMTP aceptado/incierto, historial, vigencia y revisiones; Angular y navegador real. No confundir cierre de desarrollo con conexión/despliegue productivo.
+
+## Conversión propietaria a OC de cliente — unidad 3
+
+[Contrato normativo](quote-purchase-order-conversion.md): añade `cotizaciones.convert`, ruta `POST /quotes/{id}/convert-to-purchase-order`, estado `converted` y `purchase_order_id` nullable string en detalle/versiones. No se establece converted mediante PATCH status; sólo el efecto transaccional real lo produce. Quote convertida no se reabre ni edita; clonar crea un nuevo Borrador sin vínculo. Ambos módulos deben estar habilitados.

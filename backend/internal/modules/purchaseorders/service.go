@@ -58,7 +58,7 @@ func (s *Service) gate(ctx context.Context, q core.Querier, a core.Actor, permis
 	return s.Core.Authorize(ctx, q, a, permission, a.UserID, team, false)
 }
 
-const orderColumns = `o.id,o.order_number,o.status,COALESCE(CAST(o.source_quote_id AS CHAR),''),COALESCE(CAST(o.customer_id AS CHAR),''),o.customer_version,o.customer_name_snapshot,o.customer_rtn_snapshot,o.customer_contact_snapshot,o.customer_phone_snapshot,o.customer_email_snapshot,o.customer_address_snapshot,o.destination,CAST(o.order_date AS CHAR),COALESCE(CAST(o.required_delivery_date AS CHAR),''),o.currency,o.comments,o.exoneration_reference,o.general_discount_type,CAST(o.general_discount AS CHAR),CAST(o.gross AS CHAR),CAST(o.item_discount AS CHAR),CAST(o.allocated_discount AS CHAR),CAST(o.base_15 AS CHAR),CAST(o.base_18 AS CHAR),CAST(o.exempt AS CHAR),CAST(o.exonerated AS CHAR),CAST(o.isv_15 AS CHAR),CAST(o.isv_18 AS CHAR),CAST(o.total AS CHAR),CAST(o.products_investment AS CHAR),CAST(o.additional_expenses AS CHAR),CAST(o.investment_total AS CHAR),o.calculator_version,o.version,CAST(o.created_by AS CHAR),COALESCE(CAST(o.team_id AS CHAR),'')`
+const orderColumns = `o.id,o.order_number,o.status,COALESCE(CAST(o.source_quote_id AS CHAR),''),COALESCE(CAST(o.customer_id AS CHAR),''),o.customer_version,o.customer_name_snapshot,o.customer_rtn_snapshot,o.customer_contact_snapshot,o.customer_phone_snapshot,o.customer_email_snapshot,o.customer_address_snapshot,o.destination,CAST(o.order_date AS CHAR),COALESCE(CAST(o.required_delivery_date AS CHAR),''),o.currency,o.comments,o.exoneration_reference,o.general_discount_type,CAST(o.general_discount AS CHAR),CAST(o.gross AS CHAR),CAST(o.item_discount AS CHAR),CAST(o.allocated_discount AS CHAR),CAST(o.base_15 AS CHAR),CAST(o.base_18 AS CHAR),CAST(o.exempt AS CHAR),CAST(o.exonerated AS CHAR),CAST(o.isv_15 AS CHAR),CAST(o.isv_18 AS CHAR),CAST(o.total AS CHAR),CAST(o.products_investment AS CHAR),CAST(o.additional_expenses AS CHAR),CAST(o.investment_total AS CHAR),o.calculator_version,o.version,CAST(o.created_by AS CHAR),COALESCE(CAST(o.team_id AS CHAR),''),o.source_quote_version`
 
 func scanOrder(row interface{ Scan(...any) error }) (PurchaseOrder, error) {
 	var o PurchaseOrder
@@ -71,7 +71,7 @@ func scanOrder(row interface{ Scan(...any) error }) (PurchaseOrder, error) {
 		&o.Destination, &o.OrderDate, &delivery, &o.Currency, &o.Comments, &o.Exoneration, &o.DiscountType, &o.Discount,
 		&c.Gross, &c.ItemDiscount, &allocated, &c.Base15, &c.Base18, &c.Exempt, &c.Exonerated, &c.ISV15, &c.ISV18, &c.Total,
 		&c.ProductsInvestment, &c.AdditionalExpenses, &c.InvestmentTotal, &c.CalculatorVersion,
-		&o.Version, &o.CreatedBy, &o.TeamID,
+		&o.Version, &o.CreatedBy, &o.TeamID, &o.SourceQuoteVersion,
 	)
 	if e != nil {
 		return o, e
@@ -297,6 +297,7 @@ func (s *Service) Save(ctx context.Context, a core.Actor, id, key string, p Inpu
 				Customer:             customer,
 				CustomerVersion:      customerVersion,
 				SourceQuoteID:        old.SourceQuoteID,
+				SourceQuoteVersion:   old.SourceQuoteVersion,
 				Destination:          p.Destination,
 				OrderDate:            p.OrderDate,
 				RequiredDeliveryDate: p.RequiredDeliveryDate,
@@ -326,8 +327,8 @@ func (s *Service) persist(ctx context.Context, tx *sql.Tx, a core.Actor, o *Purc
 	c := o.Calculation
 	topic := "purchase_order.created"
 	if o.ID == "" {
-		res, e := tx.ExecContext(ctx, `INSERT INTO customer_purchase_orders(order_number,status,source_quote_id,customer_id,customer_version,customer_name_snapshot,customer_rtn_snapshot,customer_contact_snapshot,customer_phone_snapshot,customer_email_snapshot,customer_address_snapshot,destination,order_date,required_delivery_date,currency,comments,exoneration_reference,general_discount_type,general_discount,gross,item_discount,allocated_discount,base_15,base_18,exempt,exonerated,isv_15,isv_18,total,products_investment,additional_expenses,investment_total,calculator_version,version,created_by,updated_by,team_id,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,UTC_TIMESTAMP(6),UTC_TIMESTAMP(6))`,
-			o.OrderNumber, o.Status, nil, nullable(o.Customer.ID), o.CustomerVersion, o.Customer.Name, o.Customer.RTN, o.Customer.Contact, o.Customer.Phone, o.Customer.Email, o.Customer.Address,
+		res, e := tx.ExecContext(ctx, `INSERT INTO customer_purchase_orders(order_number,status,source_quote_id,source_quote_version,customer_id,customer_version,customer_name_snapshot,customer_rtn_snapshot,customer_contact_snapshot,customer_phone_snapshot,customer_email_snapshot,customer_address_snapshot,destination,order_date,required_delivery_date,currency,comments,exoneration_reference,general_discount_type,general_discount,gross,item_discount,allocated_discount,base_15,base_18,exempt,exonerated,isv_15,isv_18,total,products_investment,additional_expenses,investment_total,calculator_version,version,created_by,updated_by,team_id,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,UTC_TIMESTAMP(6),UTC_TIMESTAMP(6))`,
+			o.OrderNumber, o.Status, nullableDate(o.SourceQuoteID), o.SourceQuoteVersion, nullable(o.Customer.ID), o.CustomerVersion, o.Customer.Name, o.Customer.RTN, o.Customer.Contact, o.Customer.Phone, o.Customer.Email, o.Customer.Address,
 			o.Destination, o.OrderDate, nullableDate(o.RequiredDeliveryDate), o.Currency, o.Comments, o.Exoneration, o.DiscountType, o.Discount,
 			c.Gross, c.ItemDiscount, c.GeneralDiscount, c.Base15, c.Base18, c.Exempt, c.Exonerated, c.ISV15, c.ISV18, c.Total,
 			c.ProductsInvestment, c.AdditionalExpenses, c.InvestmentTotal, c.CalculatorVersion, o.Version, o.CreatedBy, a.UserID, nullable(o.TeamID),

@@ -61,7 +61,8 @@
         <p><strong>Versión:</strong> {{ saved.version }}</p>
         <p><strong>Creada por:</strong> {{ saved.created_by }}</p>
         @if (saved.source_quote_id) {
-          <p><strong>Cotización de origen:</strong> {{ saved.source_quote_id }}</p>
+          <p><strong>Cotización de origen:</strong> {{ saved.source_quote_id }} · Versión {{saved.source_quote_version}}</p>
+          @if(api.moduleEnabled('quotes')&&api.has('cotizaciones.view')){<a routerLink="/quotes" [queryParams]="{id:saved.source_quote_id}">Ver cotización de origen</a>}
         }
       </div>
     }

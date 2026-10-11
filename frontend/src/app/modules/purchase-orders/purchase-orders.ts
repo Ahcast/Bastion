@@ -1,4 +1,5 @@
 import { Component, inject, signal, OnInit } from "@angular/core";
+import { ActivatedRoute, RouterLink } from "@angular/router";
 import { DatePipe } from "@angular/common";
 import { Reauthentication } from "../../core/security/reauthentication";
 import { FormsModule } from "@angular/forms";
@@ -72,6 +73,7 @@ export interface PurchaseOrder extends Omit<PurchaseOrderInput, "items"> {
   status: OrderStatus;
   customer_version: string;
   source_quote_id: string | null;
+  source_quote_version?: string | null;
   created_by: string;
   calculation: PurchaseOrderCalculation;
   items: (PurchaseOrderItemInput & {
@@ -133,7 +135,7 @@ export function emptyPurchaseOrder(): PurchaseOrderInput {
 }
 
 @Component({
-  imports: [FormsModule, DatePipe, Reauthentication],
+  imports: [RouterLink, FormsModule, DatePipe, Reauthentication],
   templateUrl: "./purchase-orders.html",
   styles: [
     `fieldset { display:grid; gap:.8rem; border:1px solid #d6e1e8; margin:.7rem 0; padding:1rem; min-width:0 }
@@ -170,8 +172,11 @@ export class PurchaseOrders implements OnInit {
   perPage = 25;
   private pending = new Map<string, { body: string; key: string }>();
 
+  private route = inject(ActivatedRoute, {optional:true});
   async ngOnInit() {
     await this.load();
+    const id=this.route?.snapshot.queryParamMap.get("id");
+    if(id) await this.open(id);
   }
 
   async load(reset = false) {

@@ -1,6 +1,6 @@
 # Ejecutar Órdenes de Compra de clientes
 
-Requiere Core, migraciones globales hasta `0016_customer_purchase_order_states.sql` en MySQL 5.7 aislado y Angular. Seguir [Core](core-runbook.md). No ejecutar seeds, pruebas ni migraciones contra datos reales.
+Requiere Core, migraciones globales hasta `0017_quote_purchase_order_conversion.sql` en MySQL 5.7 aislado y Angular. Seguir [Core](core-runbook.md). No ejecutar seeds, pruebas ni migraciones contra datos reales.
 
 `BASTION_PURCHASE_ORDERS_ENABLED=true` registra el módulo; deshabilitarlo retira todas sus rutas y conserva los datos. Clientes/Proveedores son opcionales: los snapshots manuales funcionan sin sus permisos; un ID requiere el propietario habilitado y acceso autorizado.
 
@@ -23,3 +23,9 @@ Facturado/Cerrado son vocabulario reservado; no existen acciones para simular su
 `python scripts/check_repository.py`; `gofmt`, `go vet`, `make build` y `go test -race -count=1 ./...` con MySQL 5.7 dedicado `bastion_test`; Angular `npm ci`, build y tests. Playwright utiliza `bastion_browser_test` y el seed sintético: cálculo/alta/edición, avance de cabecera/ítems, bloqueo de entrega incompleta, confirmación de identidad, entrega y recarga persistida.
 
 S3, SMTP, Percona Bluehost, DNS y despliegue productivos mantienen sus validaciones externas. Esta unidad no envía mensajes ni factura por cambiar un estado.
+
+## Conversión desde Cotizaciones
+
+Ambos módulos habilitados; permisos explícitos `cotizaciones.view/convert` y `ordenes.create/view` con scopes actuales. Abrir una cotización **Aceptada**, indicar número externo OC, fechas, destino, gastos y comentarios; confirmar la conversión. No existe conversión de Borrador/Aprobada internamente ni alta vacía. La fuente queda **Convertida a OC** y enlaza el destino; la OC conserva ID/versión de fuente. Revisar ambos con sus permisos independientes. No se copian PDFs/adjuntos ni notas privadas; documentos de OC tendrán su propia unidad.
+
+Si se pierde el ACK, repetir la misma intención y datos. Otra intención tras convertir devuelve conflicto; no otra OC. La migración añade unicidad del origen: datos legacy con orígenes duplicados deben revisarse antes de una migración productiva; no se depuran automáticamente. Playwright incluye conversión USD 201.25, inversión 83.50, recarga y navegación cruzada con usuario sin permisos de catálogos.

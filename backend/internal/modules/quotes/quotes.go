@@ -15,7 +15,7 @@ import (
 	"time"
 )
 
-var Permissions = []string{"cotizaciones.view", "cotizaciones.create", "cotizaciones.update", "cotizaciones.delete", "cotizaciones.pdf", "cotizaciones.transition", "cotizaciones.request_approval", "cotizaciones.approve", "cotizaciones.revoke_approval", "cotizaciones.emit"}
+var Permissions = []string{"cotizaciones.view", "cotizaciones.create", "cotizaciones.update", "cotizaciones.delete", "cotizaciones.pdf", "cotizaciones.transition", "cotizaciones.request_approval", "cotizaciones.approve", "cotizaciones.revoke_approval", "cotizaciones.emit", "cotizaciones.convert"}
 
 type CustomerInput struct {
 	ID      string `json:"id"`
@@ -39,6 +39,7 @@ type Input struct {
 	Version uint64 `json:"version,string"`
 }
 type Quote struct {
+	PurchaseOrderID *string       `json:"purchase_order_id"`
 	ID              string        `json:"id"`
 	Number          string        `json:"number"`
 	Status          string        `json:"status"`
@@ -69,12 +70,13 @@ type ProcessSource interface {
 	QuoteSourceInTransaction(context.Context, *sql.Tx, core.Actor, string) (processes.QuoteSource, error)
 }
 type Service struct {
-	Core        *core.Service
-	Approvals   *workflow.Service
-	Customers   CustomerSource
-	Processes   ProcessSource
-	Store       PDFStore
-	Logo, Stamp []byte
+	PurchaseOrders PurchaseOrderTarget
+	Core           *core.Service
+	Approvals      *workflow.Service
+	Customers      CustomerSource
+	Processes      ProcessSource
+	Store          PDFStore
+	Logo, Stamp    []byte
 }
 
 func normalize(p *Input) error {
@@ -129,13 +131,13 @@ func (s *Service) gate(ctx context.Context, q core.Querier, a core.Actor, perm s
 	return s.Core.Authorize(ctx, q, a, perm, a.UserID, team, false)
 }
 
-const columns = `id,number,status,COALESCE(CAST(source_process_id AS CHAR),''),COALESCE(CAST(customer_id AS CHAR),''),customer_version,customer_name_snapshot,customer_rtn_snapshot,customer_contact_snapshot,customer_phone_snapshot,customer_email_snapshot,customer_address_snapshot,process_reference_snapshot,CAST(date AS CHAR),validity_days,currency,terms,private_notes,author_contact,exoneration_reference,general_discount_type,general_discount,gross,item_discount,allocated_discount,base_15,base_18,exempt,exonerated,isv_15,isv_18,total,cost,margin,calculator_version,version,created_by,COALESCE(CAST(team_id AS CHAR),''),deleted_at`
+const columns = `id,number,status,COALESCE(CAST(source_process_id AS CHAR),''),COALESCE(CAST(customer_id AS CHAR),''),customer_version,customer_name_snapshot,customer_rtn_snapshot,customer_contact_snapshot,customer_phone_snapshot,customer_email_snapshot,customer_address_snapshot,process_reference_snapshot,CAST(date AS CHAR),validity_days,currency,terms,private_notes,author_contact,exoneration_reference,general_discount_type,general_discount,gross,item_discount,allocated_discount,base_15,base_18,exempt,exonerated,isv_15,isv_18,total,cost,margin,calculator_version,version,created_by,COALESCE(CAST(team_id AS CHAR),''),deleted_at,purchase_order_id`
 
 func scan(row interface{ Scan(...any) error }) (Quote, error) {
 	var q Quote
 	q.Items = []CalculatedItem{}
 	c := &q.Calculation
-	e := row.Scan(&q.ID, &q.Number, &q.Status, &q.Source, &q.Customer.ID, &q.CustomerVersion, &q.Customer.Name, &q.Customer.RTN, &q.Customer.Contact, &q.Customer.Phone, &q.Customer.Email, &q.Customer.Address, &q.Reference, &q.Date, &q.ValidityDays, &q.Currency, &q.Terms, &q.Notes, &q.AuthorContact, &q.Exoneration, &q.DiscountType, &q.Discount, &c.Gross, &c.ItemDiscount, &c.GeneralDiscount, &c.Base15, &c.Base18, &c.Exempt, &c.Exonerated, &c.ISV15, &c.ISV18, &c.Total, &c.Cost, &c.Margin, &c.CalculatorVersion, &q.Version, &q.Owner, &q.Team, &q.Deleted)
+	e := row.Scan(&q.ID, &q.Number, &q.Status, &q.Source, &q.Customer.ID, &q.CustomerVersion, &q.Customer.Name, &q.Customer.RTN, &q.Customer.Contact, &q.Customer.Phone, &q.Customer.Email, &q.Customer.Address, &q.Reference, &q.Date, &q.ValidityDays, &q.Currency, &q.Terms, &q.Notes, &q.AuthorContact, &q.Exoneration, &q.DiscountType, &q.Discount, &c.Gross, &c.ItemDiscount, &c.GeneralDiscount, &c.Base15, &c.Base18, &c.Exempt, &c.Exonerated, &c.ISV15, &c.ISV18, &c.Total, &c.Cost, &c.Margin, &c.CalculatorVersion, &q.Version, &q.Owner, &q.Team, &q.Deleted, &q.PurchaseOrderID)
 	if e == nil {
 		q.Discount = decimal.RequireFromString(q.Discount).String()
 	}

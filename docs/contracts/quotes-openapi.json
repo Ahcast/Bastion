@@ -2,8 +2,8 @@
   "openapi": "3.0.3",
   "info": {
     "title": "Bastion Cotizaciones",
-    "version": "0.7.0",
-    "description": "Contrato REST vigente para borradores, cálculo, archivos/PDF, estados, aprobación, emisión, correo comercial y bulk. FX y conversiones OC/Factura permanecen fuera del contrato hasta definir sus reglas. Ver quotes.md."
+    "version": "0.8.0",
+    "description": "Contrato REST para cotizaciones HNL/USD, cálculo, archivos/PDF, estados, aprobación, emisión, correo comercial, bulk y conversión propietaria a OC. Facturas permanece posterior. Ver quotes.md."
   },
   "paths": {
     "/api/v1/quotes": {
@@ -1651,6 +1651,69 @@
           }
         }
       }
+    },
+    "/api/v1/quotes/{id}/convert-to-purchase-order": {
+      "post": {
+        "summary": "Convertir cotización aceptada a OC de cliente",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ID"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 100
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PurchaseOrderConversionInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Conversión confirmada o replay autorizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PurchaseOrderConversionResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sesión requerida"
+          },
+          "403": {
+            "description": "Acceso denegado"
+          },
+          "404": {
+            "description": "No visible"
+          },
+          "409": {
+            "description": "Versión o intención conflictiva"
+          },
+          "422": {
+            "description": "Entrada inválida"
+          }
+        },
+        "description": "Sólo humanos. Ambos módulos habilitados. Permisos cotizaciones.convert/view y ordenes.create/view; scopes actuales. Versión exacta, Idempotency-Key y una OC por cotización. Ambos propietarios y evidencia en una TX."
+      }
     }
   },
   "components": {
@@ -2278,6 +2341,80 @@
           },
           "content": {
             "type": "string"
+          }
+        }
+      },
+      "PurchaseOrderConversionInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "version",
+          "order_number",
+          "destination",
+          "order_date",
+          "required_delivery_date",
+          "comments",
+          "additional_expenses"
+        ],
+        "properties": {
+          "version": {
+            "$ref": "#/components/schemas/VersionString"
+          },
+          "order_number": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 160
+          },
+          "destination": {
+            "type": "string",
+            "maxLength": 1000
+          },
+          "order_date": {
+            "type": "string",
+            "format": "date"
+          },
+          "required_delivery_date": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date"
+          },
+          "comments": {
+            "type": "string",
+            "maxLength": 12000
+          },
+          "additional_expenses": {
+            "type": "string",
+            "pattern": "^[0-9]+(\\.[0-9]{1,2})?$"
+          }
+        }
+      },
+      "PurchaseOrderConversionResult": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "version",
+          "status",
+          "purchase_order_id",
+          "purchase_order_version"
+        ],
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/ID"
+          },
+          "version": {
+            "$ref": "#/components/schemas/VersionString"
+          },
+          "status": {
+            "const": "converted"
+          },
+          "purchase_order_id": {
+            "$ref": "#/components/schemas/ID"
+          },
+          "purchase_order_version": {
+            "$ref": "#/components/schemas/VersionString"
           }
         }
       }
