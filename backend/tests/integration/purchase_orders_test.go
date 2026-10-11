@@ -173,3 +173,47 @@ func TestPurchaseOrdersTransactionalSaveGetSnapshotsIdempotencyAndRollback(t *te
 		t.Fatal("rolled-back idempotency record survived", created, e)
 	}
 }
+
+func TestPurchaseOrdersReorderPreservesSupplierSnapshots(t *testing.T) {
+	s, _, ss, a := purchaseOrdersFixture(t)
+	grantPurchaseOrders(t, s.Core, a, "all")
+	grantSupplier(t, s.Core, a, "all")
+
+	supplierA := makeSupplier(t, ss, a, "po-reorder-a", supplierInput("Proveedor A"))
+	supplierB := makeSupplier(t, ss, a, "po-reorder-b", supplierInput("Proveedor B"))
+	p := purchaseOrderInput("", supplierA)
+	p.OrderNumber = "OC-REORDER"
+	second := p.Items[0]
+	second.Description = "Equipo B"
+	second.SupplierID = supplierB
+	p.Items = append(p.Items, second)
+
+	created, e := s.Save(ctx, a, "", "po-reorder-create", p)
+	id := customerResult(t, created, e)["id"]
+	o, e := s.Get(ctx, a, id)
+	if e != nil || len(o.Items) != 2 {
+		t.Fatal(o, e)
+	}
+	if o.Items[0].SupplierName != "Proveedor A" || o.Items[1].SupplierName != "Proveedor B" {
+		t.Fatal(o.Items)
+	}
+
+	if _, e := s.Core.DB.Exec(`UPDATE suppliers SET name=CONCAT(name,' actualizado'),version=version+1,updated_at=UTC_TIMESTAMP(6) WHERE id IN (?,?)`, supplierA, supplierB); e != nil {
+		t.Fatal(e)
+	}
+	edit := editPurchaseOrder(o)
+	edit.Items[0], edit.Items[1] = edit.Items[1], edit.Items[0]
+	if _, e := s.Save(ctx, a, id, "po-reorder-update", edit); e != nil {
+		t.Fatal(e)
+	}
+	o, e = s.Get(ctx, a, id)
+	if e != nil || len(o.Items) != 2 {
+		t.Fatal(o, e)
+	}
+	if o.Items[0].SupplierID != supplierB || o.Items[0].SupplierName != "Proveedor B" || o.Items[0].SupplierVersion != 1 {
+		t.Fatal("supplier B snapshot changed on reorder", o.Items[0])
+	}
+	if o.Items[1].SupplierID != supplierA || o.Items[1].SupplierName != "Proveedor A" || o.Items[1].SupplierVersion != 1 {
+		t.Fatal("supplier A snapshot changed on reorder", o.Items[1])
+	}
+}
