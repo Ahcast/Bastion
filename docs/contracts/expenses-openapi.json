@@ -1,0 +1,751 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Bastion Gastos",
+    "version": "0.1.0"
+  },
+  "paths": {
+    "/api/v1/expenses": {
+      "get": {
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Resultado autorizado"
+          },
+          "401": {
+            "description": "Sesión/MFA requerida"
+          },
+          "403": {
+            "description": "Permiso/CSRF/reauth requerida"
+          },
+          "404": {
+            "description": "No visible"
+          },
+          "409": {
+            "description": "Versión/estado divergente"
+          },
+          "422": {
+            "description": "Entrada inválida"
+          }
+        },
+        "parameters": [
+          {
+            "name": "search",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "supplier_id",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "date_from",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "date_to",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "currency",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "category",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "deleted",
+            "in": "query",
+            "schema": {
+              "type": "boolean",
+              "default": false
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100000,
+              "default": 1
+            }
+          },
+          {
+            "name": "per_page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 25
+            }
+          }
+        ]
+      },
+      "post": {
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Resultado autorizado"
+          },
+          "401": {
+            "description": "Sesión/MFA requerida"
+          },
+          "403": {
+            "description": "Permiso/CSRF/reauth requerida"
+          },
+          "404": {
+            "description": "No visible"
+          },
+          "409": {
+            "description": "Versión/estado divergente"
+          },
+          "422": {
+            "description": "Entrada inválida"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Input"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8
+            }
+          },
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/expenses/{id}": {
+      "get": {
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Resultado autorizado"
+          },
+          "401": {
+            "description": "Sesión/MFA requerida"
+          },
+          "403": {
+            "description": "Permiso/CSRF/reauth requerida"
+          },
+          "404": {
+            "description": "No visible"
+          },
+          "409": {
+            "description": "Versión/estado divergente"
+          },
+          "422": {
+            "description": "Entrada inválida"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9]+$"
+            }
+          }
+        ]
+      },
+      "patch": {
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Resultado autorizado"
+          },
+          "401": {
+            "description": "Sesión/MFA requerida"
+          },
+          "403": {
+            "description": "Permiso/CSRF/reauth requerida"
+          },
+          "404": {
+            "description": "No visible"
+          },
+          "409": {
+            "description": "Versión/estado divergente"
+          },
+          "422": {
+            "description": "Entrada inválida"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Input"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9]+$"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8
+            }
+          },
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      },
+      "delete": {
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Resultado autorizado"
+          },
+          "401": {
+            "description": "Sesión/MFA requerida"
+          },
+          "403": {
+            "description": "Permiso/CSRF/reauth requerida"
+          },
+          "404": {
+            "description": "No visible"
+          },
+          "409": {
+            "description": "Versión/estado divergente"
+          },
+          "422": {
+            "description": "Entrada inválida"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StateInput"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9]+$"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8
+            }
+          },
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/expenses/{id}/restore": {
+      "post": {
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Resultado autorizado"
+          },
+          "401": {
+            "description": "Sesión/MFA requerida"
+          },
+          "403": {
+            "description": "Permiso/CSRF/reauth requerida"
+          },
+          "404": {
+            "description": "No visible"
+          },
+          "409": {
+            "description": "Versión/estado divergente"
+          },
+          "422": {
+            "description": "Entrada inválida"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StateInput"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9]+$"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8
+            }
+          },
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/expenses/calculate": {
+      "post": {
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Resultado autorizado"
+          },
+          "401": {
+            "description": "Sesión/MFA requerida"
+          },
+          "403": {
+            "description": "Permiso/CSRF/reauth requerida"
+          },
+          "404": {
+            "description": "No visible"
+          },
+          "409": {
+            "description": "Versión/estado divergente"
+          },
+          "422": {
+            "description": "Entrada inválida"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CalculationInput"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/expenses/totals": {
+      "get": {
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Resultado autorizado"
+          },
+          "401": {
+            "description": "Sesión/MFA requerida"
+          },
+          "403": {
+            "description": "Permiso/CSRF/reauth requerida"
+          },
+          "404": {
+            "description": "No visible"
+          },
+          "409": {
+            "description": "Versión/estado divergente"
+          },
+          "422": {
+            "description": "Entrada inválida"
+          }
+        },
+        "parameters": [
+          {
+            "name": "search",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "supplier_id",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "date_from",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "date_to",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "currency",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "category",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "deleted",
+            "in": "query",
+            "schema": {
+              "type": "boolean",
+              "default": false
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100000,
+              "default": 1
+            }
+          },
+          {
+            "name": "per_page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 25
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/expenses/{id}/duplicates": {
+      "get": {
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Resultado autorizado"
+          },
+          "401": {
+            "description": "Sesión/MFA requerida"
+          },
+          "403": {
+            "description": "Permiso/CSRF/reauth requerida"
+          },
+          "404": {
+            "description": "No visible"
+          },
+          "409": {
+            "description": "Versión/estado divergente"
+          },
+          "422": {
+            "description": "Entrada inválida"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9]+$"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100000,
+              "default": 1
+            }
+          },
+          {
+            "name": "per_page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 25
+            }
+          }
+        ]
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "session": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "__Host-bastion_session"
+      }
+    },
+    "schemas": {
+      "Input": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "invoice_number",
+          "expense_date",
+          "supplier",
+          "category",
+          "currency",
+          "taxable_amount",
+          "exempt_amount",
+          "notes",
+          "team_id",
+          "version"
+        ],
+        "properties": {
+          "invoice_number": {
+            "type": "string"
+          },
+          "expense_date": {
+            "type": "string",
+            "format": "date"
+          },
+          "supplier": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "name"
+            ],
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              }
+            }
+          },
+          "category": {
+            "type": "string",
+            "enum": [
+              "product_purchase",
+              "freight",
+              "customs",
+              "taxes",
+              "transport",
+              "travel",
+              "software",
+              "services",
+              "advertising",
+              "office",
+              "other"
+            ]
+          },
+          "currency": {
+            "type": "string",
+            "enum": [
+              "HNL",
+              "USD"
+            ]
+          },
+          "taxable_amount": {
+            "type": "string",
+            "pattern": "^(0|[1-9][0-9]*)(\\.[0-9]{1,2})?$"
+          },
+          "exempt_amount": {
+            "type": "string",
+            "pattern": "^(0|[1-9][0-9]*)(\\.[0-9]{1,2})?$"
+          },
+          "notes": {
+            "type": "string"
+          },
+          "team_id": {
+            "type": "string"
+          },
+          "version": {
+            "type": "string",
+            "pattern": "^[0-9]+$"
+          }
+        }
+      },
+      "StateInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "version",
+          "reason"
+        ],
+        "properties": {
+          "version": {
+            "type": "string",
+            "pattern": "^[0-9]+$"
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000
+          }
+        }
+      },
+      "CalculationInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "currency",
+          "taxable_amount",
+          "exempt_amount"
+        ],
+        "properties": {
+          "currency": {
+            "type": "string",
+            "enum": [
+              "HNL",
+              "USD"
+            ]
+          },
+          "taxable_amount": {
+            "type": "string",
+            "pattern": "^(0|[1-9][0-9]*)(\\.[0-9]{1,2})?$"
+          },
+          "exempt_amount": {
+            "type": "string",
+            "pattern": "^(0|[1-9][0-9]*)(\\.[0-9]{1,2})?$"
+          }
+        }
+      }
+    }
+  }
+}

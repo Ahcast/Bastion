@@ -150,3 +150,25 @@ func TestInvoicesDraftModuleFlagAndExplicitPermissions(t *testing.T) {
 		t.Fatal("invalid invoice flag", e)
 	}
 }
+
+func TestExpensesModuleFlagAndOptionalSupplierCatalog(t *testing.T) {
+	for _, enabled := range []bool{false, true} {
+		t.Setenv("BASTION_EXPENSES_ENABLED", fmt.Sprint(enabled))
+		s, r := compositionFixture(t, "false")
+		m := moduleByID(t, r, "expenses")
+		if m.Enabled != enabled || len(m.Dependencies) != 1 || m.Dependencies[0] != "core" {
+			t.Fatal(m)
+		}
+		for _, p := range []string{"gastos.view", "gastos.create", "gastos.update", "gastos.delete", "gastos.restore"} {
+			if hasPermission(s.PermissionCatalog(), p) != enabled {
+				t.Fatal(p)
+			}
+		}
+	}
+	t.Setenv("BASTION_EXPENSES_ENABLED", "invalid")
+	s := &core.Service{DocumentPolicies: map[string]core.DocumentPolicy{}}
+	r := registry.New()
+	if e := Register(s, r, slog.New(slog.NewTextHandler(io.Discard, nil))); e == nil || e.Error() != "invalid expenses enable flag" {
+		t.Fatal(e)
+	}
+}

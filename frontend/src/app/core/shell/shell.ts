@@ -26,6 +26,7 @@ import { Client } from "../api/client";
         @if(api.has("cotizaciones.view") && api.moduleEnabled("quotes")){<a routerLink="/quotes" routerLinkActive="active">Cotizaciones</a>}
         @if(api.has("ordenes.view") && api.moduleEnabled("purchase-orders")){<a routerLink="/purchase-orders" routerLinkActive="active">Órdenes de Compra</a>}
         @if(api.has("facturas.view") && api.moduleEnabled("invoices")){<a routerLink="/invoices" routerLinkActive="active">Facturas</a>}
+        @if(api.has("gastos.view") && api.moduleEnabled("expenses")){<a routerLink="/expenses" routerLinkActive="active">Gastos</a>}
         @if(api.has("procesos.view") && api.moduleEnabled("processes")){<a routerLink="/processes" routerLinkActive="active">Procesos</a>}
         <a routerLink="/settings" routerLinkActive="active">Configuración</a>
       </nav>
