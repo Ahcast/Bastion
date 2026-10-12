@@ -356,9 +356,13 @@ test("Órdenes de Compra: cálculo, alta, persistencia, edición y búsqueda con
       exact: true,
     }),
   ).toBeVisible();
+  // A late list response is not proof that the restore mutation committed.
+  // Await the real ACK before changing filters or reloading the page.
+  const restoredDocument = page.waitForResponse(r => r.request().method() === "POST" && /\/api\/v1\/documents\/[0-9]+\/restore$/.test(r.url()));
   await docs
     .getByRole("button", { name: "Restaurar documento item.pdf", exact: true })
     .click();
+  expect((await restoredDocument).status()).toBe(200);
   await docs.getByLabel("Papelera de documentos").uncheck();
   await expect(
     docs.locator("p").filter({ hasText: /item.pdf · Ítem 1 · En cuarentena/ }),
