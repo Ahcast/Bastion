@@ -16,6 +16,7 @@
 <button type="button" (click)="calculate()">Calcular gasto</button><button type="submit">{{selected()?'Guardar cambios de gasto':'Registrar gasto'}}</button></fieldset></form>
 @if(currentCalculation();as c){<section aria-label="Cálculo del gasto"><p>ISV del gasto (15%): {{c.currency}} {{c.tax_amount}}</p><p>Total del gasto: {{c.currency}} {{c.total}}</p></section>}
 @if(selected();as o){@if(!o.deleted_at){<button type="button" (click)="findDuplicates()" [disabled]="busy()||needsReload()||dirty()">Consultar posibles duplicados</button>@if(duplicates();as d){<p>{{d.total}} posibles duplicados visibles. Revise los documentos antes de decidir; los registros se conservan.</p><ul>@for(x of d.data;track x.id){<li><button type="button" (click)="open(x.id)" [disabled]="busy()">Revisar gasto #{{x.id}}</button> · {{x.supplier.name}} · {{x.currency}} {{x.calculation.total}}</li>}</ul>}}
+<bastion-expense-links [expense]="o" [changesPending]="dirty()||needsReload()" (changed)="afterLinksChanged($event)"/>
 @if(api.has(o.deleted_at?'gastos.restore':'gastos.delete')){<label>Motivo de cambio del gasto<textarea [(ngModel)]="reason" maxlength="1000" [disabled]="busy()"></textarea></label><button type="button" (click)="changeState(!!o.deleted_at)" [disabled]="busy()||needsReload()||dirty()||!reason.trim()">{{o.deleted_at?'Restaurar gasto':'Enviar gasto a papelera'}}</button>}}
 </section>}
 </section>
