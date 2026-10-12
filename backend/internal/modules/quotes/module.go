@@ -133,6 +133,7 @@ func (s *Service) ModuleFiles(logger *slog.Logger, enabled bool, objects core.Ob
 			return Calculate(p)
 		})
 		s.registerPurchaseOrderConversion(register)
+		s.registerInvoiceConversion(register)
 		s.registerBulk(register)
 		s.registerFX(register)
 		if s.Approvals != nil {

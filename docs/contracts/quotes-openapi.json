@@ -1714,6 +1714,69 @@
         },
         "description": "Sólo humanos. Ambos módulos habilitados. Permisos cotizaciones.convert/view y ordenes.create/view; scopes actuales. Versión exacta, Idempotency-Key y una OC por cotización. Ambos propietarios y evidencia en una TX."
       }
+    },
+    "/api/v1/quotes/{id}/convert-to-invoice": {
+      "post": {
+        "summary": "Convertir cotización aceptada a borrador de factura íntegro",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ID"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 100
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InvoiceConversionInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Conversión confirmada o replay autorizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvoiceConversionResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sesión requerida"
+          },
+          "403": {
+            "description": "Acceso denegado"
+          },
+          "404": {
+            "description": "No visible"
+          },
+          "409": {
+            "description": "Versión o intención conflictiva"
+          },
+          "422": {
+            "description": "Entrada inválida"
+          }
+        },
+        "description": "Sólo humanos. Ambos módulos habilitados. Permisos cotizaciones.convert/view y ordenes.create/view; scopes actuales. Versión exacta, Idempotency-Key y una OC por cotización. Ambos propietarios y evidencia en una TX."
+      }
     }
   },
   "components": {
@@ -2415,6 +2478,80 @@
           },
           "purchase_order_version": {
             "$ref": "#/components/schemas/VersionString"
+          }
+        }
+      },
+      "InvoiceConversionInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "version",
+          "invoice_date",
+          "payment_term_type",
+          "credit_days",
+          "public_notes",
+          "additional_expenses",
+          "reason"
+        ],
+        "properties": {
+          "version": {
+            "$ref": "#/components/schemas/Version"
+          },
+          "invoice_date": {
+            "type": "string",
+            "format": "date"
+          },
+          "payment_term_type": {
+            "type": "string",
+            "enum": [
+              "contado",
+              "credito"
+            ]
+          },
+          "credit_days": {
+            "type": "integer",
+            "nullable": true,
+            "minimum": 1,
+            "maximum": 65535
+          },
+          "public_notes": {
+            "type": "string",
+            "maxLength": 12000
+          },
+          "additional_expenses": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000
+          }
+        }
+      },
+      "InvoiceConversionResult": {
+        "type": "object",
+        "required": [
+          "id",
+          "version",
+          "status",
+          "invoice_id",
+          "invoice_version"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "version": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "invoice_id": {
+            "type": "string"
+          },
+          "invoice_version": {
+            "type": "string"
           }
         }
       }

@@ -1,0 +1,18 @@
+import {Component,input,output,inject,signal} from '@angular/core';
+import {FormsModule} from '@angular/forms';
+import {RouterLink} from '@angular/router';
+import {Client} from '../../core/api/client';
+import type {Quote} from './quotes';
+export interface InvoiceConversionResult{id:string;version:string;status:string;invoice_id:string;invoice_version:string}
+@Component({selector:'app-quote-invoice',imports:[FormsModule,RouterLink],template:`
+@if(quote().invoice_id){<p>Cotización convertida a borrador de factura {{quote().invoice_id}}.</p>@if(api.moduleEnabled('invoices')&&api.has('facturas.view')){<a routerLink="/invoices" [queryParams]="{id:quote().invoice_id}">Ver factura derivada</a>}}
+@else if(available()){<section aria-label="Conversión a factura"><h3>Crear borrador de factura desde cotización aceptada</h3><p>Se copiarán cliente, moneda, ítems y cálculo guardados. Emitir y cobrar son acciones separadas; no se copiarán documentos ni notas privadas.</p>
+<fieldset [disabled]="busy()||disabled()"><label>Fecha de factura derivada<input type="date" [(ngModel)]="date" required></label><label for="quote-invoice-term">Condición de factura derivada</label><select id="quote-invoice-term" [(ngModel)]="term" (ngModelChange)="days=term==='credito'?30:null"><option value="contado">Contado</option><option value="credito">Crédito</option></select>@if(term==='credito'){<label>Días de crédito de factura derivada<input type="number" [(ngModel)]="days" min="1" max="65535"></label>}<label>Notas públicas de factura derivada<textarea [(ngModel)]="notes" maxlength="12000"></textarea></label><label>Gastos adicionales de factura derivada<input [(ngModel)]="expenses" inputmode="decimal"></label><label>Motivo de conversión a factura<textarea [(ngModel)]="reason" maxlength="1000" required></textarea></label><button type="button" (click)="convert()" [disabled]="changesPending()||!reason.trim()||!date">Confirmar conversión a factura</button></fieldset>
+@if(changesPending()){<p>Guarde o descarte cambios antes de convertir.</p>}
+</section>}
+@if(error()){<p role="alert">{{error()}}</p>}`})
+export class QuoteInvoice{
+ api=inject(Client);quote=input.required<Quote>();changesPending=input(false);disabled=input(false);converted=output<InvoiceConversionResult>();busyChange=output<boolean>();busy=signal(false);error=signal('');date=new Intl.DateTimeFormat('en-CA',{timeZone:'America/Tegucigalpa',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());term='contado';days:number|null=null;notes='';expenses='0';reason='';private pending=new Map<string,string>();
+ available(){return this.quote().status==='accepted'&&!this.quote().deleted_at&&!this.quote().purchase_order_id&&this.api.moduleEnabled('invoices')&&['cotizaciones.view','cotizaciones.convert','facturas.create','facturas.view'].every(p=>this.api.has(p))}
+ async convert(){if(!this.available()||this.busy()||this.disabled()||this.changesPending()||!this.reason.trim()||!this.date)return;const q=this.quote();const body={version:q.version,invoice_date:this.date,payment_term_type:this.term,credit_days:this.term==='credito'?this.days:null,public_notes:this.notes,additional_expenses:this.expenses,reason:this.reason};const path='/quotes/'+q.id+'/convert-to-invoice';const serialized=path+JSON.stringify(body);let key=this.pending.get(serialized);if(!key){key=crypto.randomUUID();this.pending.set(serialized,key)}this.busy.set(true);this.busyChange.emit(true);this.error.set('');try{const r=await this.api.write<InvoiceConversionResult>('POST',path,body,key);this.pending.delete(serialized);this.converted.emit(r)}catch(e){this.error.set(this.api.message(e))}finally{this.busy.set(false);this.busyChange.emit(false)}}
+}

@@ -39,6 +39,7 @@ type Input struct {
 	Version uint64 `json:"version,string"`
 }
 type Quote struct {
+	InvoiceID       *string       `json:"invoice_id"`
 	PurchaseOrderID *string       `json:"purchase_order_id"`
 	ID              string        `json:"id"`
 	Number          string        `json:"number"`
@@ -70,6 +71,7 @@ type ProcessSource interface {
 	QuoteSourceInTransaction(context.Context, *sql.Tx, core.Actor, string) (processes.QuoteSource, error)
 }
 type Service struct {
+	Invoices       InvoiceTarget
 	PurchaseOrders PurchaseOrderTarget
 	Core           *core.Service
 	Approvals      *workflow.Service
@@ -131,13 +133,13 @@ func (s *Service) gate(ctx context.Context, q core.Querier, a core.Actor, perm s
 	return s.Core.Authorize(ctx, q, a, perm, a.UserID, team, false)
 }
 
-const columns = `id,number,status,COALESCE(CAST(source_process_id AS CHAR),''),COALESCE(CAST(customer_id AS CHAR),''),customer_version,customer_name_snapshot,customer_rtn_snapshot,customer_contact_snapshot,customer_phone_snapshot,customer_email_snapshot,customer_address_snapshot,process_reference_snapshot,CAST(date AS CHAR),validity_days,currency,terms,private_notes,author_contact,exoneration_reference,general_discount_type,general_discount,gross,item_discount,allocated_discount,base_15,base_18,exempt,exonerated,isv_15,isv_18,total,cost,margin,calculator_version,version,created_by,COALESCE(CAST(team_id AS CHAR),''),deleted_at,purchase_order_id`
+const columns = `id,number,status,COALESCE(CAST(source_process_id AS CHAR),''),COALESCE(CAST(customer_id AS CHAR),''),customer_version,customer_name_snapshot,customer_rtn_snapshot,customer_contact_snapshot,customer_phone_snapshot,customer_email_snapshot,customer_address_snapshot,process_reference_snapshot,CAST(date AS CHAR),validity_days,currency,terms,private_notes,author_contact,exoneration_reference,general_discount_type,general_discount,gross,item_discount,allocated_discount,base_15,base_18,exempt,exonerated,isv_15,isv_18,total,cost,margin,calculator_version,version,created_by,COALESCE(CAST(team_id AS CHAR),''),deleted_at,purchase_order_id,invoice_id`
 
 func scan(row interface{ Scan(...any) error }) (Quote, error) {
 	var q Quote
 	q.Items = []CalculatedItem{}
 	c := &q.Calculation
-	e := row.Scan(&q.ID, &q.Number, &q.Status, &q.Source, &q.Customer.ID, &q.CustomerVersion, &q.Customer.Name, &q.Customer.RTN, &q.Customer.Contact, &q.Customer.Phone, &q.Customer.Email, &q.Customer.Address, &q.Reference, &q.Date, &q.ValidityDays, &q.Currency, &q.Terms, &q.Notes, &q.AuthorContact, &q.Exoneration, &q.DiscountType, &q.Discount, &c.Gross, &c.ItemDiscount, &c.GeneralDiscount, &c.Base15, &c.Base18, &c.Exempt, &c.Exonerated, &c.ISV15, &c.ISV18, &c.Total, &c.Cost, &c.Margin, &c.CalculatorVersion, &q.Version, &q.Owner, &q.Team, &q.Deleted, &q.PurchaseOrderID)
+	e := row.Scan(&q.ID, &q.Number, &q.Status, &q.Source, &q.Customer.ID, &q.CustomerVersion, &q.Customer.Name, &q.Customer.RTN, &q.Customer.Contact, &q.Customer.Phone, &q.Customer.Email, &q.Customer.Address, &q.Reference, &q.Date, &q.ValidityDays, &q.Currency, &q.Terms, &q.Notes, &q.AuthorContact, &q.Exoneration, &q.DiscountType, &q.Discount, &c.Gross, &c.ItemDiscount, &c.GeneralDiscount, &c.Base15, &c.Base18, &c.Exempt, &c.Exonerated, &c.ISV15, &c.ISV18, &c.Total, &c.Cost, &c.Margin, &c.CalculatorVersion, &q.Version, &q.Owner, &q.Team, &q.Deleted, &q.PurchaseOrderID, &q.InvoiceID)
 	if e == nil {
 		q.Discount = decimal.RequireFromString(q.Discount).String()
 	}

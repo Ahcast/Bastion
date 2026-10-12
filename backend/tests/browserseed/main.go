@@ -291,4 +291,47 @@ func main() {
 		log.Fatal(e)
 	}
 
+	// Isolated accepted quote for invoice conversion; setup grants are removed before login.
+	result, e = db.Exec(`INSERT INTO users(email,name,password_hash,totp_secret,active,created_at,updated_at) SELECT 'quote-invoice@example.test','Conversión factura sintética',password_hash,?,TRUE,UTC_TIMESTAMP(6),UTC_TIMESTAMP(6) FROM users WHERE id=1`, secret)
+	if e != nil {
+		log.Fatal(e)
+	}
+	user, e = result.LastInsertId()
+	if e != nil {
+		log.Fatal(e)
+	}
+	result, e = db.Exec(`INSERT INTO roles(name) VALUES('Conversión factura sintética')`)
+	if e != nil {
+		log.Fatal(e)
+	}
+	role, e = result.LastInsertId()
+	if e != nil {
+		log.Fatal(e)
+	}
+	if _, e = db.Exec(`INSERT INTO role_permissions SELECT ?,name,'self' FROM permissions WHERE name IN ('cotizaciones.view','cotizaciones.create','cotizaciones.transition','cotizaciones.convert','facturas.view','facturas.create','facturas.update')`, role); e != nil {
+		log.Fatal(e)
+	}
+	if _, e = db.Exec(`INSERT INTO user_roles VALUES(?,?)`, user, role); e != nil {
+		log.Fatal(e)
+	}
+	token, _, e = s.NewSession(context.Background(), core.WrapID(user), true)
+	if e != nil {
+		log.Fatal(e)
+	}
+	actor = core.Actor{Type: "user", ID: core.WrapID(user), UserID: core.WrapID(user), SessionHash: security.Hash(token), Source: "web", RequestID: security.ID(), CorrelationID: security.ID()}
+	v, e = quoteService.Save(context.Background(), actor, "", "browser-invoice-source", quotes.Input{Customer: quotes.CustomerInput{Name: "Cliente factura derivada sintético"}, Date: time.Now().In(time.FixedZone("Honduras", -6*3600)).Format("2006-01-02"), ValidityDays: 30, Currency: "USD", Notes: "Nota privada no copiar", CalculationInput: quotes.CalculationInput{Items: []quotes.Item{{Description: "Equipo factura derivada", Unit: "unidad", Quantity: "2", Price: "100", Cost: "40", DiscountType: "amount", Discount: "10", Tax: "isv15"}}, DiscountType: "amount", Discount: "5"}})
+	if e != nil {
+		log.Fatal(e)
+	}
+	quoteID = v.(map[string]string)["id"]
+	if _, e = db.Exec(`UPDATE quotes SET status='sent' WHERE id=?`, quoteID); e != nil {
+		log.Fatal(e)
+	}
+	if _, e = quoteService.Transition(context.Background(), actor, quoteID, "browser-invoice-accepted", quotes.TransitionInput{Status: "accepted", Version: 1, Reason: "Aceptación sintética para factura"}); e != nil {
+		log.Fatal(e)
+	}
+	if _, e = db.Exec(`DELETE FROM role_permissions WHERE role_id=? AND permission IN ('cotizaciones.create','cotizaciones.transition')`, role); e != nil {
+		log.Fatal(e)
+	}
+
 }

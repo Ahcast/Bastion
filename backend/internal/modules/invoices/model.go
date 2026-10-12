@@ -44,14 +44,16 @@ type Item struct {
 	finance.CalculatedItem
 }
 type Invoice struct {
-	ID             string          `json:"id"`
-	Number         *string         `json:"invoice_number"`
-	SAR            json.RawMessage `json:"sar_snapshot_json"`
-	IssuedAt       *time.Time      `json:"issued_at"`
-	IssuedBy       *string         `json:"issued_by"`
-	DueDate        *string         `json:"due_date"`
-	Company        json.RawMessage `json:"company_snapshot_json"`
-	CompanyVersion *uint64         `json:"company_version,string"`
+	SourceQuoteID      *string         `json:"source_quote_id"`
+	SourceQuoteVersion *uint64         `json:"source_quote_version,string"`
+	ID                 string          `json:"id"`
+	Number             *string         `json:"invoice_number"`
+	SAR                json.RawMessage `json:"sar_snapshot_json"`
+	IssuedAt           *time.Time      `json:"issued_at"`
+	IssuedBy           *string         `json:"issued_by"`
+	DueDate            *string         `json:"due_date"`
+	Company            json.RawMessage `json:"company_snapshot_json"`
+	CompanyVersion     *uint64         `json:"company_version,string"`
 
 	CommercialStatus *string       `json:"commercial_status"`
 	Status           string        `json:"status"`

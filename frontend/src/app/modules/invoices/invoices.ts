@@ -1,3 +1,4 @@
+import {ActivatedRoute,RouterLink} from "@angular/router";
 import {InvoicePayments,PaymentResult,collectionLabel} from "./invoice-payments";
 import {InvoiceEmission,InvoiceEmissionResult} from "./invoice-emission";
 import {InvoiceFiscalSettings} from "./fiscal-settings";
@@ -60,6 +61,8 @@ export interface Invoice extends Omit<DraftInput, "additional_expenses"> {
   invoice_number: string | null;
   sar_snapshot_json: {configuration:{cai:string;currency:string};configuration_version:string} | null;
   customer_version: string;
+ source_quote_id?:string|null;
+ source_quote_version?:string|null;
   issued_at:string|null;
   issued_by:string|null;
   due_date:string|null;
@@ -127,10 +130,11 @@ export const emptyInvoice = (): DraftInput => ({
 });
 @Component({
   selector: "bastion-invoices",
-  imports: [InvoicePayments,FormsModule, Reauthentication, InvoiceFiscalSettings, InvoiceEmission],
+  imports: [RouterLink,InvoicePayments,FormsModule, Reauthentication, InvoiceFiscalSettings, InvoiceEmission],
   templateUrl: "./invoices.html",
 })
 export class Invoices implements OnInit {
+ route=inject(ActivatedRoute,{optional:true});
  collectionLabel=collectionLabel;
  commercialFilter="";
   api = inject(Client);
@@ -158,6 +162,7 @@ export class Invoices implements OnInit {
   private baseline = "";
   async ngOnInit() {
     await Promise.all([this.load(), this.loadTeams()]);
+ const id=this.route?.snapshot.queryParamMap.get("id");if(id)await this.open(id);
   }
   catalogEnabled() {
     return this.api.has("clientes.view") && this.api.moduleEnabled("customers");

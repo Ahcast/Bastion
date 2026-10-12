@@ -101,6 +101,7 @@ func (s *Service) cloneInTransaction(ctx context.Context, tx *sql.Tx, a core.Act
 			return nil, core.Conflict
 		}
 		q.PurchaseOrderID = nil
+		q.InvoiceID = nil
 		q.ID = ""
 		q.Number = ""
 		q.Status = "draft"

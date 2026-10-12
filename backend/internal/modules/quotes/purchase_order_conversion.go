@@ -55,7 +55,7 @@ func (s *Service) ConvertToPurchaseOrder(ctx context.Context, a core.Actor, id, 
 			return e
 		}
 		out, e = s.Core.Idempotent(ctx, tx, a, "quotes.convert_to_purchase_order:"+id, key, p, func() (any, error) {
-			if q.Deleted != nil || q.Status != "accepted" || q.Version != p.Version || q.PurchaseOrderID != nil {
+			if q.Deleted != nil || q.Status != "accepted" || q.Version != p.Version || q.PurchaseOrderID != nil || q.InvoiceID != nil {
 				return nil, core.Conflict
 			}
 			if e := s.items(ctx, tx, &q); e != nil {
@@ -99,6 +99,9 @@ func (s *Service) registerPurchaseOrderConversion(register func(string, api.Acti
 }
 
 func nullableConversionField(v any, name string) bool {
+	if _, ok := v.(*InvoiceConversionInput); ok {
+		return name == "credit_days"
+	}
 	_, ok := v.(*PurchaseOrderConversionInput)
 	return ok && name == "required_delivery_date"
 }
