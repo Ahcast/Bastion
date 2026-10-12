@@ -1,9 +1,10 @@
 import {test,expect} from '@playwright/test';
 import {readFileSync} from 'node:fs';
+import {join} from 'node:path';
 import {totp} from './helpers';
 
 function expenseFixtureCredentials(){
- const source=readFileSync(new URL('./zzzzzzzzz-expenses.spec.ts',import.meta.url),'utf8');
+ const source=readFileSync(join(process.cwd(),'e2e','zzzzzzzzz-expenses.spec.ts'),'utf8');
  const password=source.match(/getByLabel\('Contraseña'.*?\.fill\('([^']+)'\)/)?.[1];
  const secret=source.match(/totp\('([^']+)'\)/)?.[1];
  if(!password||!secret)throw new Error('Synthetic expense browser fixture unavailable');
