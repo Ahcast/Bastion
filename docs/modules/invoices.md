@@ -408,3 +408,5 @@ Unidad 4 pagos implementada en validación bajo contrato previo: ledger normaliz
 Unidad 4 pagos cerrada en 0db033c44d57326d42bb1e83459b5a1709a04c46 / Core checks 38195876549: Go/MySQL5.7/race/builds, Angular 103 y navegador 13/13 aprobados. Continúa unidad 5 conversiones por propietarios; recibos/documentos/anulación/clonación y aceptación integral conservan sus dependencias. Ninguna integración fiscal/bancaria/productiva validada por este cierre.
 
 Unidad 5 primer bloque Cotización→Borrador de factura implementado en validación bajo contrato previo. 0025, propietarios en una TX, vínculos/versiones, REST/UI; OC→Factura y Facturado/Cerrado continúan después de certificar este bloque.
+
+Cotización→Factura certificada en 20bd810901ed2762cb1c7d828f86ee63c5b10f8e / Core 38197746643 (107 Angular, 14/14 navegador, Go/MySQL/race/builds). Continúa OC→Factura/Facturado/Cerrado con contrato previo; unidad 5 sigue abierta.
