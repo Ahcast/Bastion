@@ -15,6 +15,53 @@ func (s *Service) EmitEvent(ctx context.Context, tx *sql.Tx, a Actor, topic, ent
 
 type DocumentPolicy func(context.Context, Querier, Actor, string, bool) error
 
+type DocumentBinding struct {
+	Version    uint64
+	EntityType string
+	EntityID   string
+	Generated  bool
+}
+
+// DocumentBindingAccess locks a document and reauthorizes its current owner and
+// entity policy without mutating it. It is used before idempotent callbacks so
+// a replay cannot bypass revoked document or destination access.
+func (s *Service) DocumentBindingAccess(ctx context.Context, tx *sql.Tx, a Actor, id string, sensitive bool) (DocumentBinding, error) {
+	var out DocumentBinding
+	if ID(id) != nil {
+		return out, Invalid
+	}
+	var owner string
+	var team, entity, eid sql.NullString
+	var deleted sql.NullTime
+	if e := tx.QueryRowContext(ctx, `SELECT owner_id,team_id,entity_type,entity_id,version,deleted_at,is_generated FROM documents WHERE id=? FOR UPDATE`, id).Scan(&owner, &team, &entity, &eid, &out.Version, &deleted, &out.Generated); e != nil {
+		if e == sql.ErrNoRows {
+			return out, Missing
+		}
+		return out, e
+	}
+	if deleted.Valid {
+		return DocumentBinding{}, Missing
+	}
+	if e := s.Authorize(ctx, tx, a, "core.documents.write", owner, team.String, sensitive); e != nil {
+		if e == Forbidden {
+			return DocumentBinding{}, Missing
+		}
+		return DocumentBinding{}, e
+	}
+	if entity.Valid {
+		policy, ok := s.DocumentPolicies[entity.String]
+		if !ok {
+			return DocumentBinding{}, Forbidden
+		}
+		if e := policy(ctx, tx, a, eid.String, true); e != nil {
+			return DocumentBinding{}, Missing
+		}
+		out.EntityType = entity.String
+		out.EntityID = eid.String
+	}
+	return out, nil
+}
+
 // BindDocument is the only public cross-module write to document ownership links.
 func (s *Service) BindDocument(ctx context.Context, tx *sql.Tx, a Actor, id, entity, entityID string, version uint64) error {
 	policy, ok := s.DocumentPolicies[entity]
