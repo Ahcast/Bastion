@@ -12,6 +12,7 @@ import (
 
 var Permissions = []string{
 	"ordenes.view",
+	"ordenes.convert", "ordenes.close", "ordenes.reopen",
 	"ordenes.create",
 	"ordenes.update",
 	"ordenes.transition",
@@ -51,6 +52,8 @@ type PurchaseOrderItem struct {
 }
 
 type PurchaseOrder struct {
+	InvoiceID            *string             `json:"invoice_id"`
+	InvoiceNumber        *string             `json:"invoice_number_snapshot"`
 	Deleted              *time.Time          `json:"deleted_at"`
 	ClonedFromID         *string             `json:"cloned_from_id"`
 	ClonedFromVersion    *uint64             `json:"cloned_from_version,string"`

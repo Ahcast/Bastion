@@ -62,6 +62,8 @@ export interface Invoice extends Omit<DraftInput, "additional_expenses"> {
   sar_snapshot_json: {configuration:{cai:string;currency:string};configuration_version:string} | null;
   customer_version: string;
  source_quote_id?:string|null;
+ source_purchase_order_id?:string|null;
+ source_purchase_order_version?:string|null;
  source_quote_version?:string|null;
   issued_at:string|null;
   issued_by:string|null;

@@ -8,6 +8,7 @@ import (
 	"github.com/Ahcast/Bastion/backend/internal/core"
 	"github.com/Ahcast/Bastion/backend/internal/core/config"
 	"github.com/Ahcast/Bastion/backend/internal/core/security"
+	"github.com/Ahcast/Bastion/backend/internal/modules/purchaseorders"
 	"github.com/Ahcast/Bastion/backend/internal/modules/quotes"
 	"github.com/go-sql-driver/mysql"
 	"log"
@@ -331,6 +332,62 @@ func main() {
 		log.Fatal(e)
 	}
 	if _, e = db.Exec(`DELETE FROM role_permissions WHERE role_id=? AND permission IN ('cotizaciones.create','cotizaciones.transition')`, role); e != nil {
+		log.Fatal(e)
+	}
+
+	// Delivered OC for billing UI; setup uses real owner transitions and then removes setup grants.
+	result, e = db.Exec(`INSERT INTO users(email,name,password_hash,totp_secret,active,created_at,updated_at) SELECT 'order-invoice@example.test','Facturación OC sintética',password_hash,?,TRUE,UTC_TIMESTAMP(6),UTC_TIMESTAMP(6) FROM users WHERE id=1`, secret)
+	if e != nil {
+		log.Fatal(e)
+	}
+	user, e = result.LastInsertId()
+	if e != nil {
+		log.Fatal(e)
+	}
+	result, e = db.Exec(`INSERT INTO roles(name) VALUES('Facturación OC sintética')`)
+	if e != nil {
+		log.Fatal(e)
+	}
+	role, e = result.LastInsertId()
+	if e != nil {
+		log.Fatal(e)
+	}
+	if _, e = db.Exec(`INSERT INTO role_permissions SELECT ?,name,'self' FROM permissions WHERE name IN ('ordenes.view','ordenes.create','ordenes.transition','ordenes.items.transition','ordenes.deliver','ordenes.convert','ordenes.close','ordenes.reopen','facturas.view','facturas.create','facturas.emit','facturas.payment','facturas.payment.void')`, role); e != nil {
+		log.Fatal(e)
+	}
+	if _, e = db.Exec(`INSERT INTO user_roles VALUES(?,?)`, user, role); e != nil {
+		log.Fatal(e)
+	}
+	token, _, e = s.NewSession(context.Background(), core.WrapID(user), true)
+	if e != nil {
+		log.Fatal(e)
+	}
+	actor = core.Actor{Type: "user", ID: core.WrapID(user), UserID: core.WrapID(user), SessionHash: security.Hash(token), Source: "web", RequestID: security.ID(), CorrelationID: security.ID()}
+	if _, e = db.Exec(`UPDATE sessions SET reauthenticated_at=UTC_TIMESTAMP(6) WHERE token_hash=?`, actor.SessionHash); e != nil {
+		log.Fatal(e)
+	}
+	orderService := &purchaseorders.Service{Core: s}
+	v, e = orderService.Save(context.Background(), actor, "", "browser-billing-order", purchaseorders.Input{OrderNumber: "OC-FACTURA-BROWSER", Customer: purchaseorders.CustomerInput{Name: "Cliente OC facturada sintético"}, OrderDate: time.Now().In(time.FixedZone("Honduras", -6*3600)).Format("2006-01-02"), Currency: "HNL", CalculationInput: purchaseorders.CalculationInput{Items: []purchaseorders.Item{{Description: "Equipo OC facturada", Unit: "unidad", Quantity: "1", UnitSalePrice: "100", UnitCost: "40", DiscountType: "amount", Discount: "0", TaxType: "isv15"}}, DiscountType: "amount", Discount: "0", AdditionalExpenses: "0"}})
+	if e != nil {
+		log.Fatal(e)
+	}
+	orderID := v.(map[string]string)["id"]
+	step := func(position int, to string) {
+		o, e := orderService.Get(context.Background(), actor, orderID)
+		if e != nil {
+			log.Fatal(e)
+		}
+		if _, e = orderService.Transition(context.Background(), actor, orderID, "browser-billing-step-"+core.WrapID(int64(o.Version)), position, purchaseorders.TransitionInput{Version: o.Version, ToStatus: to}); e != nil {
+			log.Fatal(e)
+		}
+	}
+	for _, to := range []string{"purchased", "shipped", "received", "delivered"} {
+		step(1, to)
+	}
+	for _, to := range []string{"confirmed", "purchasing", "in_transit", "goods_received", "preparing_delivery", "delivered"} {
+		step(0, to)
+	}
+	if _, e = db.Exec(`DELETE FROM role_permissions WHERE role_id=? AND permission IN ('ordenes.create','ordenes.transition','ordenes.items.transition','ordenes.deliver')`, role); e != nil {
 		log.Fatal(e)
 	}
 

@@ -153,3 +153,6 @@ Facturas emisión (0023): issued_at/issued_by/due_date y snapshot/versión públ
 
 
 Migración 0025, conversión propietaria Cotización→Borrador Factura: invoices.source_quote_id UNIQUE/FK nullable y source_quote_version nullable; quotes.invoice_id UNIQUE/FK nullable. Vínculo/versiones y creación completa atómicos. Una cotización genera OC o factura, no ambos; no asigna número fiscal ni pagos.
+
+
+0026 Facturación OC: invoices.source_purchase_order_id UNIQUE/FK y source_purchase_order_version nullable; customer_purchase_orders.invoice_id UNIQUE/FK e invoice_number_snapshot nullable. Origen directo exclusivo Quote u OC. Estado OC delivered conserva draft vinculado; emisión atómica marca invoiced y cierre humano con saldo cero marca closed. Reopen precede corrección de pagos. Historial OC registra estados; payments conserva filas/anulaciones.

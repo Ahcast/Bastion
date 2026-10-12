@@ -4,7 +4,7 @@
 @if (message()) { <p role="status">{{ message() }}</p> }
 
 <form (ngSubmit)="load(true)" class="card">
-  <fieldset [disabled]="loading() || busy()">
+  <fieldset [disabled]="loading() || (busy()||billingBusy())">
     <legend>Filtros</legend>
     <label>Buscar
       <input name="search" [(ngModel)]="search" maxlength="1000" placeholder="Número, cliente, descripción o comentario">
@@ -31,11 +31,11 @@
 
 <div class="actions">
   @if (api.has('ordenes.create')) {
-    <button type="button" (click)="create()" [disabled]="busy()">Nueva orden de compra</button>
+    <button type="button" (click)="create()" [disabled]="(busy()||billingBusy())">Nueva orden de compra</button>
   }
   <span>{{ total() }} órdenes · Página {{ page }}</span>
-  <button type="button" [disabled]="page <= 1 || loading() || busy()" (click)="page = page - 1; load()">Anterior</button>
-  <button type="button" [disabled]="page * perPage >= total() || loading() || busy()" (click)="page = page + 1; load()">Siguiente</button>
+  <button type="button" [disabled]="page <= 1 || loading() || (busy()||billingBusy())" (click)="page = page - 1; load()">Anterior</button>
+  <button type="button" [disabled]="page * perPage >= total() || loading() || (busy()||billingBusy())" (click)="page = page + 1; load()">Siguiente</button>
 </div>
 
 @for (order of rows(); track order.id) {
@@ -43,7 +43,7 @@
     <h2>{{ order.order_number }}</h2>
     <p>{{ order.customer.name || 'Cliente sin nombre' }}</p>
     <p>{{ statusLabel(order.status) }} · {{ order.order_date }} · {{ order.currency }} {{ order.total }}</p>
-    <button type="button" (click)="open(order.id)" [disabled]="busy()">Ver orden {{ order.order_number }}</button>
+    <button type="button" (click)="open(order.id)" [disabled]="(busy()||billingBusy())">Ver orden {{ order.order_number }}</button>
   </article>
 } @empty {
   @if (!loading()) { <p>No hay órdenes de compra para estos filtros.</p> }
@@ -53,13 +53,16 @@
   <section class="card">
     <div class="actions">
       <h2>{{ selected()?.order_number || 'Nueva orden de compra' }}</h2>
-      <button type="button" (click)="close()" [disabled]="busy()">Cerrar ficha</button>
+      <button type="button" (click)="close()" [disabled]="(busy()||billingBusy())">Cerrar ficha</button>
     </div>
 
     @if (selected(); as saved) {
       <div class="summary">
         <p><strong>Estado:</strong> {{ statusLabel(saved.status) }}</p>
         <p><strong>Versión:</strong> {{ saved.version }}</p>
+ <bastion-order-billing [order]="saved" [disabled]="busy()||billingBusy()||billingNeedsReload()" [changesPending]="dirty()" (busyChange)="billingBusy.set($event)" (changed)="billingConfirmed($event)"/>
+ @if(billingNeedsReload()){<p>Operación confirmada. Consulte la OC para recuperar su estado actual.</p><button type="button" (click)="open(saved.id)" [disabled]="busy()||billingBusy()">Consultar OC confirmada</button>}
+
         <p><strong>Creada por:</strong> {{ saved.created_by }}</p>
         @if (saved.source_quote_id) {
           <p><strong>Cotización de origen:</strong> {{ saved.source_quote_id }} · Versión {{saved.source_quote_version}}</p>
@@ -75,7 +78,7 @@
     saved.cloned_from_version }}
   </p>
   } @if(api.has('ordenes.create') && !saved.deleted_at) {
-  <button type="button" (click)="beginClone()" [disabled]="busy() || dirty()">
+  <button type="button" (click)="beginClone()" [disabled]="(busy()||billingBusy()) || dirty()">
     Clonar orden
   </button>
   } @if(cloneForm; as draft) {
@@ -84,7 +87,7 @@
       Conserva datos comerciales. Inicia Recibida, con ítems Pendiente y sin
       adjuntos ni entrega.
     </p>
-    <fieldset [disabled]="busy() || !!cloned()">
+    <fieldset [disabled]="(busy()||billingBusy()) || !!cloned()">
       <legend>Nueva orden independiente</legend>
       <label
         >Número de la nueva OC<input
@@ -135,7 +138,7 @@
     @if(cloned(); as result){<button
       type="button"
       (click)="open(result.id)"
-      [disabled]="busy()"
+      [disabled]="(busy()||billingBusy())"
     >
       Abrir OC clonada #{{ result.id }}</button
     >}
@@ -148,12 +151,12 @@
           <p>Solo OC recibidas sin avance, conversión ni evidencia vinculada pueden eliminarse. Se conservan la identidad y el número originales.</p>
 
           <label>Motivo de eliminación o restauración<textarea [(ngModel)]="trashReason" name="trashReason" maxlength="1000"></textarea></label>
-          <button type="button" (click)="trash()" [disabled]="busy() || dirty() || !trashReason.trim()">{{ saved.deleted_at ? 'Restaurar orden' : 'Enviar orden a papelera' }}</button>
+          <button type="button" (click)="trash()" [disabled]="(busy()||billingBusy()) || dirty() || !trashReason.trim()">{{ saved.deleted_at ? 'Restaurar orden' : 'Enviar orden a papelera' }}</button>
         </section>
       }
       <section aria-label="Seguimiento de la orden">
         @if (nextOrderStatus(); as next) {
-          <button type="button" (click)="transition(next)" [disabled]="busy() || dirty() || (next === 'delivered' && !deliveryReady())">Cambiar a {{ statusLabel(next) }}</button>
+          <button type="button" (click)="transition(next)" [disabled]="(busy()||billingBusy()) || dirty() || (next === 'delivered' && !deliveryReady())">Cambiar a {{ statusLabel(next) }}</button>
           @if (next === 'delivered') {
             <p>La entrega requiere todos los ítems entregados y confirmación de identidad vigente.</p>
 
@@ -162,10 +165,10 @@
         @for (item of saved.items; track $index; let i = $index) {
           <p>Ítem {{ i + 1 }}: {{ itemStatusLabel(item.status) }}</p>
           @if (nextItemStatus(i); as next) {
-            <button type="button" (click)="transition(next, i + 1)" [disabled]="busy() || dirty()">Ítem {{ i + 1 }}: cambiar a {{ itemStatusLabel(next) }}</button>
+            <button type="button" (click)="transition(next, i + 1)" [disabled]="(busy()||billingBusy()) || dirty()">Ítem {{ i + 1 }}: cambiar a {{ itemStatusLabel(next) }}</button>
           }
         }
-        <button type="button" (click)="loadHistory(1)" [disabled]="busy()">Ver historial de estados</button>
+        <button type="button" (click)="loadHistory(1)" [disabled]="(busy()||billingBusy())">Ver historial de estados</button>
         @if (historyTotal()) {
           <h3>Historial de estados</h3>
           @for (entry of history(); track entry.id) {
@@ -174,14 +177,14 @@
               {{ entry.item_position === null ? statusLabel(entry.to_status) : itemStatusLabel(entry.to_status) }} ·
               Versión {{ entry.purchase_order_version }} · Usuario {{ entry.actor_id }} · {{ entry.created_at | date:'short':'-0600' }}</p>
           }
-          <button type="button" (click)="loadHistory(historyPage - 1)" [disabled]="busy() || historyPage <= 1">Historial anterior</button>
-          <button type="button" (click)="loadHistory(historyPage + 1)" [disabled]="busy() || historyPage * 25 >= historyTotal()">Historial siguiente</button>
+          <button type="button" (click)="loadHistory(historyPage - 1)" [disabled]="(busy()||billingBusy()) || historyPage <= 1">Historial anterior</button>
+          <button type="button" (click)="loadHistory(historyPage + 1)" [disabled]="(busy()||billingBusy()) || historyPage * 25 >= historyTotal()">Historial siguiente</button>
         }
       </section>
     }
 
     <form (ngSubmit)="save()">
-      <fieldset [disabled]="!writable() || busy()">
+      <fieldset [disabled]="!writable() || (busy()||billingBusy())">
         <legend>Datos de la orden</legend>
         <label>Número de orden
           <input name="orderNumber" [(ngModel)]="form.order_number" required maxlength="160">
@@ -211,7 +214,7 @@
         </label>
       </fieldset>
 
-      <fieldset [disabled]="!writable() || busy()">
+      <fieldset [disabled]="!writable() || (busy()||billingBusy())">
         <legend>Cliente</legend>
         <label>ID del cliente registrado (opcional)
           <input name="customerId" [(ngModel)]="form.customer.id" inputmode="numeric">
@@ -239,7 +242,7 @@
 
       <h3>Ítems</h3>
       @for (item of form.items; track $index; let i = $index) {
-        <fieldset [disabled]="!writable() || busy()">
+        <fieldset [disabled]="!writable() || (busy()||billingBusy())">
           <legend>Ítem {{ i + 1 }}</legend>
           <label>Descripción
             <textarea [name]="'description' + i" [(ngModel)]="item.description" required maxlength="4000"></textarea>
@@ -292,9 +295,9 @@
           <button type="button" (click)="removeItem(i)">Quitar ítem {{ i + 1 }}</button>
         </fieldset>
       }
-      <button type="button" (click)="addItem()" [disabled]="!writable() || busy() || form.items.length >= 200">Agregar ítem</button>
+      <button type="button" (click)="addItem()" [disabled]="!writable() || (busy()||billingBusy()) || form.items.length >= 200">Agregar ítem</button>
 
-      <fieldset [disabled]="!writable() || busy()">
+      <fieldset [disabled]="!writable() || (busy()||billingBusy())">
         <legend>Totales y condiciones fiscales</legend>
         <label>Tipo de descuento general
           <select name="generalDiscountType" [(ngModel)]="form.general_discount_type">
@@ -312,15 +315,15 @@
           <input name="additionalExpenses" [(ngModel)]="form.additional_expenses" inputmode="decimal" required>
         </label>
         <div class="actions">
-          <button type="button" (click)="calculate()" [disabled]="busy() || form.items.length === 0">Calcular vista previa</button>
-          <button [disabled]="busy() || form.items.length === 0">{{ selected() ? 'Guardar cambios' : 'Registrar orden' }}</button>
+          <button type="button" (click)="calculate()" [disabled]="(busy()||billingBusy()) || form.items.length === 0">Calcular vista previa</button>
+          <button [disabled]="(busy()||billingBusy()) || form.items.length === 0">{{ selected() ? 'Guardar cambios' : 'Registrar orden' }}</button>
         </div>
       </fieldset>
     </form>
 
     @if (selected(); as savedOrder) {
       @if(api.has('core.documents.read') && !savedOrder.deleted_at) {
-        <app-order-documents [order]="savedOrder" [changesPending]="dirty() || busy()" (linked)="documentLinked($event)" />
+        <app-order-documents [order]="savedOrder" [changesPending]="dirty() || (busy()||billingBusy())" (linked)="documentLinked($event)" />
       }
     }
     @if (preview(); as calculation) {

@@ -1,3 +1,4 @@
+import {OrderBilling,BillingResult} from "./order-billing";
 import { OrderDocuments } from "./order-documents";
 import { Component, inject, signal, OnInit } from "@angular/core";
 import { ActivatedRoute, RouterLink } from "@angular/router";
@@ -96,6 +97,8 @@ export interface PurchaseOrder extends Omit<PurchaseOrderInput, "items"> {
   status: OrderStatus;
   customer_version: string;
   source_quote_id: string | null;
+ invoice_id?:string|null;
+ invoice_number_snapshot?:string|null;
   source_quote_version?: string | null;
   cloned_from_id?: string | null;
   cloned_from_version?: string | null;
@@ -169,7 +172,7 @@ export function emptyPurchaseOrder(): PurchaseOrderInput {
 }
 
 @Component({
-  imports: [
+  imports: [OrderBilling,
     OrderDocuments,
     RouterLink,
     FormsModule,
@@ -212,6 +215,8 @@ export function emptyPurchaseOrder(): PurchaseOrderInput {
   ],
 })
 export class PurchaseOrders implements OnInit {
+ billingBusy=signal(false);
+ billingNeedsReload=signal(false);
   api = inject(Client);
   rows = signal<Summary[]>([]);
   total = signal(0);
@@ -261,7 +266,7 @@ export class PurchaseOrders implements OnInit {
     if (
       !source ||
       source.deleted_at ||
-      this.busy() ||
+      (this.busy()||this.billingBusy()) ||
       this.dirty() ||
       !this.api.has("ordenes.create")
     )
@@ -282,7 +287,7 @@ export class PurchaseOrders implements OnInit {
       !source ||
       source.deleted_at ||
       !this.cloneForm ||
-      this.busy() ||
+      (this.busy()||this.billingBusy()) ||
       this.dirty() ||
       !this.api.has("ordenes.create") ||
       this.cloned()
@@ -352,6 +357,7 @@ export class PurchaseOrders implements OnInit {
   }
 
   create() {
+ if(this.billingBusy())return;
     this.cloneForm = null;
     this.cloned.set(null);
     this.form = emptyPurchaseOrder();
@@ -363,6 +369,7 @@ export class PurchaseOrders implements OnInit {
   }
 
   close() {
+ if(this.billingBusy())return;
     this.cloneForm = null;
     this.cloned.set(null);
     this.editorOpen.set(false);
@@ -372,7 +379,8 @@ export class PurchaseOrders implements OnInit {
   }
 
   async open(id: string) {
-    if (this.busy()) return;
+ if(this.billingBusy())return;
+    if ((this.busy()||this.billingBusy())) return;
     this.busy.set(true);
     this.error.set("");
     try {
@@ -383,6 +391,7 @@ export class PurchaseOrders implements OnInit {
       this.cloneForm = null;
       this.cloned.set(null);
       this.selected.set(order);
+ this.billingNeedsReload.set(false);
       this.form = this.editable(order);
       this.preview.set(order.calculation);
       this.editorOpen.set(true);
@@ -430,7 +439,7 @@ export class PurchaseOrders implements OnInit {
     const saved = this.selected();
     if (
       !saved ||
-      this.busy() ||
+      (this.busy()||this.billingBusy()) ||
       this.dirty() ||
       !this.api.has("ordenes.delete") ||
       !this.trashReason.trim()
@@ -467,6 +476,7 @@ export class PurchaseOrders implements OnInit {
       this.busy.set(false);
     }
   }
+  async billingConfirmed(r:BillingResult){const o=this.selected();if(!o||o.id!==r.id)return;this.selected.set({...o,version:r.version,status:r.status as OrderStatus,invoice_id:r.invoice_id});this.form.version=r.version;this.billingNeedsReload.set(true);this.message.set('Facturación confirmada · factura #'+r.invoice_id+' · OC versión '+r.version);this.busy.set(true);try{await this.openAfterSave(r.id);this.billingNeedsReload.set(false);await this.load()}catch(e){this.error.set(this.api.message(e))}finally{this.busy.set(false)}}
   documentLinked(result: { id: string; version: string }) {
     const order = this.selected();
     if (!order || order.id !== result.id) return;
@@ -533,7 +543,7 @@ export class PurchaseOrders implements OnInit {
 
   async transition(to: string, position = 0) {
     const saved = this.selected();
-    if (!saved || this.busy()) return;
+    if (!saved || (this.busy()||this.billingBusy())) return;
     if (this.dirty()) {
       this.error.set(
         "Guarde o descarte los cambios antes de cambiar el estado.",
@@ -636,7 +646,7 @@ export class PurchaseOrders implements OnInit {
   }
 
   async calculate() {
-    if (this.busy()) return;
+    if ((this.busy()||this.billingBusy())) return;
     this.busy.set(true);
     this.error.set("");
     try {
@@ -669,7 +679,7 @@ export class PurchaseOrders implements OnInit {
   }
 
   async save() {
-    if (this.busy() || !this.writable()) return;
+    if ((this.busy()||this.billingBusy()) || !this.writable()) return;
     const id = this.selected()?.id || "";
     const path = "/purchase-orders" + (id ? "/" + id : "");
     const body = structuredClone(this.form);
@@ -700,6 +710,7 @@ export class PurchaseOrders implements OnInit {
   private async openAfterSave(id: string) {
     const order = await this.api.get<PurchaseOrder>("/purchase-orders/" + id);
     this.selected.set(order);
+ this.billingNeedsReload.set(false);
     this.form = this.editable(order);
     this.preview.set(order.calculation);
     this.editorOpen.set(true);

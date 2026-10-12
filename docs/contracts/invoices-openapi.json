@@ -1044,6 +1044,11 @@
             "type": "string",
             "minLength": 1,
             "maxLength": 1000
+          },
+          "source_order_version": {
+            "type": "string",
+            "nullable": true,
+            "pattern": "^[1-9][0-9]*$"
           }
         }
       },
@@ -1099,6 +1104,11 @@
           "due_date": {
             "type": "string",
             "format": "date"
+          },
+          "source_order_version": {
+            "type": "string",
+            "nullable": true,
+            "pattern": "^[1-9][0-9]*$"
           }
         }
       },

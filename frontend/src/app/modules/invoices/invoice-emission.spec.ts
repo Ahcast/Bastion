@@ -23,4 +23,6 @@ describe('Emisión de factura',()=>{
  const busy=vi.fn();c.busyChange.subscribe(busy);await c.load();expect(busy.mock.calls.map(x=>x[0])).toEqual([true,false]);busy.mockClear();c.reason='Revisión';api.write.mockRejectedValue(new Error('Respuesta incierta'));await c.emit();expect(busy.mock.calls.map(x=>x[0])).toEqual([true,false]);c.disabled=true;await c.load();await c.emit();expect(api.write).toHaveBeenCalledTimes(1);
  });
 
+ it('envía versión de OC revisada y exige sus permisos al emitir derivada',async()=>{c.invoice={...c.invoice,source_purchase_order_id:'8'};api.has.mockImplementation((p:string)=>p!=='ordenes.convert');await c.load();expect(api.get).not.toHaveBeenCalled();api.has.mockReturnValue(true);(api as any).moduleEnabled=vi.fn(()=>true);api.get.mockResolvedValue({...review(),source_order_version:'9007199254740996'});await c.load();c.reason='Revisada';await c.emit();expect(api.write.mock.calls[0][2].source_order_version).toBe('9007199254740996')});
+
 });

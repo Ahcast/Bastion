@@ -50,11 +50,12 @@ type PaymentResult struct {
 	CommercialStatus string `json:"commercial_status"`
 }
 type PaymentPage struct {
-	Data    []Payment `json:"data"`
-	Total   int64     `json:"total"`
-	Page    int       `json:"page"`
-	PerPage int       `json:"per_page"`
-	Version uint64    `json:"version,string"`
+	SourceOrderClosed *bool     `json:"source_order_closed"`
+	Data              []Payment `json:"data"`
+	Total             int64     `json:"total"`
+	Page              int       `json:"page"`
+	PerPage           int       `json:"per_page"`
+	Version           uint64    `json:"version,string"`
 	PaymentProjection
 	CommercialStatus *string `json:"commercial_status"`
 }
@@ -96,16 +97,15 @@ func invoiceCommercial(o *Invoice, now time.Time) error {
 	o.CommercialStatus, e = CommercialStatus(o.Status, o.DueDate, PaymentProjection{Currency: o.Currency, PaidTotal: o.PaidTotal, Balance: o.Balance}, today)
 	return e
 }
-func (s *Service) paymentInvoice(ctx context.Context, tx *sql.Tx, a core.Actor, id, permission string) (Invoice, error) {
-	o, e := s.access(ctx, tx, a, id, permission, true)
-	if e != nil {
-		return o, e
+func (s *Service) paymentInvoice(ctx context.Context, tx *sql.Tx, a core.Actor, id, permission string, modes ...string) (Invoice, error) {
+	mode := "read"
+	if len(modes) > 0 {
+		mode = modes[0]
 	}
-	if e = s.Core.Authorize(ctx, tx, a, "facturas.view", o.CreatedBy, o.TeamID, false); e == core.Forbidden {
-		return o, core.Missing
-	}
+	o, _, e := s.lockSourceInvoice(ctx, tx, a, id, permission, mode)
 	return o, e
 }
+
 func (s *Service) paymentProjection(ctx context.Context, tx *sql.Tx, o Invoice, exclude string) (PaymentProjection, error) {
 	rows, e := tx.QueryContext(ctx, `SELECT CAST(id AS CHAR),currency,CAST(amount AS CHAR) FROM payments WHERE invoice_id=? AND voided_at IS NULL ORDER BY id`, o.ID)
 	if e != nil {
@@ -166,6 +166,7 @@ func (s *Service) Payments(ctx context.Context, a core.Actor, id string, page, p
 		if e != nil {
 			return e
 		}
+		out.SourceOrderClosed = o.SourceOrderClosed
 		out.Version = o.Version
 		out.PaymentProjection = p
 		if e = invoiceCommercial(&o, time.Now().UTC()); e != nil {
@@ -267,7 +268,7 @@ func (s *Service) writePayment(ctx context.Context, a core.Actor, id, paymentID,
 		}
 		var e error
 		out, e = s.Core.Idempotent(ctx, tx, a, permission+":"+id+":"+paymentID, key, payload, func() (any, error) {
-			o, e := s.paymentInvoice(ctx, tx, a, id, permission)
+			o, e := s.paymentInvoice(ctx, tx, a, id, permission, "payment")
 			if e != nil {
 				return nil, e
 			}

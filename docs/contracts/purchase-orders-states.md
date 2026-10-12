@@ -224,3 +224,5 @@ Antes de declararla cerrada:
 - regresión completa y CI verde del mismo HEAD.
 
 No desplegar/migrar producción por aprobar esta unidad.
+
+Integración Facturas unidad 5 en validación: el [contrato propietario](invoices.md) habilita delivered→invoiced exclusivamente al emitir Invoice, invoiced→closed mediante close con saldo cero y closed→invoiced mediante reopen con razón/reauth. El grafo ordinario Unit2/transition permanece sin esas aristas manuales; cada efecto depende de servicios propietarios, vínculo/versiones y evidencia atómica. No declarar certificada la integración antes de CI completo.

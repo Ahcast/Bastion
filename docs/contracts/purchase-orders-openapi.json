@@ -2,7 +2,7 @@
   "openapi": "3.0.3",
   "info": {
     "title": "Bastion Órdenes de Compra de clientes",
-    "version": "0.6.0",
+    "version": "0.7.0",
     "description": "OC recibidas de clientes: agregado, utilidad decimal, estados, historial, origen Quotes, documentos privados, clonación y eliminación reversible. Facturación/cierre requieren Invoices."
   },
   "paths": {
@@ -816,6 +816,183 @@
           }
         }
       ]
+    },
+    "/api/v1/purchase-orders/{id}/convert-to-invoice": {
+      "post": {
+        "summary": "OC delivered con todos ítems delivered → draft completo, propietarios en una TX, sin número ni pagos. Humano ordenes.convert/view y facturas.create/view.",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 100
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InvoiceConversionInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Resultado confirmado o replay autorizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvoiceBillingResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sesión requerida"
+          },
+          "403": {
+            "description": "Acceso denegado"
+          },
+          "404": {
+            "description": "No visible"
+          },
+          "409": {
+            "description": "Versión o intención conflictiva"
+          },
+          "422": {
+            "description": "Entrada inválida"
+          },
+          "503": {
+            "description": "Propietario requerido deshabilitado"
+          }
+        },
+        "operationId": "clonePurchaseOrder",
+        "description": "Actor humano; lectura de fuente/destino y creación autorizada en equipo. Número y metadata nuevos explícitos. Clona snapshots históricos, reinicia estados/IDs operativos y no copia adjuntos ni entrega. Replay reautoriza el destino actual."
+      }
+    },
+    "/api/v1/purchase-orders/{id}/close": {
+      "post": {
+        "summary": "OC invoiced → closed explícito, factura linked issued con versión actual y saldo cero. Humano ordenes.close/view, facturas.view, reauth.",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 100
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InvoiceClosureInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Resultado confirmado o replay autorizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvoiceBillingResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sesión requerida"
+          },
+          "403": {
+            "description": "Acceso denegado"
+          },
+          "404": {
+            "description": "No visible"
+          },
+          "409": {
+            "description": "Versión o intención conflictiva"
+          },
+          "422": {
+            "description": "Entrada inválida"
+          },
+          "503": {
+            "description": "Propietario requerido deshabilitado"
+          }
+        },
+        "operationId": "clonePurchaseOrder",
+        "description": "Actor humano; lectura de fuente/destino y creación autorizada en equipo. Número y metadata nuevos explícitos. Clona snapshots históricos, reinicia estados/IDs operativos y no copia adjuntos ni entrega. Replay reautoriza el destino actual."
+      }
+    },
+    "/api/v1/purchase-orders/{id}/reopen": {
+      "post": {
+        "summary": "OC closed → invoiced con razón antes de corregir ledger. Humano ordenes.reopen/view, facturas.view, reauth.",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 100
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InvoiceClosureInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Resultado confirmado o replay autorizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvoiceBillingResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sesión requerida"
+          },
+          "403": {
+            "description": "Acceso denegado"
+          },
+          "404": {
+            "description": "No visible"
+          },
+          "409": {
+            "description": "Versión o intención conflictiva"
+          },
+          "422": {
+            "description": "Entrada inválida"
+          },
+          "503": {
+            "description": "Propietario requerido deshabilitado"
+          }
+        },
+        "operationId": "clonePurchaseOrder",
+        "description": "Actor humano; lectura de fuente/destino y creación autorizada en equipo. Número y metadata nuevos explícitos. Clona snapshots históricos, reinicia estados/IDs operativos y no copia adjuntos ni entrega. Replay reautoriza el destino actual."
+      }
     }
   },
   "components": {
@@ -2105,6 +2282,101 @@
               "null"
             ],
             "format": "date-time"
+          }
+        }
+      },
+      "InvoiceConversionInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "version",
+          "invoice_date",
+          "payment_term_type",
+          "credit_days",
+          "public_notes",
+          "reason"
+        ],
+        "properties": {
+          "version": {
+            "type": "string",
+            "pattern": "^[1-9][0-9]*$"
+          },
+          "invoice_date": {
+            "type": "string",
+            "format": "date"
+          },
+          "payment_term_type": {
+            "type": "string",
+            "enum": [
+              "contado",
+              "credito"
+            ]
+          },
+          "credit_days": {
+            "type": "integer",
+            "nullable": true,
+            "minimum": 1,
+            "maximum": 65535
+          },
+          "public_notes": {
+            "type": "string",
+            "maxLength": 12000
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000
+          }
+        }
+      },
+      "InvoiceClosureInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "version",
+          "invoice_version",
+          "reason"
+        ],
+        "properties": {
+          "version": {
+            "type": "string",
+            "pattern": "^[1-9][0-9]*$"
+          },
+          "invoice_version": {
+            "type": "string",
+            "pattern": "^[1-9][0-9]*$"
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000
+          }
+        }
+      },
+      "InvoiceBillingResult": {
+        "type": "object",
+        "required": [
+          "id",
+          "version",
+          "status",
+          "invoice_id",
+          "invoice_version"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "version": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "invoice_id": {
+            "type": "string"
+          },
+          "invoice_version": {
+            "type": "string"
           }
         }
       }

@@ -182,3 +182,6 @@ Contrato vigente: [clonación OC](purchase-order-cloning.md). Migración 0019 co
 ## Aceptación integral OC
 
 [Contrato vigente](purchase-orders-acceptance.md): utilidad neta sin ISV menos inversión total; profit/profit_version persistidos y eliminación reversible con evidencia protegida. Migración 0020 y permisos explícitos. Integraciones posteriores conservan sus propietarios.
+
+
+Facturación de unidad 5 (en validación): [contrato único](invoices.md), 0026, POST convert-to-invoice/close/reopen, puertos públicos y scopes/reauth/versiones. Snapshot de número fiscal solo al emitir, no al crear draft. Ledger cerrado exige reapertura explícita.

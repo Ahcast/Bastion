@@ -410,3 +410,5 @@ Unidad 4 pagos cerrada en 0db033c44d57326d42bb1e83459b5a1709a04c46 / Core checks
 Unidad 5 primer bloque Cotización→Borrador de factura implementado en validación bajo contrato previo. 0025, propietarios en una TX, vínculos/versiones, REST/UI; OC→Factura y Facturado/Cerrado continúan después de certificar este bloque.
 
 Cotización→Factura certificada en 20bd810901ed2762cb1c7d828f86ee63c5b10f8e / Core 38197746643 (107 Angular, 14/14 navegador, Go/MySQL/race/builds). Continúa OC→Factura/Facturado/Cerrado con contrato previo; unidad 5 sigue abierta.
+
+Unidad 5 segundo bloque OC→Factura/Facturado/Cerrado implementado en validación: contrato previo, 0026, servicios propietarios/TX, version OC revisada al emitir, cierre/reapertura explícitos y guard de ledger closed. Angular 114 local; CI completo pendiente.

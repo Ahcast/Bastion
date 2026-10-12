@@ -18,8 +18,9 @@ type CustomerSource interface {
 	SnapshotInTransaction(context.Context, *sql.Tx, core.Actor, string) (customers.Snapshot, error)
 }
 type Service struct {
-	Core      *core.Service
-	Customers CustomerSource
+	PurchaseOrders PurchaseOrderSource
+	Core           *core.Service
+	Customers      CustomerSource
 }
 
 func nullable(v string) any {
@@ -78,8 +79,8 @@ func (s *Service) access(ctx context.Context, q core.Querier, a core.Actor, id, 
 	}
 	targets := []any{&o.ID, &o.Number, &sar, &o.Status, &o.Customer.ID, &o.CustomerVersion, &o.Customer.Name, &o.Customer.RTN, &o.Customer.Contact, &o.Customer.Phone, &o.Customer.Email, &o.Customer.Address, &o.InvoiceDate, &o.PaymentTerm, &o.CreditDays, &o.Currency, &o.PublicNotes, &o.Exoneration, &o.DiscountType, &o.Discount}
 	targets = append(targets, financialTargets(&o.Calculation)...)
-	targets = append(targets, &o.PaidTotal, &o.Balance, &o.Calculation.CalculatorVersion, &o.Calculation.ProfitVersion, &o.Version, &o.CreatedBy, &o.TeamID, &o.IssuedAt, &o.IssuedBy, &o.DueDate, &company, &o.CompanyVersion, &o.SourceQuoteID, &o.SourceQuoteVersion)
-	e := q.QueryRowContext(ctx, `SELECT `+headerColumns+`,`+castColumns("i.", financialColumns)+`,CAST(i.paid_total AS CHAR),CAST(i.balance AS CHAR),i.calculator_version,i.profit_version,i.version,CAST(i.created_by AS CHAR),COALESCE(CAST(i.team_id AS CHAR),''),i.issued_at,CAST(i.issued_by AS CHAR),CAST(i.due_date AS CHAR),CAST(i.company_snapshot_json AS CHAR),i.company_version,CAST(i.source_quote_id AS CHAR),i.source_quote_version FROM invoices i WHERE i.id=?`+suffix, id).Scan(targets...)
+	targets = append(targets, &o.PaidTotal, &o.Balance, &o.Calculation.CalculatorVersion, &o.Calculation.ProfitVersion, &o.Version, &o.CreatedBy, &o.TeamID, &o.IssuedAt, &o.IssuedBy, &o.DueDate, &company, &o.CompanyVersion, &o.SourceQuoteID, &o.SourceQuoteVersion, &o.SourcePurchaseOrderID, &o.SourcePurchaseOrderVersion)
+	e := q.QueryRowContext(ctx, `SELECT `+headerColumns+`,`+castColumns("i.", financialColumns)+`,CAST(i.paid_total AS CHAR),CAST(i.balance AS CHAR),i.calculator_version,i.profit_version,i.version,CAST(i.created_by AS CHAR),COALESCE(CAST(i.team_id AS CHAR),''),i.issued_at,CAST(i.issued_by AS CHAR),CAST(i.due_date AS CHAR),CAST(i.company_snapshot_json AS CHAR),i.company_version,CAST(i.source_quote_id AS CHAR),i.source_quote_version,CAST(i.source_purchase_order_id AS CHAR),i.source_purchase_order_version FROM invoices i WHERE i.id=?`+suffix, id).Scan(targets...)
 	if e == sql.ErrNoRows {
 		return Invoice{}, core.Missing
 	}
@@ -276,8 +277,8 @@ func (s *Service) persist(ctx context.Context, tx *sql.Tx, a core.Actor, o *Invo
 	vals = append(vals, o.PaidTotal, o.Balance, o.Calculation.CalculatorVersion, o.Calculation.ProfitVersion, o.Version, a.UserID, nullable(o.TeamID))
 	topic := "invoice.created"
 	if o.ID == "" {
-		cols = append(cols, "created_by", "source_quote_id", "source_quote_version")
-		vals = append(vals, o.CreatedBy, o.SourceQuoteID, o.SourceQuoteVersion)
+		cols = append(cols, "created_by", "source_quote_id", "source_quote_version", "source_purchase_order_id", "source_purchase_order_version")
+		vals = append(vals, o.CreatedBy, o.SourceQuoteID, o.SourceQuoteVersion, o.SourcePurchaseOrderID, o.SourcePurchaseOrderVersion)
 		res, e := tx.ExecContext(ctx, `INSERT INTO invoices(`+strings.Join(cols, ",")+`,created_at,updated_at) VALUES(`+placeholders(len(vals))+`,UTC_TIMESTAMP(6),UTC_TIMESTAMP(6))`, vals...)
 		if e != nil {
 			return nil, e

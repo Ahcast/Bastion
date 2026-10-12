@@ -427,4 +427,6 @@ describe("Órdenes de Compra", () => {
     );
     expect(component.selected()?.deleted_at).toBeNull();
   });
+ it('preserva vínculo/versión de facturación confirmado y bloquea navegación durante petición',async()=>{const component=TestBed.createComponent(PurchaseOrders).componentInstance;const source=record();api.get.mockResolvedValue(source);await component.open(source.id);component.billingBusy.set(true);component.create();component.close();await component.open('2');expect(component.selected()?.id).toBe(source.id);component.billingBusy.set(false);api.get.mockRejectedValue(new Error('Recarga'));await component.billingConfirmed({id:source.id,version:'2',status:'delivered',invoice_id:'9007199254740994',invoice_version:'1'});expect(component.billingNeedsReload()).toBe(true);expect(component.selected()?.invoice_id).toBe('9007199254740994');expect(component.form.version).toBe('2');expect(component.message()).toContain('9007199254740994')});
+
 });

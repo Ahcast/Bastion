@@ -150,7 +150,7 @@ func (s *Service) Module(logger *slog.Logger, enabled bool) registry.Module {
 	return registry.Module{
 		ID:           "purchase-orders",
 		Label:        "Órdenes de Compra",
-		Version:      "0.6.0",
+		Version:      "0.7.0",
 		Enabled:      enabled,
 		Dependencies: []string{"core"},
 		Permissions:  Permissions,
@@ -158,6 +158,28 @@ func (s *Service) Module(logger *slog.Logger, enabled bool) registry.Module {
 			register := func(pattern string, action api.Action) {
 				mux.Handle(pattern, api.Operation(s.Core, logger, action))
 			}
+			if s.Invoices != nil {
+				register("POST /api/v1/purchase-orders/{id}/convert-to-invoice", func(ctx context.Context, a core.Actor, r *http.Request) (any, error) {
+					var p InvoiceConversionInput
+					if _, e := strictRequired(r, &p, map[string]bool{"credit_days": true}, "version", "invoice_date", "payment_term_type", "credit_days", "public_notes", "reason"); e != nil {
+						return nil, e
+					}
+					return s.ConvertToInvoice(ctx, a, r.PathValue("id"), r.Header.Get("Idempotency-Key"), p)
+				})
+				closure := func(reopen bool) api.Action {
+					return func(ctx context.Context, a core.Actor, r *http.Request) (any, error) {
+						var p InvoiceClosureInput
+						if _, e := strictRequired(r, &p, nil, "version", "invoice_version", "reason"); e != nil {
+							return nil, e
+						}
+						return s.CloseInvoice(ctx, a, r.PathValue("id"), r.Header.Get("Idempotency-Key"), p, reopen)
+					}
+				}
+				register("POST /api/v1/purchase-orders/{id}/close", closure(false))
+				register("POST /api/v1/purchase-orders/{id}/reopen", closure(true))
+
+			}
+
 			register("POST /api/v1/purchase-orders/calculate", func(ctx context.Context, a core.Actor, r *http.Request) (any, error) {
 				if e := s.gate(ctx, s.Core.DB, a, "ordenes.view"); e != nil {
 					return nil, e

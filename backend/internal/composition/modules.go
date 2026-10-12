@@ -167,6 +167,10 @@ func RegisterFiles(s *core.Service, r *registry.Registry, logger *slog.Logger, o
 		invoiceEnabled = v == "true"
 	}
 	invoiceService := &invoices.Service{Core: s}
+	if invoiceEnabled && purchaseOrderEnabled {
+		invoiceService.PurchaseOrders = purchaseOrderService
+		purchaseOrderService.Invoices = invoiceService
+	}
 	if invoiceEnabled && quoteEnabled {
 		quoteService.Invoices = invoiceService
 	}
