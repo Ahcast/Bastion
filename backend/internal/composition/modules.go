@@ -167,6 +167,15 @@ func RegisterFiles(s *core.Service, r *registry.Registry, logger *slog.Logger, o
 		invoiceEnabled = v == "true"
 	}
 	invoiceService := &invoices.Service{Core: s}
+	if invoiceEnabled && objects != nil {
+		store, ok := objects.(invoices.PDFStore)
+		if !ok {
+			return fmt.Errorf("invoice generated PDF storage unavailable")
+		}
+		invoices.ConfigureDocumentStore(invoiceService, store)
+	} else {
+		invoices.ConfigureDocumentStore(invoiceService, nil)
+	}
 	if invoiceEnabled && purchaseOrderEnabled {
 		invoiceService.PurchaseOrders = purchaseOrderService
 		purchaseOrderService.Invoices = invoiceService
@@ -179,6 +188,9 @@ func RegisterFiles(s *core.Service, r *registry.Registry, logger *slog.Logger, o
 	}
 	if invoiceEnabled {
 		s.RegisterPermissions(invoices.Permissions, []string{"facturas.view"})
+		s.DocumentPolicies["invoices"] = invoiceService.DocumentPolicy
+	} else {
+		delete(s.DocumentPolicies, "invoices")
 	}
 	if e := r.Register(invoiceService.Module(logger, invoiceEnabled)); e != nil {
 		return e
