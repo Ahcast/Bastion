@@ -2,13 +2,15 @@ import {Component,Input,Output,EventEmitter,OnChanges,inject,signal} from '@angu
 import {FormsModule} from '@angular/forms';
 import {Client} from '../../core/api/client';
 import {Reauthentication} from '../../core/security/reauthentication';
+import {InvoiceDocuments} from './invoice-documents';
 export interface PaymentInvoice{id:string;version:string;status:string;currency:string}
 export interface PaymentRow{id:string;invoice_id:string;date:string;method:string;currency:string;amount:string;reference:string;reason:string;receipt_number:string|null;version:string;created_by:string;created_at:string;voided_at:string|null;voided_by:string|null;void_reason:string|null}
 export interface PaymentsPage{source_order_closed?:boolean|null;data:PaymentRow[];total:number;page:number;per_page:number;version:string;currency:string;paid_total:string;balance:string;commercial_status:string|null}
 export interface PaymentResult{invoice_id:string;payment_id:string;version:string;payment_version:string;currency:string;paid_total:string;balance:string;commercial_status:string}
 export function collectionLabel(v:string|null|undefined){return ({pending:'Pendiente',partially_paid:'Parcialmente pagada',paid:'Pagada',overdue:'Vencida'} as Record<string,string>)[v||'']||''}
 function today(){const p=new Intl.DateTimeFormat('en',{timeZone:'America/Tegucigalpa',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date());return ['year','month','day'].map(k=>p.find(x=>x.type===k)!.value).join('-')}
-@Component({selector:'bastion-invoice-payments',imports:[FormsModule,Reauthentication],template:`
+@Component({selector:'bastion-invoice-payments',imports:[FormsModule,Reauthentication,InvoiceDocuments],template:`
+@if(api.has('facturas.view')){<bastion-invoice-documents [invoice]="invoice" [disabled]="disabled" [changesPending]="changesPending"/>}
 @if(invoice.status==='issued'&&api.has('facturas.view')){<section aria-label="Pagos de factura"><h3>Pagos de factura</h3>
 @if(confirmed();as r){<p role="status">Pago confirmado #{{r.payment_id}} · versión de factura {{r.version}} · pagado {{r.currency}} {{r.paid_total}} · saldo {{r.currency}} {{r.balance}}</p>}
 @if(error()){<p role="alert">{{error()}}</p>}
@@ -24,6 +26,7 @@ function today(){const p=new Intl.DateTimeFormat('en',{timeZone:'America/Tegucig
 export class InvoicePayments implements OnChanges{
  @Input({required:true})invoice!:PaymentInvoice;
  @Input()disabled=false;
+ @Input()changesPending=false;
  @Output()busyChange=new EventEmitter<boolean>();
  @Output()changed=new EventEmitter<PaymentResult>();
  api=inject(Client);busy=signal(false);error=signal('');ledger=signal<PaymentsPage|null>(null);confirmed=signal<PaymentResult|null>(null);label=collectionLabel;page=1;date=today();method='Transferencia';amount='';reference='';reason='';voidReason='';voidTarget:PaymentRow|null=null;private invoiceKey='';private pending=new Map<string,string>();
