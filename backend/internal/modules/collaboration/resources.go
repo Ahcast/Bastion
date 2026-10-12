@@ -129,7 +129,9 @@ func (s *Service) MentionableUsers(ctx context.Context, a core.Actor, resourceTy
 		where = append(where, "u.name LIKE ? ESCAPE '!'")
 		args = append(args, pattern)
 	}
-	rows, e := s.Core.DB.QueryContext(ctx, `SELECT DISTINCT CAST(u.id AS CHAR),u.name FROM users u WHERE `+strings.Join(where, " AND ")+` ORDER BY u.name,u.id LIMIT 50`, args...)
+	// EXISTS predicates avoid grant-row duplication, so DISTINCT is unnecessary
+	// and would conflict with MySQL 5.7's ONLY_FULL_GROUP_BY ORDER BY rules.
+	rows, e := s.Core.DB.QueryContext(ctx, `SELECT CAST(u.id AS CHAR),u.name FROM users u WHERE `+strings.Join(where, " AND ")+` ORDER BY u.name,u.id LIMIT 50`, args...)
 	if e != nil {
 		return nil, e
 	}
