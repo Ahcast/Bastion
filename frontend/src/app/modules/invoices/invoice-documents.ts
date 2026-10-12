@@ -1,8 +1,8 @@
 import {Component,Input,OnChanges,inject,signal} from '@angular/core';
 import {Client} from '../../core/api/client';
-import type {Invoice} from './invoices';
 import type {PaymentRow,PaymentsPage} from './invoice-payments';
 
+export interface DocumentInvoice{id:string;version:string;status:string;currency:string}
 type DocumentKind='invoice'|'delivery_note'|'receipt';
 interface GeneratedDocument{id:string;document_id:string|null;kind:DocumentKind;status:string;invoice_version:string;payment_id:string|null;payment_version:string|null;created_at:string;available_at:string|null}
 interface DocumentPage{data:GeneratedDocument[];total:number;page:number;per_page:number}
@@ -31,7 +31,7 @@ interface GeneratedResult{id:string;document_id:string;kind:DocumentKind;status:
  </section>}`
 })
 export class InvoiceDocuments implements OnChanges{
- @Input({required:true})invoice!:Invoice;
+ @Input({required:true})invoice!:DocumentInvoice;
  @Input()disabled=false;
  @Input()changesPending=false;
  api=inject(Client);documents=signal<GeneratedDocument[]>([]);total=signal(0);payments=signal<PaymentsPage|null>(null);busy=signal(false);error=signal('');message=signal('');page=1;paymentPage=1;
@@ -44,6 +44,6 @@ export class InvoiceDocuments implements OnChanges{
  async load(){if(this.busy()||this.disabled)return;this.busy.set(true);this.error.set('');try{await this.loadDocuments(false);if(this.invoice.status==='issued')await this.loadPayments(false)}catch(e){this.error.set(this.api.message(e))}finally{this.busy.set(false)}}
  async loadDocuments(manageBusy=true){if(this.disabled)return;if(manageBusy){if(this.busy())return;this.busy.set(true);this.error.set('')}const key=this.invoice.id+':'+this.invoice.version;try{const r=await this.api.get<DocumentPage>(`/invoices/${this.invoice.id}/documents?page=${this.page}&per_page=25`);if(key===this.invoice.id+':'+this.invoice.version){this.documents.set(r.data);this.total.set(r.total);this.page=r.page}}catch(e){if(manageBusy)this.error.set(this.api.message(e));else throw e}finally{if(manageBusy)this.busy.set(false)}}
  async loadPayments(manageBusy=true){if(this.disabled||this.invoice.status!=='issued')return;if(manageBusy){if(this.busy())return;this.busy.set(true);this.error.set('')}const key=this.invoice.id+':'+this.invoice.version;try{const r=await this.api.get<PaymentsPage>(`/invoices/${this.invoice.id}/payments?page=${this.paymentPage}&per_page=25`);if(key===this.invoice.id+':'+this.invoice.version){this.payments.set(r);this.paymentPage=r.page}}catch(e){if(manageBusy)this.error.set(this.api.message(e));else throw e}finally{if(manageBusy)this.busy.set(false)}}
- async generate(kind:DocumentKind,payment?:PaymentRow){if(this.busy()||this.disabled||!this.canGenerate())return;if(kind==='delivery_note'&&this.invoice.status!=='issued')return;if(kind==='receipt'&&(!payment||this.invoice.status!=='issued'))return;const body={kind,version:this.invoice.version,payment_id:payment?.id??null,payment_version:payment?.version??null};const path=`/invoices/${this.invoice.id}/documents`,key=this.intent(path+':'+kind+':'+(payment?.id??''),body),invoiceKey=this.invoice.id+':'+this.invoice.version;this.busy.set(true);this.error.set('');this.message.set('');try{const r=await this.api.write<GeneratedResult>('POST',path,body,key);if(invoiceKey!==this.invoice.id+':'+this.invoice.version)return;this.pending.delete(path+':'+kind+':'+(payment?.id??''));this.message.set(this.kindLabel(r.kind)+' generado.');await this.loadDocuments(false)}catch(e){if(invoiceKey===this.invoice.id+':'+this.invoice.version)this.error.set(this.api.message(e))}finally{this.busy.set(false)}}
+ async generate(kind:DocumentKind,payment?:PaymentRow){if(this.busy()||this.disabled||!this.canGenerate())return;if(kind==='delivery_note'&&this.invoice.status!=='issued')return;if(kind==='receipt'&&(!payment||this.invoice.status!=='issued'))return;const body={kind,version:this.invoice.version,payment_id:payment?.id??null,payment_version:payment?.version??null};const path=`/invoices/${this.invoice.id}/documents`,intentPath=path+':'+kind+':'+(payment?.id??''),key=this.intent(intentPath,body),invoiceKey=this.invoice.id+':'+this.invoice.version;this.busy.set(true);this.error.set('');this.message.set('');try{const r=await this.api.write<GeneratedResult>('POST',path,body,key);if(invoiceKey!==this.invoice.id+':'+this.invoice.version)return;this.pending.delete(intentPath);this.message.set(this.kindLabel(r.kind)+' generado.');await this.loadDocuments(false)}catch(e){if(invoiceKey===this.invoice.id+':'+this.invoice.version)this.error.set(this.api.message(e))}finally{this.busy.set(false)}}
  async deliver(row:GeneratedDocument,action:'preview'|'download'){if(row.status!=='available'||!row.document_id||!this.api.has('core.documents.read'))return;this.error.set('');try{const r=await this.api.get<{url:string}>(`/documents/${row.document_id}/${action}`);window.open(r.url,'_blank','noopener,noreferrer')}catch(e){this.error.set(this.api.message(e))}}
 }
