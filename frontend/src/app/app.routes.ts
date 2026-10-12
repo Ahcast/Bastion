@@ -14,6 +14,7 @@ export const routes: Routes = [
     canActivate: [authenticated],
     loadComponent: () => import("./core/shell/shell").then((m) => m.Shell),
     children: [
+ {path:"reports",canActivate:[permitted],data:{permission:"reportes.view",module:"reports"},loadComponent:()=>import("./modules/reports/reports").then(m=>m.Reports)},
       {path:"quotes/fx",canActivate:[permitted],data:{permission:"cotizaciones.fx.view",module:"quotes"},loadComponent:()=>import("./modules/quotes/quote-fx").then(m=>m.QuoteFX)},
       {path:"quotes",canActivate:[permitted],data:{permission:"cotizaciones.view",module:"quotes"},loadComponent:()=>import("./modules/quotes/quotes").then(m=>m.Quotes)},
       {path:"expenses",canActivate:[permitted],data:{permission:"gastos.view",module:"expenses"},loadComponent:()=>import("./modules/expenses/expenses").then(m=>m.Expenses)},

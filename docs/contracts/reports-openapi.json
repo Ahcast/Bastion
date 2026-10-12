@@ -1,0 +1,737 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Bastion Reportes",
+    "version": "0.1.0"
+  },
+  "security": [
+    {
+      "session": []
+    }
+  ],
+  "paths": {
+    "/api/v1/reports/invoices": {
+      "get": {
+        "summary": "Reporte invoices",
+        "description": "reportes.view y permiso fuente; scopes intersectados; montos exactos, totales SQL y página del mismo snapshot.",
+        "parameters": [
+          {
+            "name": "date_from",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "date_to",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "currency",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "HNL",
+                "USD"
+              ]
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100000,
+              "default": 1
+            }
+          },
+          {
+            "name": "per_page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 25
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "draft",
+                "issued"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Reporte autorizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/invoicesPage"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sesión/MFA requeridos"
+          },
+          "403": {
+            "description": "Permiso denegado"
+          },
+          "404": {
+            "description": "Fuente deshabilitada"
+          },
+          "422": {
+            "description": "Filtro inválido"
+          },
+          "500": {
+            "description": "Error interno sanitizado"
+          }
+        }
+      }
+    },
+    "/api/v1/reports/orders": {
+      "get": {
+        "summary": "Reporte orders",
+        "description": "reportes.view y permiso fuente; scopes intersectados; montos exactos, totales SQL y página del mismo snapshot.",
+        "parameters": [
+          {
+            "name": "date_from",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "date_to",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "currency",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "HNL",
+                "USD"
+              ]
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100000,
+              "default": 1
+            }
+          },
+          {
+            "name": "per_page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 25
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "received",
+                "confirmed",
+                "purchasing",
+                "in_transit",
+                "goods_received",
+                "preparing_delivery",
+                "delivered",
+                "invoiced",
+                "closed"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Reporte autorizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ordersPage"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sesión/MFA requeridos"
+          },
+          "403": {
+            "description": "Permiso denegado"
+          },
+          "404": {
+            "description": "Fuente deshabilitada"
+          },
+          "422": {
+            "description": "Filtro inválido"
+          },
+          "500": {
+            "description": "Error interno sanitizado"
+          }
+        }
+      }
+    },
+    "/api/v1/reports/expenses": {
+      "get": {
+        "summary": "Reporte expenses",
+        "description": "reportes.view y permiso fuente; scopes intersectados; montos exactos, totales SQL y página del mismo snapshot.",
+        "parameters": [
+          {
+            "name": "date_from",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "date_to",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "currency",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "HNL",
+                "USD"
+              ]
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100000,
+              "default": 1
+            }
+          },
+          {
+            "name": "per_page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 25
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Reporte autorizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/expensesPage"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sesión/MFA requeridos"
+          },
+          "403": {
+            "description": "Permiso denegado"
+          },
+          "404": {
+            "description": "Fuente deshabilitada"
+          },
+          "422": {
+            "description": "Filtro inválido"
+          },
+          "500": {
+            "description": "Error interno sanitizado"
+          }
+        }
+      }
+    },
+    "/api/v1/reports/home": {
+      "get": {
+        "summary": "Resumen autorizado de Inicio",
+        "parameters": [
+          {
+            "name": "date_from",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "date_to",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "currency",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "HNL",
+                "USD"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Fuentes autorizadas exclusivamente",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Home"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sesión/MFA requeridos"
+          },
+          "403": {
+            "description": "Permiso denegado"
+          },
+          "404": {
+            "description": "Fuente deshabilitada"
+          },
+          "422": {
+            "description": "Filtro inválido"
+          },
+          "500": {
+            "description": "Error interno sanitizado"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "session": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "__Host-bastion_session"
+      }
+    },
+    "schemas": {
+      "Filter": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "date_from": {
+            "type": "string"
+          },
+          "date_to": {
+            "type": "string"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "page": {
+            "type": "integer"
+          },
+          "per_page": {
+            "type": "integer"
+          }
+        }
+      },
+      "Total": {
+        "type": "object",
+        "required": [
+          "currency",
+          "count",
+          "values"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "currency": {
+            "type": "string",
+            "enum": [
+              "HNL",
+              "USD"
+            ]
+          },
+          "count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "values": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string",
+              "pattern": "^-?[0-9]+\\.[0-9]{2}$"
+            }
+          }
+        }
+      },
+      "invoicesRow": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "invoice_number",
+          "customer",
+          "invoice_date",
+          "due_date",
+          "currency",
+          "status",
+          "total",
+          "paid_total",
+          "balance"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "invoice_number": {
+            "type": "string"
+          },
+          "customer": {
+            "type": "string"
+          },
+          "invoice_date": {
+            "type": "string"
+          },
+          "due_date": {
+            "type": "string"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "total": {
+            "type": "string"
+          },
+          "paid_total": {
+            "type": "string"
+          },
+          "balance": {
+            "type": "string"
+          }
+        }
+      },
+      "invoicesPage": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "report",
+          "filters",
+          "data",
+          "total",
+          "page",
+          "per_page",
+          "totals"
+        ],
+        "properties": {
+          "report": {
+            "const": "invoices"
+          },
+          "filters": {
+            "$ref": "#/components/schemas/Filter"
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/invoicesRow"
+            }
+          },
+          "total": {
+            "type": "integer"
+          },
+          "page": {
+            "type": "integer"
+          },
+          "per_page": {
+            "type": "integer"
+          },
+          "totals": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Total"
+            }
+          }
+        }
+      },
+      "ordersRow": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "order_number",
+          "customer",
+          "destination",
+          "order_date",
+          "currency",
+          "status",
+          "subtotal",
+          "tax_amount",
+          "total",
+          "products_investment",
+          "additional_expenses",
+          "investment_total",
+          "profit"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "order_number": {
+            "type": "string"
+          },
+          "customer": {
+            "type": "string"
+          },
+          "destination": {
+            "type": "string"
+          },
+          "order_date": {
+            "type": "string"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "subtotal": {
+            "type": "string"
+          },
+          "tax_amount": {
+            "type": "string"
+          },
+          "total": {
+            "type": "string"
+          },
+          "products_investment": {
+            "type": "string"
+          },
+          "additional_expenses": {
+            "type": "string"
+          },
+          "investment_total": {
+            "type": "string"
+          },
+          "profit": {
+            "type": "string"
+          }
+        }
+      },
+      "ordersPage": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "report",
+          "filters",
+          "data",
+          "total",
+          "page",
+          "per_page",
+          "totals"
+        ],
+        "properties": {
+          "report": {
+            "const": "orders"
+          },
+          "filters": {
+            "$ref": "#/components/schemas/Filter"
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ordersRow"
+            }
+          },
+          "total": {
+            "type": "integer"
+          },
+          "page": {
+            "type": "integer"
+          },
+          "per_page": {
+            "type": "integer"
+          },
+          "totals": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Total"
+            }
+          }
+        }
+      },
+      "expensesRow": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "invoice_number",
+          "supplier",
+          "expense_date",
+          "category",
+          "currency",
+          "taxable_amount",
+          "exempt_amount",
+          "tax_amount",
+          "total"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "invoice_number": {
+            "type": "string"
+          },
+          "supplier": {
+            "type": "string"
+          },
+          "expense_date": {
+            "type": "string"
+          },
+          "category": {
+            "type": "string"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "taxable_amount": {
+            "type": "string"
+          },
+          "exempt_amount": {
+            "type": "string"
+          },
+          "tax_amount": {
+            "type": "string"
+          },
+          "total": {
+            "type": "string"
+          }
+        }
+      },
+      "expensesPage": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "report",
+          "filters",
+          "data",
+          "total",
+          "page",
+          "per_page",
+          "totals"
+        ],
+        "properties": {
+          "report": {
+            "const": "expenses"
+          },
+          "filters": {
+            "$ref": "#/components/schemas/Filter"
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/expensesRow"
+            }
+          },
+          "total": {
+            "type": "integer"
+          },
+          "page": {
+            "type": "integer"
+          },
+          "per_page": {
+            "type": "integer"
+          },
+          "totals": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Total"
+            }
+          }
+        }
+      },
+      "Home": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "filters",
+          "reports"
+        ],
+        "properties": {
+          "filters": {
+            "$ref": "#/components/schemas/Filter"
+          },
+          "reports": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "invoices": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/Total"
+                }
+              },
+              "orders": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/Total"
+                }
+              },
+              "expenses": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/Total"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

@@ -28,6 +28,7 @@ import { Client } from "../api/client";
         @if(api.has("facturas.view") && api.moduleEnabled("invoices")){<a routerLink="/invoices" routerLinkActive="active">Facturas</a>}
         @if(api.has("gastos.view") && api.moduleEnabled("expenses")){<a routerLink="/expenses" routerLinkActive="active">Gastos</a>}
         @if(api.has("procesos.view") && api.moduleEnabled("processes")){<a routerLink="/processes" routerLinkActive="active">Procesos</a>}
+        @if(api.has("reportes.view") && api.moduleEnabled("reports")){<a routerLink="/reports" routerLinkActive="active">Reportes</a>}
         <a routerLink="/settings" routerLinkActive="active">Configuración</a>
       </nav>
       <main>

@@ -172,3 +172,38 @@ func TestExpensesModuleFlagAndOptionalSupplierCatalog(t *testing.T) {
 		t.Fatal(e)
 	}
 }
+
+func TestReportsCompositionFlagsAndSourceRoutes(t *testing.T) {
+	for _, enabled := range []string{"true", "false"} {
+		t.Run(enabled, func(t *testing.T) {
+			t.Setenv("BASTION_REPORTS_ENABLED", enabled)
+			t.Setenv("BASTION_INVOICES_ENABLED", "false")
+			t.Setenv("BASTION_EXPENSES_ENABLED", "true")
+			s, r := compositionFixture(t, "false")
+			m := moduleByID(t, r, "reports")
+			if m.Enabled != (enabled == "true") {
+				t.Fatal(m)
+			}
+			if hasPermission(s.PermissionCatalog(), "reportes.view") != (enabled == "true") {
+				t.Fatal("report permission flag")
+			}
+			if enabled == "true" {
+				mux := http.NewServeMux()
+				m.Routes(mux)
+				for _, kind := range []string{"invoices", "orders", "expenses"} {
+					_, p := mux.Handler(httptest.NewRequest("GET", "/api/v1/reports/"+kind, nil))
+					if (p != "") != (kind == "expenses") {
+						t.Fatal(kind, p)
+					}
+				}
+			}
+		})
+	}
+	t.Setenv("BASTION_REPORTS_ENABLED", "invalid")
+	s := &core.Service{DocumentPolicies: map[string]core.DocumentPolicy{}}
+	r := registry.New()
+	_ = r.Register(registry.Module{ID: "core", Enabled: true})
+	if Register(s, r, slog.New(slog.NewTextHandler(io.Discard, nil))) == nil {
+		t.Fatal("invalid flag accepted")
+	}
+}

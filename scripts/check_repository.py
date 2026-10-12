@@ -135,6 +135,17 @@ if purchase_orders_contract_name in openapi_docs and purchase_orders_dir.is_dir(
             f'documents nonexistent PurchaseOrders route {method.upper()} {path}'
         )
 
+# Reports canonical projections and Home must match their machine contract.
+reports_contract = openapi_docs.get('reports-openapi.json')
+if reports_contract:
+    registered = {('get', '/api/v1/reports/' + kind) for kind in ('invoices', 'orders', 'expenses', 'home')}
+    reports_source = ROOT / 'backend/internal/modules/reports/module.go'
+    if reports_source.exists() and 'POST /api/v1/reports/orders/export' in reports_source.read_text():
+        registered.add(('post', '/api/v1/reports/orders/export'))
+    documented = {(method, path) for path, ops in reports_contract['paths'].items() for method in ops if method in ('get','post','patch','delete','put')}
+    if registered != documented:
+        errors.append('Reports OpenAPI: registered and documented routes differ')
+
 if errors:
     print('\n'.join(errors))
     sys.exit(1)

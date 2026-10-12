@@ -418,4 +418,18 @@ func main() {
 		log.Fatal(e)
 	}
 
+	// Report operator is isolated from commercial mutating browser scenarios.
+	if _, e = db.Exec(`INSERT INTO users(email,name,password_hash,totp_secret,active,created_at,updated_at) SELECT 'reports@example.test','Operador Reportes sintético',password_hash,?,TRUE,UTC_TIMESTAMP(6),UTC_TIMESTAMP(6) FROM users WHERE id=1`, secret); e != nil {
+		log.Fatal(e)
+	}
+	if _, e = db.Exec(`INSERT INTO roles(name) VALUES('Reportes sintético')`); e != nil {
+		log.Fatal(e)
+	}
+	if _, e = db.Exec(`INSERT INTO role_permissions SELECT r.id,p.name,'all' FROM roles r JOIN permissions p ON p.name IN ('reportes.view','reportes.export','facturas.view','ordenes.view','gastos.view') WHERE r.name='Reportes sintético'`); e != nil {
+		log.Fatal(e)
+	}
+	if _, e = db.Exec(`INSERT INTO user_roles SELECT u.id,r.id FROM users u JOIN roles r ON r.name='Reportes sintético' WHERE u.email='reports@example.test'`); e != nil {
+		log.Fatal(e)
+	}
+
 }

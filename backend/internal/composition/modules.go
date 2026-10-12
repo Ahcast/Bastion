@@ -11,6 +11,7 @@ import (
 	"github.com/Ahcast/Bastion/backend/internal/modules/processes"
 	"github.com/Ahcast/Bastion/backend/internal/modules/purchaseorders"
 	"github.com/Ahcast/Bastion/backend/internal/modules/quotes"
+	"github.com/Ahcast/Bastion/backend/internal/modules/reports"
 	"github.com/Ahcast/Bastion/backend/internal/modules/suppliers"
 	"github.com/Ahcast/Bastion/backend/internal/modules/workflow"
 	"io"
@@ -229,6 +230,20 @@ func RegisterFiles(s *core.Service, r *registry.Registry, logger *slog.Logger, o
 		delete(s.DocumentPolicies, "expenses")
 	}
 	if e := r.Register(expenseService.Module(logger, expenseEnabled)); e != nil {
+		return e
+	}
+	reportEnabled := true
+	if v := os.Getenv("BASTION_REPORTS_ENABLED"); v != "" {
+		if v != "true" && v != "false" {
+			return fmt.Errorf("invalid reports enable flag")
+		}
+		reportEnabled = v == "true"
+	}
+	reportService := &reports.Service{Core: s, Sources: map[string]bool{"invoices": invoiceEnabled, "orders": purchaseOrderEnabled, "expenses": expenseEnabled}}
+	if reportEnabled {
+		s.RegisterPermissions(reports.Permissions, []string{"reportes.view"})
+	}
+	if e := r.Register(reportService.Module(logger, reportEnabled)); e != nil {
 		return e
 	}
 	return r.Validate()

@@ -1,13 +1,18 @@
 import { Component, inject, signal } from "@angular/core";
 import { Client } from "../../api/client";
+import { HomeMetrics } from "../../../modules/reports/home-metrics";
 @Component({
+  imports: [HomeMetrics],
   template: `<h1>Inicio</h1>
     <p>Bienvenido, {{ api.profile()?.user?.name }}.</p>
+    @if (api.has("reportes.view") && api.moduleEnabled("reports")) {
+      <bastion-home-metrics />
+    }
     <section class="card">
       <h2>Estado de la plataforma</h2>
       <p>
-        Core de identidad y administración habilitado. Los módulos comerciales
-        se incorporarán siguiendo el plan de desarrollo.
+        Identidad y administración habilitadas. El menú muestra los módulos
+        disponibles según sus permisos.
       </p>
       @if (error()) {
         <p role="alert">{{ error() }}</p>
