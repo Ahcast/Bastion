@@ -155,3 +155,7 @@ Primera ejecución 11f9dae5fa7a09b3afb4b7519f30c563dcfa2369 / Core checks 381777
 ## 2026-10-12 — Comprobantes Gastos: permisos y orden de locks
 
 La revisión final de unidad 2 exige permiso view además de acciones específicas sobre el gasto. Core protege mutaciones con orden actor→propietario→documento y revalida binding/owner/equipo al bloquear; evita inversión documento→actor/propietario frente a LinkDocument/revisión. El helper Core permanece genérico con políticas inyectadas, sin imports de negocio. Se exige regresión global de documentos y carrera real MySQL entre dos actores para gasto/papelera de comprobante. Paginación de metadata autorizada se ejecuta en SQL antes de recuperar la página, sin recorrer todos los archivos en memoria. Las referencias son documentales, no costos adicionales aplicados automáticamente.
+
+## 2026-10-12 — Recuperación del pull de MySQL de CI
+
+Core 38300195778 falló en backend antes de ejecutar pasos de prueba: public.ecr.aws devolvió `toomanyrequests: Data limit exceeded` al descargar MySQL. Docker Hub oficial library/mysql:5.7.44 devuelve HTTP 200 y el mismo digest OCI `sha256:4bc6bc963e6d8443453676cae56536f4b8156d78bae03c0145cbe47c2aad73bb`, verificado mediante la API primaria registry-1.docker.io. CI backend/browser usa docker.io con ese digest fijado. No se sustituye versión/artefacto ni se desactiva validación. Afecta exclusivamente descarga de contenedores de prueba; la configuración productiva de MySQL permanece en su contrato Bluehost.
