@@ -127,23 +127,23 @@ func TestInvoicePaymentsRejectInvalidAndIncoherentInputs(t *testing.T) {
 	}
 	q := p
 	q.Amount = "201.26"
-	if _, e := s.RegisterPayment(ctx, a, id, "over", q); e != core.Conflict {
+	if _, e := s.RegisterPayment(ctx, a, id, "payment-test-over", q); e != core.Conflict {
 		t.Fatal(e)
 	}
 	q = p
 	q.Currency = "USD"
-	if _, e := s.RegisterPayment(ctx, a, id, "currency", q); e != core.Conflict {
+	if _, e := s.RegisterPayment(ctx, a, id, "payment-test-currency", q); e != core.Conflict {
 		t.Fatal(e)
 	}
 	q = p
 	q.Version = 1
-	if _, e := s.RegisterPayment(ctx, a, id, "version", q); e != core.Conflict {
+	if _, e := s.RegisterPayment(ctx, a, id, "payment-test-version", q); e != core.Conflict {
 		t.Fatal(e)
 	}
 	if _, e := s.RegisterPayment(ctx, core.Actor{Type: "service", ServiceID: "synthetic"}, id, "technical", p); e != core.Forbidden {
 		t.Fatal(e)
 	}
-	if _, e := s.VoidPayment(ctx, a, id, "999999", "foreign", invoices.VoidPaymentInput{Version: 2, PaymentVersion: 1, Reason: "Ajeno"}); e != core.Missing {
+	if _, e := s.VoidPayment(ctx, a, id, "999999", "payment-test-foreign", invoices.VoidPaymentInput{Version: 2, PaymentVersion: 1, Reason: "Ajeno"}); e != core.Missing {
 		t.Fatal(e)
 	}
 	if _, e := s.Core.DB.Exec(`UPDATE invoices SET paid_total=1,balance=total-1 WHERE id=?`, id); e != nil {
@@ -296,18 +296,18 @@ func TestInvoicePaymentHTTPStrictScopeReauthAndRevocation(t *testing.T) {
 	if _, e = s.Payments(ctx, other, id, 1, 25); e != core.Missing {
 		t.Fatal(e)
 	}
-	if _, e = s.RegisterPayment(ctx, other, id, "scope", p); e != core.Missing {
+	if _, e = s.RegisterPayment(ctx, other, id, "payment-test-scope", p); e != core.Missing {
 		t.Fatal(e)
 	}
 	if _, e = s.Core.DB.Exec(`UPDATE sessions SET reauthenticated_at=UTC_TIMESTAMP(6) WHERE user_id=?`, a.UserID); e != nil {
 		t.Fatal(e)
 	}
 	status, out = purchaseOrderHTTP(t, h, "POST", path, body, cookie, csrf, s.Core.Config.Origin, "http-payment")
-	if status != 200 || out["paid_total"] != "50.00" || out["version"] != "3" {
+	if status != 200 || out["paid_total"] != "50.00" || out["payment-test-version"] != "3" {
 		t.Fatal(status, out)
 	}
 	pid := out["payment_id"].(string)
-	voidBody := map[string]any{"version": "3", "payment_version": "1", "reason": "Void HTTP"}
+	voidBody := map[string]any{"payment-test-version": "3", "payment_version": "1", "reason": "Void HTTP"}
 	status, out = purchaseOrderHTTP(t, h, "POST", path+"/"+pid+"/void", voidBody, cookie, csrf, s.Core.Config.Origin, "http-void")
 	if status != 200 || out["paid_total"] != "0.00" {
 		t.Fatal(status, out)
