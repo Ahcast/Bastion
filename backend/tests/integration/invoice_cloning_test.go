@@ -130,3 +130,44 @@ func TestInvoiceCloneDraftAndConcurrentIndependentDestinations(t *testing.T) {
 		t.Fatal(current, e)
 	}
 }
+
+func TestInvoiceCloneRollbackAndReplayRevocation(t *testing.T) {
+	s, a := invoiceFixture(t)
+	grantInvoice(t, s.Core, a, "all")
+	p := invoiceInput()
+	p.InvoiceDate = invoiceToday()
+	v, e := s.Save(ctx, a, "", "clone-auth-source", p)
+	id := customerResult(t, v, e)["id"]
+	o, e := s.Get(ctx, a, id)
+	if e != nil {
+		t.Fatal(e)
+	}
+	input := invoices.CloneInput{Version: o.Version, InvoiceDate: invoiceToday(), PublicNotes: "Copia segura"}
+	if _, e = s.Core.DB.Exec(`CREATE TRIGGER invoice_clone_event_failure BEFORE INSERT ON domain_events FOR EACH ROW SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='synthetic clone failure'`); e != nil {
+		t.Fatal(e)
+	}
+	if _, e = s.Clone(ctx, a, id, "clone-rollback", input); e == nil {
+		t.Fatal("expected rollback")
+	}
+	if _, e = s.Core.DB.Exec(`DROP TRIGGER invoice_clone_event_failure`); e != nil {
+		t.Fatal(e)
+	}
+	var count int
+	if e = s.Core.DB.QueryRow(`SELECT COUNT(*) FROM invoice_clones WHERE source_invoice_id=?`, id).Scan(&count); e != nil || count != 0 {
+		t.Fatal(count, e)
+	}
+	v, e = s.Clone(ctx, a, id, "clone-replay-revoke", input)
+	first := customerResult(t, v, e)
+	if _, e = s.Core.DB.Exec(`DELETE rp FROM role_permissions rp JOIN user_roles ur ON ur.role_id=rp.role_id WHERE ur.user_id=? AND rp.permission='facturas.create'`, a.UserID); e != nil {
+		t.Fatal(e)
+	}
+	if _, e = s.Clone(ctx, a, id, "clone-replay-revoke", input); e != core.Forbidden {
+		t.Fatal(e)
+	}
+	if _, e = s.Clone(ctx, a, id, "clone-after-revoke", input); e != core.Forbidden {
+		t.Fatal(e)
+	}
+	if e = s.Core.DB.QueryRow(`SELECT COUNT(*) FROM invoice_clones WHERE source_invoice_id=?`, id).Scan(&count); e != nil || count != 1 {
+		t.Fatal(first, count, e)
+	}
+}
