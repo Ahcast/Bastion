@@ -122,7 +122,7 @@ func TestInvoiceGeneratedDraftDocumentPersistsSafeSnapshotAndReplays(t *testing.
 		`"created_by"`, `"team_id"`, `"paid_total"`, `"balance"`, `"source_quote_id"`, `"source_purchase_order_id"`)
 	var entityType, entityID, mediaType string
 	var size int64
-	if e = s.Core.DB.QueryRow(`SELECT d.entity_type,CAST(d.entity_id AS CHAR),v.media_type,v.size FROM documents d JOIN document_versions v ON v.document_id=d.id AND v.version=1 WHERE d.id=?`, first["document_id"]).Scan(&entityType, &entityID, &mediaType, &size); e != nil {
+	if e = s.Core.DB.QueryRow(`SELECT d.entity_type,CAST(d.entity_id AS CHAR),v.media_type,v.size_bytes FROM documents d JOIN document_versions v ON v.document_id=d.id AND v.number=1 WHERE d.id=?`, first["document_id"]).Scan(&entityType, &entityID, &mediaType, &size); e != nil {
 		t.Fatal(e)
 	}
 	if entityType != "invoices" || entityID != id || mediaType != "application/pdf" || size <= 0 {
