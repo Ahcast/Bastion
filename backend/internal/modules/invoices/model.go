@@ -9,7 +9,7 @@ import (
 	"time"
 )
 
-var Permissions = []string{"facturas.view", "facturas.create", "facturas.update", "facturas.fiscal.read", "facturas.fiscal.manage", "facturas.emit", "facturas.payment", "facturas.payment.void"}
+var Permissions = []string{"facturas.view", "facturas.create", "facturas.update", "facturas.fiscal.read", "facturas.fiscal.manage", "facturas.emit", "facturas.payment", "facturas.payment.void", "facturas.documents.generate"}
 
 type CustomerInput struct {
 	ID      string `json:"id"`
