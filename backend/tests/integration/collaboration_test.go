@@ -173,6 +173,9 @@ func TestCollaborationLibraryScopeVersionQuarantineAndTrashRestore(t *testing.T)
 	if _, e = s.DB.Exec(`INSERT INTO role_permissions SELECT r.id,'colaboracion.delete','all' FROM roles r WHERE r.name=? ON DUPLICATE KEY UPDATE scope='all'`, "collaboration-"+a.UserID+"-all"); e != nil {
 		t.Fatal(e)
 	}
+	if _, e = s.DB.Exec(`UPDATE sessions SET reauthenticated_at=NULL WHERE token_hash=?`, a.SessionHash); e != nil {
+		t.Fatal(e)
+	}
 
 	if _, e = service.TrashEntry(ctx, a, entry.ID, "collab-file-trash-no-reauth", collaboration.VersionInput{Version: 2}, false); e == nil || e.Error() != "reauth_required" {
 		t.Fatal("trash without recent reauthentication", e)

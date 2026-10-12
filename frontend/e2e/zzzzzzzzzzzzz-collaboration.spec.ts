@@ -104,9 +104,12 @@ test("Colaboración: carga privada, cuarentena y papelera reversible", async ({
   expect(reviewer?.id).toBeTruthy();
   const body = "<script>alert('xss')</script> comentario sintético";
   await page.getByLabel("Comentario", { exact: true }).fill(body);
-  await page
-    .getByLabel("Destinatarios", { exact: true })
-    .selectOption(reviewer.id);
+  const recipients = page.getByRole("listbox", {
+    name: "Destinatarios",
+    exact: true,
+  });
+  await expect(recipients).toBeVisible();
+  await recipients.selectOption(reviewer.id);
   const posted = page.waitForResponse(
     (r) =>
       r.request().method() === "POST" &&
