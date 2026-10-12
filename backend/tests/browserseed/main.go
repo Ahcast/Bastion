@@ -432,4 +432,12 @@ func main() {
 		log.Fatal(e)
 	}
 
+	// Fiscal emission uses an independent MFA identity to avoid replaying a prior test's TOTP step.
+	if _, e = db.Exec(`INSERT INTO users(email,name,password_hash,totp_secret,active,created_at,updated_at) SELECT 'invoice-emission-fiscal@example.test','Fiscal emisión sintético',password_hash,totp_secret,TRUE,UTC_TIMESTAMP(6),UTC_TIMESTAMP(6) FROM users WHERE email='fiscal@example.test'`); e != nil {
+		log.Fatal(e)
+	}
+	if _, e = db.Exec(`INSERT INTO user_roles SELECT target.id,ur.role_id FROM users target JOIN users source ON source.email='fiscal@example.test' JOIN user_roles ur ON ur.user_id=source.id WHERE target.email='invoice-emission-fiscal@example.test'`); e != nil {
+		log.Fatal(e)
+	}
+
 }
