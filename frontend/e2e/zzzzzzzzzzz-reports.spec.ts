@@ -22,11 +22,14 @@ test("Reportes: filas y totales autorizados por moneda coinciden con Inicio", as
   await expect(
     page.getByRole("heading", { name: "Reportes", exact: true }),
   ).toBeVisible();
-  const response = page.waitForResponse(
-    (r) => r.url().includes("/api/v1/reports/expenses?") && r.status() === 200,
-  );
+  const response = page
+    .waitForResponse(
+      (r) =>
+        r.url().includes("/api/v1/reports/expenses?") && r.status() === 200,
+    )
+    .then((r) => r.json());
   await page.getByLabel("Reporte", { exact: true }).selectOption("expenses");
-  const expenses = await (await response).json();
+  const expenses = await response;
   expect(expenses.total).toBeGreaterThan(0);
   expect(
     expenses.totals.map((x: { currency: string }) => x.currency),
