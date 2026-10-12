@@ -334,6 +334,9 @@ func TestInvoiceEmissionHTTPStrictFieldsCSRFAndMissingCompany(t *testing.T) {
 	var body map[string]any
 	_ = json.Unmarshal(raw, &body)
 	for name := range body {
+		if name == "source_order_version" {
+			continue
+		} // Optional for a standalone invoice.
 		clone := map[string]any{}
 		for k, v := range body {
 			clone[k] = v

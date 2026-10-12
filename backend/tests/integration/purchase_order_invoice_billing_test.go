@@ -285,6 +285,10 @@ func TestOrderInvoiceBillingRejectStateParityVersionsScopesAndReauth(t *testing.
 	if _, e = inv.Emit(ctx, a, iid, "order-version-stale", emit); e != core.Conflict {
 		t.Fatal(e)
 	}
+	emit.SourceOrderVersion = nil
+	if _, e = inv.Emit(ctx, a, iid, "order-version-missing", emit); e != core.Invalid {
+		t.Fatal(e)
+	}
 	emit.SourceOrderVersion = c.SourceOrderVersion
 	if _, e = po.Core.DB.Exec(`UPDATE sessions SET reauthenticated_at=NULL WHERE token_hash=?`, a.SessionHash); e != nil {
 		t.Fatal(e)

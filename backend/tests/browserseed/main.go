@@ -43,7 +43,7 @@ func main() {
 	if e = database.Migrate(context.Background(), db); e != nil {
 		log.Fatal(e)
 	}
-	s := core.New(db, config.Config{Key: make([]byte, 32)})
+	s := core.New(db, config.Config{Key: make([]byte, 32), Idle: 30 * time.Minute, Absolute: 12 * time.Hour, Reauth: 5 * time.Minute})
 	if e = s.Bootstrap(context.Background(), "browser@example.test", "Administrador sintético", "synthetic browser password 42"); e != nil {
 		log.Fatal(e)
 	}
