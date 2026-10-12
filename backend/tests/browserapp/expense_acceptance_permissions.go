@@ -70,7 +70,7 @@ func rotateExpenseBrowserIdentity(dsn string) {
 		case <-ticker.C:
 			var step int64
 			e = db.QueryRow(`SELECT totp_last_step FROM users WHERE name='Operador Gastos sintético' LIMIT 1`).Scan(&step)
-			if e != nil || step == 0 {
+			if e != nil || step < 0 {
 				continue
 			}
 			tx, e := db.Begin()
