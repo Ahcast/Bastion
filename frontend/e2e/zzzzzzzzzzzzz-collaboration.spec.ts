@@ -109,7 +109,11 @@ test("Colaboración: carga privada, cuarentena y papelera reversible", async ({
     exact: true,
   });
   await expect(recipients).toBeVisible();
-  await recipients.selectOption(reviewer.id);
+  await expect(
+    recipients.getByRole("option", { name: reviewer.name, exact: true }),
+  ).toBeVisible();
+  await recipients.selectOption({ label: reviewer.name });
+  await expect(recipients).toHaveValue([reviewer.id]);
   const posted = page.waitForResponse(
     (r) =>
       r.request().method() === "POST" &&
