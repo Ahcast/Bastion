@@ -62,7 +62,7 @@ func TestExpenseReferenceOwnerPortsEnforceLiveVisibilityAndTerminalState(t *test
 	if e != nil || quoteLabel != "COT-000001" || quoteVersion != 1 {
 		t.Fatal("quote reference", quoteLabel, quoteVersion, e)
 	}
-	if _, e = qs.Core.DB.Exec(`UPDATE quotes SET deleted_at=UTC_TIMESTAMP(6),deleted_by=? WHERE id=?`, qa.UserID, quoteID); e != nil {
+	if _, e = qs.Core.DB.Exec(`UPDATE quotes SET deleted_at=UTC_TIMESTAMP(6) WHERE id=?`, quoteID); e != nil {
 		t.Fatal(e)
 	}
 	tx, e = qs.Core.DB.BeginTx(ctx, nil)
@@ -89,7 +89,7 @@ func TestExpenseReferenceOwnerPortsEnforceLiveVisibilityAndTerminalState(t *test
 	if e != nil || poLabel != "OC-CLIENTE-001" || poVersion != 1 {
 		t.Fatal("purchase order reference", poLabel, poVersion, e)
 	}
-	if _, e = pos.Core.DB.Exec(`UPDATE purchase_orders SET deleted_at=UTC_TIMESTAMP(6),deleted_by=? WHERE id=?`, poa.UserID, poID); e != nil {
+	if _, e = pos.Core.DB.Exec(`UPDATE customer_purchase_orders SET deleted_at=UTC_TIMESTAMP(6) WHERE id=?`, poID); e != nil {
 		t.Fatal(e)
 	}
 	tx, e = pos.Core.DB.BeginTx(ctx, nil)
