@@ -270,14 +270,15 @@ func TestInvoiceDraftHTTPStrictFieldsCSRFAndProtectedState(t *testing.T) {
 		t.Fatal(status, out)
 	}
 	id := out["id"].(string)
-	if _, e = s.Core.DB.Exec(`UPDATE invoices SET status='issued' WHERE id=?`, id); e != nil {
-		t.Fatal(e)
-	}
 	o, e := s.Get(ctx, a, id)
 	if e != nil {
 		t.Fatal(e)
 	}
 	p := editInvoice(o)
+	// Exercise the write guard without reading an intentionally incomplete emission.
+	if _, e = s.Core.DB.Exec(`UPDATE invoices SET status='issued' WHERE id=?`, id); e != nil {
+		t.Fatal(e)
+	}
 	if _, e = s.Save(ctx, a, id, "invoice-protected-status", p); e != core.Conflict {
 		t.Fatal(e)
 	}
