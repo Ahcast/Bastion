@@ -26,7 +26,9 @@ func TestInvoiceGeneratedDocumentReauthorizesBeforePublishingMetadata(t *testing
 	s, a := invoiceFixture(t)
 	grantInvoice(t, s.Core, a, "all")
 	store := &blockingInvoiceDocumentStore{started: make(chan struct{}), release: make(chan struct{})}
-	configureInvoiceDocuments(t, s, store)
+	s.Core.DocumentPolicies["invoices"] = s.DocumentPolicy
+	invoices.ConfigureDocumentStore(s, store)
+	t.Cleanup(func() { invoices.ConfigureDocumentStore(s, nil) })
 	if e := s.Core.SaveSetting(ctx, a, "company", core.Setting{Version: 0, Value: []byte(`{"name":"Empresa revocación","tax_id":"08011900123456","address":"Tegucigalpa"}`)}, ""); e != nil {
 		t.Fatal(e)
 	}
