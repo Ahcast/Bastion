@@ -271,7 +271,7 @@ func main() {
 	if _, e = db.Exec(`INSERT INTO roles(name) VALUES('Facturas emisión sintética')`); e != nil {
 		log.Fatal(e)
 	}
-	if _, e = db.Exec(`INSERT INTO role_permissions SELECT r.id,p.name,'self' FROM roles r JOIN permissions p ON p.name IN ('facturas.view','facturas.create','facturas.update','facturas.emit','facturas.payment','facturas.payment.void') WHERE r.name='Facturas emisión sintética'`); e != nil {
+	if _, e = db.Exec(`INSERT INTO role_permissions SELECT r.id,p.name,'self' FROM roles r JOIN permissions p ON p.name IN ('facturas.view','facturas.create','facturas.update','facturas.emit','facturas.payment','facturas.payment.void','facturas.documents.generate','core.documents.read','core.documents.write') WHERE r.name='Facturas emisión sintética'`); e != nil {
 		log.Fatal(e)
 	}
 	if _, e = db.Exec(`INSERT INTO user_roles SELECT u.id,r.id FROM users u JOIN roles r ON r.name='Facturas emisión sintética' WHERE u.email='invoice-emitter@example.test'`); e != nil {
