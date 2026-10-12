@@ -3,6 +3,7 @@ import {FormsModule} from '@angular/forms';
 import {ActivatedRoute} from '@angular/router';
 import {Client} from '../../core/api/client';
 import {Reauthentication} from '../../core/security/reauthentication';
+import {ExpenseLinks,ExpenseLinkChange} from './expense-links';
 export const categories=[{id:'product_purchase',name:'Compra producto'},{id:'freight',name:'Flete'},{id:'customs',name:'Aduana'},{id:'taxes',name:'Impuestos'},{id:'transport',name:'Transporte'},{id:'travel',name:'Viáticos'},{id:'software',name:'Software'},{id:'services',name:'Servicios'},{id:'advertising',name:'Publicidad'},{id:'office',name:'Oficina'},{id:'other',name:'Otros'}];
 export interface ExpenseInput {invoice_number:string;expense_date:string;supplier:{id:string;name:string};category:string;currency:string;taxable_amount:string;exempt_amount:string;notes:string;team_id:string;version:string}
 export interface Calculation {currency:string;taxable_amount:string;exempt_amount:string;tax_rate:string;tax_amount:string;total:string;calculator_version:number}
@@ -11,7 +12,7 @@ interface Page {data:Expense[];total:number;page:number;per_page:number}
 interface Total {currency:string;count:number;taxable_amount:string;exempt_amount:string;tax_amount:string;total:string}
 const today=()=>{const p=new Intl.DateTimeFormat('en',{timeZone:'America/Tegucigalpa',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date());return ['year','month','day'].map(x=>p.find(v=>v.type===x)!.value).join('-')};
 export const emptyExpense=():ExpenseInput=>({invoice_number:'',expense_date:today(),supplier:{id:'',name:''},category:'other',currency:'HNL',taxable_amount:'0',exempt_amount:'0',notes:'',team_id:'',version:'0'});
-@Component({selector:'bastion-expenses',imports:[FormsModule,Reauthentication],templateUrl:'./expenses.html'})
+@Component({selector:'bastion-expenses',imports:[FormsModule,Reauthentication,ExpenseLinks],templateUrl:'./expenses.html'})
 export class Expenses implements OnInit {
  api=inject(Client);route=inject(ActivatedRoute,{optional:true});categories=categories;
  rows=signal<Expense[]>([]);totals=signal<Total[]>([]);total=signal(0);page=1;search='';supplierFilter='';dateFrom='';dateTo='';currencyFilter='';categoryFilter='';deleted=false;
@@ -34,6 +35,7 @@ export class Expenses implements OnInit {
  private key(path:string,body:unknown){const intent=path+JSON.stringify(body);let key=this.pending.get(intent);if(!key){key=crypto.randomUUID();this.pending.set(intent,key)}return {intent,key}}
  async save(){if(this.busy()||!this.writable())return;const id=this.selected()?.id;const path='/expenses'+(id?'/'+id:'');const body=structuredClone(this.form);const {intent,key}=this.key(path,body);this.busy.set(true);this.error.set('');try{const r=await this.api.write<{id:string;version:string}>(id?'PATCH':'POST',path,body,key);this.pending.delete(intent);await this.accept(r,'Gasto guardado #'+r.id)}catch(e){this.error.set(this.api.message(e))}finally{this.busy.set(false)}}
  private async accept(r:{id:string;version:string},message:string){this.confirmed.set(r);this.needsReload.set(true);this.form.version=r.version;this.message.set(message);await this.reload(r.id);await this.refresh()}
+ async afterLinksChanged(r:ExpenseLinkChange){if(this.busy())return;this.busy.set(true);this.error.set('');this.confirmed.set({id:r.id,version:r.version});this.needsReload.set(true);this.form.version=r.version;this.message.set(r.message);try{await this.reload(r.id);await this.refresh()}catch(e){this.error.set(this.api.message(e))}finally{this.busy.set(false)}}
  async changeState(restore:boolean){const o=this.selected();if(!o||this.busy()||this.needsReload()||this.dirty()||!this.reason.trim()||!this.api.has(restore?'gastos.restore':'gastos.delete')||!!o.deleted_at!==restore)return;const path='/expenses/'+o.id+(restore?'/restore':'');const body={version:o.version,reason:this.reason};const {intent,key}=this.key(path,body);this.busy.set(true);this.error.set('');try{const r=await this.api.write<{id:string;version:string}>(restore?'POST':'DELETE',path,body,key);this.pending.delete(intent);this.confirmed.set(r);this.needsReload.set(true);this.form.version=r.version;this.message.set(restore?'Gasto restaurado.':'Gasto enviado a papelera.');if(restore||this.api.has('gastos.restore'))await this.reload(r.id);else{this.selected.set(null);this.editing.set(false);this.needsReload.set(false)};await this.refresh()}catch(e){this.error.set(this.api.message(e))}finally{this.busy.set(false)}}
  catalogEnabled(){return this.api.has('proveedores.view')&&this.api.moduleEnabled('suppliers')}
  async findSuppliers(){if(this.busy()||!this.catalogEnabled())return;this.busy.set(true);try{this.supplierChoices.set((await this.api.get<{data:{id:string;name:string}[]}>('/suppliers?per_page=100&page=1&is_active=true&search='+encodeURIComponent(this.supplierSearch))).data)}catch(e){this.error.set(this.api.message(e))}finally{this.busy.set(false)}}
