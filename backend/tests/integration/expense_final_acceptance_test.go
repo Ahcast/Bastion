@@ -135,3 +135,28 @@ func TestExpenseDocumentTrashVersusExpenseDeletionTwoActors(t *testing.T) {
 		t.Fatal("deleted expense documents visible", e)
 	}
 }
+
+func TestExpenseDocumentBindingUsesCanonicalAggregateIdentity(t *testing.T) {
+	s, a := expenseFixture(t)
+	grantExpense(t, s.Core, a, "all")
+	grantExpenseDocuments(t, s.Core, a, "all")
+	s.Core.DocumentPolicies["expenses"] = s.DocumentPolicy
+	id := makeExpense(t, s, a, "expense-canonical-source", expenseInput())
+	doc := insertExpenseDocument(t, s.Core, a, "canonical-receipt.pdf")
+	input := expenses.LinkDocumentInput{Version: 1, DocumentID: doc, DocumentVersion: 1}
+	v, e := s.LinkDocument(ctx, a, "0"+id, "expense-canonical-link", input)
+	result := customerResult(t, v, e)
+	if result["id"] != id {
+		t.Fatal(result)
+	}
+	var bound string
+	if e = s.Core.DB.QueryRow(`SELECT entity_id FROM documents WHERE id=?`, doc).Scan(&bound); e != nil || bound != id {
+		t.Fatal(bound, e)
+	}
+	for _, readID := range []string{id, "0" + id} {
+		page, e := s.Documents(ctx, a, readID, 1, 25)
+		if e != nil || page.Total != 1 || page.Data[0].ID != doc {
+			t.Fatal(readID, page, e)
+		}
+	}
+}

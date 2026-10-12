@@ -74,7 +74,7 @@ func (s *Service) LinkDocument(ctx context.Context, a core.Actor, id, key string
 		if e = s.Core.Authorize(ctx, tx, a, "gastos.documents.write", o.CreatedBy, o.TeamID, true); e != nil {
 			return e
 		}
-		binding, e := s.Core.DocumentBindingAccess(ctx, tx, a, p.DocumentID, true, "expenses", id)
+		binding, e := s.Core.DocumentBindingAccess(ctx, tx, a, p.DocumentID, true, "expenses", o.ID)
 		if e != nil {
 			return e
 		}
@@ -85,7 +85,7 @@ func (s *Service) LinkDocument(ctx context.Context, a core.Actor, id, key string
 			if o.Version != p.Version || binding.Version != p.DocumentVersion || binding.EntityType != "" {
 				return nil, core.Conflict
 			}
-			if e := s.Core.BindDocument(ctx, tx, a, p.DocumentID, "expenses", id, p.DocumentVersion); e != nil {
+			if e := s.Core.BindDocument(ctx, tx, a, p.DocumentID, "expenses", o.ID, p.DocumentVersion); e != nil {
 				return nil, e
 			}
 			if _, e := tx.ExecContext(ctx, `INSERT INTO expense_documents(expense_id,document_id,document_version,linked_by,linked_at) VALUES(?,?,?,?,UTC_TIMESTAMP(6))`, id, p.DocumentID, p.DocumentVersion+1, a.UserID); e != nil {
@@ -97,7 +97,7 @@ func (s *Service) LinkDocument(ctx context.Context, a core.Actor, id, key string
 			if e := s.evidence(ctx, tx, a, "expense.document_linked", id, p.Version+1, ""); e != nil {
 				return nil, e
 			}
-			return map[string]string{"id": id, "version": fmt.Sprint(p.Version + 1), "document_id": p.DocumentID, "document_version": fmt.Sprint(p.DocumentVersion + 1)}, nil
+			return map[string]string{"id": o.ID, "version": fmt.Sprint(p.Version + 1), "document_id": p.DocumentID, "document_version": fmt.Sprint(p.DocumentVersion + 1)}, nil
 		})
 		return e
 	})
@@ -107,6 +107,11 @@ func (s *Service) LinkDocument(ctx context.Context, a core.Actor, id, key string
 func (s *Service) Documents(ctx context.Context, a core.Actor, id string, page, perPage int, deletedFilter ...bool) (DocumentPage, error) {
 	out := DocumentPage{Data: []ExpenseDocument{}, Page: page, PerPage: perPage}
 	deleted := len(deletedFilter) > 0 && deletedFilter[0]
+	owner, e := s.Get(ctx, a, id)
+	if e != nil {
+		return out, e
+	}
+	id = owner.ID
 	meta, e := s.Core.EntityDocumentMetadataPage(ctx, s.Core.DB, a, "expenses", id, page, perPage, deleted)
 	if e != nil {
 		return out, e
