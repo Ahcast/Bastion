@@ -568,26 +568,31 @@ func RenderDocumentPDF(d PublicDocument) ([]byte, int, error) {
 		if d.Kind == DocumentReceipt && d.Receipt != nil {
 			ref = d.Receipt.Number + " | Factura " + d.InvoiceNumber
 		}
-		header := d.Label
-		if ref != "" {
-			header += " | " + ref
-		}
 		footer := fmt.Sprintf("Página %d", pages)
-		if e := glyphs(header); e != nil {
+		if e := glyphs(d.Label); e != nil {
+			return e
+		}
+		if e := glyphs(ref); e != nil {
 			return e
 		}
 		if e := glyphs(footer); e != nil {
 			return e
 		}
 		pdf.SetXY(42, 24)
-		if e := pdf.Cell(nil, header); e != nil {
+		if e := pdf.Cell(nil, d.Label); e != nil {
 			return e
+		}
+		if ref != "" {
+			pdf.SetXY(42, 37)
+			if e := pdf.Cell(nil, ref); e != nil {
+				return e
+			}
 		}
 		pdf.SetXY(42, 806)
 		if e := pdf.Cell(nil, footer); e != nil {
 			return e
 		}
-		y = 50
+		y = 58
 		return nil
 	}
 	if e = newPage(); e != nil {
@@ -717,7 +722,10 @@ func RenderDocumentPDF(d PublicDocument) ([]byte, int, error) {
 			}
 		}
 		if d.Fiscal != nil {
-			for _, text := range []string{"CAI: " + d.Fiscal.CAI, "Rango autorizado: " + d.Fiscal.Prefix + d.Fiscal.RangeStart + " - " + d.Fiscal.Prefix + d.Fiscal.RangeEnd, "Vigencia: " + d.Fiscal.ValidFrom + " - " + d.Fiscal.ValidUntil} {
+			start, _ := strconv.ParseUint(d.Fiscal.RangeStart, 10, 64)
+			end, _ := strconv.ParseUint(d.Fiscal.RangeEnd, 10, 64)
+			rangeLabel := fmt.Sprintf("Rango autorizado: %s%0*d - %s%0*d", d.Fiscal.Prefix, int(d.Fiscal.NumberWidth), start, d.Fiscal.Prefix, int(d.Fiscal.NumberWidth), end)
+			for _, text := range []string{"CAI: " + d.Fiscal.CAI, rangeLabel, "Vigencia: " + d.Fiscal.ValidFrom + " - " + d.Fiscal.ValidUntil} {
 				if e = write(text, 9); e != nil {
 					return nil, pages, e
 				}
