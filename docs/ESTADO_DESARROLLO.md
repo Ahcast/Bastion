@@ -21,8 +21,9 @@ Actualizado: 2026-10-12. Checkpoint vigente para reanudar. Arquitectura, contrat
 | Órdenes de Compra de clientes | Seis unidades cerradas: agregado, seguimiento/entrega, conversión, documentos, clonación, papelera/utilidad y aceptación; OC→Factura/cierre/reapertura integrados |
 | Facturas/pagos | Siete unidades y aceptación cerradas: borradores, fiscal interno/emisión, pagos, conversiones, PDF, anulación conservadora y clonación |
 | Gastos | Tres unidades y aceptación integral cerradas: registro/cálculo/proveedor/categorías, scopes/filtros/totales/duplicados/papelera, referencias y comprobantes privados |
-| Reportes | **Siguiente módulo. Sin implementación propietaria todavía** |
-| Colaboración, workflows configurables e IA | Fases posteriores según dependencias del plan; no confundir Workflow de aprobación ya integrado con configuración futura de flujos |
+| Reportes | Tres unidades canónicas cerradas/certificadas: consultas Facturas/Órdenes/Gastos, Inicio, Excel privado y aceptación integral |
+| Colaboración | **Siguiente módulo**, reutilizando Core.Files y permisos propietarios |
+| Workflows configurables e IA | Fases posteriores según dependencias; no confundir Workflow de aprobación ya integrado con configuración futura |
 | Producción | No desplegada ni migrada; integraciones externas no acreditadas por CI |
 
 ## Cierre certificado de Gastos
@@ -39,13 +40,22 @@ La aceptación final corrigió permiso view adicional en writes/replays, bloqueo
 
 CI usa Docker Hub oficial con el mismo digest OCI fijado de MySQL 5.7.44. El registro ECR anterior devolvió `Data limit exceeded` antes de pruebas; se verificó igualdad de hash y se recuperó la ejecución sin cambiar versión ni artefacto.
 
-## Próximo paso exacto — Reportes
+## Reportes — alcance canónico cerrado
 
-Leer [spec de Reportes](modules/reports.md), [plan](development/plan.md), Core/datos y contratos propietarios de Invoice/OC/Expense. Definir contrato, permisos/migración si corresponde y unidades verificables antes de código.
+Tres unidades: consultas/proyección de Inicio, exportación Excel y aceptación integral. Contratos [Reportes](contracts/reports.md), [Excel](contracts/reports-export.md), [OpenAPI](contracts/reports-openapi.json), [matriz](contracts/reports-acceptance.md) y [runbook](development/reports-runbook.md).
 
-Primero: tres reportes canónicos Facturas/Órdenes/Gastos con filtros/fechas (`invoice_date`, `order_date`, `expense_date`), filas y totales autorizados por permisos del reporte **y** fuente, agregación SQL y moneda explícita. Inicio debe consumir la misma proyección para coincidir en rango/estado/scopes. Excluir anuladas y papelera conforme a propietario; no inventar ni duplicar gastos de inversión por referencias documentales.
+- Unidad 1: `6e615338d0e5310c33dda05682f4bdfa2776186f`, [Core checks 38309240350](https://github.com/Ahcast/Bastion/actions/runs/38309240350), success: Go/race/MySQL5.7/builds, Angular 148 pruebas, navegador 19/19. Las correcciones intermedias de etiquetas/ACK/MFA sintético quedan documentadas en status.
+- Excel y aceptación: código `84fcc123e1ea2b10e11b0d0c78427a90f41ea553`, [Core checks 38310992510](https://github.com/Ahcast/Bastion/actions/runs/38310992510), success: Go fmt/vet/race/MySQL5.7/builds, Angular build/152 pruebas, navegador 19/19 con descarga real XLSX. [Documentación 38310992497](https://github.com/Ahcast/Bastion/actions/runs/38310992497) y [rama única 38310992521](https://github.com/Ahcast/Bastion/actions/runs/38310992521), success. Lector openpyxl independiente local verificó libro sintético, precisión, fórmulas/cache y filtros.
 
-Después: exportación Excel autenticada/expirable con reauth y mismos filtros/permisos, sin pérdida silenciosa de precisión ni fórmulas externas; aceptación integral. Vistas de RFQ/IA y métricas con propietarios aún inexistentes se integran en sus fases, sin datos fabricados. No iniciar Colaboración antes de cerrar Reportes.
+Migración 0033 registra permisos sin grants. Reportes intersecta scopes propios/fuente; Excel agrega scope export/reauth/humano/CSRF. Proyecciones SQL sobre fechas DATE canónicas; anuladas/papelera excluidas; todos los montos strings/DECIMAL, monedas separadas, filas/totales en snapshot REPEATABLE READ. Inicio usa misma función sin estado específico; conciliar mismo período/moneda y reporte sin filtro de estado. Referencias documentales no vuelven a sumar gastos ni modifican utilidad.
+
+Excel privado por stream, sin URL reutilizable/archivo persistido: texto exacto, fórmulas auxiliares de centavos con cota SUM ABS SQL, dos hojas, filtros/UTC, auditoría antes de bytes y errores explícitos por 10001 filas/24MiB XML/concurrencia. Tests incluyen exportación de 128 filas independiente de página, límite 10001, montos grandes/utilidad negativa, permisos, reauth, CSRF, revocación y rollback de auditoría.
+
+## Próximo paso exacto — Colaboración
+
+Leer [spec de Colaboración](modules/collaboration.md), Core.Files/datos, plan y contratos documentales de propietarios existentes. Definir contrato/migración/DTO/permisos/errores/aceptación antes de código. Conservar documentos privados/versiones/cuarentena/papelera de Core y vínculos propietarios; implementar carpetas, organización/comentarios y colaboración según capacidades reales, con permisos por registro y auditoría. Una unidad a la vez, con MySQL5.7/UI/navegador/CI antes de la siguiente.
+
+Ampliaciones analíticas de RFQ/IA, competitividad de proveedores y estados de procesos no modelados se integran por contratos propietarios en sus fases, sin datos fabricados ni cálculos de modelos. No se acredita aún el alcance completo de todas las categorías analíticas futuras del maestro. Reportes canónicos funciona sin IA.
 
 ## Gates externos pendientes
 

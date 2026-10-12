@@ -26,11 +26,11 @@ GET `/api/v1/reports/home` usa mismos filtros de período/moneda, rechaza status
 
 Errores Core: 401 identidad/sesión; 403 sin permiso; 404 fuente deshabilitada; 422 filtros; 500 sanitizado. No estados/transiciones comerciales, eventos ni jobs en la unidad 1. Sin cache de permisos/datos.
 
-## Excel (unidad 2, contrato reservado)
+## Excel (unidad 2)
 
 POST `/api/v1/reports/orders/export` cuerpo filtros de período, moneda y estado, sin paginación. Usuario humano, CSRF, `reportes.view`, `reportes.export`, `ordenes.view`, reautenticación reciente; scopes de los tres permisos se intersectan. Stream XLSX autenticado, `Cache-Control: no-store`, sin URL pública ni archivo persistido; acceso expira con sesión/reauth, no se crea enlace reutilizable. Límite explícito de 10000 filas: 422 si supera, nunca truncar. Operación de lectura repetible no crea job ni requiere clave idempotente; cada descarga recalcula el snapshot autorizado y audita generación exitosa antes de enviar bytes. Filtros y fecha/hora UTC de generación incluidas.
 
-Hoja Órdenes con encabezados españoles, filtros, moneda por fila, texto protegido de inyección de fórmulas, totales por moneda y fórmulas auxiliares solo cuando la precisión Excel lo permita. Valores de más de 15 dígitos significativos deben conservarse como texto exacto con advertencia visible en el libro; nunca float financiero ni fórmula que mezcle monedas. Especificación OOXML/fórmulas se concreta antes de programar la unidad 2.
+Hoja Órdenes con encabezados españoles, filtros, moneda por fila, texto protegido de inyección de fórmulas, totales por moneda y fórmulas auxiliares solo cuando la precisión Excel lo permita. Valores de más de 15 dígitos significativos deben conservarse como texto exacto con advertencia visible en el libro; nunca float financiero ni fórmula que mezcle monedas. Especificación normativa OOXML/fórmulas en [Excel](reports-export.md).
 
 ## Alcance evolutivo
 

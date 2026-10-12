@@ -12,10 +12,10 @@ Conceder permisos explícitos por rol mediante Core: `reportes.view` y cada perm
 
 1. Elegir reporte/período DATE inclusivo y moneda; fechas sin hora no cambian por zona. Estado aplica solo a Facturas/Órdenes.
 2. Consultar: totales SQL abarcan TODO el conjunto autorizado, no solo página. No combinar HNL/USD ni OC con sus facturas. Un gasto vinculado no vuelve a restarse de utilidad OC.
-3. En Inicio consultar mismo período/moneda: el total coincide por fuente, salvo cambios confirmados entre peticiones. Fuentes sin permiso no aparecen.
+3. En Inicio consultar mismo período/moneda y comparar Reportes sin estado específico: el total coincide por fuente, salvo cambios confirmados entre peticiones. Fuentes sin permiso no aparecen.
 4. Una revocación confirmada se evalúa en siguiente petición. Error de consulta limpia datos anteriores. Una lectura ya iniciada conserva snapshot; no promete invalidación retroactiva.
 
-## Excel (tras certificar unidad 2)
+## Excel
 
 Consultar Órdenes primero. Confirmar identidad con Core y descargar Excel. Se exportan filtros de la consulta confirmada, no campos editados sin consultar. Sin paginación. Si límites de filas/tamaño se exceden, reducir intervalo; no esperar truncamiento. Descarga privada autenticada, sin enlace reutilizable ni persistencia del libro en servidor.
 

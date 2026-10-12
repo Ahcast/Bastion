@@ -22,3 +22,5 @@ Alcance contractual: tres reportes canónicos, Inicio y Excel privado de órdene
 | Regresión | Go fmt/vet/race/MySQL5.7/builds, Angular build/pruebas, Playwright real y paridad documental |
 
 No se prometen análisis IA/RFQ/competitividad o estados de procesos no modelados. Estas ampliaciones siguen por contratos de sus propietarios en fases siguientes. Producción, fiscalidad e infraestructura requieren su verificación independiente; las pruebas sintéticas no la sustituyen.
+
+Cierre de desarrollo sintético: código `84fcc123e1ea2b10e11b0d0c78427a90f41ea553`, [CI integral 38310992510](https://github.com/Ahcast/Bastion/actions/runs/38310992510), Go/race/MySQL5.7/builds, Angular 152 y navegador 19/19 aprobados. Unidad 1 certificada en 38309240350. Esta evidencia cubre el alcance canónico descrito; no acredita producción ni todas las categorías analíticas futuras.

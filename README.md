@@ -1,6 +1,6 @@
 # Bastion
 
-Aplicación operativa de Castillo IT. Core, Clientes, Proveedores, Procesos/receptor crawler y Cotizaciones tienen su alcance implementado y validado en CI. Órdenes de Compra de clientes tiene sus seis unidades y aceptación integral cerradas en CI. Facturas/pagos completó sus siete unidades y aceptación integral de desarrollo sintético en CI. Gastos completó tres unidades y aceptación integral de desarrollo sintético en CI. El siguiente módulo en orden es Reportes. Los demás módulos se desarrollan según el checkpoint. Producción e integraciones externas siguen pendientes.
+Aplicación operativa de Castillo IT. Core, Clientes, Proveedores, Procesos/receptor crawler y Cotizaciones tienen su alcance implementado y validado en CI. Órdenes de Compra de clientes tiene sus seis unidades y aceptación integral cerradas en CI. Facturas/pagos completó sus siete unidades y aceptación integral de desarrollo sintético en CI. Gastos completó tres unidades y aceptación integral de desarrollo sintético en CI. Reportes completó consultas canónicas, Inicio, Excel privado y aceptación integral en CI. El siguiente módulo en orden es Colaboración. Los demás módulos se desarrollan según el checkpoint. Producción e integraciones externas siguen pendientes.
 
 **Entrada del agente:** [AGENTS.md](AGENTS.md) → [checkpoint operativo](docs/ESTADO_DESARROLLO.md) → [maestro](docs/Proyecto_Bastion_Documento_Maestro.md) → [plan](docs/development/plan.md).
 
@@ -16,4 +16,4 @@ Solo `main` está permitida. Los commits conservan versiones; no crear ramas adi
 
 No se despliega software ni se activa correo por actualizar documentación. Las capacidades externas sin verificar se registran en el [checkpoint operativo](docs/ESTADO_DESARROLLO.md) y el [estado histórico](docs/development/status.md).
 
-Runbooks: [Core](docs/development/core-runbook.md) · [Clientes](docs/development/customers-runbook.md) · [Proveedores](docs/development/suppliers-runbook.md) · [Procesos y receptor crawler](docs/development/processes-runbook.md) · [Cotizaciones](docs/development/quotes-runbook.md) · [Órdenes de Compra](docs/development/purchase-orders-runbook.md) · [Gastos](docs/development/expenses-runbook.md).
+Runbooks: [Core](docs/development/core-runbook.md) · [Clientes](docs/development/customers-runbook.md) · [Proveedores](docs/development/suppliers-runbook.md) · [Procesos y receptor crawler](docs/development/processes-runbook.md) · [Cotizaciones](docs/development/quotes-runbook.md) · [Órdenes de Compra](docs/development/purchase-orders-runbook.md) · [Gastos](docs/development/expenses-runbook.md) · [Reportes](docs/development/reports-runbook.md).
