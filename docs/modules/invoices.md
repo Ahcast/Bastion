@@ -403,3 +403,6 @@ Unidad 3 emisión implementada en validación: 0023 y facturas.emit, contexto de
 Unidad 3 emisión certificada en fa8670bcf68c11a07a2ed9ff7aedc7d23a4bc890 / Core checks 38183414256: Go/MySQL/race/builds, Angular 97 y navegador 13/13. Continúa unidad 4 bajo contrato previo; módulo completo y fiscalidad productiva no cerrados.
 
 Unidad 4 pagos implementada en validación bajo contrato previo: ledger normalizado, anulación sin borrar, proyección comercial, REST/UI y pruebas. Pendiente CI completo; sin recibos ni conversiones implementados en este bloque.
+
+
+Unidad 4 pagos cerrada en 0db033c44d57326d42bb1e83459b5a1709a04c46 / Core checks 38195876549: Go/MySQL5.7/race/builds, Angular 103 y navegador 13/13 aprobados. Continúa unidad 5 conversiones por propietarios; recibos/documentos/anulación/clonación y aceptación integral conservan sus dependencias. Ninguna integración fiscal/bancaria/productiva validada por este cierre.
