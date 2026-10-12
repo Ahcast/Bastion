@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Bastion Reportes",
-    "version": "0.1.0"
+    "version": "0.2.0"
   },
   "security": [
     {
@@ -342,6 +342,75 @@
           },
           "500": {
             "description": "Error interno sanitizado"
+          }
+        }
+      }
+    },
+    "/api/v1/reports/orders/export": {
+      "post": {
+        "summary": "Excel autenticado de órdenes",
+        "description": "Humano, CSRF y reauth reciente; scopes reportes.view/export y ordenes.view intersectados. <=10000 filas y 24 MiB XML. Dos exportaciones concurrentes por proceso. Sin enlace persistido, paginación ni idempotencia comercial.",
+        "parameters": [
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExportFilter"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Libro OOXML privado, importes exactos y fórmulas auxiliares seguras",
+            "headers": {
+              "Content-Disposition": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Cache-Control": {
+                "schema": {
+                  "const": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sesión inválida"
+          },
+          "403": {
+            "description": "Permisos/reauth/CSRF"
+          },
+          "404": {
+            "description": "Fuente deshabilitada"
+          },
+          "422": {
+            "description": "Filtro o exportación demasiado grande"
+          },
+          "429": {
+            "description": "Exportaciones en curso"
+          },
+          "500": {
+            "description": "Error sanitizado"
           }
         }
       }
@@ -729,6 +798,30 @@
                 }
               }
             }
+          }
+        }
+      },
+      "ExportFilter": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "date_from",
+          "date_to",
+          "currency",
+          "status"
+        ],
+        "properties": {
+          "date_from": {
+            "type": "string"
+          },
+          "date_to": {
+            "type": "string"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
           }
         }
       }

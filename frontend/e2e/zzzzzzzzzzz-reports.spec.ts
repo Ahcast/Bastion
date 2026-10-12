@@ -1,4 +1,6 @@
 import { test, expect } from "@playwright/test";
+import { readFile } from "node:fs/promises";
+import { execFileSync } from "node:child_process";
 import { totp } from "./helpers";
 test("Reportes: filas y totales autorizados por moneda coinciden con Inicio", async ({
   page,
@@ -71,6 +73,47 @@ test("Reportes: filas y totales autorizados por moneda coinciden con Inicio", as
   await expect(
     page.getByRole("columnheader", { name: "Utilidad", exact: true }),
   ).toBeVisible();
+  await page
+    .getByLabel("Contraseña para confirmar", { exact: true })
+    .fill("synthetic browser password 42");
+  await page
+    .getByLabel("Código de confirmación", { exact: true })
+    .fill("synthetic-reports-recovery");
+  await page
+    .getByRole("button", { name: "Confirmar identidad", exact: true })
+    .click();
+  await expect(
+    page.getByText("Identidad confirmada. Puede continuar con la operación.", {
+      exact: true,
+    }),
+  ).toBeVisible();
+  const downloaded = page.waitForEvent("download");
+  await page
+    .getByRole("button", { name: "Descargar Excel de órdenes", exact: true })
+    .click();
+  const file = await downloaded;
+  expect(file.suggestedFilename()).toBe("ordenes.xlsx");
+  const path = await file.path();
+  expect(path).not.toBeNull();
+  const bytes = await readFile(path!);
+  expect(bytes.subarray(0, 2).toString()).toBe("PK");
+  const inspected = JSON.parse(
+    execFileSync(
+      "python",
+      [
+        "-c",
+        `import zipfile,xml.etree.ElementTree as E,json,sys
+z=zipfile.ZipFile(sys.argv[1]);ns={'s':'http://schemas.openxmlformats.org/spreadsheetml/2006/main'}
+w=E.fromstring(z.read('xl/workbook.xml'));s=E.fromstring(z.read('xl/worksheets/sheet1.xml'));t=E.fromstring(z.read('xl/worksheets/sheet2.xml'))
+print(json.dumps({'sheets':[x.attrib['name'] for x in w.findall('s:sheets/s:sheet',ns)],'rows':len([r for r in s.findall('s:sheetData/s:row',ns) if int(r.attrib['r'])>6]),'formulas':len(t.findall('.//s:f',ns))}))`,
+        path!,
+      ],
+      { encoding: "utf8" },
+    ),
+  );
+  expect(inspected.sheets).toEqual(["Órdenes", "Totales"]);
+  expect(inspected.rows).toBeGreaterThan(0);
+  expect(inspected.formulas).toBeGreaterThan(0);
   await page.reload();
   await expect(
     page.getByRole("heading", { name: "Reportes", exact: true }),

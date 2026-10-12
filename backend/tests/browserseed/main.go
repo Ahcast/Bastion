@@ -440,4 +440,8 @@ func main() {
 		log.Fatal(e)
 	}
 
+	if _, e = db.Exec(`INSERT INTO recovery_codes SELECT id,? FROM users WHERE email='reports@example.test'`, security.Hash("synthetic-reports-recovery")); e != nil {
+		log.Fatal(e)
+	}
+
 }

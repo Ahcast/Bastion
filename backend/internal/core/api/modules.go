@@ -4,7 +4,9 @@ import (
 	"context"
 	"github.com/Ahcast/Bastion/backend/internal/core"
 	"log/slog"
+	"mime"
 	"net/http"
+	"strconv"
 	"strings"
 )
 
@@ -16,6 +18,12 @@ func ActorFrom(ctx context.Context) (core.Actor, error) {
 		return core.Actor{}, core.Unauthorized
 	}
 	return x.Actor, nil
+}
+
+// Download is a bounded authenticated response; domain services authorize before returning it.
+type Download struct {
+	Data                []byte
+	Filename, MediaType string
 }
 
 type Action func(context.Context, core.Actor, *http.Request) (any, error)
@@ -37,6 +45,24 @@ func Operation(s *core.Service, logger *slog.Logger, action Action) http.Handler
 				_ = s.Audit(r.Context(), s.DB, a, "api.denied", "route", r.Pattern, "denied", map[string]string{})
 			}
 			server.error(w, r, e)
+			return
+		}
+		if d, ok := v.(Download); ok {
+			if _, _, e := mime.ParseMediaType(d.MediaType); e != nil || len(d.Data) > 32*1024*1024 {
+				server.error(w, r, core.Invalid)
+				return
+			}
+			if e := r.Context().Err(); e != nil {
+				server.error(w, r, e)
+				return
+			}
+			w.Header().Set("Content-Type", d.MediaType)
+			w.Header().Set("Content-Disposition", mime.FormatMediaType("attachment", map[string]string{"filename": d.Filename}))
+			w.Header().Set("Cache-Control", "no-store")
+			w.Header().Set("X-Content-Type-Options", "nosniff")
+			w.Header().Set("Content-Length", strconv.Itoa(len(d.Data)))
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write(d.Data)
 			return
 		}
 		if v == nil {

@@ -1,6 +1,7 @@
 import { Component, inject, signal, OnDestroy } from "@angular/core";
 import { FormsModule } from "@angular/forms";
 import { Client } from "../../core/api/client";
+import { Reauthentication } from "../../core/security/reauthentication";
 export type Kind = "invoices" | "orders" | "expenses";
 export interface Total {
   currency: string;
@@ -61,6 +62,13 @@ export const labels: Record<string, string> = {
   travel: "Viajes",
   utilities: "Servicios públicos",
   other: "Otros",
+  product_purchase: "Compra de productos",
+  customs: "Aduana",
+  taxes: "Impuestos",
+  transport: "Transporte",
+  software: "Software",
+  advertising: "Publicidad",
+  office: "Oficina",
 };
 export const fields: Record<Kind, string[]> = {
   invoices: [
@@ -120,57 +128,79 @@ export function periodQuery(
 }
 @Component({
   selector: "bastion-reports",
-  imports: [FormsModule],
+  imports: [FormsModule, Reauthentication],
   template: ` <h1>Reportes</h1>
     <p>
       Totales del período autorizado, separados por moneda. Las referencias de
       gastos no modifican la utilidad de las órdenes.
     </p>
     <form (ngSubmit)="load(1)">
-      <label
-        >Reporte
-        <select
-          aria-label="Reporte"
-          name="kind"
-          [(ngModel)]="kind"
-          (ngModelChange)="changeKind()"
-        >
-          @for (k of available(); track k) {
-            <option [value]="k">{{ label(k) }}</option>
-          }
-        </select></label
-      >
-      <label>Desde <input name="from" type="date" [(ngModel)]="from" /></label
-      ><label>Hasta <input name="to" type="date" [(ngModel)]="to" /></label>
-      <label
-        >Moneda
-        <select aria-label="Moneda" name="currency" [(ngModel)]="currency">
-          <option value="">Todas</option>
-          <option>HNL</option>
-          <option>USD</option>
-        </select></label
-      >
-      @if (kind !== "expenses") {
+      <fieldset [disabled]="exportBusy()">
         <label
-          >Estado
-          <select aria-label="Estado" name="status" [(ngModel)]="status">
-            <option value="">Todos</option>
-            @for (s of statuses(); track s) {
-              <option [value]="s">{{ label(s) }}</option>
+          >Reporte
+          <select
+            aria-label="Reporte"
+            name="kind"
+            [(ngModel)]="kind"
+            (ngModelChange)="changeKind()"
+          >
+            @for (k of available(); track k) {
+              <option [value]="k">{{ label(k) }}</option>
             }
           </select></label
         >
-      }
-      <label
-        >Filas por página
-        <select aria-label="Filas por página" name="limit" [(ngModel)]="limit">
-          <option [ngValue]="25">25</option>
-          <option [ngValue]="50">50</option>
-          <option [ngValue]="100">100</option>
-        </select></label
-      >
-      <button [disabled]="busy() || !available().length">Consultar</button>
+        <label>Desde <input name="from" type="date" [(ngModel)]="from" /></label
+        ><label>Hasta <input name="to" type="date" [(ngModel)]="to" /></label>
+        <label
+          >Moneda
+          <select aria-label="Moneda" name="currency" [(ngModel)]="currency">
+            <option value="">Todas</option>
+            <option>HNL</option>
+            <option>USD</option>
+          </select></label
+        >
+        @if (kind !== "expenses") {
+          <label
+            >Estado
+            <select aria-label="Estado" name="status" [(ngModel)]="status">
+              <option value="">Todos</option>
+              @for (s of statuses(); track s) {
+                <option [value]="s">{{ label(s) }}</option>
+              }
+            </select></label
+          >
+        }
+        <label
+          >Filas por página
+          <select
+            aria-label="Filas por página"
+            name="limit"
+            [(ngModel)]="limit"
+          >
+            <option [ngValue]="25">25</option>
+            <option [ngValue]="50">50</option>
+            <option [ngValue]="100">100</option>
+          </select></label
+        >
+        <button [disabled]="busy() || !available().length">Consultar</button>
+      </fieldset>
     </form>
+    @if (kind === "orders" && api.has("reportes.export")) {
+      <bastion-reauthentication />
+      <button
+        (click)="exportOrders()"
+        [disabled]="busy() || exportBusy() || !result()"
+      >
+        Descargar Excel de órdenes
+      </button>
+      <p>
+        Se descargarán todos los registros de los filtros consultados. Los
+        importes se conservan como texto exacto.
+      </p>
+    }
+    @if (exportBusy()) {
+      <p role="status">Generando Excel…</p>
+    }
     @if (busy()) {
       <p role="status">Consultando reporte…</p>
     }
@@ -232,13 +262,13 @@ export function periodQuery(
         </table>
       </div>
       <button
-        [disabled]="busy() || r.page <= 1"
+        [disabled]="busy() || exportBusy() || r.page <= 1"
         (click)="load(r.page - 1, true)"
       >
         Anterior</button
       ><span> Página {{ r.page }} </span
       ><button
-        [disabled]="busy() || r.page * r.per_page >= r.total"
+        [disabled]="busy() || exportBusy() || r.page * r.per_page >= r.total"
         (click)="load(r.page + 1, true)"
       >
         Siguiente
@@ -257,6 +287,8 @@ export class Reports implements OnDestroy {
   result = signal<ReportPage | null>(null);
   error = signal("");
   busy = signal(false);
+  exportBusy = signal(false);
+  private destroyed = false;
   private sequence = 0;
   constructor() {
     this.kind = this.available()[0] || "invoices";
@@ -326,6 +358,7 @@ export class Reports implements OnDestroy {
     void this.load(1);
   }
   async load(page = 1, paginate = false) {
+    if (this.exportBusy() || this.destroyed) return;
     const ticket = ++this.sequence;
     const previous = this.result();
     this.result.set(null);
@@ -369,7 +402,49 @@ export class Reports implements OnDestroy {
       if (ticket === this.sequence) this.busy.set(false);
     }
   }
+  async exportOrders() {
+    const r = this.result();
+    if (
+      this.exportBusy() ||
+      this.busy() ||
+      !r ||
+      r.report !== "orders" ||
+      this.kind !== "orders" ||
+      !this.api.has("reportes.export") ||
+      !this.api.has("reportes.view") ||
+      !this.available().includes("orders")
+    )
+      return;
+    this.exportBusy.set(true);
+    this.error.set("");
+    const body = {
+      date_from: String(r.filters["date_from"] || ""),
+      date_to: String(r.filters["date_to"] || ""),
+      currency: String(r.filters["currency"] || ""),
+      status: String(r.filters["status"] || ""),
+    };
+    try {
+      const blob = await this.api.download("/reports/orders/export", body);
+      if (!this.destroyed) this.saveDownload(blob);
+    } catch (e) {
+      if (!this.destroyed) {
+        this.error.set(this.api.message(e));
+        this.result.set(null);
+      }
+    } finally {
+      if (!this.destroyed) this.exportBusy.set(false);
+    }
+  }
+  saveDownload(blob: Blob) {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "ordenes.xlsx";
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
   ngOnDestroy() {
+    this.destroyed = true;
     ++this.sequence;
   }
 }

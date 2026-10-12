@@ -8,6 +8,7 @@ function api() {
     has: vi.fn(() => true),
     moduleEnabled: vi.fn((_k: string) => true),
     get: vi.fn(),
+    download: vi.fn(),
     message: vi.fn(() => "Acceso denegado"),
   };
 }
@@ -34,6 +35,63 @@ const result: ReportPage = {
   ],
 };
 describe("Reportes", () => {
+  it("Excel utiliza filtros confirmados, bloquea dobles clics e ignora respuesta al salir", async () => {
+    const a = api();
+    a.get.mockResolvedValue({
+      ...result,
+      report: "orders",
+      filters: { ...result.filters, status: "received" },
+    });
+    let finish!: (v: Blob) => void;
+    a.download.mockReturnValue(new Promise<Blob>((r) => (finish = r)));
+    const c = fixture(a);
+    await c.load();
+    c.kind = "orders";
+    c.from = "2030-01-01";
+    const save = vi.spyOn(c, "saveDownload").mockImplementation(() => {});
+    const pending = c.exportOrders();
+    await c.exportOrders();
+    expect(a.download).toHaveBeenCalledTimes(1);
+    expect(a.download.mock.calls[0]).toEqual([
+      "/reports/orders/export",
+      {
+        date_from: "2026-10-01",
+        date_to: "2026-10-12",
+        currency: "USD",
+        status: "received",
+      },
+    ]);
+    c.ngOnDestroy();
+    finish(new Blob(["PK"]));
+    await pending;
+    expect(save).not.toHaveBeenCalled();
+  });
+  it("Excel no descarga errores ni permite exportar sin permiso", async () => {
+    const a = api();
+    a.get.mockResolvedValue({
+      ...result,
+      report: "orders",
+      filters: { ...result.filters, status: "received" },
+    });
+    a.download.mockRejectedValue(new Error());
+    const c = fixture(a);
+    await c.load();
+    c.kind = "orders";
+    const save = vi.spyOn(c, "saveDownload").mockImplementation(() => {});
+    await c.exportOrders();
+    expect(c.error()).toBe("Acceso denegado");
+    expect(c.result()).toBeNull();
+    expect(save).not.toHaveBeenCalled();
+    c.result.set({
+      ...result,
+      report: "orders",
+      filters: { ...result.filters, status: "received" },
+    });
+    a.has.mockReturnValue(false);
+    await c.exportOrders();
+    expect(a.download).toHaveBeenCalledTimes(1);
+  });
+
   it("selector etiquetado cambia al reporte elegido en la interfaz", async () => {
     const a = api();
     a.get.mockImplementation(async (path: string) => ({

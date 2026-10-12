@@ -46,7 +46,7 @@ func safe(e error) error {
 	return &core.Error{Code: "internal", Message: "No se pudo completar el reporte.", Status: 500}
 }
 func (s *Service) Module(logger *slog.Logger, enabled bool) registry.Module {
-	return registry.Module{ID: "reports", Label: "Reportes", Version: "0.1.0", Enabled: enabled, Dependencies: []string{"core"}, Permissions: Permissions, Routes: func(mux *http.ServeMux) {
+	return registry.Module{ID: "reports", Label: "Reportes", Version: "0.2.0", Enabled: enabled, Dependencies: []string{"core"}, Permissions: Permissions, Routes: func(mux *http.ServeMux) {
 		register := func(path string, fn api.Action) {
 			mux.Handle(path, api.Operation(s.Core, logger, func(ctx context.Context, a core.Actor, r *http.Request) (any, error) {
 				v, e := fn(ctx, a, r)
@@ -65,6 +65,32 @@ func (s *Service) Module(logger *slog.Logger, enabled bool) registry.Module {
 				return s.Read(ctx, a, kind, f)
 			})
 		}
+		if s.Sources["orders"] {
+			register("POST /api/v1/reports/orders/export", func(ctx context.Context, a core.Actor, r *http.Request) (any, error) {
+				if len(r.URL.Query()) != 0 {
+					return nil, core.Invalid
+				}
+				var fields map[string]*string
+				if e := api.Decode(r, &fields); e != nil {
+					return nil, e
+				}
+				if len(fields) != 4 {
+					return nil, core.Invalid
+				}
+				for _, key := range []string{"date_from", "date_to", "currency", "status"} {
+					if fields[key] == nil {
+						return nil, core.Invalid
+					}
+				}
+				f := Filter{From: *fields["date_from"], To: *fields["date_to"], Currency: *fields["currency"], Status: *fields["status"]}
+				out, e := s.ExportOrders(ctx, a, f)
+				if e != nil {
+					return nil, e
+				}
+				return api.Download{Data: out.Data, Filename: "ordenes.xlsx", MediaType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"}, nil
+			})
+		}
+
 		register("GET /api/v1/reports/home", func(ctx context.Context, a core.Actor, r *http.Request) (any, error) {
 			f, e := filter(r, true)
 			if e != nil {

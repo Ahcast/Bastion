@@ -94,6 +94,31 @@ export class Client {
       }),
     );
   }
+  async download(path: string, body: unknown): Promise<Blob> {
+    if (!this.csrf) await this.refreshCSRF();
+    try {
+      return await firstValueFrom(
+        this.http.post(this.apiUrl + "/api/v1" + path, body, {
+          responseType: "blob",
+        }),
+      );
+    } catch (e) {
+      if (e instanceof HttpErrorResponse && e.error instanceof Blob) {
+        try {
+          const parsed = JSON.parse(await e.error.text());
+          throw new HttpErrorResponse({
+            error: parsed,
+            status: e.status,
+            statusText: e.statusText,
+            url: e.url || undefined,
+          });
+        } catch (decoded) {
+          if (decoded instanceof HttpErrorResponse) throw decoded;
+        }
+      }
+      throw e;
+    }
+  }
   async login(email: string, password: string) {
     const result = await this.write<{ csrf_token: string }>(
       "POST",
@@ -130,7 +155,9 @@ export class Client {
       this.profile()?.grants.some((g) => g.permission === permission) || false
     );
   }
-  moduleEnabled(id: string) { return this.profile()?.enabled_modules?.includes(id) || false; }
+  moduleEnabled(id: string) {
+    return this.profile()?.enabled_modules?.includes(id) || false;
+  }
   message(error: unknown): string {
     if (error instanceof HttpErrorResponse) {
       if (error.status === 401) {

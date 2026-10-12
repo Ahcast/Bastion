@@ -159,3 +159,7 @@ La revisión final de unidad 2 exige permiso view además de acciones específic
 ## 2026-10-12 — Recuperación del pull de MySQL de CI
 
 Core 38300195778 falló en backend antes de ejecutar pasos de prueba: public.ecr.aws devolvió `toomanyrequests: Data limit exceeded` al descargar MySQL. Docker Hub oficial library/mysql:5.7.44 devuelve HTTP 200 y el mismo digest OCI `sha256:4bc6bc963e6d8443453676cae56536f4b8156d78bae03c0145cbe47c2aad73bb`, verificado mediante la API primaria registry-1.docker.io. CI backend/browser usa docker.io con ese digest fijado. No se sustituye versión/artefacto ni se desactiva validación. Afecta exclusivamente descarga de contenedores de prueba; la configuración productiva de MySQL permanece en su contrato Bluehost.
+
+## 2026-10-12 — Excel Reportes determinista y precisión
+
+Renderer XLSX fijo con archive/zip y encoding/xml de Go estándar, sin dependencia runtime adicional. Dos hojas OOXML, texto financiero/IDs exacto, SUM SQL por moneda y fórmula auxiliar de centavos enteros únicamente cuando SUM ABS SQL <=999999999999999 cents. Se evita cambiar silenciosamente DECIMAL(18,2) a precisión Excel de 15 dígitos; aviso y total exacto siguen disponibles. Export privado como stream autenticado con reauth, scopes intersectados, auditoría y límites explícitos de filas/XML/concurrencia, sin URLs ni archivos persistidos. Fuente primaria/restricciones documentadas en contracts/reports-export.md. Lector independiente openpyxl local verificó el libro sintético; no se añade esa biblioteca al runtime del servidor.

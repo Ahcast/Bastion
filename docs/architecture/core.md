@@ -462,3 +462,5 @@ Además de los criterios de la sección 19, comprobar:
 
 La estructura y el Core ya tienen implementación local y pruebas; las integraciones/despliegue reales están sujetos a validación. La validación de este documento no acredita controles instalados ni una auditoría de seguridad del hosting.
 
+
+Las acciones registradas pueden devolver un Download binario acotado de Core API, conservando middleware de sesión/MFA/CSRF/Origin, errores JSON y no-store. El servicio propietario debe autorizar acción y filas antes de devolver bytes; esta capacidad técnica no concede permiso de exportación ni publica enlaces.
