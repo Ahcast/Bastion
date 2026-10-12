@@ -17,7 +17,7 @@ interface Metrics {
       ><label>Hasta <input name="to" type="date" [(ngModel)]="to" /></label
       ><label
         >Moneda
-        <select name="currency" [(ngModel)]="currency">
+        <select aria-label="Moneda" name="currency" [(ngModel)]="currency">
           <option value="">Todas</option>
           <option>HNL</option>
           <option>USD</option>

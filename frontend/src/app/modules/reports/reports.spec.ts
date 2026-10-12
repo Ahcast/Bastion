@@ -34,6 +34,29 @@ const result: ReportPage = {
   ],
 };
 describe("Reportes", () => {
+  it("selector etiquetado cambia al reporte elegido en la interfaz", async () => {
+    const a = api();
+    a.get.mockImplementation(async (path: string) => ({
+      ...result,
+      report: path.includes("/expenses?") ? "expenses" : "invoices",
+    }));
+    TestBed.configureTestingModule({
+      providers: [{ provide: Client, useValue: a }],
+    });
+    const f = TestBed.createComponent(Reports);
+    f.detectChanges();
+    await f.whenStable();
+    const select = f.nativeElement.querySelector(
+      'select[aria-label="Reporte"]',
+    ) as HTMLSelectElement;
+    expect(select).not.toBeNull();
+    select.value = "expenses";
+    select.dispatchEvent(new Event("change"));
+    f.detectChanges();
+    await f.whenStable();
+    expect(a.get.mock.lastCall?.[0]).toContain("/reports/expenses?");
+    f.destroy();
+  });
   it("página conserva filtros consultados y valores exactos aunque se edite formulario", async () => {
     const a = api();
     a.get.mockResolvedValue(result);

@@ -129,7 +129,12 @@ export function periodQuery(
     <form (ngSubmit)="load(1)">
       <label
         >Reporte
-        <select name="kind" [(ngModel)]="kind" (ngModelChange)="changeKind()">
+        <select
+          aria-label="Reporte"
+          name="kind"
+          [(ngModel)]="kind"
+          (ngModelChange)="changeKind()"
+        >
           @for (k of available(); track k) {
             <option [value]="k">{{ label(k) }}</option>
           }
@@ -139,7 +144,7 @@ export function periodQuery(
       ><label>Hasta <input name="to" type="date" [(ngModel)]="to" /></label>
       <label
         >Moneda
-        <select name="currency" [(ngModel)]="currency">
+        <select aria-label="Moneda" name="currency" [(ngModel)]="currency">
           <option value="">Todas</option>
           <option>HNL</option>
           <option>USD</option>
@@ -148,7 +153,7 @@ export function periodQuery(
       @if (kind !== "expenses") {
         <label
           >Estado
-          <select name="status" [(ngModel)]="status">
+          <select aria-label="Estado" name="status" [(ngModel)]="status">
             <option value="">Todos</option>
             @for (s of statuses(); track s) {
               <option [value]="s">{{ label(s) }}</option>
@@ -158,7 +163,7 @@ export function periodQuery(
       }
       <label
         >Filas por página
-        <select name="limit" [(ngModel)]="limit">
+        <select aria-label="Filas por página" name="limit" [(ngModel)]="limit">
           <option [ngValue]="25">25</option>
           <option [ngValue]="50">50</option>
           <option [ngValue]="100">100</option>
