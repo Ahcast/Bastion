@@ -2,7 +2,7 @@
 
 Este archivo es el **checkpoint corto para reanudar desarrollo**. La documentación de arquitectura, contratos, decisiones y runbooks sigue siendo normativa; este archivo indica dónde quedó el trabajo real y qué debe hacerse después.
 
-Actualizado: 2026-10-11.
+Actualizado: 2026-10-12.
 
 ## Regla para reanudar
 
@@ -21,7 +21,7 @@ Actualizado: 2026-10-11.
 - Procesos/receptor crawler: unidad base cerrada y validada.
 - Cotizaciones: **cerrado y validado en CI para el alcance monomoneda HNL/USD**.
 - OC de clientes: **Unidades 1..6 y aceptación integral cerradas y validadas en CI**.
-- Facturas/pagos: módulo activo, unidades 1 financieras, 2 Borradores y 3 emisión certificadas; continúa unidad 4 pagos según contrato previo. Gastos, Reportes y Colaboración siguen después.
+- Facturas/pagos: módulo activo, unidades 1 financieras, 2 Borradores, 3 emisión y 4 pagos certificadas; siguiente unidad 5 conversiones por propietarios. Gastos, Reportes y Colaboración siguen después.
 - Producción: no desplegada ni migrada.
 
 ## Cotizaciones — cierre certificado
@@ -291,3 +291,10 @@ Unidad 3 cerrada para desarrollo sintético. Continúa unidad 4 bajo contrato pr
 Contrato previo 2c733b22a84ba3436ed88553f6c1a7dac7bc985a y migración 0024 payments; permisos payment/payment.void sin grants productivos. Ledger normalizado inmutable/anulable con versión, fecha/método/moneda/importes/referencia/razón y receipt_number NULL. Servicio humano view/action con reauth/CSRF/versión/intención; factura bajo lock, saldo recalculado desde filas activas, no sobrepago ni FX/retenciones. Register/void cambian exclusivamente proyecciones/versiones con audit/event y evidencia atómica; rollback y replay reautorizados. Estado documental issued se conserva y commercial_status deriva Pendiente/Parcialmente pagada/Pagada/Vencida en reloj Honduras; filtro/listado/ficha y ledger sin agregados entre monedas.
 
 UI consulta explícitamente ledger vigente, registra/anula con razón y reauth, conserva clave ACK incierto y resultado confirmado si falla recarga, bloquea padre durante HTTP y nuevas mutaciones hasta recuperar versión. Seis integraciones MySQL nuevas cubren persistencia/anulación/cuatro métodos, total cero/importes >2^53, versiones/invalidaciones/moneda/fechas, 12 replays, ocho cobros en contención por dos humanos, rollback register/void, HTTP/CSRF/scopes/reauth/revocación. Prueba pura de vencimiento y prioridades; seis Angular nuevas. Build local aprobado; 102 pruebas locales previas al último caso de padre (objetivo 103) y suite de navegador ampliada con abono/anulación/cobro completo y contador/snapshots inmutables. Go fmt/vet/race/MySQL/builds, Angular y navegador completos pendientes; no cerrar pagos ni empezar conversiones hasta CI verde. Sin recibos/PDF/Siafi bancario ni validación fiscal productiva.
+
+
+## 2026-10-12 — Facturas, unidad 4 pagos certificada
+
+Código certificado `0db033c44d57326d42bb1e83459b5a1709a04c46`: [Core checks 38195876549](https://github.com/Ahcast/Bastion/actions/runs/38195876549), [documentación 38195876513](https://github.com/Ahcast/Bastion/actions/runs/38195876513) y [rama única 38195876471](https://github.com/Ahcast/Bastion/actions/runs/38195876471): success. Go fmt/vet/race con MySQL 5.7 y builds server/worker/admin aprobados; Angular build y **103 pruebas**; navegador **13/13**. Ledger de abonos/anulaciones, saldo exacto, sobrepago, scopes/revocación/reauth, rollback, idempotencia y cobros concurrentes certificados. Número/correlativo y snapshots fiscales/empresa se conservan; ningún recibo ni integración bancaria/Siafi real acreditados.
+
+Las fallas previas de aceptación provenían de claves de prueba inferiores al mínimo Core y lectura de una emisión incompleta fabricada por el test; se corrigieron escenarios sin relajar reglas productivas. La corrección inicial cambió accidentalmente dos nombres version del test HTTP; se restauraron y la suite íntegra final aprobó. Unidad 4 cerrada. Siguiente unidad 5: conversiones Cotización→Factura y OC→Factura por servicios propietarios, contrato/migración previos y evidencia transaccional/idempotente. Documentos/anulación/clonación y aceptación integral mantienen su orden; Facturas completo y producción todavía pendientes.
