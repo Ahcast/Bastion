@@ -2,14 +2,26 @@ package integration
 
 import (
 	"testing"
+	"time"
 
 	"github.com/Ahcast/Bastion/backend/internal/core"
 	"github.com/Ahcast/Bastion/backend/internal/modules/invoices"
+	"github.com/Ahcast/Bastion/backend/internal/modules/processes"
 )
 
 func TestExpenseReferenceOwnerPortsEnforceLiveVisibilityAndTerminalState(t *testing.T) {
 	// Process: owner service supplies the live snapshot under its own authorization.
-	ps, _ := processFixture(t)
+	ps, machine := processFixture(t)
+	batch := processes.Batch{
+		ID:     "expense-reference-process",
+		Schema: "1.0",
+		Processes: []processes.Observation{
+			obs(time.Now().UTC().Add(-time.Minute), "Entidad referencia gastos"),
+		},
+	}
+	if _, e := ps.Import(ctx, machine, "HC-synthetic-test", batch.ID, batch); e != nil {
+		t.Fatal(e)
+	}
 	processActor := admin(t, ps.Core)
 	var processID string
 	if e := ps.Core.DB.QueryRow(`SELECT CAST(id AS CHAR) FROM processes ORDER BY id LIMIT 1`).Scan(&processID); e != nil {
