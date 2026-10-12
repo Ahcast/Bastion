@@ -303,11 +303,11 @@ func TestInvoicePaymentHTTPStrictScopeReauthAndRevocation(t *testing.T) {
 		t.Fatal(e)
 	}
 	status, out = purchaseOrderHTTP(t, h, "POST", path, body, cookie, csrf, s.Core.Config.Origin, "http-payment")
-	if status != 200 || out["paid_total"] != "50.00" || out["payment-test-version"] != "3" {
+	if status != 200 || out["paid_total"] != "50.00" || out["version"] != "3" {
 		t.Fatal(status, out)
 	}
 	pid := out["payment_id"].(string)
-	voidBody := map[string]any{"payment-test-version": "3", "payment_version": "1", "reason": "Void HTTP"}
+	voidBody := map[string]any{"version": "3", "payment_version": "1", "reason": "Void HTTP"}
 	status, out = purchaseOrderHTTP(t, h, "POST", path+"/"+pid+"/void", voidBody, cookie, csrf, s.Core.Config.Origin, "http-void")
 	if status != 200 || out["paid_total"] != "0.00" {
 		t.Fatal(status, out)
