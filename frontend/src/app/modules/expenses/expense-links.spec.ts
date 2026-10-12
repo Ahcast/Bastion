@@ -16,7 +16,7 @@ describe('Referencias y comprobantes de gastos',()=>{
  it('captura la versión viva de cada referencia y conserva la clave tras ACK incierto',async()=>{
   api.get.mockImplementation(async(path:string)=>path==='/processes/42'?{version:'7'}:{});
   api.write.mockRejectedValueOnce(new Error('ACK perdido')).mockResolvedValueOnce({id:expense.id,version:'5'});
-  c.referenceIds.processes='42';c.referenceReason='Evidencia revisada';
+  c.referenceIds['processes']='42';c.referenceReason='Evidencia revisada';
   await c.saveReferences();await c.saveReferences();
   expect(api.get).toHaveBeenCalledWith('/processes/42');
   const first=api.write.mock.calls[0],second=api.write.mock.calls[1];
@@ -27,7 +27,7 @@ describe('Referencias y comprobantes de gastos',()=>{
  });
  it('bloquea una nueva referencia si el módulo propietario está deshabilitado',async()=>{
   api.moduleEnabled.mockImplementation((id:string)=>id!=='processes');
-  c.referenceIds.processes='42';c.referenceReason='Intento inválido';
+  c.referenceIds['processes']='42';c.referenceReason='Intento inválido';
   await c.saveReferences();
   expect(api.write).not.toHaveBeenCalled();
   expect(c.error()).toContain('deshabilitado');
