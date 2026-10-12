@@ -186,6 +186,7 @@ test("Colaboración: carga privada, cuarentena y papelera reversible", async ({
   await page.getByRole("button", { name: "Restaurar", exact: true }).click();
   await restored;
   await page.getByLabel("Papelera", { exact: true }).uncheck();
+  await page.getByRole("button", { name: /Biblioteca sintética/ }).click();
   await expect(page.getByText("manual.pdf", { exact: true })).toBeVisible();
   expect(folder.id).toBeTruthy();
 });
