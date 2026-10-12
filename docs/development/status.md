@@ -347,3 +347,9 @@ La limpieza automática del espacio temporal retiró el checkout y los runtimes 
 ## 2026-10-12 — Facturas, unidad 5 conversiones certificada
 
 Código e45d1caa2f6866e9812e3859d87a1656e9b8d0ca: Core checks 38200999714 attempt 5 aprobado. Backend: gofmt/vet/race con MySQL 5.7 y make build server/worker/admin aprobados; Angular build/114 pruebas; navegador 15/15 en 44.6 s. Documentación del checkpoint 696cff45: 38209907963 reintento aprobado; rama única 38209907982 aprobada. GitHub Actions volvió a ejecutar los jobs después de la recuperación de cuenta informada por el usuario. Unidad 5 cerrada: Quote→Factura y OC→Factura, emisión/Facturado, cobro/cierre/reapertura/void, scopes/CSRF/reauth, versiones, idempotencia, rollback y concurrencia certificados. Ninguna integración fiscal/bancaria productiva acreditada. Continúa unidad 6 documentos, anulación y clonación; unidad 7 aceptación integral antes de Gastos.
+
+## 2026-10-12 — Facturas, unidad 6: documentos certificados
+
+Código 370ba44fa67a001cd3bac94775a4a602740840fc: Core checks 38259786051, documentación 38259786115 y rama única 38259786156 aprobados. Go fmt/vet/race con MySQL 5.7 y builds; Angular build y pruebas; navegador 15/15 con generación real de factura PDF, nota de entrega y recibos activo/anulado. La prueba de persistencia usa columnas reales `document_versions.number` y `size_bytes`. Proyección pública, snapshots, almacenamiento inmutable, reintentos, revocación, concurrencia, scope y descarga por Core están cubiertos. Muestras sintéticas A4 de los tres tipos fueron renderizadas y revisadas visualmente; se corrigió encabezado que excedía el margen y el relleno del rango fiscal.
+
+Bloque documentos cerrado para desarrollo sintético. Siguen anulación y clonación, luego aceptación integral de Facturas. No hay validación fiscal productiva, S3 real ni despliegue acreditados.

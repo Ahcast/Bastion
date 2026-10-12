@@ -277,6 +277,20 @@ func main() {
 	if _, e = db.Exec(`INSERT INTO user_roles SELECT u.id,r.id FROM users u JOIN roles r ON r.name='Facturas emisión sintética' WHERE u.email='invoice-emitter@example.test'`); e != nil {
 		log.Fatal(e)
 	}
+	// Independent cancellation operator keeps the existing emission test's
+	// correlativo and MFA session isolated. Production grants remain unchanged.
+	if _, e = db.Exec(`INSERT INTO users(email,name,password_hash,totp_secret,active,created_at,updated_at) SELECT 'invoice-cancel@example.test','Anulación factura sintética',password_hash,?,TRUE,UTC_TIMESTAMP(6),UTC_TIMESTAMP(6) FROM users WHERE id=1`, secret); e != nil {
+		log.Fatal(e)
+	}
+	if _, e = db.Exec(`INSERT INTO roles(name) VALUES('Facturas anulación sintética')`); e != nil {
+		log.Fatal(e)
+	}
+	if _, e = db.Exec(`INSERT INTO role_permissions SELECT r.id,p.name,'self' FROM roles r JOIN permissions p ON p.name IN ('facturas.view','facturas.create','facturas.emit','facturas.cancel','facturas.documents.generate','core.documents.read','core.documents.write') WHERE r.name='Facturas anulación sintética'`); e != nil {
+		log.Fatal(e)
+	}
+	if _, e = db.Exec(`INSERT INTO user_roles SELECT u.id,r.id FROM users u JOIN roles r ON r.name='Facturas anulación sintética' WHERE u.email='invoice-cancel@example.test'`); e != nil {
+		log.Fatal(e)
+	}
 
 	// Company reviewer is isolated from the administrator's MFA enrollment scenario.
 	if _, e = db.Exec(`INSERT INTO users(email,name,password_hash,totp_secret,active,created_at,updated_at) SELECT 'invoice-company@example.test','Empresa emisión sintética',password_hash,?,TRUE,UTC_TIMESTAMP(6),UTC_TIMESTAMP(6) FROM users WHERE id=1`, secret); e != nil {

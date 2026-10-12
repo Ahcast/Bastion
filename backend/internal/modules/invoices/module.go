@@ -100,6 +100,13 @@ func (s *Service) Module(logger *slog.Logger, enabled bool) registry.Module {
 			}
 			return s.GenerateDocument(ctx, a, r.PathValue("id"), r.Header.Get("Idempotency-Key"), p)
 		})
+		register("POST /api/v1/invoices/{id}/cancel", func(ctx context.Context, a core.Actor, r *http.Request) (any, error) {
+			var p CancelInput
+			if e := decodePayment(r, &p, "version", "reason", "original_and_copy_marked_and_archived"); e != nil {
+				return nil, e
+			}
+			return s.Cancel(ctx, a, r.PathValue("id"), r.Header.Get("Idempotency-Key"), p)
+		})
 
 		register("GET /api/v1/invoices/{id}/payments", func(ctx context.Context, a core.Actor, r *http.Request) (any, error) {
 			f, e := invoiceFilter(r)

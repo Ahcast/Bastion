@@ -1,5 +1,7 @@
 # Contrato propietario de Facturas/pagos
 
+Anulación de factura emitida sin pagos/documentos generados ni OC vinculada: [contrato de anulación](invoice-cancellation.md). La anulación conserva número y snapshots; no acredita por sí sola cumplimiento fiscal productivo.
+
 Continúa después de las seis unidades OC certificadas en a36de697a4c0d39d16f7095a76d443258deec3f5 (Core checks 38175683879). Especificación funcional: ../modules/invoices.md. Desarrollo incremental en orden: (1) InvoiceFinancials y saldos exactos; (2) borradores, persistencia, REST/UI y autorización; (3) configuración fiscal, correlativo y emisión; (4) pagos auditados y proyección comercial; (5) conversiones por propietarios; (6) documentos, anulación y clonación; (7) aceptación integral. Cada unidad se certifica antes de la siguiente.
 
 ## Unidad 1: motor financiero y proyección de pagos

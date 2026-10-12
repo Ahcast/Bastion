@@ -34,7 +34,7 @@ type Page struct {
 
 func (s *Service) List(ctx context.Context, a core.Actor, f Filter) (Page, error) {
 	out := Page{Data: []Summary{}, Page: f.Page, PerPage: f.PerPage}
-	if f.Page < 1 || f.Page > 100000 || f.PerPage < 1 || f.PerPage > 100 || !finance.ValidText(f.Search, 1000, false) || f.CustomerID != "" && core.ID(f.CustomerID) != nil || f.Status != "" && f.Status != "draft" && f.Status != "issued" || !validCommercialFilter(f.CommercialStatus) {
+	if f.Page < 1 || f.Page > 100000 || f.PerPage < 1 || f.PerPage > 100 || !finance.ValidText(f.Search, 1000, false) || f.CustomerID != "" && core.ID(f.CustomerID) != nil || f.Status != "" && f.Status != "draft" && f.Status != "issued" && f.Status != "cancelled" || !validCommercialFilter(f.CommercialStatus) {
 		return out, core.Invalid
 	}
 	if e := s.gate(ctx, s.Core.DB, a, "facturas.view"); e != nil {

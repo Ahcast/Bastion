@@ -62,7 +62,7 @@ type PaymentPage struct {
 
 // CommercialStatus derives collection state without rewriting document status.
 func CommercialStatus(status string, due *string, p PaymentProjection, today string) (*string, error) {
-	if status == "draft" {
+	if status == "draft" || status == "cancelled" {
 		return nil, nil
 	}
 	if !validCurrency(p.Currency) {

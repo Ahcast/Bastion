@@ -309,7 +309,10 @@ func ProjectDocument(kind DocumentKind, o Invoice, payment *Payment, draft *Draf
 		out.CreditDays = o.CreditDays
 		out.PublicNotes = o.PublicNotes
 		out.Invoice = projectInvoiceBody(o)
-	case "issued":
+	case "issued", "cancelled":
+		if o.Status == "cancelled" && (kind != DocumentInvoice || o.CancelledAt == nil || o.CancelledBy == nil) {
+			return PublicDocument{}, core.Conflict
+		}
 		company, version, fiscal, e := issuedDocumentContext(o)
 		if e != nil {
 			return PublicDocument{}, e
@@ -320,6 +323,9 @@ func ProjectDocument(kind DocumentKind, o Invoice, payment *Payment, draft *Draf
 		switch kind {
 		case DocumentInvoice:
 			out.Label = "Factura"
+			if o.Status == "cancelled" {
+				out.Label = "Factura anulada"
+			}
 			out.InvoiceDate = o.InvoiceDate
 			out.DueDate = *o.DueDate
 			out.Currency = o.Currency
@@ -481,7 +487,7 @@ func validatePublicDocument(d PublicDocument) error {
 				return core.Invalid
 			}
 		} else {
-			if d.Label != "Factura" || validatePublicFiscal(d.Fiscal, d.InvoiceNumber, d.Currency, d.InvoiceDate) != nil {
+			if d.Label != "Factura" && d.Label != "Factura anulada" || validatePublicFiscal(d.Fiscal, d.InvoiceNumber, d.Currency, d.InvoiceDate) != nil {
 				return core.Invalid
 			}
 		}

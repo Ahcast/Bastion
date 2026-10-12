@@ -171,6 +171,26 @@ func TestProjectDraftNeverLooksFiscal(t *testing.T) {
 	}
 }
 
+func TestCancelledInvoiceDocumentIsMarkedAndHasNoDeliveryOrReceipt(t *testing.T) {
+	o := issueDocumentTestInvoice(t, documentTestInvoice(t, "HNL"))
+	now := time.Date(2026, 10, 12, 10, 0, 0, 0, time.UTC)
+	by := "11"
+	o.Status, o.CancelledAt, o.CancelledBy = "cancelled", &now, &by
+	doc, e := ProjectDocument(DocumentInvoice, o, nil, nil)
+	if e != nil || doc.Label != "Factura anulada" || doc.Fiscal == nil {
+		t.Fatal(doc, e)
+	}
+	if _, _, e = RenderDocumentPDF(doc); e != nil {
+		t.Fatal(e)
+	}
+	if _, e = ProjectDocument(DocumentDeliveryNote, o, nil, nil); e != core.Conflict {
+		t.Fatal(e)
+	}
+	if _, e = ProjectDocument(DocumentReceipt, o, nil, nil); e != core.Conflict {
+		t.Fatal(e)
+	}
+}
+
 func TestProjectReceiptVoidedAndIncoherentPayments(t *testing.T) {
 	o := issueDocumentTestInvoice(t, documentTestInvoice(t, "HNL"))
 	payment := documentTestPayment(o)

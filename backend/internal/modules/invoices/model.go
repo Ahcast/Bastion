@@ -9,7 +9,7 @@ import (
 	"time"
 )
 
-var Permissions = []string{"facturas.view", "facturas.create", "facturas.update", "facturas.fiscal.read", "facturas.fiscal.manage", "facturas.emit", "facturas.payment", "facturas.payment.void", "facturas.documents.generate"}
+var Permissions = []string{"facturas.view", "facturas.create", "facturas.update", "facturas.fiscal.read", "facturas.fiscal.manage", "facturas.emit", "facturas.payment", "facturas.payment.void", "facturas.documents.generate", "facturas.cancel"}
 
 type CustomerInput struct {
 	ID      string `json:"id"`
@@ -44,6 +44,9 @@ type Item struct {
 	finance.CalculatedItem
 }
 type Invoice struct {
+	CancelledAt                *time.Time      `json:"cancelled_at"`
+	CancelledBy                *string         `json:"cancelled_by"`
+	CancelReason               *string         `json:"cancel_reason"`
 	SourceOrderClosed          *bool           `json:"source_order_closed"`
 	SourcePurchaseOrderID      *string         `json:"source_purchase_order_id"`
 	SourcePurchaseOrderVersion *uint64         `json:"source_purchase_order_version,string"`

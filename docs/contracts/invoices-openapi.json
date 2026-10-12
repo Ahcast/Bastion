@@ -657,6 +657,71 @@
           }
         }
       }
+    },
+    "/api/v1/invoices/{id}/cancel": {
+      "post": {
+        "description": "Anulación conservadora: sin pagos, PDFs previos ni OC vinculada; conserva número/SAR, requiere declaración de archivo, reauth y evidencia atómica. No certifica fiscalidad productiva.",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CancelInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Factura anulada",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CancelResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sesión inválida"
+          },
+          "403": {
+            "description": "Permiso/CSRF/reauth insuficiente"
+          },
+          "404": {
+            "description": "Fuera de alcance"
+          },
+          "409": {
+            "description": "Estado, versión o historial incompatible"
+          },
+          "422": {
+            "description": "DTO inválido"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -1257,6 +1322,58 @@
           },
           "commercial_status": {
             "type": "string"
+          }
+        }
+      },
+      "CancelInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "version",
+          "reason",
+          "original_and_copy_marked_and_archived"
+        ],
+        "properties": {
+          "version": {
+            "type": "string",
+            "pattern": "^[1-9][0-9]*$"
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000
+          },
+          "original_and_copy_marked_and_archived": {
+            "type": "boolean",
+            "const": true
+          }
+        }
+      },
+      "CancelResult": {
+        "type": "object",
+        "required": [
+          "id",
+          "version",
+          "status",
+          "invoice_number",
+          "cancelled_at"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "version": {
+            "type": "string"
+          },
+          "status": {
+            "const": "cancelled"
+          },
+          "invoice_number": {
+            "type": "string"
+          },
+          "cancelled_at": {
+            "type": "string",
+            "format": "date-time"
           }
         }
       }

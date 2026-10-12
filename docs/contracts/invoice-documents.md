@@ -10,7 +10,7 @@ Los documentos generados usan `documents.entity_type='invoices'` y `entity_id=<i
 
 ## Tipos
 
-- `invoice`: borrador o emitida. Borrador usa empresa pública actual y versionada capturada al reservar. Emitida usa exclusivamente snapshots históricos de empresa/SAR de la factura.
+- `invoice`: borrador, emitida o anulada. Borrador usa empresa pública actual y versionada capturada al reservar. Emitida/anulada usa exclusivamente snapshots históricos de empresa/SAR; anulada imprime «Factura anulada». La anulación se bloquea si existen documentos generados anteriores.
 - `delivery_note`: sólo factura emitida; no contiene precios, impuestos, totales ni SAR y no afirma entrega física.
 - `receipt`: sólo factura emitida y un pago real de esa factura. Requiere `payment_id` y `payment_version`; usa número público `RCP-{payment_id}`. Un pago anulado sigue generando `Recibo anulado` sin publicar la razón interna.
 
