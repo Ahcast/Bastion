@@ -14,7 +14,7 @@ import (
 func documentTestInput(currency string) Input {
 	days := uint16(30)
 	return Input{
-		Customer: CustomerInput{ID: "44", Name: "Cliente Histórico, S.A.", RTN: "08011999123456", Contact: "Ana López", Phone: "+504 2200-0000", Email: "ana@example.test", Address: "Tegucigalpa, Honduras"},
+		Customer:    CustomerInput{ID: "44", Name: "Cliente Histórico, S.A.", RTN: "08011999123456", Contact: "Ana López", Phone: "+504 2200-0000", Email: "ana@example.test", Address: "Tegucigalpa, Honduras"},
 		InvoiceDate: "2026-10-10", PaymentTerm: "credito", CreditDays: &days, Currency: currency,
 		PublicNotes: "Entrega coordinada con el cliente.", DiscountType: "amount", Discount: "20.00", Exoneration: "EXO-2026-TEST",
 		AdditionalExpenses: "17.00", TeamID: "22",
@@ -273,7 +273,7 @@ func TestPublicDocumentPreservesExactLargeDecimalsAndDeterministicPDF(t *testing
 func longDocumentInvoice(t *testing.T) Invoice {
 	t.Helper()
 	p := Input{
-		Customer: CustomerInput{Name: "Cliente de paginación", RTN: "08010000000000", Address: "Dirección con acentos: información pública"},
+		Customer:    CustomerInput{Name: "Cliente de paginación", RTN: "08010000000000", Address: "Dirección con acentos: información pública"},
 		InvoiceDate: "2026-10-10", PaymentTerm: "contado", Currency: "HNL",
 		PublicNotes: strings.Repeat("Información pública con áéíóú y ñ. ", 200), DiscountType: "amount", Discount: "0.00", AdditionalExpenses: "0.00", TeamID: "22",
 	}
