@@ -150,3 +150,6 @@ Facturas Borradores (0021): invoices e invoice_items propietarios, campos DECIMA
 Facturas configuración fiscal (0022): invoice_fiscal_settings singleton, configuración/version y actualización auditada; contador único document_counters.invoice creado junto a primera configuración, sin adelantar/retroceder al editar. No emisión ni payments en este bloque.
 
 Facturas emisión (0023): issued_at/issued_by/due_date y snapshot/versión pública de empresa; número/SAR previamente nullable se congelan al emitir junto a correlativo document_counters.invoice. Fechas de negocio Honduras, timestamps UTC; pago y saldo conservados sin crear payments. Contrato propietario invoices.md.
+
+
+Migración 0025, conversión propietaria Cotización→Borrador Factura: invoices.source_quote_id UNIQUE/FK nullable y source_quote_version nullable; quotes.invoice_id UNIQUE/FK nullable. Vínculo/versiones y creación completa atómicos. Una cotización genera OC o factura, no ambos; no asigna número fiscal ni pagos.
