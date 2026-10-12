@@ -107,6 +107,13 @@ func (s *Service) Module(logger *slog.Logger, enabled bool) registry.Module {
 			}
 			return s.Cancel(ctx, a, r.PathValue("id"), r.Header.Get("Idempotency-Key"), p)
 		})
+		register("POST /api/v1/invoices/{id}/clone", func(ctx context.Context, a core.Actor, r *http.Request) (any, error) {
+			var p CloneInput
+			if e := decodePayment(r, &p, "version", "invoice_date", "public_notes"); e != nil {
+				return nil, e
+			}
+			return s.Clone(ctx, a, r.PathValue("id"), r.Header.Get("Idempotency-Key"), p)
+		})
 
 		register("GET /api/v1/invoices/{id}/payments", func(ctx context.Context, a core.Actor, r *http.Request) (any, error) {
 			f, e := invoiceFilter(r)

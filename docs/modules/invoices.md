@@ -412,3 +412,5 @@ Unidad 5 primer bloque Cotización→Borrador de factura implementado en validac
 Cotización→Factura certificada en 20bd810901ed2762cb1c7d828f86ee63c5b10f8e / Core 38197746643 (107 Angular, 14/14 navegador, Go/MySQL/race/builds). Continúa OC→Factura/Facturado/Cerrado con contrato previo; unidad 5 sigue abierta.
 
 Unidad 5 segundo bloque OC→Factura/Facturado/Cerrado implementado en validación: contrato previo, 0026, servicios propietarios/TX, version OC revisada al emitir, cierre/reapertura explícitos y guard de ledger closed. Angular 114 local; CI completo pendiente.
+
+La clonación de una factura borrador o emitida crea un borrador independiente con snapshot comercial histórico; fecha y notas son nuevas. Conserva sólo una referencia interna a la fuente y versión, sin copiar su número fiscal, pagos, documentos ni vínculos de conversión. La factura anulada no puede clonarse. Contrato técnico: `docs/contracts/invoice-cloning.md`.

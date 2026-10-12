@@ -2,6 +2,7 @@ import {ActivatedRoute,RouterLink} from "@angular/router";
 import {InvoicePayments,PaymentResult,collectionLabel} from "./invoice-payments";
 import {InvoiceEmission,InvoiceEmissionResult} from "./invoice-emission";
 import {InvoiceCancellation,CancellationResult} from "./invoice-cancellation";
+import {InvoiceCloning,CloningResult} from "./invoice-cloning";
 import {InvoiceFiscalSettings} from "./fiscal-settings";
 import { Component, OnInit, inject, signal } from "@angular/core";
 import { FormsModule } from "@angular/forms";
@@ -133,7 +134,7 @@ export const emptyInvoice = (): DraftInput => ({
 });
 @Component({
   selector: "bastion-invoices",
-  imports: [RouterLink,InvoicePayments,InvoiceCancellation,FormsModule, Reauthentication, InvoiceFiscalSettings, InvoiceEmission],
+  imports: [RouterLink,InvoicePayments,InvoiceCancellation,InvoiceCloning,FormsModule, Reauthentication, InvoiceFiscalSettings, InvoiceEmission],
   templateUrl: "./invoices.html",
 })
 export class Invoices implements OnInit {
@@ -349,6 +350,10 @@ export class Invoices implements OnInit {
   async paymentConfirmed(r:PaymentResult){
  this.confirmed.set({id:r.invoice_id,version:r.version});this.needsReload.set(true);this.form.version=r.version;this.message.set('Pago confirmado #'+r.payment_id+' · saldo '+r.currency+' '+r.balance);this.busy.set(true);try{await this.openConfirmed(r.invoice_id);await this.load()}catch(e){this.error.set(this.api.message(e))}finally{this.busy.set(false)}
  }
+  async cloningConfirmed(r:CloningResult){
+    this.message.set("Borrador clonado #"+r.id+" creado. Puede abrirlo desde la sección de clonación.");
+    await this.load();
+  }
   async cancellationConfirmed(r:CancellationResult){
     this.confirmed.set({id:r.id,version:r.version});this.needsReload.set(true);this.form.version=r.version;this.message.set('Factura '+r.invoice_number+' anulada; número conservado.');this.busy.set(true);try{await this.openConfirmed(r.id);await this.load()}catch(e){this.error.set(this.api.message(e))}finally{this.busy.set(false)}
   }

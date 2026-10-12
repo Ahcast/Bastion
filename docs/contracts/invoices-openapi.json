@@ -722,6 +722,83 @@
           }
         }
       }
+    },
+    "/api/v1/invoices/{id}/clone": {
+      "post": {
+        "description": "Copia snapshot comercial histórico a un borrador independiente, sin serie/SAR/pagos/documentos/origen.",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CloneInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Borrador creado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "id",
+                    "version"
+                  ],
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "version": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sesión inválida"
+          },
+          "403": {
+            "description": "Permiso/CSRF insuficiente"
+          },
+          "404": {
+            "description": "Fuera de alcance"
+          },
+          "409": {
+            "description": "Versión/estado/cálculo conflictivo"
+          },
+          "422": {
+            "description": "DTO inválido"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -1374,6 +1451,29 @@
           "cancelled_at": {
             "type": "string",
             "format": "date-time"
+          }
+        }
+      },
+      "CloneInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "version",
+          "invoice_date",
+          "public_notes"
+        ],
+        "properties": {
+          "version": {
+            "type": "string",
+            "pattern": "^[1-9][0-9]*$"
+          },
+          "invoice_date": {
+            "type": "string",
+            "format": "date"
+          },
+          "public_notes": {
+            "type": "string",
+            "maxLength": 12000
           }
         }
       }
