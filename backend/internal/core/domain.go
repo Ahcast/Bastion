@@ -14,12 +14,42 @@ func (s *Service) EmitEvent(ctx context.Context, tx *sql.Tx, a Actor, topic, ent
 }
 
 type DocumentPolicy func(context.Context, Querier, Actor, string, bool) error
+type DocumentBindingPolicy func(context.Context, Querier, Actor, string) error
+type DocumentVersionPolicy func(context.Context, Querier, Actor, string) error
+type DocumentTrashPolicy func(context.Context, Querier, Actor, string) error
 
 type DocumentBinding struct {
+	OwnerID    string
+	TeamID     string
 	Version    uint64
 	EntityType string
 	EntityID   string
 	Generated  bool
+}
+
+func (s *Service) authorizeDocumentVersion(ctx context.Context, q Querier, a Actor, entity, entityID string) error {
+	if entity == "" {
+		return nil
+	}
+	policy, ok := s.DocumentVersionPolicies[entity]
+	if !ok {
+		return Forbidden
+	}
+	return policy(ctx, q, a, entityID)
+}
+
+func (s *Service) authorizeDocumentVersionForID(ctx context.Context, q Querier, a Actor, id string) error {
+	var entity, entityID sql.NullString
+	if e := q.QueryRowContext(ctx, `SELECT entity_type,entity_id FROM documents WHERE id=?`, id).Scan(&entity, &entityID); e != nil {
+		if e == sql.ErrNoRows {
+			return Missing
+		}
+		return e
+	}
+	if !entity.Valid {
+		return nil
+	}
+	return s.authorizeDocumentVersion(ctx, q, a, entity.String, entityID.String)
 }
 
 // documentWriteBinding follows actor -> entity -> document lock ordering.
@@ -87,7 +117,7 @@ func (s *Service) DocumentBindingAccess(ctx context.Context, tx *sql.Tx, a Actor
 	if v.Deleted.Valid {
 		return DocumentBinding{}, Missing
 	}
-	return DocumentBinding{Version: v.Version, EntityType: v.Entity.String, EntityID: v.EntityID.String, Generated: v.Generated}, nil
+	return DocumentBinding{OwnerID: v.Owner, TeamID: v.Team.String, Version: v.Version, EntityType: v.Entity.String, EntityID: v.EntityID.String, Generated: v.Generated}, nil
 }
 
 // BindDocument is the only public cross-module write to document ownership links.
@@ -101,6 +131,11 @@ func (s *Service) BindDocument(ctx context.Context, tx *sql.Tx, a Actor, id, ent
 	}
 	if e := policy(ctx, tx, a, entityID, true); e != nil {
 		return e
+	}
+	if bindingPolicy, ok := s.DocumentBindingPolicies[entity]; ok {
+		if e := bindingPolicy(ctx, tx, a, entityID); e != nil {
+			return e
+		}
 	}
 	var owner string
 	var team, kind sql.NullString

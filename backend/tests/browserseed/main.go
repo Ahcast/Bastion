@@ -148,6 +148,23 @@ func main() {
 		log.Fatal(e)
 	}
 
+	// The Collaboration browser actor can upload and manage its own synthetic library only.
+	if _, e = db.Exec(`INSERT INTO users(email,name,password_hash,totp_secret,active,created_at,updated_at) SELECT 'collaboration@example.test','Operador Colaboración sintético',password_hash,?,TRUE,UTC_TIMESTAMP(6),UTC_TIMESTAMP(6) FROM users WHERE id=1`, secret); e != nil {
+		log.Fatal(e)
+	}
+	if _, e = db.Exec(`INSERT INTO roles(name) VALUES('Colaboración sintético')`); e != nil {
+		log.Fatal(e)
+	}
+	if _, e = db.Exec(`INSERT INTO role_permissions SELECT r.id,p.name,'all' FROM roles r JOIN permissions p ON p.name IN ('colaboracion.view','colaboracion.upload','colaboracion.organize','colaboracion.delete','core.documents.read','core.documents.write') WHERE r.name='Colaboración sintético'`); e != nil {
+		log.Fatal(e)
+	}
+	if _, e = db.Exec(`INSERT INTO user_roles SELECT u.id,r.id FROM users u JOIN roles r ON r.name='Colaboración sintético' WHERE u.email='collaboration@example.test'`); e != nil {
+		log.Fatal(e)
+	}
+	if _, e = db.Exec(`INSERT INTO recovery_codes SELECT id,? FROM users WHERE email='collaboration@example.test'`, security.Hash("synthetic-collaboration-recovery")); e != nil {
+		log.Fatal(e)
+	}
+
 	if _, e = db.Exec(`INSERT INTO recovery_codes SELECT id,? FROM users WHERE email='purchase-orders@example.test'`, security.Hash("synthetic-po-reauth-recovery")); e != nil {
 		log.Fatal(e)
 	}

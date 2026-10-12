@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/Ahcast/Bastion/backend/internal/core"
 	"github.com/Ahcast/Bastion/backend/internal/core/registry"
+	"github.com/Ahcast/Bastion/backend/internal/modules/collaboration"
 	"github.com/Ahcast/Bastion/backend/internal/modules/customers"
 	"github.com/Ahcast/Bastion/backend/internal/modules/expenses"
 	"github.com/Ahcast/Bastion/backend/internal/modules/invoices"
@@ -244,6 +245,38 @@ func RegisterFiles(s *core.Service, r *registry.Registry, logger *slog.Logger, o
 		s.RegisterPermissions(reports.Permissions, []string{"reportes.view"})
 	}
 	if e := r.Register(reportService.Module(logger, reportEnabled)); e != nil {
+		return e
+	}
+	collaborationEnabled := true
+	if v := os.Getenv("BASTION_COLLABORATION_ENABLED"); v != "" {
+		if v != "true" && v != "false" {
+			return fmt.Errorf("invalid collaboration enable flag")
+		}
+		collaborationEnabled = v == "true"
+	}
+	collaborationService := &collaboration.Service{Core: s}
+	if collaborationEnabled {
+		if s.DocumentBindingPolicies == nil {
+			s.DocumentBindingPolicies = map[string]core.DocumentBindingPolicy{}
+		}
+		if s.DocumentVersionPolicies == nil {
+			s.DocumentVersionPolicies = map[string]core.DocumentVersionPolicy{}
+		}
+		if s.DocumentTrashPolicies == nil {
+			s.DocumentTrashPolicies = map[string]core.DocumentTrashPolicy{}
+		}
+		s.RegisterPermissions(collaboration.Permissions, nil)
+		s.DocumentPolicies["collaboration"] = collaborationService.DocumentPolicy
+		s.DocumentBindingPolicies["collaboration"] = collaborationService.DocumentBindingPolicy
+		s.DocumentVersionPolicies["collaboration"] = collaborationService.DocumentVersionPolicy
+		s.DocumentTrashPolicies["collaboration"] = collaborationService.DocumentTrashPolicy
+	} else {
+		delete(s.DocumentPolicies, "collaboration")
+		delete(s.DocumentBindingPolicies, "collaboration")
+		delete(s.DocumentVersionPolicies, "collaboration")
+		delete(s.DocumentTrashPolicies, "collaboration")
+	}
+	if e := r.Register(collaborationService.Module(logger, collaborationEnabled, objects)); e != nil {
 		return e
 	}
 	return r.Validate()

@@ -5846,6 +5846,11 @@
           "media_type": {
             "enum": [
               "application/pdf",
+              "application/msword",
+              "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+              "application/vnd.ms-excel",
+              "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+              "text/csv",
               "image/png",
               "image/jpeg",
               "text/plain"
@@ -5863,6 +5868,10 @@
           "version": {
             "type": "string",
             "pattern": "^[0-9]+$"
+          },
+          "team_id": {
+            "type": "string",
+            "pattern": "^[1-9][0-9]*$"
           }
         },
         "required": [
@@ -6146,6 +6155,10 @@
           "number": {
             "type": "integer"
           },
+          "version": {
+            "type": "string",
+            "pattern": "^[1-9][0-9]*$"
+          },
           "status": {
             "const": "pending"
           },
@@ -6160,6 +6173,7 @@
         "required": [
           "id",
           "number",
+          "version",
           "status",
           "upload_url",
           "checksum_base64"

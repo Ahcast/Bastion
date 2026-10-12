@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+	"unicode/utf8"
 )
 
 type ObjectInfo struct {
@@ -30,9 +31,20 @@ type FileRequest struct {
 	Size      int64  `json:"size_bytes"`
 	Checksum  string `json:"checksum"`
 	Version   uint64 `json:"version,string"`
+	TeamID    string `json:"team_id,omitempty"`
 }
 
-var extensions = map[string]string{"application/pdf": ".pdf", "image/png": ".png", "image/jpeg": ".jpg", "text/plain": ".txt"}
+var extensions = map[string]string{
+	"application/pdf":    ".pdf",
+	"application/msword": ".doc",
+	"application/vnd.openxmlformats-officedocument.wordprocessingml.document": ".docx",
+	"application/vnd.ms-excel": ".xls",
+	"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": ".xlsx",
+	"text/csv":   ".csv",
+	"text/plain": ".txt",
+	"image/png":  ".png",
+	"image/jpeg": ".jpg",
+}
 
 func ValidateFile(c FileRequest) error {
 	ext, ok := extensions[c.MediaType]
@@ -46,7 +58,34 @@ func ValidateFile(c FileRequest) error {
 	if e != nil || len(h) != 32 {
 		return Invalid
 	}
+	if c.TeamID != "" && ID(c.TeamID) != nil {
+		return Invalid
+	}
 	return nil
+}
+
+// ValidateFileContent checks a bounded object prefix after S3 confirms the
+// expected size and checksum. Office files and CSV are download-only types.
+func ValidateFileContent(media string, prefix []byte) bool {
+	switch media {
+	case "application/pdf":
+		return strings.HasPrefix(string(prefix), "%PDF-")
+	case "image/png":
+		return len(prefix) >= 8 && string(prefix[:8]) == "\x89PNG\r\n\x1a\n"
+	case "image/jpeg":
+		return len(prefix) >= 3 && prefix[0] == 0xff && prefix[1] == 0xd8 && prefix[2] == 0xff
+	case "application/msword", "application/vnd.ms-excel":
+		return len(prefix) >= 8 && string(prefix[:8]) == "\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1"
+	case "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet":
+		return len(prefix) >= 4 && string(prefix[:4]) == "PK\x03\x04"
+	case "text/csv", "text/plain":
+		if len(prefix) == 0 || !utf8.Valid(prefix) || strings.ContainsRune(string(prefix), '\x00') {
+			return false
+		}
+		return strings.HasPrefix(http.DetectContentType(prefix), "text/plain")
+	default:
+		return false
+	}
 }
 func (s *Service) DocumentAccess(ctx context.Context, q Querier, a Actor, id, permission string) (int, uint64, error) {
 	var owner string
@@ -84,17 +123,37 @@ func (s *Service) CreateFile(ctx context.Context, a Actor, id, key string, c Fil
 	if e := ValidateFile(c); e != nil {
 		return nil, e
 	}
+	if c.Version == ^uint64(0) {
+		return nil, Invalid
+	}
 	var result any
 	e := s.Transact(ctx, func(tx *sql.Tx) error {
+		var binding documentWriteState
+		var e error
 		if id == "" {
-			if e := s.Authorize(ctx, tx, a, "core.documents.write", a.UserID, "", false); e != nil {
+			if c.TeamID != "" {
+				var members int
+				if e := tx.QueryRowContext(ctx, `SELECT COUNT(*) FROM team_members WHERE team_id=? AND user_id=?`, c.TeamID, a.UserID).Scan(&members); e != nil {
+					return e
+				} else if members == 0 {
+					return Forbidden
+				}
+			}
+			if e := s.Authorize(ctx, tx, a, "core.documents.write", a.UserID, c.TeamID, false); e != nil {
 				return e
 			}
 		} else {
-			if ID(id) != nil {
+			if ID(id) != nil || c.TeamID != "" {
 				return Invalid
 			}
-			if _, _, e := s.DocumentAccess(ctx, tx, a, id, "core.documents.write"); e != nil {
+			binding, e = s.lockDocumentWrite(ctx, tx, a, id, false)
+			if e != nil {
+				return e
+			}
+			if binding.Deleted.Valid {
+				return Missing
+			}
+			if e = s.authorizeDocumentVersion(ctx, tx, a, binding.Entity.String, binding.EntityID.String); e != nil {
 				return e
 			}
 		}
@@ -102,8 +161,10 @@ func (s *Service) CreateFile(ctx context.Context, a Actor, id, key string, c Fil
 		result, err = s.Idempotent(ctx, tx, a, "files.create:"+id, key, c, func() (any, error) {
 			number := 1
 			docID := id
+			documentVersion := c.Version + 1
 			if docID == "" {
-				r, e := tx.ExecContext(ctx, "INSERT INTO documents(owner_id,created_at) VALUES(?,UTC_TIMESTAMP(6))", a.UserID)
+				documentVersion = 1
+				r, e := tx.ExecContext(ctx, "INSERT INTO documents(owner_id,team_id,created_at) VALUES(?,?,UTC_TIMESTAMP(6))", a.UserID, nullable(c.TeamID))
 				if e != nil {
 					return nil, e
 				}
@@ -131,7 +192,7 @@ func (s *Service) CreateFile(ctx context.Context, a Actor, id, key string, c Fil
 			if e := s.Audit(ctx, tx, a, "files.create", "document", docID, "pending", map[string]any{"number": number}); e != nil {
 				return nil, e
 			}
-			return map[string]any{"id": docID, "number": number, "status": "pending", "object_key": objectKey}, nil
+			return map[string]any{"id": docID, "number": number, "version": fmt.Sprint(documentVersion), "status": "pending", "object_key": objectKey}, nil
 		})
 		return err
 	})
@@ -165,6 +226,9 @@ func (s *Service) FinalizeFile(ctx context.Context, a Actor, id string, objects 
 	if e != nil {
 		return e
 	}
+	if e = s.authorizeDocumentVersionForID(ctx, s.DB, a, id); e != nil {
+		return e
+	}
 	var key, media, hash, status string
 	var size int64
 	if e = s.DB.QueryRowContext(ctx, "SELECT object_key,media_type,checksum,size_bytes,status FROM document_versions WHERE document_id=? AND number=?", id, number).Scan(&key, &media, &hash, &size, &status); e != nil {
@@ -182,12 +246,22 @@ func (s *Service) FinalizeFile(ctx context.Context, a Actor, id string, objects 
 		return e
 	}
 	expected, _ := hex.DecodeString(hash)
-	if info.Size != size || info.Checksum != base64.StdEncoding.EncodeToString(expected) || !strings.HasPrefix(http.DetectContentType(info.Prefix), media) {
+	if info.Size != size || info.Checksum != base64.StdEncoding.EncodeToString(expected) || !ValidateFileContent(media, info.Prefix) {
 		return Invalid
 	}
 	return s.Transact(ctx, func(tx *sql.Tx) error {
-		current, _, e := s.DocumentAccess(ctx, tx, a, id, "core.documents.write")
+		binding, e := s.lockDocumentWrite(ctx, tx, a, id, false)
 		if e != nil {
+			return e
+		}
+		if binding.Deleted.Valid {
+			return Missing
+		}
+		if e = s.authorizeDocumentVersion(ctx, tx, a, binding.Entity.String, binding.EntityID.String); e != nil {
+			return e
+		}
+		var current int
+		if e = tx.QueryRowContext(ctx, `SELECT current_version FROM documents WHERE id=?`, id).Scan(&current); e != nil {
 			return e
 		}
 		if current != number {

@@ -63,10 +63,13 @@ type Service struct {
 	ServiceReadPermissions  []string
 	ServiceWritePermissions []string
 	DocumentPolicies        map[string]DocumentPolicy
+	DocumentBindingPolicies map[string]DocumentBindingPolicy
+	DocumentVersionPolicies map[string]DocumentVersionPolicy
+	DocumentTrashPolicies   map[string]DocumentTrashPolicy
 }
 
 func New(db *sql.DB, c config.Config) *Service {
-	return &Service{DB: db, Config: c, DummyHash: security.Password(security.Token()), DocumentPolicies: map[string]DocumentPolicy{}}
+	return &Service{DB: db, Config: c, DummyHash: security.Password(security.Token()), DocumentPolicies: map[string]DocumentPolicy{}, DocumentBindingPolicies: map[string]DocumentBindingPolicy{}, DocumentVersionPolicies: map[string]DocumentVersionPolicy{}, DocumentTrashPolicies: map[string]DocumentTrashPolicy{}}
 }
 
 // RegisterPermissions is called by composition before serving requests, never by HTTP input.

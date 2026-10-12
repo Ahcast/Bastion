@@ -76,6 +76,13 @@ func (s *Service) TrashFile(ctx context.Context, a Actor, id, key string, versio
 		if e != nil {
 			return e
 		}
+		if state.Entity.Valid {
+			if policy, ok := s.DocumentTrashPolicies[state.Entity.String]; ok {
+				if e = policy(ctx, tx, a, state.EntityID.String); e != nil {
+					return e
+				}
+			}
+		}
 		old, deleted, generated := state.Version, state.Deleted, state.Generated
 
 		out, e = s.Idempotent(ctx, tx, a, "files.trash:"+id, key, map[string]any{"version": version, "restore": restore}, func() (any, error) {

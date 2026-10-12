@@ -14,15 +14,80 @@ export const routes: Routes = [
     canActivate: [authenticated],
     loadComponent: () => import("./core/shell/shell").then((m) => m.Shell),
     children: [
- {path:"reports",canActivate:[permitted],data:{permission:"reportes.view",module:"reports"},loadComponent:()=>import("./modules/reports/reports").then(m=>m.Reports)},
-      {path:"quotes/fx",canActivate:[permitted],data:{permission:"cotizaciones.fx.view",module:"quotes"},loadComponent:()=>import("./modules/quotes/quote-fx").then(m=>m.QuoteFX)},
-      {path:"quotes",canActivate:[permitted],data:{permission:"cotizaciones.view",module:"quotes"},loadComponent:()=>import("./modules/quotes/quotes").then(m=>m.Quotes)},
-      {path:"expenses",canActivate:[permitted],data:{permission:"gastos.view",module:"expenses"},loadComponent:()=>import("./modules/expenses/expenses").then(m=>m.Expenses)},
-      {path:"invoices",canActivate:[permitted],data:{permission:"facturas.view",module:"invoices"},loadComponent:()=>import("./modules/invoices/invoices").then(m=>m.Invoices)},
-      {path:"purchase-orders",canActivate:[permitted],data:{permission:"ordenes.view",module:"purchase-orders"},loadComponent:()=>import("./modules/purchase-orders/purchase-orders").then(m=>m.PurchaseOrders)},
-      {path:"processes",canActivate:[permitted],data:{permission:"procesos.view",module:"processes"},loadComponent:()=>import("./modules/processes/processes").then(m=>m.Processes)},
-      { path:"suppliers", canActivate:[permitted],data:{permission:"proveedores.view",module:"suppliers"},loadComponent:()=>import("./modules/suppliers/suppliers").then(m=>m.Suppliers) },
-      { path:"customers", canActivate:[permitted],data:{permission:"clientes.view",module:"customers"},loadComponent:()=>import("./modules/customers/customers").then(m=>m.Customers) },
+      {
+        path: "reports",
+        canActivate: [permitted],
+        data: { permission: "reportes.view", module: "reports" },
+        loadComponent: () =>
+          import("./modules/reports/reports").then((m) => m.Reports),
+      },
+      {
+        path: "collaboration",
+        canActivate: [permitted],
+        data: { permission: "colaboracion.view", module: "collaboration" },
+        loadComponent: () =>
+          import("./modules/collaboration/collaboration").then(
+            (m) => m.Collaboration,
+          ),
+      },
+      {
+        path: "quotes/fx",
+        canActivate: [permitted],
+        data: { permission: "cotizaciones.fx.view", module: "quotes" },
+        loadComponent: () =>
+          import("./modules/quotes/quote-fx").then((m) => m.QuoteFX),
+      },
+      {
+        path: "quotes",
+        canActivate: [permitted],
+        data: { permission: "cotizaciones.view", module: "quotes" },
+        loadComponent: () =>
+          import("./modules/quotes/quotes").then((m) => m.Quotes),
+      },
+      {
+        path: "expenses",
+        canActivate: [permitted],
+        data: { permission: "gastos.view", module: "expenses" },
+        loadComponent: () =>
+          import("./modules/expenses/expenses").then((m) => m.Expenses),
+      },
+      {
+        path: "invoices",
+        canActivate: [permitted],
+        data: { permission: "facturas.view", module: "invoices" },
+        loadComponent: () =>
+          import("./modules/invoices/invoices").then((m) => m.Invoices),
+      },
+      {
+        path: "purchase-orders",
+        canActivate: [permitted],
+        data: { permission: "ordenes.view", module: "purchase-orders" },
+        loadComponent: () =>
+          import("./modules/purchase-orders/purchase-orders").then(
+            (m) => m.PurchaseOrders,
+          ),
+      },
+      {
+        path: "processes",
+        canActivate: [permitted],
+        data: { permission: "procesos.view", module: "processes" },
+        loadComponent: () =>
+          import("./modules/processes/processes").then((m) => m.Processes),
+      },
+      {
+        path: "suppliers",
+        canActivate: [permitted],
+        data: { permission: "proveedores.view", module: "suppliers" },
+        loadComponent: () =>
+          import("./modules/suppliers/suppliers").then((m) => m.Suppliers),
+      },
+      {
+        path: "customers",
+        canActivate: [permitted],
+        data: { permission: "clientes.view", module: "customers" },
+        loadComponent: () =>
+          import("./modules/customers/customers").then((m) => m.Customers),
+      },
       {
         path: "",
         loadComponent: () =>

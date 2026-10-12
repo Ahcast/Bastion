@@ -3,6 +3,7 @@ package core
 import (
 	"context"
 	"database/sql"
+	"time"
 )
 
 type DocumentMetadata struct {
@@ -35,6 +36,38 @@ type DocumentMetadataPage struct {
 	Total   int                `json:"total"`
 	Page    int                `json:"page"`
 	PerPage int                `json:"per_page"`
+}
+
+type DocumentVersionMetadata struct {
+	Number    int       `json:"file_version"`
+	Filename  string    `json:"filename"`
+	Media     string    `json:"media_type"`
+	Size      int64     `json:"size_bytes"`
+	Checksum  string    `json:"checksum"`
+	Status    string    `json:"status"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
+// DocumentVersions exposes immutable file metadata after a fresh entity and
+// document authorization check; storage keys and signed URLs remain private.
+func (s *Service) DocumentVersions(ctx context.Context, q Querier, a Actor, id string) ([]DocumentVersionMetadata, error) {
+	if _, _, e := s.DocumentAccess(ctx, q, a, id, "core.documents.read"); e != nil {
+		return nil, e
+	}
+	rows, e := q.QueryContext(ctx, `SELECT number,filename,media_type,size_bytes,checksum,status,created_at FROM document_versions WHERE document_id=? ORDER BY number DESC`, id)
+	if e != nil {
+		return nil, e
+	}
+	defer rows.Close()
+	out := []DocumentVersionMetadata{}
+	for rows.Next() {
+		var v DocumentVersionMetadata
+		if e = rows.Scan(&v.Number, &v.Filename, &v.Media, &v.Size, &v.Checksum, &v.Status, &v.CreatedAt); e != nil {
+			return nil, e
+		}
+		out = append(out, v)
+	}
+	return out, rows.Err()
 }
 
 // EntityDocumentMetadataPage applies document scope in SQL before pagination.

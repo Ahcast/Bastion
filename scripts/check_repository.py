@@ -146,6 +146,35 @@ if reports_contract:
     if registered != documented:
         errors.append('Reports OpenAPI: registered and documented routes differ')
 
+# Collaboration is authorized through the module registry; its REST route set
+# and machine contract must stay in lockstep, including generated file paths.
+collaboration_contract = openapi_docs.get('collaboration-openapi.json')
+collaboration_dir = ROOT / 'backend/internal/modules/collaboration'
+if collaboration_contract and collaboration_dir.is_dir():
+    route_pattern = re.compile(
+        r'register\("(GET|POST|PATCH|PUT|DELETE) (/api/v1/[^"\\]+)"'
+    )
+    registered: set[tuple[str, str]] = set()
+    for source in collaboration_dir.glob('*.go'):
+        registered.update(
+            (method.lower(), path)
+            for method, path in route_pattern.findall(source.read_text())
+        )
+    registered.update({
+        ('get', '/api/v1/collaboration/{id}/preview'),
+        ('get', '/api/v1/collaboration/{id}/download'),
+    })
+    documented = {
+        (method.lower(), path)
+        for path, operations in collaboration_contract['paths'].items()
+        for method in operations
+        if method.lower() in {'get', 'post', 'patch', 'put', 'delete'}
+    }
+    for method, path in sorted(registered - documented):
+        errors.append(f'Collaboration OpenAPI: missing {method.upper()} {path}')
+    for method, path in sorted(documented - registered):
+        errors.append(f'Collaboration OpenAPI: nonexistent {method.upper()} {path}')
+
 if errors:
     print('\n'.join(errors))
     sys.exit(1)

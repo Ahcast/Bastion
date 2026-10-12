@@ -116,6 +116,49 @@ func TestRegisterPurchaseOrdersCanBeDisabled(t *testing.T) {
 	}
 }
 
+func TestRegisterCollaborationCanBeDisabledWithoutLeavingFilePolicy(t *testing.T) {
+	for _, enabled := range []bool{true, false} {
+		t.Run(fmt.Sprint(enabled), func(t *testing.T) {
+			t.Setenv("BASTION_COLLABORATION_ENABLED", fmt.Sprint(enabled))
+			s, r := compositionFixture(t, "false")
+			m := moduleByID(t, r, "collaboration")
+			if m.Enabled != enabled || m.Routes == nil {
+				t.Fatalf("module registration: %#v", m)
+			}
+			if _, ok := s.DocumentPolicies["collaboration"]; ok != enabled {
+				t.Fatal("collaboration document policy did not follow module switch")
+			}
+			if _, ok := s.DocumentBindingPolicies["collaboration"]; ok != enabled {
+				t.Fatal("collaboration binding policy did not follow module switch")
+			}
+			if _, ok := s.DocumentVersionPolicies["collaboration"]; ok != enabled {
+				t.Fatal("collaboration version policy did not follow module switch")
+			}
+			if _, ok := s.DocumentTrashPolicies["collaboration"]; ok != enabled {
+				t.Fatal("collaboration trash policy did not follow module switch")
+			}
+			mux := http.NewServeMux()
+			r.Mount(mux)
+			_, pattern := mux.Handler(httptest.NewRequest("GET", "/api/v1/collaboration", nil))
+			if (pattern != "") != enabled {
+				t.Fatal("route availability", pattern, enabled)
+			}
+			for _, permission := range []string{"colaboracion.view", "colaboracion.upload", "colaboracion.organize", "colaboracion.delete"} {
+				if hasPermission(s.PermissionCatalog(), permission) != enabled {
+					t.Fatal("permission catalog switch", permission, enabled)
+				}
+			}
+		})
+	}
+	t.Setenv("BASTION_COLLABORATION_ENABLED", "invalid")
+	s := &core.Service{DocumentPolicies: map[string]core.DocumentPolicy{}}
+	r := registry.New()
+	_ = r.Register(registry.Module{ID: "core", Label: "Core", Version: "1", Enabled: true})
+	if e := Register(s, r, slog.New(slog.NewTextHandler(io.Discard, nil))); e == nil {
+		t.Fatal("invalid module flag accepted")
+	}
+}
+
 func TestPurchaseOrderDocumentPolicyFollowsModuleFlag(t *testing.T) {
 	s, _ := compositionFixture(t, "true")
 	if s.DocumentPolicies["purchase_orders"] == nil {

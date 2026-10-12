@@ -133,6 +133,10 @@ Programación Core en 0011 agrega outbox_events.available_at nullable UTC con pr
 
 Conversión Quotes→OC en 0017: customer_purchase_orders.source_quote_id único nullable y source_quote_version FK a quote_versions; quotes.purchase_order_id único nullable/FK al destino. Los propietarios escriben sus agregados dentro de la misma TX; Quote converted y snapshot/versiones conservan destino. No copia documentos ni cambia estados sin efecto.
 
+## Biblioteca privada de Colaboración
+
+La unidad 1 de Colaboración usa migración 0034: `collaboration_folders` organiza por empresa/persona y acceso opcional de equipo; `collaboration_entries` conserva título/notas y vínculo a `documents`. Los bytes, owner/team, checksum, versiones, cuarentena y papelera siguen en Core.Files. `BindDocument` y `DocumentTrashPolicy` aplican políticas propietarias en operaciones directas o replays; `collaboration` nunca duplica objetos ni expone claves firmadas persistentes. Conversación y tareas se agregan solo en sus migraciones 0035/0036. Ver [contrato de Colaboración](contracts/collaboration.md) y [OpenAPI](contracts/collaboration-openapi.json).
+
 ## Documentos privados OC e identidad de ítems
 
 Contrato propietario vigente: [documentos privados OC](contracts/purchase-order-documents.md). Migración 0018 y vínculos durables a IDs de ítem; edición/reordenamiento preserva identidad, papelera no permite eliminar el ítem vinculado.
@@ -160,3 +164,5 @@ Migración 0025, conversión propietaria Cotización→Borrador Factura: invoice
 Gastos en 0030–0032: expenses propietario con ISV legacy exacto, proveedor libre/FK + nombre/version histórica, categoría, moneda/importes y versiones/scopes/papelera; expense_references conserva etiquetas/versiones de Process/Quote/OC/Invoice por puertos públicos; expense_documents captura vínculo/versión de Core. El índice documental owner/deleted/id soporta paginación autorizada. Las referencias no reparten ni aplican montos a los costos de otra entidad ni convierten moneda. Ver [contrato](contracts/expenses.md) y [aceptación](contracts/expense-acceptance.md).
 
 Reportes 0033 registra permisos sin grants. Proyecciones de lectura SQL autorizadas sobre los tres propietarios, sin tablas comerciales propias, cálculos duplicados ni modificación de fuentes. Ver [contrato](contracts/reports.md).
+
+Colaboración, migración 0034, incorpora collaboration_folders y collaboration_entries. La primera tabla organiza scopes company/person con jerarquía; la segunda conserva metadata y se vincula a un documento Core mediante Core.BindDocument en una transacción. S3, documentos/versiones físicas, cuarentena, hash y acceso firmado permanecen propiedad de Core.Files. La policy collaboration protege también los endpoints Core de preview/descarga/versiones. Permisos iniciales sin grants: colaboracion.view/upload/organize/delete; requieren además core.documents.read/write en operaciones de archivos. Comentarios/menciones, tareas y vínculos genéricos se incorporarán en migraciones de unidades posteriores, no se crean anticipadamente. Ver [contrato](contracts/collaboration.md).

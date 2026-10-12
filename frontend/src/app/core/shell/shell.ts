@@ -21,14 +21,39 @@ import { Client } from "../api/client";
           [routerLinkActiveOptions]="{ exact: true }"
           >Inicio</a
         >
-        @if(api.has("clientes.view") && api.moduleEnabled("customers")){<a routerLink="/customers" routerLinkActive="active">Clientes</a>}
-        @if(api.has("proveedores.view") && api.moduleEnabled("suppliers")){<a routerLink="/suppliers" routerLinkActive="active">Proveedores</a>}
-        @if(api.has("cotizaciones.view") && api.moduleEnabled("quotes")){<a routerLink="/quotes" routerLinkActive="active">Cotizaciones</a>}
-        @if(api.has("ordenes.view") && api.moduleEnabled("purchase-orders")){<a routerLink="/purchase-orders" routerLinkActive="active">Órdenes de Compra</a>}
-        @if(api.has("facturas.view") && api.moduleEnabled("invoices")){<a routerLink="/invoices" routerLinkActive="active">Facturas</a>}
-        @if(api.has("gastos.view") && api.moduleEnabled("expenses")){<a routerLink="/expenses" routerLinkActive="active">Gastos</a>}
-        @if(api.has("procesos.view") && api.moduleEnabled("processes")){<a routerLink="/processes" routerLinkActive="active">Procesos</a>}
-        @if(api.has("reportes.view") && api.moduleEnabled("reports")){<a routerLink="/reports" routerLinkActive="active">Reportes</a>}
+        @if (api.has("clientes.view") && api.moduleEnabled("customers")) {
+          <a routerLink="/customers" routerLinkActive="active">Clientes</a>
+        }
+        @if (api.has("proveedores.view") && api.moduleEnabled("suppliers")) {
+          <a routerLink="/suppliers" routerLinkActive="active">Proveedores</a>
+        }
+        @if (api.has("cotizaciones.view") && api.moduleEnabled("quotes")) {
+          <a routerLink="/quotes" routerLinkActive="active">Cotizaciones</a>
+        }
+        @if (api.has("ordenes.view") && api.moduleEnabled("purchase-orders")) {
+          <a routerLink="/purchase-orders" routerLinkActive="active"
+            >Órdenes de Compra</a
+          >
+        }
+        @if (api.has("facturas.view") && api.moduleEnabled("invoices")) {
+          <a routerLink="/invoices" routerLinkActive="active">Facturas</a>
+        }
+        @if (api.has("gastos.view") && api.moduleEnabled("expenses")) {
+          <a routerLink="/expenses" routerLinkActive="active">Gastos</a>
+        }
+        @if (api.has("procesos.view") && api.moduleEnabled("processes")) {
+          <a routerLink="/processes" routerLinkActive="active">Procesos</a>
+        }
+        @if (api.has("reportes.view") && api.moduleEnabled("reports")) {
+          <a routerLink="/reports" routerLinkActive="active">Reportes</a>
+        }
+        @if (
+          api.has("colaboracion.view") && api.moduleEnabled("collaboration")
+        ) {
+          <a routerLink="/collaboration" routerLinkActive="active"
+            >Colaboración</a
+          >
+        }
         <a routerLink="/settings" routerLinkActive="active">Configuración</a>
       </nav>
       <main>
