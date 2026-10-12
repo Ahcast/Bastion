@@ -75,6 +75,12 @@ func generatedDocumentResult(t *testing.T, value any, e error) map[string]string
 	return out
 }
 
+func mustGenerateDocument(t *testing.T, s *invoices.Service, a core.Actor, id, key string, input invoices.GenerateDocumentInput) map[string]string {
+	t.Helper()
+	value, e := s.GenerateDocument(ctx, a, id, key, input)
+	return generatedDocumentResult(t, value, e)
+}
+
 func assertPublicSnapshotPrivate(t *testing.T, raw string, forbidden ...string) {
 	t.Helper()
 	for _, fragment := range forbidden {
@@ -99,7 +105,7 @@ func TestInvoiceGeneratedDraftDocumentPersistsSafeSnapshotAndReplays(t *testing.
 		t.Fatal(e)
 	}
 	input := invoices.GenerateDocumentInput{Kind: invoices.DocumentInvoice, Version: o.Version}
-	first := generatedDocumentResult(t, s.GenerateDocument(ctx, a, id, "document-draft-pdf", input))
+	first := mustGenerateDocument(t, s, a, id, "document-draft-pdf", input)
 	if first["status"] != "available" || first["document_id"] == "" || first["kind"] != string(invoices.DocumentInvoice) || first["invoice_version"] != "1" {
 		t.Fatal(first)
 	}
@@ -122,7 +128,7 @@ func TestInvoiceGeneratedDraftDocumentPersistsSafeSnapshotAndReplays(t *testing.
 	if entityType != "invoices" || entityID != id || mediaType != "application/pdf" || size <= 0 {
 		t.Fatal(entityType, entityID, mediaType, size)
 	}
-	replay := generatedDocumentResult(t, s.GenerateDocument(ctx, a, id, "document-draft-pdf", input))
+	replay := mustGenerateDocument(t, s, a, id, "document-draft-pdf", input)
 	if replay["id"] != first["id"] || replay["document_id"] != first["document_id"] || replay["status"] != "available" {
 		t.Fatal(replay, first)
 	}
@@ -171,7 +177,7 @@ func TestInvoiceGeneratedDocumentStorageFailureIsResumable(t *testing.T) {
 	if status != "pending" || documentID != nil {
 		t.Fatal(snapshotID, status, documentID)
 	}
-	result := generatedDocumentResult(t, s.GenerateDocument(ctx, a, id, "document-retry-key", input))
+	result := mustGenerateDocument(t, s, a, id, "document-retry-key", input)
 	if result["id"] != snapshotID || result["status"] != "available" || result["document_id"] == "" {
 		t.Fatal(result, snapshotID)
 	}
@@ -202,7 +208,7 @@ func TestInvoiceGeneratedIssuedDeliveryAndReceiptUseHistoricalEvidence(t *testin
 	if e = s.Core.SaveSetting(ctx, a, "company", core.Setting{Version: 1, Value: []byte(`{"name":"Empresa posterior no histórica","tax_id":"08011900999999","address":"Otra dirección"}`)}, ""); e != nil {
 		t.Fatal(e)
 	}
-	invoicePDF := generatedDocumentResult(t, s.GenerateDocument(ctx, a, id, "document-issued-invoice", invoices.GenerateDocumentInput{Kind: invoices.DocumentInvoice, Version: issued.Version}))
+	invoicePDF := mustGenerateDocument(t, s, a, id, "document-issued-invoice", invoices.GenerateDocumentInput{Kind: invoices.DocumentInvoice, Version: issued.Version})
 	var invoicePublic string
 	if e = s.Core.DB.QueryRow(`SELECT public_data FROM invoice_document_snapshots WHERE id=?`, invoicePDF["id"]).Scan(&invoicePublic); e != nil {
 		t.Fatal(e)
@@ -212,7 +218,7 @@ func TestInvoiceGeneratedIssuedDeliveryAndReceiptUseHistoricalEvidence(t *testin
 	}
 	assertPublicSnapshotPrivate(t, invoicePublic, `"unit_cost"`, `"profit"`, `"paid_total"`, `"balance"`)
 
-	delivery := generatedDocumentResult(t, s.GenerateDocument(ctx, a, id, "document-issued-delivery", invoices.GenerateDocumentInput{Kind: invoices.DocumentDeliveryNote, Version: issued.Version}))
+	delivery := mustGenerateDocument(t, s, a, id, "document-issued-delivery", invoices.GenerateDocumentInput{Kind: invoices.DocumentDeliveryNote, Version: issued.Version})
 	var deliveryPublic string
 	if e = s.Core.DB.QueryRow(`SELECT public_data FROM invoice_document_snapshots WHERE id=?`, delivery["id"]).Scan(&deliveryPublic); e != nil {
 		t.Fatal(e)
@@ -223,12 +229,13 @@ func TestInvoiceGeneratedIssuedDeliveryAndReceiptUseHistoricalEvidence(t *testin
 	assertPublicSnapshotPrivate(t, deliveryPublic, `"currency"`, `"unit_price"`, `"tax"`, `"totals"`, `"fiscal"`, `"cai"`, `"paid_total"`, `"balance"`)
 
 	paymentInput := invoices.PaymentInput{Version: issued.Version, Date: invoiceToday(), Method: "Transferencia", Currency: issued.Currency, Amount: "50.00", Reference: "DOC-RECEIPT-1", Reason: "razón privada que no debe publicarse"}
-	payment := paymentResult(t, s.RegisterPayment(ctx, a, id, "document-receipt-payment", paymentInput))
+	paymentValue, paymentError := s.RegisterPayment(ctx, a, id, "document-receipt-payment", paymentInput)
+	payment := paymentResult(t, paymentValue, paymentError)
 	afterPayment, e := s.Get(ctx, a, id)
 	if e != nil {
 		t.Fatal(e)
 	}
-	receipt := generatedDocumentResult(t, s.GenerateDocument(ctx, a, id, "document-receipt-active", invoices.GenerateDocumentInput{Kind: invoices.DocumentReceipt, Version: afterPayment.Version, PaymentID: &payment.PaymentID, PaymentVersion: &payment.PaymentVersion}))
+	receipt := mustGenerateDocument(t, s, a, id, "document-receipt-active", invoices.GenerateDocumentInput{Kind: invoices.DocumentReceipt, Version: afterPayment.Version, PaymentID: &payment.PaymentID, PaymentVersion: &payment.PaymentVersion})
 	var receiptPublic string
 	if e = s.Core.DB.QueryRow(`SELECT public_data FROM invoice_document_snapshots WHERE id=?`, receipt["id"]).Scan(&receiptPublic); e != nil {
 		t.Fatal(e)
@@ -238,12 +245,13 @@ func TestInvoiceGeneratedIssuedDeliveryAndReceiptUseHistoricalEvidence(t *testin
 	}
 	assertPublicSnapshotPrivate(t, receiptPublic, "razón privada", `"reason"`, `"void_reason"`, `"paid_total"`, `"balance"`)
 
-	voided := paymentResult(t, s.VoidPayment(ctx, a, id, payment.PaymentID, "document-receipt-void", invoices.VoidPaymentInput{Version: afterPayment.Version, PaymentVersion: payment.PaymentVersion, Reason: "motivo interno de anulación"}))
+	voidValue, voidError := s.VoidPayment(ctx, a, id, payment.PaymentID, "document-receipt-void", invoices.VoidPaymentInput{Version: afterPayment.Version, PaymentVersion: payment.PaymentVersion, Reason: "motivo interno de anulación"})
+	voided := paymentResult(t, voidValue, voidError)
 	afterVoid, e := s.Get(ctx, a, id)
 	if e != nil {
 		t.Fatal(e)
 	}
-	voidReceipt := generatedDocumentResult(t, s.GenerateDocument(ctx, a, id, "document-receipt-voided", invoices.GenerateDocumentInput{Kind: invoices.DocumentReceipt, Version: afterVoid.Version, PaymentID: &payment.PaymentID, PaymentVersion: &voided.PaymentVersion}))
+	voidReceipt := mustGenerateDocument(t, s, a, id, "document-receipt-voided", invoices.GenerateDocumentInput{Kind: invoices.DocumentReceipt, Version: afterVoid.Version, PaymentID: &payment.PaymentID, PaymentVersion: &voided.PaymentVersion})
 	var voidPublic string
 	if e = s.Core.DB.QueryRow(`SELECT public_data FROM invoice_document_snapshots WHERE id=?`, voidReceipt["id"]).Scan(&voidPublic); e != nil {
 		t.Fatal(e)
