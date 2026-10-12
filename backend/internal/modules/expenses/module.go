@@ -76,6 +76,35 @@ func filter(r *http.Request) (Filter, error) {
 	}
 	return f, nil
 }
+func documentPage(r *http.Request) (int, int, error) {
+	v := r.URL.Query()
+	for k, values := range v {
+		if (k != "page" && k != "per_page") || len(values) != 1 {
+			return 0, 0, core.Invalid
+		}
+	}
+	page, perPage := 1, 25
+	var e error
+	if v.Has("page") {
+		page, e = strconv.Atoi(v.Get("page"))
+		if e != nil {
+			return 0, 0, core.Invalid
+		}
+	}
+	if v.Has("per_page") {
+		perPage, e = strconv.Atoi(v.Get("per_page"))
+		if e != nil {
+			return 0, 0, core.Invalid
+		}
+	}
+	return page, perPage, nil
+}
+func noQuery(r *http.Request) error {
+	if len(r.URL.Query()) != 0 {
+		return core.Invalid
+	}
+	return nil
+}
 func safe(e error) error {
 	if e == nil || core.IsClient(e) {
 		return e
@@ -83,7 +112,7 @@ func safe(e error) error {
 	return &core.Error{Code: "internal", Message: "No se pudo completar la operación.", Status: 500}
 }
 func (s *Service) Module(logger *slog.Logger, enabled bool) registry.Module {
-	return registry.Module{ID: "expenses", Label: "Gastos", Version: "0.1.0", Enabled: enabled, Dependencies: []string{"core"}, Permissions: Permissions, Routes: func(mux *http.ServeMux) {
+	return registry.Module{ID: "expenses", Label: "Gastos", Version: "0.2.0", Enabled: enabled, Dependencies: []string{"core"}, Permissions: Permissions, Routes: func(mux *http.ServeMux) {
 		register := func(path string, f api.Action) {
 			mux.Handle(path, api.Operation(s.Core, logger, func(ctx context.Context, a core.Actor, r *http.Request) (any, error) {
 				v, e := f(ctx, a, r)
@@ -105,6 +134,9 @@ func (s *Service) Module(logger *slog.Logger, enabled bool) registry.Module {
 			return s.Totals(ctx, a, f)
 		})
 		register("GET /api/v1/expenses/{id}", func(ctx context.Context, a core.Actor, r *http.Request) (any, error) {
+			if e := noQuery(r); e != nil {
+				return nil, e
+			}
 			return s.Get(ctx, a, r.PathValue("id"))
 		})
 		register("GET /api/v1/expenses/{id}/duplicates", func(ctx context.Context, a core.Actor, r *http.Request) (any, error) {
@@ -113,6 +145,39 @@ func (s *Service) Module(logger *slog.Logger, enabled bool) registry.Module {
 				return nil, e
 			}
 			return s.Duplicates(ctx, a, r.PathValue("id"), f.Page, f.PerPage)
+		})
+		register("GET /api/v1/expenses/{id}/references", func(ctx context.Context, a core.Actor, r *http.Request) (any, error) {
+			if e := noQuery(r); e != nil {
+				return nil, e
+			}
+			return s.References(ctx, a, r.PathValue("id"))
+		})
+		register("POST /api/v1/expenses/{id}/references", func(ctx context.Context, a core.Actor, r *http.Request) (any, error) {
+			if e := noQuery(r); e != nil {
+				return nil, e
+			}
+			var p SetReferencesInput
+			if e := decode(r, &p, "version", "reason", "references"); e != nil {
+				return nil, e
+			}
+			return s.SetReferences(ctx, a, r.PathValue("id"), r.Header.Get("Idempotency-Key"), p)
+		})
+		register("GET /api/v1/expenses/{id}/documents", func(ctx context.Context, a core.Actor, r *http.Request) (any, error) {
+			page, perPage, e := documentPage(r)
+			if e != nil {
+				return nil, e
+			}
+			return s.Documents(ctx, a, r.PathValue("id"), page, perPage)
+		})
+		register("POST /api/v1/expenses/{id}/documents", func(ctx context.Context, a core.Actor, r *http.Request) (any, error) {
+			if e := noQuery(r); e != nil {
+				return nil, e
+			}
+			var p LinkDocumentInput
+			if e := decode(r, &p, "version", "document_id", "document_version"); e != nil {
+				return nil, e
+			}
+			return s.LinkDocument(ctx, a, r.PathValue("id"), r.Header.Get("Idempotency-Key"), p)
 		})
 		register("POST /api/v1/expenses/calculate", func(ctx context.Context, a core.Actor, r *http.Request) (any, error) {
 			if e := s.gate(ctx, s.Core.DB, a, "gastos.view"); e != nil {
