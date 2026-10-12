@@ -83,8 +83,23 @@ func invoiceFilter(r *http.Request) (Filter, error) {
 	return f, nil
 }
 func (s *Service) Module(logger *slog.Logger, enabled bool) registry.Module {
-	return registry.Module{ID: "invoices", Label: "Facturas", Version: "0.4.0", Enabled: enabled, Dependencies: []string{"core"}, Permissions: Permissions, Routes: func(mux *http.ServeMux) {
+	return registry.Module{ID: "invoices", Label: "Facturas", Version: "0.5.0", Enabled: enabled, Dependencies: []string{"core"}, Permissions: Permissions, Routes: func(mux *http.ServeMux) {
 		register := func(pattern string, action api.Action) { mux.Handle(pattern, api.Operation(s.Core, logger, action)) }
+
+		register("GET /api/v1/invoices/{id}/documents", func(ctx context.Context, a core.Actor, r *http.Request) (any, error) {
+			f, e := invoiceFilter(r)
+			if e != nil {
+				return nil, e
+			}
+			return s.GeneratedDocuments(ctx, a, r.PathValue("id"), f.Page, f.PerPage)
+		})
+		register("POST /api/v1/invoices/{id}/documents", func(ctx context.Context, a core.Actor, r *http.Request) (any, error) {
+			var p GenerateDocumentInput
+			if e := decodeGenerateDocument(r, &p); e != nil {
+				return nil, e
+			}
+			return s.GenerateDocument(ctx, a, r.PathValue("id"), r.Header.Get("Idempotency-Key"), p)
+		})
 
 		register("GET /api/v1/invoices/{id}/payments", func(ctx context.Context, a core.Actor, r *http.Request) (any, error) {
 			f, e := invoiceFilter(r)
@@ -177,6 +192,31 @@ func (s *Service) Module(logger *slog.Logger, enabled bool) registry.Module {
 			})
 		}
 	}}
+}
+
+func decodeGenerateDocument(r *http.Request, p *GenerateDocumentInput) error {
+	body, e := io.ReadAll(r.Body)
+	if e != nil {
+		return core.Invalid
+	}
+	r.Body = io.NopCloser(bytes.NewReader(body))
+	if e = api.Decode(r, p); e != nil {
+		return e
+	}
+	var fields map[string]json.RawMessage
+	if json.Unmarshal(body, &fields) != nil {
+		return core.Invalid
+	}
+	for _, name := range []string{"kind", "version", "payment_id", "payment_version"} {
+		raw, ok := fields[name]
+		if !ok {
+			return core.Invalid
+		}
+		if (name == "kind" || name == "version") && bytes.Equal(bytes.TrimSpace(raw), []byte("null")) {
+			return core.Invalid
+		}
+	}
+	return nil
 }
 
 func decodeFiscalSettings(r *http.Request, p *FiscalSettingsInput) error {
