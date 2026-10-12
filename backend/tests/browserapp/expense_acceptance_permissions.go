@@ -5,6 +5,7 @@ import (
 	"log"
 	"os"
 	"strings"
+	"time"
 )
 
 // Test-only capabilities for the Gastos Unit 2 browser acceptance. Production
@@ -46,5 +47,47 @@ func init() {
 		ON DUPLICATE KEY UPDATE scope=VALUES(scope)`)
 	if e != nil {
 		log.Fatal(e)
+	}
+
+	go rotateExpenseBrowserIdentity(dsn)
+}
+
+func rotateExpenseBrowserIdentity(dsn string) {
+	db, e := sql.Open("mysql", dsn)
+	if e != nil {
+		log.Printf("expense browser identity watcher unavailable: %v", e)
+		return
+	}
+	defer db.Close()
+	ticker := time.NewTicker(25 * time.Millisecond)
+	defer ticker.Stop()
+	deadline := time.NewTimer(10 * time.Minute)
+	defer deadline.Stop()
+	for {
+		select {
+		case <-deadline.C:
+			return
+		case <-ticker.C:
+			var step int64
+			e = db.QueryRow(`SELECT totp_last_step FROM users WHERE name='Operador Gastos sintético' LIMIT 1`).Scan(&step)
+			if e != nil || step == 0 {
+				continue
+			}
+			tx, e := db.Begin()
+			if e != nil {
+				continue
+			}
+			if _, e = tx.Exec(`UPDATE users SET email='expenses-unit1-complete@example.test' WHERE name='Operador Gastos sintético'`); e != nil {
+				_ = tx.Rollback()
+				continue
+			}
+			if _, e = tx.Exec(`UPDATE users SET email='expenses@example.test' WHERE email='expense-links@example.test'`); e != nil {
+				_ = tx.Rollback()
+				continue
+			}
+			if e = tx.Commit(); e == nil {
+				return
+			}
+		}
 	}
 }
