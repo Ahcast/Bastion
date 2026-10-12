@@ -156,3 +156,5 @@ Migración 0025, conversión propietaria Cotización→Borrador Factura: invoice
 
 
 0026 Facturación OC: invoices.source_purchase_order_id UNIQUE/FK y source_purchase_order_version nullable; customer_purchase_orders.invoice_id UNIQUE/FK e invoice_number_snapshot nullable. Origen directo exclusivo Quote u OC. Estado OC delivered conserva draft vinculado; emisión atómica marca invoiced y cierre humano con saldo cero marca closed. Reopen precede corrección de pagos. Historial OC registra estados; payments conserva filas/anulaciones.
+
+Gastos en 0030–0032: expenses propietario con ISV legacy exacto, proveedor libre/FK + nombre/version histórica, categoría, moneda/importes y versiones/scopes/papelera; expense_references conserva etiquetas/versiones de Process/Quote/OC/Invoice por puertos públicos; expense_documents captura vínculo/versión de Core. El índice documental owner/deleted/id soporta paginación autorizada. Las referencias no reparten ni aplican montos a los costos de otra entidad ni convierten moneda. Ver [contrato](contracts/expenses.md) y [aceptación](contracts/expense-acceptance.md).

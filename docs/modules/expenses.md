@@ -295,3 +295,7 @@ Objetivo:
 
 
 
+
+## Estado de implementación — 2026-10-12
+
+Tres unidades y aceptación integral de desarrollo sintético cerradas en f3dd6121df2695cf89d9eb89c40dc28644f7a2c5 / Core 38300556293: Go/race/MySQL 5.7/builds, Angular 143 y navegador 18/18. Registro, cálculo legacy, categorías/proveedor histórico, filtros/totales/duplicados, papelera y referencias/comprobantes privados implementados bajo [contrato propietario](../contracts/expenses.md). Las referencias son documentales y no modifican inversión/profit/pagos de fuentes; métricas de rentabilidad se concilian en Reportes. IA/OCR/extracción queda en su fase externa, sin registro automático. [Runbook](../development/expenses-runbook.md), [matriz de aceptación](../contracts/expense-acceptance.md) y [checkpoint](../ESTADO_DESARROLLO.md) conservan límites productivos.

@@ -1,25 +1,21 @@
 # Backend Bastion — Go
 
-Core implementado en internal/core; composición cmd/server, worker y admin; migraciones SQL en database/migrations. [Cómo ejecutar](../docs/development/core-runbook.md), [contrato OpenAPI](../docs/contracts/core-openapi.json), [estado real](../docs/development/status.md).
+Monolito modular: Core en internal/core, propietarios en internal/modules y composición en cmd/server/worker/admin. Migraciones SQL ordenadas en database/migrations. [Runbook Core](../docs/development/core-runbook.md), [stack](../docs/development/stack.md), [checkpoint vigente](../docs/ESTADO_DESARROLLO.md) y [plan](../docs/development/plan.md).
 
 ```bash
 cd backend
 go mod download
 go vet ./...
-go test -race ./...
+go test -race -count=1 ./...
 make build
 ```
 
-Pruebas de integración requieren MySQL 5.7 dedicado: BASTION_TEST_MYSQL_DSN debe seleccionar bastion_test. Sin esa variable, las pruebas MySQL se omiten explícitamente; no contar ese resultado como validación de persistencia. CI exige el servicio MySQL 5.7.
+Integraciones requieren `BASTION_TEST_MYSQL_DSN` con MySQL 5.7 y esquema dedicado `bastion_test`: destruyen/recrean ese esquema. Sin DSN se omiten y no acreditan persistencia. CI exige MySQL 5.7.44 oficial con digest fijado.
 
-Frontend Angular/MySQL/correo permanecen en Bluehost. Core/API/MCP/crawler/workers en Lightsail; archivos S3. No se incluye MySQL de producción en AWS. [Crawler Python existente](crawler/README.md) se conserva sin cambios. Clientes y Proveedores implementados; catálogo de fuente y receptor de Procesos implementados. Demás módulos comerciales pendientes según el plan.
+Core, Clientes, Proveedores, Procesos/receptor crawler, Cotizaciones, OC de clientes, Facturas/pagos y Gastos están implementados/certificados para su alcance de desarrollo sintético. **Siguiente módulo: Reportes**. Los flags BASTION_*_ENABLED de composición habilitan propietarios sin otorgar permisos automáticamente. UI española; IDs/importes JSON como cadenas; MFA/RBAC/CSRF/reauth y acciones transaccionales/versionadas.
 
-Proveedores: internal/modules/suppliers, migración 0003_suppliers.sql y composición independiente de Clientes. [Ejecutar y validar](../docs/development/suppliers-runbook.md).
+Frontend/MySQL/correo permanecen en Bluehost. Core/API/MCP/crawler/workers en Lightsail, archivos privados S3. No MySQL productivo ni OCR en AWS. [Crawler existente](crawler/README.md) conserva su contrato/CLI; no cambiar ritmo ni ACK silenciosamente.
 
-Cotizaciones cerrado para alcance HNL/USD separado: cálculo, PDF/adjuntos, aprobación/emisión, correo, estados/bulk y FX auxiliar. [Runbook](../docs/development/quotes-runbook.md). OC de clientes es el módulo activo: [runbook](../docs/development/purchase-orders-runbook.md). Conversiones comerciales se completan mediante sus propietarios en sus unidades.
+Runbooks: [Clientes](../docs/development/customers-runbook.md), [Proveedores](../docs/development/suppliers-runbook.md), [Procesos](../docs/development/processes-runbook.md), [Cotizaciones](../docs/development/quotes-runbook.md), [Órdenes de Compra](../docs/development/purchase-orders-runbook.md), [Gastos](../docs/development/expenses-runbook.md). Contratos [Facturas](../docs/contracts/invoices.md) y [Gastos](../docs/contracts/expenses.md) documentan alcance y restricciones.
 
-Facturas Borradores: BASTION_INVOICES_ENABLED=true|false (true predeterminado), permisos explícitos facturas.view/create/update, sin concesiones automáticas; borrador/cálculo y configuración fiscal certificados; emisión transaccional en validación, sin pagos/PDF todavía. Migración 0021 de desarrollo y pruebas; no activar series/pagos/emisión por habilitar el módulo.
-
-Configuración fiscal de Facturas: migración 0022, GET/PUT /invoices/fiscal-settings, permisos fiscal.read/manage globales y reauth para writes. Sin grants/configuración precargada. Primer contador invoice se crea atómicamente; editar configuración no modifica el correlativo. CI 38180883877 certificado.
-
-Emisión en validación: 0023, facturas.emit por registro, humano/reauth/CSRF/versiones e idempotencia. GET /invoices/{id}/emission-context revisa datos guardados; POST /invoices/{id}/emit congela snapshots y asigna correlativo atómicamente. No producción certificada ni pagos/PDF en este bloque.
+Las pruebas usan datos y adaptadores sintéticos. Producción, infraestructura real, fiscalidad SAR y correo/banca/Siafi/OAuth externos exigen autorización y comprobación independientes. No ejecutar browserseed/browserapp ni credenciales de prueba en producción.
