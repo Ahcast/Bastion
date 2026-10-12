@@ -19,6 +19,13 @@ func TestModuleRegistersDocumentedRoutes(t *testing.T) {
 		{"GET", "/api/v1/collaboration"},
 		{"GET", "/api/v1/collaboration/folders"},
 		{"GET", "/api/v1/collaboration/teams"},
+		{"GET", "/api/v1/collaboration/resources/collaboration/1/comments"},
+		{"POST", "/api/v1/collaboration/resources/collaboration/1/comments"},
+		{"GET", "/api/v1/collaboration/resources/collaboration/1/activity"},
+		{"GET", "/api/v1/collaboration/resources/collaboration/1/mentionable-users"},
+		{"DELETE", "/api/v1/collaboration/comments/1"},
+		{"GET", "/api/v1/collaboration/notifications"},
+		{"POST", "/api/v1/collaboration/notifications/1/read"},
 		{"POST", "/api/v1/collaboration/folders"},
 		{"PATCH", "/api/v1/collaboration/folders/1"},
 		{"DELETE", "/api/v1/collaboration/folders/1"},
@@ -67,5 +74,11 @@ func TestRequiredJSONAndQueryRejectAmbiguousInput(t *testing.T) {
 		if _, e := queryValues(r, "scope"); e != core.Invalid {
 			t.Fatalf("accepted ambiguous query %s: %v", target, e)
 		}
+	}
+	comment := httptest.NewRequest("POST", "/", strings.NewReader(`{"body":"Hola","mention_user_ids":[]}`))
+	comment.Header.Set("Content-Type", "application/json")
+	var commentInput CommentInput
+	if e := decodeRequired(comment, &commentInput, "body", "mention_user_ids"); e != nil || commentInput.Body != "Hola" || commentInput.MentionUserIDs == nil {
+		t.Fatal("comment payload boundary", commentInput, e)
 	}
 }

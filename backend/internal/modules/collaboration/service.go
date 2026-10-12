@@ -14,9 +14,25 @@ var Permissions = []string{
 	"colaboracion.upload",
 	"colaboracion.organize",
 	"colaboracion.delete",
+	"colaboracion.comment",
+	"colaboracion.moderate",
 }
 
-type Service struct{ Core *core.Service }
+type Resource struct {
+	ID              string
+	OwnerID         string
+	TeamID          string
+	DocumentID      string
+	DocumentOwnerID string
+	DocumentTeamID  string
+}
+
+type ResourcePolicy func(context.Context, core.Querier, string) (Resource, error)
+
+type Service struct {
+	Core             *core.Service
+	ResourcePolicies map[string]ResourcePolicy
+}
 
 type Folder struct {
 	ID        string     `json:"id"`

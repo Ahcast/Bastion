@@ -143,7 +143,7 @@ func TestRegisterCollaborationCanBeDisabledWithoutLeavingFilePolicy(t *testing.T
 			if (pattern != "") != enabled {
 				t.Fatal("route availability", pattern, enabled)
 			}
-			for _, permission := range []string{"colaboracion.view", "colaboracion.upload", "colaboracion.organize", "colaboracion.delete"} {
+			for _, permission := range []string{"colaboracion.view", "colaboracion.upload", "colaboracion.organize", "colaboracion.delete", "colaboracion.comment", "colaboracion.moderate"} {
 				if hasPermission(s.PermissionCatalog(), permission) != enabled {
 					t.Fatal("permission catalog switch", permission, enabled)
 				}

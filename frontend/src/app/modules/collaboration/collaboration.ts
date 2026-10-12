@@ -44,6 +44,33 @@ interface Team {
   id: string;
   name: string;
 }
+interface Comment {
+  id: string;
+  author_id: string;
+  author_name: string;
+  body: string;
+  mention_user_ids: string[];
+  version: string;
+  created_at: string;
+}
+interface ActivityItem {
+  id: string;
+  actor_name: string;
+  action: "comment_added" | "comment_removed";
+  created_at: string;
+}
+interface MentionableUser {
+  id: string;
+  name: string;
+}
+interface CollaborationNotification {
+  id: string;
+  resource_type: string;
+  resource_id: string;
+  comment_id: string;
+  created_at: string;
+  read_at?: string;
+}
 interface Pending {
   body: string;
   key: string;
@@ -283,13 +310,151 @@ const ACCEPT = ".pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.jpg,.jpeg,.png";
         </section>
       }
 
-      @if (canUpload() || canEditEntry() || canManageFiles() || canDelete()) {
+      @if (
+        canUpload() || canEditEntry() || canManageFiles() || canDelete() || canComment() || canModerate()
+      ) {
         <details class="reauth">
           <summary>
-            Confirmar identidad para vincular, editar o eliminar archivos
+            Confirmar identidad para vincular, editar, eliminar o moderar contenido
           </summary>
           <bastion-reauthentication />
         </details>
+      }
+
+      <section aria-label="Notificaciones de menciones">
+        <h2>Menciones</h2>
+        <button
+          type="button"
+          (click)="loadNotifications()"
+          [disabled]="busy()"
+        >
+          Actualizar menciones
+        </button>
+        <ul>
+          @for (notification of notifications(); track notification.id) {
+            <li>
+              Mención en un recurso · {{ notification.created_at }}
+              <button
+                type="button"
+                (click)="openNotification(notification)"
+                [disabled]="busy()"
+              >
+                Abrir conversación
+              </button>
+              @if (!notification.read_at) {
+                <button
+                  type="button"
+                  (click)="readNotification(notification)"
+                  [disabled]="busy()"
+                >
+                  Marcar como leída
+                </button>
+              }
+            </li>
+          } @empty {
+            <li>No hay menciones disponibles.</li>
+          }
+        </ul>
+        @if (notificationsMore()) {
+          <button
+            type="button"
+            (click)="loadNotifications(false)"
+            [disabled]="busy()"
+          >
+            Cargar más menciones
+          </button>
+        }
+      </section>
+
+      @if (conversationEntry(); as conversation) {
+        <section aria-label="Conversación del recurso" class="conversation">
+          <div class="file-heading">
+            <h2>Conversación: {{ conversation.title }}</h2>
+            <button type="button" (click)="closeConversation()">
+              Cerrar
+            </button>
+          </div>
+          <h3>Comentarios</h3>
+          <ul>
+            @for (comment of comments(); track comment.id) {
+              <li>
+                <strong>{{ comment.author_name }}</strong>
+                <time>{{ comment.created_at }}</time>
+                <p>{{ comment.body }}</p>
+                @if (
+                  comment.author_id === currentUserID() && canComment() ||
+                  canModerate()
+                ) {
+                  <button
+                    type="button"
+                    (click)="removeComment(comment)"
+                    [disabled]="busy()"
+                  >
+                    Enviar comentario a papelera
+                  </button>
+                }
+              </li>
+            } @empty {
+              <li>No hay comentarios en este recurso.</li>
+            }
+          </ul>
+          @if (canComment()) {
+            <label
+              >Comentario<textarea
+                [(ngModel)]="commentBody"
+                maxlength="4000"
+                rows="3"
+                [disabled]="busy()"
+              ></textarea
+            ></label>
+            <label
+              >Mencionar usuarios
+              <input
+                [(ngModel)]="mentionSearch"
+                maxlength="100"
+                placeholder="Buscar por nombre"
+                [disabled]="busy()"
+              />
+            </label>
+            <button
+              type="button"
+              (click)="findMentionableUsers()"
+              [disabled]="busy()"
+            >
+              Buscar personas
+            </button>
+            <label
+              >Destinatarios<select
+                multiple
+                [(ngModel)]="mentionUserIDs"
+                [disabled]="busy()"
+              >
+                @for (user of mentionableUsers(); track user.id) {
+                  <option [value]="user.id">{{ user.name }}</option>
+                }
+              </select></label
+            >
+            <button
+              type="button"
+              (click)="postComment()"
+              [disabled]="busy() || !commentBody.trim()"
+            >
+              Publicar comentario
+            </button>
+          }
+          <h3>Actividad</h3>
+          <ul>
+            @for (item of activity(); track item.id) {
+              <li>
+                {{ item.actor_name }}
+                {{ item.action === "comment_added" ? "agregó un comentario" : "envió un comentario a papelera" }}
+                · {{ item.created_at }}
+              </li>
+            } @empty {
+              <li>No hay actividad disponible.</li>
+            }
+          </ul>
+        </section>
       }
 
       <section aria-label="Archivos de la biblioteca">
@@ -394,6 +559,13 @@ const ACCEPT = ".pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.jpg,.jpeg,.png";
                 @if (!trash) {
                   <button type="button" (click)="showVersions(entry)">
                     Historial de versiones
+                  </button>
+                  <button
+                    type="button"
+                    (click)="openConversation(entry)"
+                    [disabled]="busy()"
+                  >
+                    Conversación y actividad
                   </button>
                 }
                 @if (!trash && canUpload() && entry.status === "available") {
@@ -574,6 +746,13 @@ export class Collaboration implements OnInit {
       status: string;
     }>
   >([]);
+  conversationEntry = signal<Entry | null>(null);
+  comments = signal<Comment[]>([]);
+  activity = signal<ActivityItem[]>([]);
+  mentionableUsers = signal<MentionableUser[]>([]);
+  notifications = signal<CollaborationNotification[]>([]);
+  notificationAfterID = signal("0");
+  notificationsMore = signal(false);
   total = signal(0);
   busy = signal(false);
   error = signal("");
@@ -598,6 +777,9 @@ export class Collaboration implements OnInit {
   editNotes = "";
   editFolderID = "";
   folderName = "";
+  commentBody = "";
+  mentionSearch = "";
+  mentionUserIDs: string[] = [];
   file: File | null = null;
   versionFile: File | null = null;
   readonly accept = ACCEPT;
@@ -611,6 +793,7 @@ export class Collaboration implements OnInit {
     if (!userID) return;
     await this.loadTeams();
     await this.load();
+    await this.loadNotifications();
   }
 
   canUpload() {
@@ -631,6 +814,15 @@ export class Collaboration implements OnInit {
   }
   canDelete() {
     return this.api.has("colaboracion.delete");
+  }
+  canComment() {
+    return this.api.has("colaboracion.comment");
+  }
+  canModerate() {
+    return this.api.has("colaboracion.moderate");
+  }
+  currentUserID() {
+    return this.api.profile()?.user.id || "";
   }
   canManageFiles() {
     return (
@@ -663,12 +855,16 @@ export class Collaboration implements OnInit {
       this.scope === "person" ? this.api.profile()?.user.id || "" : "";
     const params: Record<string, string> = {
       scope: this.scope,
-      folder_id: this.currentFolder || "root",
       search: this.search,
       page: String(this.page),
       per_page: String(this.perPage),
       deleted: String(this.trash),
     };
+    // The root-level trash view spans all folders. Sending folder_id=root here
+    // would hide deleted entries that were stored inside a folder.
+    if (!this.trash || this.currentFolder) {
+      params["folder_id"] = this.currentFolder || "root";
+    }
     if (personID) params["person_id"] = personID;
     try {
       const [page, folders] = await Promise.all([
@@ -715,6 +911,158 @@ export class Collaboration implements OnInit {
     }
   }
 
+  async loadNotifications(reset = true) {
+    const after = reset ? "0" : this.notificationAfterID();
+    try {
+      const page = await this.api.get<{
+        data: CollaborationNotification[];
+        next_after_id: string;
+        has_more: boolean;
+      }>(`/collaboration/notifications?after_id=${after}&limit=50`);
+      this.notifications.set(
+        reset ? page.data : [...this.notifications(), ...page.data],
+      );
+      this.notificationAfterID.set(page.next_after_id || after);
+      this.notificationsMore.set(page.has_more && page.next_after_id !== after);
+    } catch (e) {
+      this.error.set(this.api.message(e));
+      if (reset) this.notifications.set([]);
+      this.notificationsMore.set(false);
+    }
+  }
+
+  async openConversation(entry: Entry) {
+    if (this.trash || entry.deleted) return;
+    this.conversationEntry.set(entry);
+    this.comments.set([]);
+    this.activity.set([]);
+    this.mentionableUsers.set([]);
+    this.commentBody = "";
+    this.mentionUserIDs = [];
+    this.error.set("");
+    await this.loadConversation(entry);
+  }
+
+  closeConversation() {
+    this.conversationEntry.set(null);
+    this.comments.set([]);
+    this.activity.set([]);
+    this.mentionableUsers.set([]);
+    this.commentBody = "";
+    this.mentionUserIDs = [];
+  }
+
+  private async loadConversation(entry: Entry) {
+    const path = `/collaboration/resources/collaboration/${entry.id}`;
+    try {
+      const [comments, activity, users] = await Promise.all([
+        this.api.get<{ data: Comment[] }>(`${path}/comments?page=1&per_page=50`),
+        this.api.get<{ data: ActivityItem[] }>(
+          `${path}/activity?page=1&per_page=50`,
+        ),
+        this.canComment()
+          ? this.api.get<{ data: MentionableUser[] }>(
+              `${path}/mentionable-users`,
+            )
+          : Promise.resolve({ data: [] as MentionableUser[] }),
+      ]);
+      if (this.conversationEntry()?.id !== entry.id) return;
+      this.comments.set(comments.data);
+      this.activity.set(activity.data);
+      this.mentionableUsers.set(users.data);
+    } catch (e) {
+      if (this.conversationEntry()?.id === entry.id) {
+        this.conversationEntry.set(null);
+        this.comments.set([]);
+        this.activity.set([]);
+        this.mentionableUsers.set([]);
+      }
+      this.error.set(this.api.message(e));
+    }
+  }
+
+  async findMentionableUsers() {
+    const entry = this.conversationEntry();
+    if (!entry || !this.canComment()) return;
+    try {
+      const query = new URLSearchParams({ search: this.mentionSearch });
+      this.mentionableUsers.set(
+        (
+          await this.api.get<{ data: MentionableUser[] }>(
+            `/collaboration/resources/collaboration/${entry.id}/mentionable-users?${query}`,
+          )
+        ).data,
+      );
+    } catch (e) {
+      this.error.set(this.api.message(e));
+    }
+  }
+
+  async postComment() {
+    const entry = this.conversationEntry();
+    if (!entry || !this.canComment() || !this.commentBody.trim()) return;
+    await this.mutate(async () => {
+      const path = `/collaboration/resources/collaboration/${entry.id}/comments`;
+      const body = {
+        body: this.commentBody.trim(),
+        mention_user_ids: [...new Set(this.mentionUserIDs)].sort(),
+      };
+      await this.api.write("POST", path, body, this.key(path, body));
+      this.clearKey(path);
+      this.commentBody = "";
+      this.mentionUserIDs = [];
+      this.message.set("Comentario publicado.");
+      await this.loadConversation(entry);
+      await this.loadNotifications();
+    });
+  }
+
+  async removeComment(comment: Comment) {
+    const entry = this.conversationEntry();
+    if (!entry) return;
+    await this.mutate(async () => {
+      const path = `/collaboration/comments/${comment.id}`;
+      const body = { version: comment.version };
+      await this.api.write("DELETE", path, body, this.key(path, body));
+      this.clearKey(path);
+      this.message.set("Comentario enviado a papelera.");
+      await this.loadConversation(entry);
+      await this.loadNotifications();
+    });
+  }
+
+  async openNotification(notification: CollaborationNotification) {
+    if (notification.resource_type !== "collaboration") {
+      this.error.set("El recurso ya no está disponible.");
+      return;
+    }
+    try {
+      const entry = await this.api.get<Entry>(
+        `/collaboration/${notification.resource_id}`,
+      );
+      this.scope = entry.scope;
+      this.currentFolder = entry.folder_id || "";
+      this.currentFolderTeam = entry.team_id || "";
+      this.currentFolderName = entry.folder_id ? "Carpeta seleccionada" : "Raíz";
+      this.trash = false;
+      this.page = 1;
+      await this.load();
+      await this.openConversation(entry);
+    } catch (e) {
+      this.error.set(this.api.message(e));
+    }
+  }
+
+  async readNotification(notification: CollaborationNotification) {
+    await this.mutate(async () => {
+      const path = `/collaboration/notifications/${notification.id}/read`;
+      const body = {};
+      await this.api.write("POST", path, body, this.key(path, body));
+      this.clearKey(path);
+      await this.loadNotifications();
+    });
+  }
+
   async changeScope() {
     if (this.uploadState) {
       this.scope = this.uploadState.scope;
@@ -724,6 +1072,7 @@ export class Collaboration implements OnInit {
       return;
     }
     this.currentFolder = "";
+    this.closeConversation();
     this.currentFolderName = "Raíz";
     this.currentFolderTeam = "";
     this.newFolderTeam = "";
@@ -739,6 +1088,7 @@ export class Collaboration implements OnInit {
       return;
     }
     this.currentFolder = "";
+    this.closeConversation();
     this.currentFolderName = "Raíz";
     this.currentFolderTeam = "";
     this.newFolderTeam = "";
@@ -754,6 +1104,7 @@ export class Collaboration implements OnInit {
       return;
     }
     this.currentFolder = "";
+    this.closeConversation();
     this.currentFolderName = "Raíz";
     this.currentFolderTeam = "";
     this.newFolderTeam = "";
@@ -768,6 +1119,7 @@ export class Collaboration implements OnInit {
       return;
     }
     this.currentFolder = folder.id;
+    this.closeConversation();
     this.currentFolderName = folder.name;
     this.currentFolderTeam = folder.team_id || "";
     this.newFolderTeam = this.currentFolderTeam;
@@ -1132,6 +1484,7 @@ export class Collaboration implements OnInit {
       await this.api.write("DELETE", path, body, this.key(path, body));
       this.clearKey(path);
       this.message.set("Archivo enviado a papelera.");
+      if (this.conversationEntry()?.id === entry.id) this.closeConversation();
       await this.load();
     });
   }

@@ -68,10 +68,41 @@ Errores conservan el catálogo Core: 401 sesión inválida; 403 permiso/reauth r
 - La versión física se conserva en Core; versión obsoleta, replay cambiado, rollback y dos actores concurrentes no pisan metadata ni reubican documentos.
 - Pruebas MySQL 5.7 verifican all/self/team, persona/empresa, módulo deshabilitado, reauth, revocación, carrera, auditoría y vínculo Core transaccional. Navegador verifica carga sintética privada, estado/cuarentena, búsqueda, folder, preview/descarga autorizados, papelera/restauración y usuario ajeno.
 
+## Unidad 2 — conversación, menciones y actividad
+
+### Datos y políticas
+
+Permisos nuevos: `colaboracion.comment` y `colaboracion.moderate`, sin asignación automática a roles. `collaboration_comments` conserva cuerpo de texto plano (máximo 4000 caracteres), autor, recurso, versión y fecha; no admite edición. Borrar es una marca lógica, permitida al autor o a quien tenga `colaboracion.moderate`; requiere versión actual, clave idempotente y reautenticación. `collaboration_mentions` guarda solo las relaciones comentario/usuario. `collaboration_notifications` guarda destinatario, comentario y estado de lectura, nunca cuerpo, título ni extracto. `collaboration_activity` guarda recurso, actor, acción, comentario opcional y fecha, nunca copia `audit_events.details`.
+
+El recurso usa `resource_type`/`resource_id`. Solo se admiten tipos con política de lectura registrada por composición; en U2 se registra únicamente `collaboration` y su ID es el de una entrada de biblioteca activa. La política vuelve a validar `colaboracion.view` y `core.documents.read` cada vez que se listan, crean o leen comentarios/actividad/notificaciones. U4 registrará recursos adicionales con la política del módulo propietario. Un ID ajeno, una carpeta eliminada o un documento en papelera se responde como inexistente.
+
+`mention_user_ids` admite hasta 25 IDs distintos. Cada destinatario debe estar activo y, en ese momento, tener alcance de lectura de Colaboración y Core.Files sobre el mismo recurso. No se crean notificaciones para el autor. Al consultar o marcar una notificación como leída se vuelve a revisar la política; notificaciones de recursos cuyo acceso se revocó se omiten. El endpoint de sugerencias devuelve solo ID y nombre de usuarios legibles, nunca correos.
+
+### API
+
+```http
+GET    /api/v1/collaboration/resources/{resource_type}/{resource_id}/comments?page=&per_page=
+POST   /api/v1/collaboration/resources/{resource_type}/{resource_id}/comments
+GET    /api/v1/collaboration/resources/{resource_type}/{resource_id}/activity?page=&per_page=
+GET    /api/v1/collaboration/resources/{resource_type}/{resource_id}/mentionable-users?search=
+DELETE /api/v1/collaboration/comments/{id}
+GET    /api/v1/collaboration/notifications?after_id=&limit=
+POST   /api/v1/collaboration/notifications/{id}/read
+```
+
+Crear comentario recibe `{body, mention_user_ids}`; borrar recibe `{version}`; marcar notificación como leída recibe `{}`. Toda escritura requiere `Idempotency-Key`. Comentarios y actividad usan paginación `page` 1–100000 y `per_page` 1–100; búsqueda de menciones tiene máximo 100 caracteres y devuelve hasta 50 resultados. Las notificaciones usan cursor `after_id` y límite 1–100, sin total global; `next_after_id` avanza por los IDs examinados aunque se hayan omitido notificaciones sin acceso vigente y `has_more` indica si queda otro tramo. La respuesta de notificación contiene solo `id`, `resource_type`, `resource_id`, `comment_id`, `created_at` y `read_at`.
+
+La bandeja muestra únicamente la actividad mínima de U2 (`comment_added` y `comment_removed`) en orden `created_at, id`; no devuelve cuerpos, destinatarios ni el detalle de auditoría. Workflow y módulos comerciales todavía no se consultan.
+
+### Aceptación de unidad 2
+
+- Usuarios sin alcance actual no pueden enumerar recursos ni comentarios; se prueba revocación antes de cada lectura, creación, replay, mención y lectura/marcado de notificación.
+- Texto se trata como texto plano y se limita en caracteres/cuerpo HTTP; no hay ruta de edición. Solo autor/moderador puede mandar a papelera; repetición idempotente no duplica comentario, relación, notificación ni actividad.
+- Destinatario inactivo, duplicado, no registrado o sin acceso vigente no puede recibir mención. Notificaciones no almacenan extractos y se omiten tras perder acceso.
+- MySQL 5.7 verifica rollback atómico, carreras de borrado/mención, aislamiento de destinatario y cursores sin conteo lateral. Navegador verifica comentario, sugerencia, mención, notificación, actividad y eliminación/revocación.
+
 ## Unidades siguientes — contratos previos
 
-Unidad 2 añade comentarios como texto plano, append-only salvo papelera por autor/moderador, anclados a una entrada o recurso con `entity_type`/`entity_id`. Solo tipos registrados en composición se admiten. La política propietaria de lectura se valida antes de listar, comentar o mencionar. `mention_user_ids` se validan contra usuarios activos que puedan ver el mismo recurso; notificaciones no llevan extracto privado y cada lectura vuelve a validar acceso. El feed de actividad publica actor/acción/recurso/fecha sin copiar `audit_events.details`.
-
-Unidad 3 añade tareas independientes de Workflow: asignado, creador, título, nota, fecha límite DATE Honduras, estado `open|in_progress|done|cancelled`, versión y timestamps. Para recursos vinculados, asignado debe tener permiso de lectura vigente; tareas personales sin recurso solo las ven creador/asignado. El asignado puede cambiar estado; editar destino/vencimiento requiere `colaboracion.task`; una tarea cerrada no se reactiva sin acción explícita y auditoría. «Mi trabajo», «Hoy» y «Vencidas» son proyecciones sobre estas tareas, sin copiar tareas de otros dueños.
+Unidad 3 añade tareas independientes de Workflow: asignado, creador, título, nota, fecha límite `DATE` en Honduras, estado `open|in_progress|done|cancelled`, versión y timestamps. Para recursos vinculados, asignado debe tener permiso de lectura vigente; tareas personales sin recurso solo las ven creador/asignado. El asignado puede cambiar estado; editar destino/vencimiento requiere `colaboracion.task`; una tarea cerrada no se reactiva sin acción explícita y auditoría. «Mi trabajo», «Hoy» y «Vencidas» son proyecciones sobre estas tareas, sin copiar tareas de otros dueños.
 
 Unidad 4 introduce relaciones documentales sin duplicar bytes y una vista de aprobaciones pendientes ya registradas por Workflow. La política del módulo dueño se comprueba en cada acceso; Workflow decide/aprueba/revoca y conserva su versión/hash. Colaboración no crea aprobaciones ni ejecuta cambios comerciales.

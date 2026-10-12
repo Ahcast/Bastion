@@ -28,38 +28,60 @@ func (s *Service) CreateEntry(ctx context.Context, a core.Actor, key string, p E
 		if e != nil {
 			return e
 		}
-		if binding.OwnerID != a.UserID || binding.Generated || binding.Version != p.DocumentVersion ||
-			(binding.EntityType != "" && binding.EntityType != "collaboration") {
-			return core.Conflict
-		}
-		var fileStatus string
-		if e = tx.QueryRowContext(ctx, `SELECT status FROM document_versions WHERE document_id=? AND number=(SELECT current_version FROM documents WHERE id=?)`, p.DocumentID, p.DocumentID).Scan(&fileStatus); e != nil {
-			return e
-		}
-		if fileStatus != "quarantined" && fileStatus != "available" {
-			return core.Conflict
-		}
-		if p.Scope == "person" && (binding.OwnerID != p.PersonID || binding.TeamID != "") {
-			return core.Forbidden
-		}
-		if e = s.gate(ctx, tx, a, "colaboracion.upload", binding.OwnerID, binding.TeamID, true); e != nil {
-			return e
-		}
-		if e = s.gate(ctx, tx, a, "colaboracion.organize", binding.OwnerID, binding.TeamID, true); e != nil {
-			return e
-		}
+		replay := binding.EntityType == "collaboration"
 		var folder Folder
-		if p.FolderID != "" {
-			folder, e = s.folder(ctx, tx, a, p.FolderID, "colaboracion.organize", false)
+		if replay {
+			// BindDocument increments the Core document version. Reauthorize the
+			// already-bound entry before consulting idempotency so an exact lost-ACK
+			// replay succeeds without weakening current access checks.
+			entry, e := s.entry(ctx, tx, a, binding.EntityID, "colaboracion.organize")
 			if e != nil {
 				return e
 			}
-			if folder.Scope != p.Scope || folder.PersonID != p.PersonID || folder.TeamID != binding.TeamID {
+			if entry.DocumentID != p.DocumentID || entry.Scope != p.Scope || entry.PersonID != p.PersonID || entry.FolderID != p.FolderID || entry.Title != p.Title || entry.Notes != p.Notes {
 				return core.Conflict
+			}
+			if binding.OwnerID != entry.UploadedBy || binding.TeamID != entry.TeamID {
+				return core.Missing
+			}
+			if e = s.gate(ctx, tx, a, "colaboracion.upload", entry.UploadedBy, entry.TeamID, true); e != nil {
+				return e
+			}
+			if e = s.gate(ctx, tx, a, "colaboracion.organize", entry.UploadedBy, entry.TeamID, true); e != nil {
+				return e
+			}
+		} else {
+			if binding.OwnerID != a.UserID || binding.Generated || binding.Version != p.DocumentVersion || binding.EntityType != "" {
+				return core.Conflict
+			}
+			var fileStatus string
+			if e = tx.QueryRowContext(ctx, `SELECT status FROM document_versions WHERE document_id=? AND number=(SELECT current_version FROM documents WHERE id=?)`, p.DocumentID, p.DocumentID).Scan(&fileStatus); e != nil {
+				return e
+			}
+			if fileStatus != "quarantined" && fileStatus != "available" {
+				return core.Conflict
+			}
+			if p.Scope == "person" && (binding.OwnerID != p.PersonID || binding.TeamID != "") {
+				return core.Forbidden
+			}
+			if e = s.gate(ctx, tx, a, "colaboracion.upload", binding.OwnerID, binding.TeamID, true); e != nil {
+				return e
+			}
+			if e = s.gate(ctx, tx, a, "colaboracion.organize", binding.OwnerID, binding.TeamID, true); e != nil {
+				return e
+			}
+			if p.FolderID != "" {
+				folder, e = s.folder(ctx, tx, a, p.FolderID, "colaboracion.organize", false)
+				if e != nil {
+					return e
+				}
+				if folder.Scope != p.Scope || folder.PersonID != p.PersonID || folder.TeamID != binding.TeamID {
+					return core.Conflict
+				}
 			}
 		}
 		out, e = s.Core.Idempotent(ctx, tx, a, "collaboration.entry.create", key, p, func() (any, error) {
-			if binding.EntityType != "" {
+			if replay {
 				// An exact replay returns above. A second key cannot create a second
 				// library row for an already-bound document.
 				return nil, core.Conflict

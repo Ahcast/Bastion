@@ -22,3 +22,18 @@ func TestScopeQueryAndInputBounds(t *testing.T) {
 		t.Fatal("invalid pagination bounds")
 	}
 }
+
+func TestCommentBodyAndMentionGrantBoundary(t *testing.T) {
+	if !validComment("Texto plano <script>alert(1)</script>\nsegunda línea") || validComment(" ") || validComment("texto\x00") || validComment("línea\x1b[31m") || validComment(strings.Repeat("a", 4001)) {
+		t.Fatal("comment body validation boundary")
+	}
+	query, args := mentionGrantClause("core.documents.read", "19", "27")
+	for _, clause := range []string{"rp.scope='all'", "rp.scope='self'", "rp.scope='team'", "team_members", "u.id"} {
+		if !strings.Contains(query, clause) {
+			t.Fatalf("mention policy clause %q missing from %s", clause, query)
+		}
+	}
+	if len(args) != 4 || args[0] != "core.documents.read" || args[1] != "19" || args[2] != "27" || args[3] != "27" {
+		t.Fatalf("unexpected mention grant arguments: %#v", args)
+	}
+}

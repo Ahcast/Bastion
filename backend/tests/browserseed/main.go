@@ -155,13 +155,28 @@ func main() {
 	if _, e = db.Exec(`INSERT INTO roles(name) VALUES('Colaboración sintético')`); e != nil {
 		log.Fatal(e)
 	}
-	if _, e = db.Exec(`INSERT INTO role_permissions SELECT r.id,p.name,'all' FROM roles r JOIN permissions p ON p.name IN ('colaboracion.view','colaboracion.upload','colaboracion.organize','colaboracion.delete','core.documents.read','core.documents.write') WHERE r.name='Colaboración sintético'`); e != nil {
+	if _, e = db.Exec(`INSERT INTO role_permissions SELECT r.id,p.name,'all' FROM roles r JOIN permissions p ON p.name IN ('colaboracion.view','colaboracion.upload','colaboracion.organize','colaboracion.delete','colaboracion.comment','core.documents.read','core.documents.write') WHERE r.name='Colaboración sintético'`); e != nil {
 		log.Fatal(e)
 	}
 	if _, e = db.Exec(`INSERT INTO user_roles SELECT u.id,r.id FROM users u JOIN roles r ON r.name='Colaboración sintético' WHERE u.email='collaboration@example.test'`); e != nil {
 		log.Fatal(e)
 	}
 	if _, e = db.Exec(`INSERT INTO recovery_codes SELECT id,? FROM users WHERE email='collaboration@example.test'`, security.Hash("synthetic-collaboration-recovery")); e != nil {
+		log.Fatal(e)
+	}
+	if _, e = db.Exec(`INSERT INTO users(email,name,password_hash,totp_secret,active,created_at,updated_at) SELECT 'collaboration-reviewer@example.test','Revisor Colaboración sintético',password_hash,?,TRUE,UTC_TIMESTAMP(6),UTC_TIMESTAMP(6) FROM users WHERE id=1`, secret); e != nil {
+		log.Fatal(e)
+	}
+	if _, e = db.Exec(`INSERT INTO roles(name) VALUES('Colaboración revisor sintético')`); e != nil {
+		log.Fatal(e)
+	}
+	if _, e = db.Exec(`INSERT INTO role_permissions SELECT r.id,p.name,'all' FROM roles r JOIN permissions p ON p.name IN ('colaboracion.view','core.documents.read') WHERE r.name='Colaboración revisor sintético'`); e != nil {
+		log.Fatal(e)
+	}
+	if _, e = db.Exec(`INSERT INTO user_roles SELECT u.id,r.id FROM users u JOIN roles r ON r.name='Colaboración revisor sintético' WHERE u.email='collaboration-reviewer@example.test'`); e != nil {
+		log.Fatal(e)
+	}
+	if _, e = db.Exec(`INSERT INTO recovery_codes SELECT id,? FROM users WHERE email='collaboration-reviewer@example.test'`, security.Hash("synthetic-collaboration-reviewer-recovery")); e != nil {
 		log.Fatal(e)
 	}
 

@@ -3,6 +3,7 @@ import { totp } from "./helpers";
 
 test("Colaboración: carga privada, cuarentena y papelera reversible", async ({
   page,
+  browser,
 }) => {
   await page.goto("/login");
   await page
@@ -43,7 +44,7 @@ test("Colaboración: carga privada, cuarentena y papelera reversible", async ({
 
   await page
     .getByText(
-      "Confirmar identidad para vincular, editar o eliminar archivos",
+      "Confirmar identidad para vincular, editar, eliminar o moderar contenido",
       { exact: true },
     )
     .click();
@@ -86,6 +87,82 @@ test("Colaboración: carga privada, cuarentena y papelera reversible", async ({
   expect(entry.document_id).toBeTruthy();
   await expect(page.getByText("manual.pdf", { exact: true })).toBeVisible();
   await expect(page.getByText(/En cuarentena/)).toBeVisible();
+
+  const mentionableUsers = page.waitForResponse(
+    (r) =>
+      r.url().includes("/api/v1/collaboration/resources/collaboration/") &&
+      r.url().endsWith("/mentionable-users") &&
+      r.status() === 200,
+  );
+  await page
+    .getByRole("button", { name: "Conversación y actividad", exact: true })
+    .click();
+  const mentionable = await (await mentionableUsers).json();
+  const reviewer = mentionable.data.find(
+    (user: { name: string }) => user.name === "Revisor Colaboración sintético",
+  );
+  expect(reviewer?.id).toBeTruthy();
+  const body = "<script>alert('xss')</script> comentario sintético";
+  await page.getByLabel("Comentario", { exact: true }).fill(body);
+  await page
+    .getByLabel("Destinatarios", { exact: true })
+    .selectOption(reviewer.id);
+  const posted = page.waitForResponse(
+    (r) =>
+      r.request().method() === "POST" &&
+      r.url().endsWith("/collaboration/resources/collaboration/" + entry.id + "/comments") &&
+      r.status() === 200,
+  );
+  await page
+    .getByRole("button", { name: "Publicar comentario", exact: true })
+    .click();
+  await posted;
+  await expect(page.getByText(body, { exact: true })).toBeVisible();
+  await expect(
+    page.locator('[aria-label="Conversación del recurso"] script'),
+  ).toHaveCount(0);
+
+  const reviewerContext = await browser.newContext();
+  const reviewerPage = await reviewerContext.newPage();
+  await reviewerPage.goto("http://localhost:4200/login");
+  await reviewerPage
+    .getByLabel("Correo", { exact: true })
+    .fill("collaboration-reviewer@example.test");
+  await reviewerPage
+    .getByLabel("Contraseña", { exact: true })
+    .fill("synthetic browser password 42");
+  await reviewerPage
+    .getByRole("button", { name: "Ingresar", exact: true })
+    .click();
+  await reviewerPage
+    .getByLabel("Código de autenticación o recuperación")
+    .fill(totp("JBSWY3DPEHPK3PXP"));
+  await reviewerPage
+    .getByRole("button", { name: "Verificar", exact: true })
+    .click();
+  const notifications = reviewerPage.waitForResponse(
+    (r) =>
+      r.url().includes("/api/v1/collaboration/notifications?") &&
+      r.status() === 200,
+  );
+  await reviewerPage
+    .getByRole("link", { name: "Colaboración", exact: true })
+    .click();
+  const noticePage = await (await notifications).json();
+  expect(noticePage.data).toHaveLength(1);
+  await reviewerPage.getByRole("button", { name: "Abrir conversación" }).click();
+  await expect(reviewerPage.getByText(body, { exact: true })).toBeVisible();
+  const markedRead = reviewerPage.waitForResponse(
+    (r) =>
+      r.request().method() === "POST" &&
+      /\/api\/v1\/collaboration\/notifications\/[0-9]+\/read$/.test(r.url()) &&
+      r.status() === 200,
+  );
+  await reviewerPage
+    .getByRole("button", { name: "Marcar como leída", exact: true })
+    .click();
+  await markedRead;
+  await reviewerContext.close();
 
   const trashed = page.waitForResponse(
     (r) =>

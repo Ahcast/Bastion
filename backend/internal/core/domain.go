@@ -31,11 +31,16 @@ func (s *Service) authorizeDocumentVersion(ctx context.Context, q Querier, a Act
 	if entity == "" {
 		return nil
 	}
-	policy, ok := s.DocumentVersionPolicies[entity]
-	if !ok {
-		return Forbidden
+	if policy, ok := s.DocumentVersionPolicies[entity]; ok {
+		return policy(ctx, q, a, entityID)
 	}
-	return policy(ctx, q, a, entityID)
+	// Existing owners keep their established write policy unless they opt into
+	// the stricter version-specific hook. This preserves Core.Files behavior
+	// while allowing modules such as Collaboration to require upload permission.
+	if policy, ok := s.DocumentPolicies[entity]; ok {
+		return policy(ctx, q, a, entityID, true)
+	}
+	return Forbidden
 }
 
 func (s *Service) authorizeDocumentVersionForID(ctx context.Context, q Querier, a Actor, id string) error {

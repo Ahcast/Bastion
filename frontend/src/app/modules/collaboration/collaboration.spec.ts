@@ -12,7 +12,8 @@ function api() {
       if (path === "/collaboration/teams") return { data: [] };
       return { data: [], total: 0, page: 1, per_page: 25 };
     }),
-    write: vi.fn(async (_method: string, path: string, _body?: unknown) => {
+    write: vi.fn(
+      async (_method: string, path: string, _body?: unknown, _key?: string) => {
       if (path === "/documents" || path === "/documents/201")
         return {
           id: "201",
@@ -21,7 +22,8 @@ function api() {
           checksum_base64: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
         };
       return {};
-    }),
+      },
+    ),
     message: vi.fn(() => "No se pudo completar la operación."),
   };
 }
@@ -121,5 +123,48 @@ describe("Colaboración", () => {
     expect(component.message()).toContain("Nueva versión");
     globalThis.fetch = originalFetch;
     digest.mockRestore();
+  });
+
+  it("publica texto plano con menciones y carga hilo/actividad tras la respuesta", async () => {
+    const client = api();
+    const component = fixture(client);
+    const entry = {
+      id: "301",
+      document_id: "201",
+      scope: "company",
+      title: "Manual",
+      version: "1",
+      document_version: "2",
+      file_version: 1,
+      filename: "manual.pdf",
+      media_type: "application/pdf",
+      size_bytes: 20,
+      status: "available",
+      updated_at: "2026-10-12T12:00:00Z",
+      deleted: false,
+    } as Entry;
+    await component.openConversation(entry);
+    component.commentBody = "<script>texto literal</script>";
+    component.mentionUserIDs = ["9", "7", "9"];
+    await component.postComment();
+
+    const post = client.write.mock.calls.find(
+      (call) =>
+        call[0] === "POST" &&
+        call[1] === "/collaboration/resources/collaboration/301/comments",
+    );
+    expect(post?.[2]).toEqual({
+      body: "<script>texto literal</script>",
+      mention_user_ids: ["7", "9"],
+    });
+    expect(post?.[3]).toBeTruthy();
+    expect(component.conversationEntry()?.id).toBe("301");
+    expect(component.commentBody).toBe("");
+    expect(client.get).toHaveBeenCalledWith(
+      "/collaboration/resources/collaboration/301/comments?page=1&per_page=50",
+    );
+    expect(client.get).toHaveBeenCalledWith(
+      "/collaboration/resources/collaboration/301/activity?page=1&per_page=50",
+    );
   });
 });

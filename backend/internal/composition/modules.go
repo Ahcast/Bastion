@@ -266,11 +266,15 @@ func RegisterFiles(s *core.Service, r *registry.Registry, logger *slog.Logger, o
 			s.DocumentTrashPolicies = map[string]core.DocumentTrashPolicy{}
 		}
 		s.RegisterPermissions(collaboration.Permissions, nil)
+		collaborationService.ResourcePolicies = map[string]collaboration.ResourcePolicy{
+			"collaboration": collaborationService.CollaborationEntryResource,
+		}
 		s.DocumentPolicies["collaboration"] = collaborationService.DocumentPolicy
 		s.DocumentBindingPolicies["collaboration"] = collaborationService.DocumentBindingPolicy
 		s.DocumentVersionPolicies["collaboration"] = collaborationService.DocumentVersionPolicy
 		s.DocumentTrashPolicies["collaboration"] = collaborationService.DocumentTrashPolicy
 	} else {
+		collaborationService.ResourcePolicies = nil
 		delete(s.DocumentPolicies, "collaboration")
 		delete(s.DocumentBindingPolicies, "collaboration")
 		delete(s.DocumentVersionPolicies, "collaboration")

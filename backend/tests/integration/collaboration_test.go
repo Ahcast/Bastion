@@ -17,6 +17,9 @@ func (f collaborationObjects) PreviewURL(context.Context, string, string, string
 }
 
 func configureCollaborationPolicies(s *core.Service, service *collaboration.Service) {
+	service.ResourcePolicies = map[string]collaboration.ResourcePolicy{
+		"collaboration": service.CollaborationEntryResource,
+	}
 	s.DocumentPolicies["collaboration"] = service.DocumentPolicy
 	s.DocumentBindingPolicies["collaboration"] = service.DocumentBindingPolicy
 	s.DocumentVersionPolicies["collaboration"] = service.DocumentVersionPolicy

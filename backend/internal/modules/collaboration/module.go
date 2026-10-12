@@ -126,6 +126,79 @@ func (s *Service) Module(logger *slog.Logger, enabled bool, objects core.Objects
 			}
 			return map[string]any{"data": teams}, nil
 		})
+		register("GET /api/v1/collaboration/resources/{resource_type}/{resource_id}/comments", func(ctx context.Context, a core.Actor, r *http.Request) (any, error) {
+			q, e := queryValues(r, "page", "per_page")
+			if e != nil {
+				return nil, e
+			}
+			page, e := queryInt(q, "page", 1)
+			if e != nil {
+				return nil, e
+			}
+			perPage, e := queryInt(q, "per_page", 25)
+			if e != nil {
+				return nil, e
+			}
+			return s.Comments(ctx, a, r.PathValue("resource_type"), r.PathValue("resource_id"), page, perPage)
+		})
+		register("POST /api/v1/collaboration/resources/{resource_type}/{resource_id}/comments", func(ctx context.Context, a core.Actor, r *http.Request) (any, error) {
+			var p CommentInput
+			if e := decodeRequired(r, &p, "body", "mention_user_ids"); e != nil {
+				return nil, e
+			}
+			return s.CreateComment(ctx, a, r.PathValue("resource_type"), r.PathValue("resource_id"), r.Header.Get("Idempotency-Key"), p)
+		})
+		register("GET /api/v1/collaboration/resources/{resource_type}/{resource_id}/activity", func(ctx context.Context, a core.Actor, r *http.Request) (any, error) {
+			q, e := queryValues(r, "page", "per_page")
+			if e != nil {
+				return nil, e
+			}
+			page, e := queryInt(q, "page", 1)
+			if e != nil {
+				return nil, e
+			}
+			perPage, e := queryInt(q, "per_page", 25)
+			if e != nil {
+				return nil, e
+			}
+			return s.Activity(ctx, a, r.PathValue("resource_type"), r.PathValue("resource_id"), page, perPage)
+		})
+		register("GET /api/v1/collaboration/resources/{resource_type}/{resource_id}/mentionable-users", func(ctx context.Context, a core.Actor, r *http.Request) (any, error) {
+			q, e := queryValues(r, "search")
+			if e != nil {
+				return nil, e
+			}
+			users, e := s.MentionableUsers(ctx, a, r.PathValue("resource_type"), r.PathValue("resource_id"), q["search"])
+			if e != nil {
+				return nil, e
+			}
+			return map[string]any{"data": users}, nil
+		})
+		register("DELETE /api/v1/collaboration/comments/{id}", func(ctx context.Context, a core.Actor, r *http.Request) (any, error) {
+			var p CommentDeleteInput
+			if e := decodeRequired(r, &p, "version"); e != nil {
+				return nil, e
+			}
+			return s.DeleteComment(ctx, a, r.PathValue("id"), r.Header.Get("Idempotency-Key"), p)
+		})
+		register("GET /api/v1/collaboration/notifications", func(ctx context.Context, a core.Actor, r *http.Request) (any, error) {
+			q, e := queryValues(r, "after_id", "limit")
+			if e != nil {
+				return nil, e
+			}
+			limit, e := queryInt(q, "limit", 50)
+			if e != nil {
+				return nil, e
+			}
+			return s.Notifications(ctx, a, q["after_id"], limit)
+		})
+		register("POST /api/v1/collaboration/notifications/{id}/read", func(ctx context.Context, a core.Actor, r *http.Request) (any, error) {
+			var p struct{}
+			if e := api.Decode(r, &p); e != nil {
+				return nil, e
+			}
+			return s.ReadNotification(ctx, a, r.PathValue("id"), r.Header.Get("Idempotency-Key"))
+		})
 		register("POST /api/v1/collaboration/folders", func(ctx context.Context, a core.Actor, r *http.Request) (any, error) {
 			var p FolderInput
 			if e := decodeRequired(r, &p, "scope", "person_id", "team_id", "parent_id", "name"); e != nil {
