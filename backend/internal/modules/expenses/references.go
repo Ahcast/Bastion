@@ -76,6 +76,10 @@ func (s *Service) SetReferences(ctx context.Context, a core.Actor, id, key strin
 		if e != nil {
 			return e
 		}
+		if e = s.Core.Authorize(ctx, tx, a, "gastos.view", o.CreatedBy, o.TeamID, false); e != nil {
+			return e
+		}
+
 		if o.DeletedAt != nil {
 			return core.Conflict
 		}

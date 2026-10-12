@@ -72,32 +72,12 @@ func (s *Service) TrashFile(ctx context.Context, a Actor, id, key string, versio
 	}
 	var out any
 	e := s.Transact(ctx, func(tx *sql.Tx) error {
-		var owner string
-		var team, entity, eid sql.NullString
-		var old uint64
-		var deleted sql.NullTime
-		var generated bool
-		if e := tx.QueryRowContext(ctx, `SELECT owner_id,team_id,entity_type,entity_id,version,deleted_at,is_generated FROM documents WHERE id=? FOR UPDATE`, id).Scan(&owner, &team, &entity, &eid, &old, &deleted, &generated); e == sql.ErrNoRows {
-			return Missing
-		} else if e != nil {
+		state, e := s.lockDocumentWrite(ctx, tx, a, id, true)
+		if e != nil {
 			return e
 		}
-		if e := s.Authorize(ctx, tx, a, "core.documents.write", owner, team.String, true); e != nil {
-			if e == Forbidden {
-				return Missing
-			}
-			return e
-		}
-		if entity.Valid {
-			policy, ok := s.DocumentPolicies[entity.String]
-			if !ok {
-				return Forbidden
-			}
-			if e := policy(ctx, tx, a, eid.String, true); e != nil {
-				return Missing
-			}
-		}
-		var e error
+		old, deleted, generated := state.Version, state.Deleted, state.Generated
+
 		out, e = s.Idempotent(ctx, tx, a, "files.trash:"+id, key, map[string]any{"version": version, "restore": restore}, func() (any, error) {
 			if generated || version != old || restore != deleted.Valid {
 				return nil, Conflict

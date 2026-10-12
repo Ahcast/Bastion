@@ -22,44 +22,72 @@ type DocumentBinding struct {
 	Generated  bool
 }
 
-// DocumentBindingAccess locks a document and reauthorizes its current owner and
-// entity policy without mutating it. It is used before idempotent callbacks so
-// a replay cannot bypass revoked document or destination access.
-func (s *Service) DocumentBindingAccess(ctx context.Context, tx *sql.Tx, a Actor, id string, sensitive bool) (DocumentBinding, error) {
-	var out DocumentBinding
+// documentWriteBinding follows actor -> entity -> document lock ordering.
+// Recheck the binding after the document lock so a concurrent bind cannot
+// select a different owner policy after authorization.
+type documentWriteState struct {
+	Owner                  string
+	Team, Entity, EntityID sql.NullString
+	Version                uint64
+	Generated              bool
+	Deleted                sql.NullTime
+}
+
+func (s *Service) lockDocumentWrite(ctx context.Context, tx *sql.Tx, a Actor, id string, sensitive bool, expected ...string) (documentWriteState, error) {
+	var first, current documentWriteState
 	if ID(id) != nil {
-		return out, Invalid
+		return current, Invalid
 	}
-	var owner string
-	var team, entity, eid sql.NullString
-	var deleted sql.NullTime
-	if e := tx.QueryRowContext(ctx, `SELECT owner_id,team_id,entity_type,entity_id,version,deleted_at,is_generated FROM documents WHERE id=? FOR UPDATE`, id).Scan(&owner, &team, &entity, &eid, &out.Version, &deleted, &out.Generated); e != nil {
-		if e == sql.ErrNoRows {
-			return out, Missing
-		}
-		return out, e
+	const cols = "owner_id,team_id,entity_type,entity_id,version,deleted_at,is_generated"
+	scan := func(v *documentWriteState) []any {
+		return []any{&v.Owner, &v.Team, &v.Entity, &v.EntityID, &v.Version, &v.Deleted, &v.Generated}
 	}
-	if deleted.Valid {
-		return DocumentBinding{}, Missing
+	if e := tx.QueryRowContext(ctx, "SELECT "+cols+" FROM documents WHERE id=?", id).Scan(scan(&first)...); e == sql.ErrNoRows {
+		return current, Missing
+	} else if e != nil {
+		return current, e
 	}
-	if e := s.Authorize(ctx, tx, a, "core.documents.write", owner, team.String, sensitive); e != nil {
+	if e := s.Authorize(ctx, tx, a, "core.documents.write", first.Owner, first.Team.String, sensitive); e != nil {
 		if e == Forbidden {
-			return DocumentBinding{}, Missing
+			e = Missing
 		}
+		return current, e
+	}
+	if len(expected) == 2 && first.Entity.Valid && (first.Entity.String != expected[0] || first.EntityID.String != expected[1]) {
+		return current, Conflict
+	}
+	if first.Entity.Valid {
+		policy, ok := s.DocumentPolicies[first.Entity.String]
+		if !ok {
+			return current, Forbidden
+		}
+		if e := policy(ctx, tx, a, first.EntityID.String, true); e != nil {
+			return current, Missing
+		}
+	}
+	if e := tx.QueryRowContext(ctx, "SELECT "+cols+" FROM documents WHERE id=? FOR UPDATE", id).Scan(scan(&current)...); e == sql.ErrNoRows {
+		return current, Missing
+	} else if e != nil {
+		return current, e
+	}
+	if current.Owner != first.Owner || current.Team != first.Team || current.Entity != first.Entity || current.EntityID != first.EntityID {
+		return current, Conflict
+	}
+	return current, nil
+}
+
+// DocumentBindingAccess reauthorizes current document/destination access on
+// every replay. An optional expected owner rejects foreign bindings before
+// taking an unrelated entity lock.
+func (s *Service) DocumentBindingAccess(ctx context.Context, tx *sql.Tx, a Actor, id string, sensitive bool, expected ...string) (DocumentBinding, error) {
+	v, e := s.lockDocumentWrite(ctx, tx, a, id, sensitive, expected...)
+	if e != nil {
 		return DocumentBinding{}, e
 	}
-	if entity.Valid {
-		policy, ok := s.DocumentPolicies[entity.String]
-		if !ok {
-			return DocumentBinding{}, Forbidden
-		}
-		if e := policy(ctx, tx, a, eid.String, true); e != nil {
-			return DocumentBinding{}, Missing
-		}
-		out.EntityType = entity.String
-		out.EntityID = eid.String
+	if v.Deleted.Valid {
+		return DocumentBinding{}, Missing
 	}
-	return out, nil
+	return DocumentBinding{Version: v.Version, EntityType: v.Entity.String, EntityID: v.EntityID.String, Generated: v.Generated}, nil
 }
 
 // BindDocument is the only public cross-module write to document ownership links.

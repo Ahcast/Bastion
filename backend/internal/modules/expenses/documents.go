@@ -34,10 +34,14 @@ func (s *Service) DocumentPolicy(ctx context.Context, q core.Querier, a core.Act
 	if write {
 		permission = "gastos.documents.write"
 	}
-	o, e := s.access(ctx, q, a, id, permission, false)
+	o, e := s.access(ctx, q, a, id, permission, write)
 	if e != nil {
 		return e
 	}
+	if e = s.Core.Authorize(ctx, q, a, "gastos.view", o.CreatedBy, o.TeamID, false); e != nil {
+		return e
+	}
+
 	if o.DeletedAt != nil {
 		return core.Missing
 	}
@@ -60,13 +64,17 @@ func (s *Service) LinkDocument(ctx context.Context, a core.Actor, id, key string
 		if e != nil {
 			return e
 		}
+		if e = s.Core.Authorize(ctx, tx, a, "gastos.view", o.CreatedBy, o.TeamID, false); e != nil {
+			return e
+		}
+
 		if o.DeletedAt != nil {
 			return core.Conflict
 		}
 		if e = s.Core.Authorize(ctx, tx, a, "gastos.documents.write", o.CreatedBy, o.TeamID, true); e != nil {
 			return e
 		}
-		binding, e := s.Core.DocumentBindingAccess(ctx, tx, a, p.DocumentID, true)
+		binding, e := s.Core.DocumentBindingAccess(ctx, tx, a, p.DocumentID, true, "expenses", id)
 		if e != nil {
 			return e
 		}
@@ -96,55 +104,21 @@ func (s *Service) LinkDocument(ctx context.Context, a core.Actor, id, key string
 	return out, dbError(e)
 }
 
-func (s *Service) Documents(ctx context.Context, a core.Actor, id string, page, perPage int) (DocumentPage, error) {
+func (s *Service) Documents(ctx context.Context, a core.Actor, id string, page, perPage int, deletedFilter ...bool) (DocumentPage, error) {
 	out := DocumentPage{Data: []ExpenseDocument{}, Page: page, PerPage: perPage}
-	if core.ID(id) != nil || page < 1 || page > 100000 || perPage < 1 || perPage > 100 {
-		return out, core.Invalid
-	}
-	if e := s.gate(ctx, s.Core.DB, a, "gastos.view"); e != nil {
-		return out, e
-	}
-	o, e := s.access(ctx, s.Core.DB, a, id, "gastos.view", false)
+	deleted := len(deletedFilter) > 0 && deletedFilter[0]
+	meta, e := s.Core.EntityDocumentMetadataPage(ctx, s.Core.DB, a, "expenses", id, page, perPage, deleted)
 	if e != nil {
 		return out, e
 	}
-	if o.DeletedAt != nil {
-		return out, core.Missing
-	}
-	rows, e := s.Core.DB.QueryContext(ctx, `SELECT CAST(document_id AS CHAR),document_version,CAST(linked_by AS CHAR),linked_at FROM expense_documents WHERE expense_id=? ORDER BY linked_at DESC,document_id DESC`, id)
-	if e != nil {
-		return out, e
-	}
-	defer rows.Close()
-	visible := []ExpenseDocument{}
-	for rows.Next() {
-		var documentID, linkedBy string
-		var linkedVersion uint64
-		var linkedAt time.Time
-		if e = rows.Scan(&documentID, &linkedVersion, &linkedBy, &linkedAt); e != nil {
+	out.Total = meta.Total
+	for _, m := range meta.Data {
+		var v ExpenseDocument
+		v.DocumentMetadata = m
+		if e = s.Core.DB.QueryRowContext(ctx, `SELECT document_version,CAST(linked_by AS CHAR),linked_at FROM expense_documents WHERE expense_id=? AND document_id=?`, id, m.ID).Scan(&v.LinkedDocumentVersion, &v.LinkedBy, &v.LinkedAt); e != nil {
 			return out, e
 		}
-		meta, accessErr := s.Core.DocumentMetadata(ctx, s.Core.DB, a, documentID)
-		if accessErr == core.Missing || accessErr == core.Forbidden {
-			continue
-		}
-		if accessErr != nil {
-			return out, accessErr
-		}
-		visible = append(visible, ExpenseDocument{DocumentMetadata: meta, LinkedDocumentVersion: linkedVersion, LinkedBy: linkedBy, LinkedAt: linkedAt})
+		out.Data = append(out.Data, v)
 	}
-	if e = rows.Err(); e != nil {
-		return out, e
-	}
-	out.Total = len(visible)
-	start := (page - 1) * perPage
-	if start >= len(visible) {
-		return out, nil
-	}
-	end := start + perPage
-	if end > len(visible) {
-		end = len(visible)
-	}
-	out.Data = visible[start:end]
 	return out, nil
 }

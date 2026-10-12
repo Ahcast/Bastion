@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Bastion Gastos",
-    "version": "0.1.0"
+    "version": "0.2.0"
   },
   "paths": {
     "/api/v1/expenses": {
@@ -608,6 +608,256 @@
           }
         ]
       }
+    },
+    "/api/v1/expenses/{id}/references": {
+      "get": {
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9]+$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Resultado autorizado"
+          },
+          "401": {
+            "description": "Sesión/MFA requerida"
+          },
+          "403": {
+            "description": "Acción y view/CSRF/reauth requerida"
+          },
+          "404": {
+            "description": "No visible"
+          },
+          "409": {
+            "description": "Versión/estado/binding divergente"
+          },
+          "422": {
+            "description": "DTO inválido"
+          },
+          "503": {
+            "description": "Propietario deshabilitado"
+          }
+        }
+      },
+      "post": {
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9]+$"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8
+            }
+          },
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Resultado autorizado"
+          },
+          "401": {
+            "description": "Sesión/MFA requerida"
+          },
+          "403": {
+            "description": "Acción y view/CSRF/reauth requerida"
+          },
+          "404": {
+            "description": "No visible"
+          },
+          "409": {
+            "description": "Versión/estado/binding divergente"
+          },
+          "422": {
+            "description": "DTO inválido"
+          },
+          "503": {
+            "description": "Propietario deshabilitado"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetReferencesInput"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/expenses/{id}/documents": {
+      "get": {
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9]+$"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100000,
+              "default": 1
+            }
+          },
+          {
+            "name": "per_page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 25
+            }
+          },
+          {
+            "name": "deleted",
+            "in": "query",
+            "schema": {
+              "type": "boolean",
+              "default": false
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Resultado autorizado"
+          },
+          "401": {
+            "description": "Sesión/MFA requerida"
+          },
+          "403": {
+            "description": "Acción y view/CSRF/reauth requerida"
+          },
+          "404": {
+            "description": "No visible"
+          },
+          "409": {
+            "description": "Versión/estado/binding divergente"
+          },
+          "422": {
+            "description": "DTO inválido"
+          },
+          "503": {
+            "description": "Propietario deshabilitado"
+          }
+        }
+      },
+      "post": {
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9]+$"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8
+            }
+          },
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Resultado autorizado"
+          },
+          "401": {
+            "description": "Sesión/MFA requerida"
+          },
+          "403": {
+            "description": "Acción y view/CSRF/reauth requerida"
+          },
+          "404": {
+            "description": "No visible"
+          },
+          "409": {
+            "description": "Versión/estado/binding divergente"
+          },
+          "422": {
+            "description": "DTO inválido"
+          },
+          "503": {
+            "description": "Propietario deshabilitado"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LinkDocumentInput"
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -743,6 +993,84 @@
           "exempt_amount": {
             "type": "string",
             "pattern": "^(0|[1-9][0-9]*)(\\.[0-9]{1,2})?$"
+          }
+        }
+      },
+      "ReferenceInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "entity_type",
+          "entity_id",
+          "entity_version"
+        ],
+        "properties": {
+          "entity_type": {
+            "type": "string",
+            "enum": [
+              "processes",
+              "quotes",
+              "purchase_orders",
+              "invoices"
+            ]
+          },
+          "entity_id": {
+            "type": "string",
+            "pattern": "^[0-9]+$"
+          },
+          "entity_version": {
+            "type": "string",
+            "pattern": "^[0-9]+$"
+          }
+        }
+      },
+      "SetReferencesInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "version",
+          "reason",
+          "references"
+        ],
+        "properties": {
+          "version": {
+            "type": "string",
+            "pattern": "^[0-9]+$"
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000
+          },
+          "references": {
+            "type": "array",
+            "maxItems": 4,
+            "items": {
+              "$ref": "#/components/schemas/ReferenceInput"
+            }
+          }
+        }
+      },
+      "LinkDocumentInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "version",
+          "document_id",
+          "document_version"
+        ],
+        "properties": {
+          "version": {
+            "type": "string",
+            "pattern": "^[0-9]+$"
+          },
+          "document_id": {
+            "type": "string",
+            "pattern": "^[0-9]+$"
+          },
+          "document_version": {
+            "type": "string",
+            "pattern": "^[0-9]+$"
           }
         }
       }

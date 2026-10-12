@@ -15,7 +15,7 @@ test('Gastos Unidad 2: referencia viva, comprobante en cuarentena y política de
  test.setTimeout(90_000);
  const credentials=expenseFixtureCredentials();
  await page.goto('/login');
- await page.getByLabel('Correo',{exact:true}).fill('expenses@example.test');
+ await page.getByLabel('Correo',{exact:true}).fill('expense-links@example.test');
  await page.getByLabel('Contraseña',{exact:true}).fill(credentials.password);
  await page.getByRole('button',{name:'Ingresar',exact:true}).click();
  await page.getByLabel('Código de autenticación o recuperación').fill(totp(credentials.secret));
@@ -49,6 +49,16 @@ test('Gastos Unidad 2: referencia viva, comprobante en cuarentena y política de
  await expect(documents.getByText(/comprobante-gasto\.pdf.*En cuarentena.*application\/pdf.*versión 2/)).toBeVisible();
  await expect(documents.getByRole('button',{name:'Vista previa',exact:true})).toHaveCount(0);
  await expect(documents.getByRole('button',{name:'Descargar',exact:true})).toHaveCount(0);
+
+ await documents.getByRole('button',{name:'Eliminar comprobante comprobante-gasto.pdf',exact:true}).click();
+ await expect(documents.getByText('0 comprobantes visibles · Página 1',{exact:true})).toBeVisible();
+ await documents.getByLabel('Papelera de comprobantes',{exact:true}).check();
+ await expect(documents.getByText(/comprobante-gasto\.pdf.*versión 3/)).toBeVisible();
+ await documents.getByRole('button',{name:'Restaurar comprobante comprobante-gasto.pdf',exact:true}).click();
+ await expect(documents.getByText('0 comprobantes visibles · Página 1',{exact:true})).toBeVisible();
+ await documents.getByLabel('Papelera de comprobantes',{exact:true}).uncheck();
+ await expect(documents.getByText(/comprobante-gasto\.pdf.*En cuarentena.*versión 4/)).toBeVisible();
+ await expect(page.getByText('Versión de gasto: 3',{exact:true})).toBeVisible();
 
  await page.getByLabel('Motivo de cambio del gasto',{exact:true}).fill('Ocultar comprobante con el gasto');
  await page.getByRole('button',{name:'Enviar gasto a papelera',exact:true}).click();

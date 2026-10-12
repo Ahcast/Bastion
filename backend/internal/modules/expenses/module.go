@@ -76,28 +76,35 @@ func filter(r *http.Request) (Filter, error) {
 	}
 	return f, nil
 }
-func documentPage(r *http.Request) (int, int, error) {
+func documentPage(r *http.Request) (int, int, bool, error) {
 	v := r.URL.Query()
-	for k, values := range v {
-		if (k != "page" && k != "per_page") || len(values) != 1 {
-			return 0, 0, core.Invalid
+	page, limit := 1, 25
+	deleted := false
+	for k, x := range v {
+		if (k != "page" && k != "per_page" && k != "deleted") || len(x) != 1 {
+			return 0, 0, false, core.Invalid
 		}
 	}
-	page, perPage := 1, 25
 	var e error
 	if v.Has("page") {
 		page, e = strconv.Atoi(v.Get("page"))
 		if e != nil {
-			return 0, 0, core.Invalid
+			return 0, 0, false, core.Invalid
 		}
 	}
 	if v.Has("per_page") {
-		perPage, e = strconv.Atoi(v.Get("per_page"))
+		limit, e = strconv.Atoi(v.Get("per_page"))
 		if e != nil {
-			return 0, 0, core.Invalid
+			return 0, 0, false, core.Invalid
 		}
 	}
-	return page, perPage, nil
+	if v.Has("deleted") {
+		if v.Get("deleted") != "true" && v.Get("deleted") != "false" {
+			return 0, 0, false, core.Invalid
+		}
+		deleted = v.Get("deleted") == "true"
+	}
+	return page, limit, deleted, nil
 }
 func noQuery(r *http.Request) error {
 	if len(r.URL.Query()) != 0 {
@@ -163,11 +170,11 @@ func (s *Service) Module(logger *slog.Logger, enabled bool) registry.Module {
 			return s.SetReferences(ctx, a, r.PathValue("id"), r.Header.Get("Idempotency-Key"), p)
 		})
 		register("GET /api/v1/expenses/{id}/documents", func(ctx context.Context, a core.Actor, r *http.Request) (any, error) {
-			page, perPage, e := documentPage(r)
+			page, perPage, deleted, e := documentPage(r)
 			if e != nil {
 				return nil, e
 			}
-			return s.Documents(ctx, a, r.PathValue("id"), page, perPage)
+			return s.Documents(ctx, a, r.PathValue("id"), page, perPage, deleted)
 		})
 		register("POST /api/v1/expenses/{id}/documents", func(ctx context.Context, a core.Actor, r *http.Request) (any, error) {
 			if e := noQuery(r); e != nil {
