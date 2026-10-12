@@ -208,8 +208,25 @@ func RegisterFiles(s *core.Service, r *registry.Registry, logger *slog.Logger, o
 	if supplierEnabled {
 		expenseService.Suppliers = supplierService
 	}
+	referenceSources := expenses.ReferenceSources{}
+	if processEnabled {
+		referenceSources.Processes = processService
+	}
+	if quoteEnabled {
+		referenceSources.Quotes = quoteService
+	}
+	if purchaseOrderEnabled {
+		referenceSources.PurchaseOrders = purchaseOrderService
+	}
+	if invoiceEnabled {
+		referenceSources.Invoices = invoiceService
+	}
+	expenses.ConfigureReferenceSources(expenseService, referenceSources)
 	if expenseEnabled {
 		s.RegisterPermissions(expenses.Permissions, []string{"gastos.view"})
+		s.DocumentPolicies["expenses"] = expenseService.DocumentPolicy
+	} else {
+		delete(s.DocumentPolicies, "expenses")
 	}
 	if e := r.Register(expenseService.Module(logger, expenseEnabled)); e != nil {
 		return e
