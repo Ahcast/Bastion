@@ -263,7 +263,7 @@ func TestExpenseSoftDeleteRestoreReauthAndProtectedEvidence(t *testing.T) {
 		t.Fatal(e)
 	}
 	restored, e := s.Get(ctx, a, id)
-	if e != nil || restored.Version != 3 || restored.DeletedAt != nil || restored.Calculation != o.Calculation {
+	if e != nil || restored.Version != 3 || restored.DeletedAt != nil || restored.Calculation != o.Calculation || restored.Notes != o.Notes {
 		t.Fatal(restored, e)
 	}
 	var n int
