@@ -8,7 +8,7 @@ import (
 	"time"
 )
 
-var Permissions = []string{"gastos.view", "gastos.create", "gastos.update", "gastos.delete", "gastos.restore"}
+var Permissions = []string{"gastos.view", "gastos.create", "gastos.update", "gastos.delete", "gastos.restore", "gastos.references.write", "gastos.documents.write"}
 var Categories = []string{"product_purchase", "freight", "customs", "taxes", "transport", "travel", "software", "services", "advertising", "office", "other"}
 
 func category(v string) bool {
