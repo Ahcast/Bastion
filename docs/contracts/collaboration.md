@@ -150,3 +150,11 @@ Locks de tareas: usuarios participantes (creador, asignado, actor y nuevo asigna
 
 
 Vínculos GET/PUT y replays revalidan explícitamente Core.DocumentMetadata sobre el documento de entrada: permiso Core.Files, policy de Colaboración, binding activo y papelera. Una revocación de lectura documental o documento eliminado responde 404 sin enumeración, aun si conserva permiso colaboracion.link; versión de entrada y relaciones no cambian ante rechazo.
+
+
+### Aceptación de conversación concurrente
+
+Los IDs de mención se normalizan como BIGINT decimal antes de comprobar unicidad/autor y antes del hash idempotente. El servicio copia el slice de entrada; no lo ordena ni modifica en el caller. Crear comentario bloquea actor/destinatarios en orden numérico antes de autorización/recurso, evitando ciclos FK en menciones cruzadas. Marcar notificación autentica/bloquea actor antes de bloquear notificación/comentario. Borrado concurrente conserva versión: un efecto y un conflicto; el replay exacto sigue recuperando el resultado tras reautorizar.
+
+
+Bandeja Workflow: además de sus permisos lectura/decisión, cada candidato requiere política de recurso propietario registrada y acceso vigente a ese recurso. La comprobación se ejecuta antes de total/página; recurso eliminado/inaccesible o módulo sin policy no expone solicitud ni afecta conteos. Workflow recibe un puerto de visibilidad de Colaboración; no importa módulos concretos ni copia sus tablas. Una mención/aprobación nunca concede permisos.

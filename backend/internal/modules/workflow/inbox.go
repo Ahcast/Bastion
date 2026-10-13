@@ -29,10 +29,15 @@ type InboxPage struct {
 
 // PendingInbox is a read-only projection. Workflow remains the only owner of
 // approval decisions and Collaboration receives no decision capability.
-func (s *Service) PendingInbox(ctx context.Context, a core.Actor, page, perPage int) (InboxPage, error) {
+type InboxVisibility func(context.Context, core.Actor, InboxItem) error
+
+func (s *Service) PendingInbox(ctx context.Context, a core.Actor, page, perPage int, canReadResource InboxVisibility) (InboxPage, error) {
 	out := InboxPage{Data: []InboxItem{}, Page: page, PerPage: perPage}
 	if a.Type != "user" || page < 1 || page > 100000 || perPage < 1 || perPage > 100 {
 		return out, core.Invalid
+	}
+	if canReadResource == nil {
+		return out, core.Disabled
 	}
 	type candidate struct {
 		InboxItem
@@ -69,6 +74,12 @@ func (s *Service) PendingInbox(ctx context.Context, a core.Actor, page, perPage 
 		}
 		if e = s.Core.Authorize(ctx, s.Core.DB, a, c.decisionPermission, c.owner, c.team, false); e != nil {
 			if e == core.Forbidden {
+				continue
+			}
+			return out, e
+		}
+		if e = canReadResource(ctx, a, c.InboxItem); e != nil {
+			if e == core.Missing || e == core.Forbidden {
 				continue
 			}
 			return out, e

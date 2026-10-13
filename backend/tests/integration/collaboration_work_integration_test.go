@@ -172,7 +172,14 @@ func TestCollaborationApprovalInboxIsWorkflowReadOnly(t *testing.T) {
 	grantCollaboration(t, s, a, "all")
 	requester := customerActor(t, s, "self")
 	grantCollaboration(t, s, requester, "all")
-	service := &collaboration.Service{Core: s, Approvals: &workflow.Service{Core: s}}
+	service := &collaboration.Service{Core: s, Approvals: &workflow.Service{Core: s}, ResourcePolicies: map[string]collaboration.ResourcePolicy{
+		"quotes": func(_ context.Context, _ core.Querier, id string) (collaboration.Resource, error) {
+			if id != "77" {
+				return collaboration.Resource{}, core.Missing
+			}
+			return collaboration.Resource{ID: id, OwnerID: requester.UserID, Label: "Solicitud sintética", Version: 1}, nil
+		},
+	}}
 	if _, e := s.DB.Exec(`INSERT INTO approvals(action,entity_type,entity_id,entity_version,input_hash,owner_id,team_id,view_permission,request_permission,decision_permission,revoke_permission,requested_by,status,reason,expires_at,created_at,updated_at)
 		VALUES('synthetic.review','quotes',77,1,REPEAT('a',64),?,'','colaboracion.view','colaboracion.view','colaboracion.view','colaboracion.view',?,'pending','',DATE_ADD(UTC_TIMESTAMP(6),INTERVAL 1 HOUR),UTC_TIMESTAMP(6),UTC_TIMESTAMP(6))`, requester.UserID, requester.UserID); e != nil {
 		t.Fatal(e)

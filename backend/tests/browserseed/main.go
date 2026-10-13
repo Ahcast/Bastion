@@ -200,7 +200,7 @@ func main() {
 		log.Fatal(e)
 	}
 	// Two independent people exercise human approval; no production grants.
-	for _, email := range []string{"approval-requester@example.test", "approval-reviewer@example.test", "emission-requester@example.test", "emission-reviewer@example.test"} {
+	for _, email := range []string{"approval-requester@example.test", "approval-reviewer@example.test", "emission-requester@example.test", "emission-reviewer@example.test", "collaboration-inbox-requester@example.test", "collaboration-inbox-reviewer@example.test"} {
 		r, e := db.Exec(`INSERT INTO users(email,name,password_hash,totp_secret,active,created_at,updated_at) SELECT ?, 'Aprobación sintética',password_hash,?,TRUE,UTC_TIMESTAMP(6),UTC_TIMESTAMP(6) FROM users WHERE id=1`, email, secret)
 		if e != nil {
 			log.Fatal(e)
@@ -215,6 +215,17 @@ func main() {
 		if _, e = db.Exec(`INSERT INTO recovery_codes VALUES(?,?)`, id, security.Hash("synthetic-approval-recovery")); e != nil {
 			log.Fatal(e)
 		}
+	}
+
+	// Inbox acceptance uses separate MFA identities, plus existing quote grants.
+	if _, e = db.Exec(`INSERT INTO roles(name) VALUES('Bandeja Colaboración sintética')`); e != nil {
+		log.Fatal(e)
+	}
+	if _, e = db.Exec(`INSERT INTO role_permissions SELECT r.id,p.name,'all' FROM roles r JOIN permissions p ON p.name='colaboracion.view' WHERE r.name='Bandeja Colaboración sintética'`); e != nil {
+		log.Fatal(e)
+	}
+	if _, e = db.Exec(`INSERT INTO user_roles SELECT u.id,r.id FROM users u JOIN roles r ON r.name='Bandeja Colaboración sintética' WHERE u.email IN ('collaboration-inbox-requester@example.test','collaboration-inbox-reviewer@example.test')`); e != nil {
+		log.Fatal(e)
 	}
 
 	// Dedicated accepted source for conversion UI; test database only.

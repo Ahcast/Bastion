@@ -179,5 +179,8 @@ func (s *Service) PendingApprovals(ctx context.Context, a core.Actor, page, perP
 	if s.Approvals == nil {
 		return out, core.Disabled
 	}
-	return s.Approvals.PendingInbox(ctx, a, page, perPage)
+	return s.Approvals.PendingInbox(ctx, a, page, perPage, func(ctx context.Context, actor core.Actor, item workflow.InboxItem) error {
+		_, e := s.resource(ctx, s.Core.DB, actor, item.EntityType, item.EntityID)
+		return e
+	})
 }

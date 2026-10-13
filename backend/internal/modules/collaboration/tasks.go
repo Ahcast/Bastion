@@ -107,7 +107,7 @@ func validateTaskInput(p TaskInput) error {
 // Task writes can require FK locks on both participants. Acquire user rows in
 // numeric order before authorization/task locks, then recheck the participant
 // snapshot under the task lock. This also protects concurrent reassignment.
-func lockTaskUsers(ctx context.Context, tx *sql.Tx, ids ...string) error {
+func lockCollaborationUsers(ctx context.Context, tx *sql.Tx, ids ...string) error {
 	values := make([]uint64, 0, len(ids))
 	seen := map[uint64]bool{}
 	for _, id := range ids {
@@ -142,7 +142,7 @@ func (s *Service) lockTaskParticipants(ctx context.Context, tx *sql.Tx, a core.A
 		return core.Missing
 	}
 	ids := append([]string{creator, assignee, a.UserID}, extra...)
-	if e := lockTaskUsers(ctx, tx, ids...); e != nil {
+	if e := lockCollaborationUsers(ctx, tx, ids...); e != nil {
 		return e
 	}
 	var currentCreator, currentAssignee string
@@ -198,7 +198,7 @@ func (s *Service) CreateTask(ctx context.Context, a core.Actor, key string, p Ta
 	}
 	var out any
 	e := s.Core.Transact(ctx, func(tx *sql.Tx) error {
-		if e := lockTaskUsers(ctx, tx, a.UserID, p.AssigneeID); e != nil {
+		if e := lockCollaborationUsers(ctx, tx, a.UserID, p.AssigneeID); e != nil {
 			return e
 		}
 		if e := s.authorizeAny(ctx, tx, a, "colaboracion.view"); e != nil {

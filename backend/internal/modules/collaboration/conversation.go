@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 	"unicode"
@@ -183,14 +184,27 @@ func (s *Service) CreateComment(ctx context.Context, a core.Actor, resourceType,
 	if a.Type != "user" || len(key) == 0 || len(key) > 100 || !validComment(p.Body) || len(p.MentionUserIDs) > 25 {
 		return nil, core.Invalid
 	}
+	// Normalize into a private slice before sorting: equivalent BIGINT IDs
+	// must not create self-notifications/duplicate mentions or mutate caller data.
+	p.MentionUserIDs = append([]string(nil), p.MentionUserIDs...)
+	for i, userID := range p.MentionUserIDs {
+		if core.ID(userID) != nil {
+			return nil, core.Invalid
+		}
+		n, _ := strconv.ParseUint(userID, 10, 64)
+		p.MentionUserIDs[i] = strconv.FormatUint(n, 10)
+	}
 	sort.Strings(p.MentionUserIDs)
 	for i, userID := range p.MentionUserIDs {
-		if core.ID(userID) != nil || userID == a.UserID || (i > 0 && p.MentionUserIDs[i-1] == userID) {
+		if userID == a.UserID || (i > 0 && p.MentionUserIDs[i-1] == userID) {
 			return nil, core.Invalid
 		}
 	}
 	var out any
 	e := s.Core.Transact(ctx, func(tx *sql.Tx) error {
+		if e := lockCollaborationUsers(ctx, tx, append([]string{a.UserID}, p.MentionUserIDs...)...); e != nil {
+			return e
+		}
 		resource, e := s.resource(ctx, tx, a, resourceType, resourceID)
 		if e != nil {
 			return e
@@ -403,6 +417,9 @@ func (s *Service) ReadNotification(ctx context.Context, a core.Actor, id, key st
 	}
 	var out any
 	e := s.Core.Transact(ctx, func(tx *sql.Tx) error {
+		if e := s.Core.Authorize(ctx, tx, a, "core.identity.self", a.UserID, "", false); e != nil {
+			return e
+		}
 		var resourceType, resourceID, commentID string
 		if e := tx.QueryRowContext(ctx, `SELECT c.resource_type,c.resource_id,CAST(c.id AS CHAR) FROM collaboration_notifications n
 			JOIN collaboration_comments c ON c.id=n.comment_id AND c.deleted_at IS NULL WHERE n.id=? AND n.recipient_id=? FOR UPDATE`, id, a.UserID).Scan(&resourceType, &resourceID, &commentID); e == sql.ErrNoRows {

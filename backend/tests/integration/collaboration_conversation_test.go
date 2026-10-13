@@ -2,7 +2,9 @@ package integration
 
 import (
 	"encoding/json"
+	"fmt"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/Ahcast/Bastion/backend/internal/core"
@@ -153,5 +155,118 @@ func TestCollaborationConversationRollsBackMentionSideEffects(t *testing.T) {
 		if e := s.DB.QueryRow(`SELECT COUNT(*) FROM ` + table).Scan(&count); e != nil || count != 0 {
 			t.Fatalf("conversation partial write in %s: count=%d error=%v", table, count, e)
 		}
+	}
+}
+
+func TestCollaborationCrossedMentionsConcurrentReplayAndDeletion(t *testing.T) {
+	s := fixture(t)
+	a := admin(t, s)
+	grantCollaboration(t, s, a, "all")
+	service := &collaboration.Service{Core: s}
+	configureCollaborationPolicies(s, service)
+	entry := createConversationEntry(t, s, a, service, "crossed-mentions")
+	b := customerActor(t, s, "self")
+	grantCollaboration(t, s, b, "all")
+	for _, ids := range [][]string{{b.UserID, "0" + b.UserID}, {"0" + a.UserID}} {
+		if _, err := service.CreateComment(ctx, a, "collaboration", entry, "alias-mention", collaboration.CommentInput{Body: "Alias inválido", MentionUserIDs: ids}); err != core.Invalid {
+			t.Fatal("alias duplicate/self mention", err)
+		}
+	}
+	var wg sync.WaitGroup
+	errs := make(chan error, 12)
+	for i := 0; i < 12; i++ {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			actor, recipient, key := a, b, "cross-a"
+			if i%2 == 1 {
+				actor, recipient, key = b, a, "cross-b"
+			}
+			_, err := service.CreateComment(ctx, actor, "collaboration", entry, key, collaboration.CommentInput{Body: "Comentario " + key, MentionUserIDs: []string{recipient.UserID}})
+			errs <- err
+		}(i)
+	}
+	wg.Wait()
+	close(errs)
+	for err := range errs {
+		if err != nil {
+			t.Fatal("crossed mention replay", err)
+		}
+	}
+	for _, table := range []string{"collaboration_comments", "collaboration_mentions", "collaboration_notifications", "collaboration_activity"} {
+		var count int
+		if err := s.DB.QueryRow(`SELECT COUNT(*) FROM ` + table).Scan(&count); err != nil || count != 2 {
+			t.Fatal("duplicate side effects", table, count, err)
+		}
+	}
+	comments, err := service.Comments(ctx, a, "collaboration", entry, 1, 25)
+	if err != nil || comments.Total != 2 {
+		t.Fatal(comments, err)
+	}
+	id := comments.Data[0].ID
+	results := make(chan error, 2)
+	for i, actor := range []core.Actor{a, b} {
+		wg.Add(1)
+		go func(i int, actor core.Actor) {
+			defer wg.Done()
+			_, err := service.DeleteComment(ctx, actor, id, fmt.Sprint("delete-race-", i), collaboration.CommentDeleteInput{Version: 1})
+			results <- err
+		}(i, actor)
+	}
+	wg.Wait()
+	close(results)
+	success, conflicts := 0, 0
+	for err := range results {
+		if err == nil {
+			success++
+		} else if err == core.Conflict {
+			conflicts++
+		} else {
+			t.Fatal("delete contention", err)
+		}
+	}
+	if success != 1 || conflicts != 1 {
+		t.Fatal("delete version race", success, conflicts)
+	}
+	var removed int
+	if err := s.DB.QueryRow(`SELECT COUNT(*) FROM collaboration_activity WHERE action='comment_removed'`).Scan(&removed); err != nil || removed != 1 {
+		t.Fatal("duplicate removal activity", removed, err)
+	}
+	remaining, err := service.Comments(ctx, a, "collaboration", entry, 1, 25)
+	if err != nil || remaining.Total != 1 {
+		t.Fatal(remaining, err)
+	}
+	last := remaining.Data[0]
+	author, recipient := a, b
+	if last.AuthorID == b.UserID {
+		author, recipient = b, a
+	}
+	notices, err := service.Notifications(ctx, recipient, "0", 25)
+	if err != nil || len(notices.Data) != 1 {
+		t.Fatal(notices, err)
+	}
+	readResult := make(chan error, 1)
+	deleteResult := make(chan error, 1)
+	wg.Add(2)
+	go func() {
+		defer wg.Done()
+		_, err := service.ReadNotification(ctx, recipient, notices.Data[0].ID, "read-delete-race")
+		readResult <- err
+	}()
+	go func() {
+		defer wg.Done()
+		_, err := service.DeleteComment(ctx, author, last.ID, "delete-read-race", collaboration.CommentDeleteInput{Version: 1})
+		deleteResult <- err
+	}()
+	wg.Wait()
+	if err = <-deleteResult; err != nil {
+		t.Fatal("delete against notification read", err)
+	}
+	if err = <-readResult; err != nil && err != core.Missing {
+		t.Fatal("notification read against deletion", err)
+	}
+	notices, err = service.Notifications(ctx, recipient, "0", 25)
+	if err != nil || len(notices.Data) != 0 {
+		t.Fatal("deleted comment notification exposed", notices, err)
 	}
 }
