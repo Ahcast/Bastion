@@ -41,7 +41,7 @@ test("Colaboración: carga privada, cuarentena y papelera reversible", async ({
     mimeType: "application/pdf",
     buffer: Buffer.from("%PDF-1.7\nsynthetic collaboration file"),
   });
-  const linked = page.waitForResponse((r) => r.request().method() === "POST" && r.url().endsWith("/api/v1/collaboration") && r.status() === 200).then((r) => r.json());
+  const linked = page.waitForResponse((r) => r.request().method() === "POST" && r.url().endsWith("/api/v1/collaboration") && r.status() === 200);
   await page.getByRole("button", { name: "Cargar y registrar en biblioteca", exact: true }).click();
   await linked;
   const entriesResponse = await page.request.get(
@@ -59,7 +59,9 @@ test("Colaboración: carga privada, cuarentena y papelera reversible", async ({
 
   const mentionableUsers = page.waitForResponse((r) => r.url().includes("/api/v1/collaboration/resources/collaboration/") && r.url().endsWith("/mentionable-users") && r.status() === 200);
   await page.getByRole("button", { name: "Conversación y actividad", exact: true }).click();
-  const mentionable = await (await mentionableUsers).json();
+  const mentionableResponse = await page.request.get((await mentionableUsers).url());
+  expect(mentionableResponse.ok()).toBeTruthy();
+  const mentionable = await mentionableResponse.json();
   const reviewer = mentionable.data.find((user: { name: string }) => user.name === "Revisor Colaboración sintético");
   expect(reviewer?.id).toBeTruthy();
   const body = "<b>texto plano</b> comentario sintético";
