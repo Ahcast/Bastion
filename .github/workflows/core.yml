@@ -41,6 +41,8 @@ jobs:
             gofmt -d cmd internal database tests
             exit 1
           fi
+      - name: Validate IA task invariants on MySQL first
+        run: go test -race -count=1 -timeout=2m -v -run '^TestAITasks' ./tests/integration
       - name: Run Go tests with race detector
         id: backend_tests
         shell: bash

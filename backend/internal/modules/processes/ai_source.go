@@ -3,15 +3,22 @@ package processes
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"github.com/Ahcast/Bastion/backend/internal/core"
-	"github.com/Ahcast/Bastion/backend/internal/modules/ai"
 	"strings"
 )
 
+// AIInput is a read-only owner snapshot contract, independent of AI runtime.
+type AIInput struct {
+	ID, Owner, Team, Hash string
+	Version               uint64
+	Data                  json.RawMessage
+}
+
 // AIInput locks only source data for a short application transaction; it never
 // reads personal notes or supplies credentials/document bytes to an executor.
-func (s *Service) Snapshot(ctx context.Context, q core.Querier, a core.Actor, id string) (ai.SourceInput, error) {
-	var p ai.SourceInput
+func (s *Service) Snapshot(ctx context.Context, q core.Querier, a core.Actor, id string) (AIInput, error) {
+	var p AIInput
 	if core.ID(id) != nil {
 		return p, core.Missing
 	}
@@ -44,7 +51,7 @@ func (s *Service) ScopeSQL(a core.Actor, permission string) (string, []any) {
 // EligibleSQL prevents changed inputs or revoked requesters from filling the
 // bounded reservation scan. Claim reauthorizes both after owner/task locks.
 func (s *Service) EligibleSQL() string {
-	clause := `EXISTS(SELECT 1 FROM processes p JOIN users u ON u.id=t.requested_by WHERE p.id=t.process_id AND p.version=t.input_version AND p.content_hash=t.input_hash AND u.active=TRUE AND u.totp_secret IS NOT NULL`
+	clause := `EXISTS(SELECT 1 FROM processes p CROSS JOIN users u WHERE u.id=t.requested_by AND p.id=t.process_id AND p.version=t.input_version AND p.content_hash=t.input_hash AND u.active=TRUE AND u.totp_secret IS NOT NULL`
 	for _, permission := range []string{"procesos.view", "ai.tasks.read", "ai.tasks.create"} {
 		clause += ` AND EXISTS(SELECT 1 FROM user_roles ur JOIN role_permissions rp ON rp.role_id=ur.role_id WHERE ur.user_id=t.requested_by AND rp.permission='` + permission + `' AND (rp.scope='all' OR (rp.scope='self' AND p.created_by=t.requested_by) OR (rp.scope='team' AND EXISTS(SELECT 1 FROM team_members tm WHERE tm.user_id=t.requested_by AND tm.team_id=p.team_id))))`
 	}

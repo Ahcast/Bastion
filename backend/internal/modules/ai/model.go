@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"github.com/Ahcast/Bastion/backend/internal/core"
+	"github.com/Ahcast/Bastion/backend/internal/modules/processes"
 	"regexp"
 	"strconv"
 	"time"
@@ -20,11 +21,7 @@ type Source interface {
 	ScopeSQL(core.Actor, string) (string, []any)
 	EligibleSQL() string
 }
-type SourceInput struct {
-	ID, Owner, Team, Hash string
-	Version               uint64
-	Data                  json.RawMessage
-}
+type SourceInput = processes.AIInput
 type Service struct {
 	Core      *core.Service
 	Processes Source
