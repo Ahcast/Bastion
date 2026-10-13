@@ -69,7 +69,9 @@ test("Colaboración: carga privada, cuarentena y papelera reversible", async ({
   await reviewerPage.getByRole("button", { name: "Verificar", exact: true }).click();
   const notifications = reviewerPage.waitForResponse((r) => r.url().includes("/api/v1/collaboration/notifications?") && r.status() === 200);
   await reviewerPage.getByRole("link", { name: "Colaboración", exact: true }).click();
-  const noticePage = await (await notifications).json();
+  const noticeResponse = await reviewerPage.request.get((await notifications).url());
+  expect(noticeResponse.ok()).toBeTruthy();
+  const noticePage = await noticeResponse.json();
   expect(noticePage.data).toHaveLength(1);
   await reviewerPage.getByRole("button", { name: "Abrir conversación" }).click();
   await expect(reviewerPage.getByText(body, { exact: true })).toBeVisible();
