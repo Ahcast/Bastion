@@ -72,11 +72,18 @@ func New(db *sql.DB, c config.Config) *Service {
 	return &Service{DB: db, Config: c, DummyHash: security.Password(security.Token()), DocumentPolicies: map[string]DocumentPolicy{}, DocumentBindingPolicies: map[string]DocumentBindingPolicy{}, DocumentVersionPolicies: map[string]DocumentVersionPolicy{}, DocumentTrashPolicies: map[string]DocumentTrashPolicy{}}
 }
 
-// RegisterPermissions registers human/user permissions only. Service identities
-// do not inherit module read permissions implicitly; service reads must be
-// explicitly reviewed and registered through RegisterServiceReads.
-func (s *Service) RegisterPermissions(permissions, _ []string) {
+// RegisterPermissions registers human/user permissions. Service identities do
+// not inherit ordinary module reads. The only compatibility exceptions are the
+// reviewed AI task read and the legacy procesos.view marker used by the AI task
+// pipeline. procesos.view can be present in a token but is never authorized as
+// a service permission by servicePermissionAllowed.
+func (s *Service) RegisterPermissions(permissions, serviceReads []string) {
 	s.ModulePermissions = append(s.ModulePermissions, permissions...)
+	for _, p := range serviceReads {
+		if p == "ai.tasks.read" || p == "procesos.view" {
+			s.ServiceReadPermissions = append(s.ServiceReadPermissions, p)
+		}
+	}
 }
 
 // RegisterServiceReads permits only explicitly reviewed machine-readable
@@ -93,11 +100,15 @@ func (s *Service) PermissionCatalog() []string {
 	return append(append([]string{}, Permissions...), s.ModulePermissions...)
 }
 
-// servicePermissionAllowed is the service-identity allowlist. Core document
-// reads are intentionally absent: MCP/service actors must never mint private
-// file download URLs. Business module reads are deny-by-default until a
-// purpose-built reduced DTO has been reviewed and registered explicitly.
+// servicePermissionAllowed is the service-identity execution allowlist. Core
+// document reads and the legacy procesos.view marker are intentionally denied:
+// MCP/service actors must never mint private file URLs or gain generic process
+// module access. The AI module may interpret the marker only while independently
+// validating ai.tasks.read plus the owning user's live procesos.view grant.
 func (s *Service) servicePermissionAllowed(permission string) bool {
+	if permission == "core.documents.read" || permission == "procesos.view" {
+		return false
+	}
 	if permission == "core.modules.read" || permission == "core.jobs.read" {
 		return true
 	}

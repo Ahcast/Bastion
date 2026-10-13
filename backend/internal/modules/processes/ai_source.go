@@ -33,7 +33,25 @@ func (s *Service) Snapshot(ctx context.Context, q core.Querier, a core.Actor, id
 	if e != nil {
 		return p, e
 	}
-	if e = s.Core.Authorize(ctx, q, a, "procesos.view", p.Owner, p.Team, false); e == core.Forbidden {
+	if a.Type == "service" {
+		marker := false
+		for _, scope := range a.Scopes {
+			if scope == "procesos.view" {
+				marker = true
+				break
+			}
+		}
+		if !marker {
+			e = core.Forbidden
+		} else if e = s.Core.Authorize(ctx, q, a, "ai.tasks.read", p.Owner, p.Team, false); e == nil {
+			// The service token is live and scoped for AI tasks; the owning user
+			// must independently retain procesos.view for this exact process.
+			e = s.Core.AuthorizeGrantHolder(ctx, q, a.UserID, "procesos.view", p.Owner, p.Team)
+		}
+	} else {
+		e = s.Core.Authorize(ctx, q, a, "procesos.view", p.Owner, p.Team, false)
+	}
+	if e == core.Forbidden {
 		e = core.Missing
 	}
 	return p, e

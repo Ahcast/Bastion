@@ -26,6 +26,25 @@ func (s *Service) gate(ctx context.Context, q core.Querier, a core.Actor, permis
 	if e != nil && e != sql.ErrNoRows {
 		return e
 	}
+	if a.Type == "service" && permission == "procesos.view" {
+		marker := false
+		for _, scope := range a.Scopes {
+			if scope == "procesos.view" {
+				marker = true
+				break
+			}
+		}
+		if !marker {
+			return core.Forbidden
+		}
+		// The legacy marker never authorizes generic process reads. Validate the
+		// live service through the reviewed AI read scope, then independently
+		// verify that its owning user still holds procesos.view.
+		if e := s.Core.Authorize(ctx, q, a, "ai.tasks.read", a.UserID, team, false); e != nil {
+			return e
+		}
+		return s.Core.AuthorizeGrantHolder(ctx, q, a.UserID, "procesos.view", a.UserID, team)
+	}
 	return s.Core.Authorize(ctx, q, a, permission, a.UserID, team, false)
 }
 
