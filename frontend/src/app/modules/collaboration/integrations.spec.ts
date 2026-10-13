@@ -14,7 +14,7 @@ function api() {
       if (path === "/collaboration/44/links") return { data: [{ resource_type: "processes", resource_id: "1", resource_version: "1", current_version: "2", label: "HC-001", current_label: "HC-001", stale: true }] };
       throw new Error(path);
     }),
-    write: vi.fn(async () => ({})),
+    write: vi.fn(async (_method: string, _path: string, _body?: unknown, _key?: string) => ({})),
     message: vi.fn(() => "Error sintético"),
   };
 }
