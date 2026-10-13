@@ -21,7 +21,7 @@ function api() {
         total: 1, page: 1, per_page: 100,
       };
     }),
-    write: vi.fn(async () => ({})),
+    write: vi.fn(async (_method: string, _path: string, _body?: unknown, _key?: string) => ({})),
     message: vi.fn(() => "Error sintético"),
   };
 }
