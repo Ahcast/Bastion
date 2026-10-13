@@ -445,3 +445,6 @@ Colaboración U4, revisión Core.Files: GET/PUT vínculos ahora llama DocumentMe
 
 
 CI 38333700732 sobre 2ec3c03 aprobó Angular/169 y navegador20/20, pero la prueba nueva de dos actores detectó deadlock MySQL1213. Quitar JOIN no fue suficiente: UPDATE también requiere locks FK de participantes. Se corrige adquisición de usuarios creador/asignado/actor/nuevo asignado en orden numérico antes de autorización/fila de tarea, con revalidación de participantes al bloquear tarea. Creates cruzados usan mismo orden. No se oculta el deadlock ni se cambia la expectativa de éxito+conflicto; requiere nueva CI.
+
+
+La revisión de log completo detectó además timeout global de paquete a los 360.027s en CI 38333700732, al iniciar TestPurchaseOrderHTTPStrictContract (0s), después de progresar por la suite. El límite 6m no alcanza de forma estable para la suite creciente de ~190 integraciones MySQL con reconstrucción de esquema. Se aumenta a 12m, conservando todos los tests/race y fallos explícitos. Este ajuste no elimina la prueba de deadlock ni su corrección de orden de locks.
