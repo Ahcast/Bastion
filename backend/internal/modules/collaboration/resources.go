@@ -8,27 +8,45 @@ import (
 	"github.com/Ahcast/Bastion/backend/internal/core"
 )
 
-// CollaborationEntryResource is the U2 resource policy registered by
-// composition. The lookup validates the live Core.Files binding but does not
-// authorize the caller; resource() applies the current caller's grants after
-// loading the owning module's security context.
+type OwnerResourceSource interface {
+	CollaborationResource(context.Context, core.Querier, string) (owner, team, label string, version uint64, err error)
+}
+
+// OwnerResourcePolicy adapts a business-owned read port without exposing that
+// owner's storage to Collaboration. The owner module remains authoritative.
+func OwnerResourcePolicy(permission string, source OwnerResourceSource) ResourcePolicy {
+	return func(ctx context.Context, q core.Querier, id string) (Resource, error) {
+		if source == nil || core.ID(id) != nil {
+			return Resource{}, core.Missing
+		}
+		owner, team, label, version, e := source.CollaborationResource(ctx, q, id)
+		if e != nil {
+			return Resource{}, e
+		}
+		return Resource{ID: id, OwnerID: owner, TeamID: team, ViewPermission: permission, Label: label, Version: version}, nil
+	}
+}
+
+// CollaborationEntryResource validates a live library record and its Core.Files
+// binding. Authorization is applied by resource() for the current caller.
 func (s *Service) CollaborationEntryResource(ctx context.Context, q core.Querier, id string) (Resource, error) {
 	var out Resource
 	if core.ID(id) != nil {
 		return out, core.Missing
 	}
-	var scope, uploadedBy, documentOwner string
+	var scope, uploadedBy, documentOwner, title string
 	var documentID string
+	var version uint64
 	var person, team, entryFolder, folderID, folderScope, folderPerson, folderTeam sql.NullString
 	var folderDeleted sql.NullTime
 	var documentTeam, documentEntity, documentEntityID sql.NullString
 	var generated bool
-	e := q.QueryRowContext(ctx, `SELECT CAST(e.id AS CHAR),e.scope,CAST(e.uploaded_by AS CHAR),CAST(e.person_id AS CHAR),CAST(e.team_id AS CHAR),CAST(e.folder_id AS CHAR),CAST(e.document_id AS CHAR),
+	e := q.QueryRowContext(ctx, `SELECT CAST(e.id AS CHAR),e.scope,CAST(e.uploaded_by AS CHAR),CAST(e.person_id AS CHAR),CAST(e.team_id AS CHAR),CAST(e.folder_id AS CHAR),CAST(e.document_id AS CHAR),e.title,e.version,
 		CAST(d.owner_id AS CHAR),CAST(d.team_id AS CHAR),d.entity_type,d.entity_id,d.is_generated,
 		CAST(f.id AS CHAR),f.scope,CAST(f.person_id AS CHAR),CAST(f.team_id AS CHAR),f.deleted_at
 		FROM collaboration_entries e JOIN documents d ON d.id=e.document_id LEFT JOIN collaboration_folders f ON f.id=e.folder_id
 		WHERE e.id=? AND d.deleted_at IS NULL`, id).Scan(&out.ID, &scope, &uploadedBy, &person, &team, &entryFolder,
-		&documentID, &documentOwner, &documentTeam, &documentEntity, &documentEntityID, &generated,
+		&documentID, &title, &version, &documentOwner, &documentTeam, &documentEntity, &documentEntityID, &generated,
 		&folderID, &folderScope, &folderPerson, &folderTeam, &folderDeleted)
 	if e == sql.ErrNoRows {
 		return Resource{}, core.Missing
@@ -61,6 +79,7 @@ func (s *Service) CollaborationEntryResource(ctx context.Context, q core.Querier
 		return Resource{}, core.Missing
 	}
 	out.TeamID = team.String
+	out.Label, out.Version = title, version
 	out.DocumentID, out.DocumentOwnerID, out.DocumentTeamID = documentID, documentOwner, documentTeam.String
 	return out, nil
 }
@@ -85,26 +104,42 @@ func (s *Service) resource(ctx context.Context, q core.Querier, a core.Actor, re
 	} else if e != nil {
 		return Resource{}, e
 	}
-	if e = s.Core.Authorize(ctx, q, a, "core.documents.read", r.DocumentOwnerID, r.DocumentTeamID, false); e == core.Forbidden {
-		return Resource{}, core.Missing
-	} else if e != nil {
-		return Resource{}, e
+	if r.ViewPermission != "" {
+		if e = s.Core.Authorize(ctx, q, a, r.ViewPermission, r.OwnerID, r.TeamID, false); e == core.Forbidden {
+			return Resource{}, core.Missing
+		} else if e != nil {
+			return Resource{}, e
+		}
+	}
+	if r.DocumentID != "" {
+		if e = s.Core.Authorize(ctx, q, a, "core.documents.read", r.DocumentOwnerID, r.DocumentTeamID, false); e == core.Forbidden {
+			return Resource{}, core.Missing
+		} else if e != nil {
+			return Resource{}, e
+		}
 	}
 	return r, nil
 }
 
 func resourcePermission(ctx context.Context, q core.Querier, s *Service, a core.Actor, r Resource, permission string, sensitive bool) error {
-	if e := s.Core.Authorize(ctx, q, a, permission, r.OwnerID, r.TeamID, sensitive); e != nil {
-		return e
-	}
-	return nil
+	return s.Core.Authorize(ctx, q, a, permission, r.OwnerID, r.TeamID, sensitive)
 }
 
-func mentionGrantClause(permission, owner, team string) (string, []any) {
-	return `EXISTS(SELECT 1 FROM user_roles ur JOIN role_permissions rp ON rp.role_id=ur.role_id
-		WHERE ur.user_id=u.id AND rp.permission=? AND (rp.scope='all' OR (rp.scope='self' AND CAST(u.id AS CHAR)=?) OR
-		(rp.scope='team' AND ?<>'' AND EXISTS(SELECT 1 FROM team_members tm WHERE tm.team_id=? AND tm.user_id=u.id))))`,
-		[]any{permission, owner, team, team}
+func (s *Service) grantHolderCanResource(ctx context.Context, q core.Querier, userID string, r Resource) error {
+	if e := s.Core.AuthorizeGrantHolder(ctx, q, userID, "colaboracion.view", r.OwnerID, r.TeamID); e != nil {
+		return e
+	}
+	if r.ViewPermission != "" {
+		if e := s.Core.AuthorizeGrantHolder(ctx, q, userID, r.ViewPermission, r.OwnerID, r.TeamID); e != nil {
+			return e
+		}
+	}
+	if r.DocumentID != "" {
+		if e := s.Core.AuthorizeGrantHolder(ctx, q, userID, "core.documents.read", r.DocumentOwnerID, r.DocumentTeamID); e != nil {
+			return e
+		}
+	}
+	return nil
 }
 
 func (s *Service) MentionableUsers(ctx context.Context, a core.Actor, resourceType, id, search string) ([]MentionableUser, error) {
@@ -118,20 +153,14 @@ func (s *Service) MentionableUsers(ctx context.Context, a core.Actor, resourceTy
 	if e = resourcePermission(ctx, s.Core.DB, s, a, r, "colaboracion.comment", false); e != nil {
 		return nil, e
 	}
-	collab, collabArgs := mentionGrantClause("colaboracion.view", r.OwnerID, r.TeamID)
-	docs, docArgs := mentionGrantClause("core.documents.read", r.DocumentOwnerID, r.DocumentTeamID)
-	where := []string{"u.active=TRUE", "u.totp_secret IS NOT NULL", "CAST(u.id AS CHAR)<>?", collab, docs}
+	where := []string{"active=TRUE", "totp_secret IS NOT NULL", "CAST(id AS CHAR)<>?"}
 	args := []any{a.UserID}
-	args = append(args, collabArgs...)
-	args = append(args, docArgs...)
 	if search != "" {
 		pattern := "%" + strings.NewReplacer("!", "!!", "%", "!%", "_", "!_").Replace(search) + "%"
-		where = append(where, "u.name LIKE ? ESCAPE '!'")
+		where = append(where, "name LIKE ? ESCAPE '!'")
 		args = append(args, pattern)
 	}
-	// EXISTS predicates avoid grant-row duplication, so DISTINCT is unnecessary
-	// and would conflict with MySQL 5.7's ONLY_FULL_GROUP_BY ORDER BY rules.
-	rows, e := s.Core.DB.QueryContext(ctx, `SELECT CAST(u.id AS CHAR),u.name FROM users u WHERE `+strings.Join(where, " AND ")+` ORDER BY u.name,u.id LIMIT 50`, args...)
+	rows, e := s.Core.DB.QueryContext(ctx, `SELECT CAST(id AS CHAR),name FROM users WHERE `+strings.Join(where, " AND ")+` ORDER BY name,id LIMIT 200`, args...)
 	if e != nil {
 		return nil, e
 	}
@@ -142,7 +171,16 @@ func (s *Service) MentionableUsers(ctx context.Context, a core.Actor, resourceTy
 		if e = rows.Scan(&item.ID, &item.Name); e != nil {
 			return nil, e
 		}
+		if e = s.grantHolderCanResource(ctx, s.Core.DB, item.ID, r); e != nil {
+			if e == core.Forbidden {
+				continue
+			}
+			return nil, e
+		}
 		out = append(out, item)
+		if len(out) == 50 {
+			break
+		}
 	}
 	return out, rows.Err()
 }
