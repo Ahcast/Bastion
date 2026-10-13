@@ -52,7 +52,7 @@ test("Colaboración: carga privada, cuarentena y papelera reversible", async ({
   const reviewerOption = recipients.getByRole("option", { name: reviewer.name, exact: true });
   await expect(reviewerOption).toBeVisible();
   await recipients.selectOption({ label: reviewer.name });
-  await expect(recipients).toHaveValues([String(reviewer.id)]);
+  await expect(recipients.locator("option:checked")).toHaveText(reviewer.name);
   const posted = page.waitForResponse((r) => r.request().method() === "POST" && r.url().endsWith("/collaboration/resources/collaboration/" + entry.id + "/comments") && r.status() === 200);
   await page.getByRole("button", { name: "Publicar comentario", exact: true }).click();
   await posted;
