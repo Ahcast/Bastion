@@ -126,6 +126,97 @@ func (s *Service) Module(logger *slog.Logger, enabled bool, objects core.Objects
 			}
 			return map[string]any{"data": teams}, nil
 		})
+
+		// U3: Collaboration-owned task work. These routes never mutate Workflow.
+		register("GET /api/v1/collaboration/tasks", func(ctx context.Context, a core.Actor, r *http.Request) (any, error) {
+			q, e := queryValues(r, "view", "status", "page", "per_page")
+			if e != nil {
+				return nil, e
+			}
+			page, e := queryInt(q, "page", 1)
+			if e != nil {
+				return nil, e
+			}
+			perPage, e := queryInt(q, "per_page", 25)
+			if e != nil {
+				return nil, e
+			}
+			return s.Tasks(ctx, a, TaskFilter{View: q["view"], Status: q["status"], Page: page, PerPage: perPage})
+		})
+		register("GET /api/v1/collaboration/task-assignees", func(ctx context.Context, a core.Actor, r *http.Request) (any, error) {
+			q, e := queryValues(r, "resource_type", "resource_id", "search")
+			if e != nil {
+				return nil, e
+			}
+			users, e := s.TaskAssignees(ctx, a, q["resource_type"], q["resource_id"], q["search"])
+			if e != nil {
+				return nil, e
+			}
+			return map[string]any{"data": users}, nil
+		})
+		register("POST /api/v1/collaboration/tasks", func(ctx context.Context, a core.Actor, r *http.Request) (any, error) {
+			var p TaskInput
+			if e := decodeRequired(r, &p, "assignee_id", "resource_type", "resource_id", "title", "note", "due_date"); e != nil {
+				return nil, e
+			}
+			return s.CreateTask(ctx, a, r.Header.Get("Idempotency-Key"), p)
+		})
+		register("PATCH /api/v1/collaboration/tasks/{id}", func(ctx context.Context, a core.Actor, r *http.Request) (any, error) {
+			var p TaskUpdate
+			if e := decodeRequired(r, &p, "version", "assignee_id", "title", "note", "due_date"); e != nil {
+				return nil, e
+			}
+			return s.UpdateTask(ctx, a, r.PathValue("id"), r.Header.Get("Idempotency-Key"), p)
+		})
+		register("POST /api/v1/collaboration/tasks/{id}/status", func(ctx context.Context, a core.Actor, r *http.Request) (any, error) {
+			var p TaskStatusInput
+			if e := decodeRequired(r, &p, "version", "status"); e != nil {
+				return nil, e
+			}
+			return s.ChangeTaskStatus(ctx, a, r.PathValue("id"), r.Header.Get("Idempotency-Key"), p)
+		})
+		register("POST /api/v1/collaboration/tasks/{id}/reopen", func(ctx context.Context, a core.Actor, r *http.Request) (any, error) {
+			var p TaskReopenInput
+			if e := decodeRequired(r, &p, "version"); e != nil {
+				return nil, e
+			}
+			return s.ReopenTask(ctx, a, r.PathValue("id"), r.Header.Get("Idempotency-Key"), p)
+		})
+
+		// U4: links are documentary only; approvals are a Workflow-owned read projection.
+		register("GET /api/v1/collaboration/approvals", func(ctx context.Context, a core.Actor, r *http.Request) (any, error) {
+			q, e := queryValues(r, "page", "per_page")
+			if e != nil {
+				return nil, e
+			}
+			page, e := queryInt(q, "page", 1)
+			if e != nil {
+				return nil, e
+			}
+			perPage, e := queryInt(q, "per_page", 25)
+			if e != nil {
+				return nil, e
+			}
+			return s.PendingApprovals(ctx, a, page, perPage)
+		})
+		register("GET /api/v1/collaboration/{id}/links", func(ctx context.Context, a core.Actor, r *http.Request) (any, error) {
+			if _, e := queryValues(r); e != nil {
+				return nil, e
+			}
+			links, e := s.Links(ctx, a, r.PathValue("id"))
+			if e != nil {
+				return nil, e
+			}
+			return map[string]any{"data": links}, nil
+		})
+		register("PUT /api/v1/collaboration/{id}/links", func(ctx context.Context, a core.Actor, r *http.Request) (any, error) {
+			var p SetLinksInput
+			if e := decodeRequired(r, &p, "version", "links"); e != nil {
+				return nil, e
+			}
+			return s.SetLinks(ctx, a, r.PathValue("id"), r.Header.Get("Idempotency-Key"), p)
+		})
+
 		register("GET /api/v1/collaboration/resources/{resource_type}/{resource_id}/comments", func(ctx context.Context, a core.Actor, r *http.Request) (any, error) {
 			q, e := queryValues(r, "page", "per_page")
 			if e != nil {
