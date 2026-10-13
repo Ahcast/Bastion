@@ -46,7 +46,7 @@ Comprobar además:
 
 El workflow Core levanta MySQL 5.7, API de prueba y Angular y ejecuta Playwright sin mocks HTTP. El fixture de browser sólo puede actuar sobre `bastion_browser_test`; nunca debe introducir grants o identidades en producción.
 
-El flujo U1/U2 debe cubrir carga privada, cuarentena, texto plano, mención/notificación, revocación y papelera reversible. U3/U4 se cubren adicionalmente con integración MySQL y unitarias Angular; cualquier extensión E2E debe conservar MFA/TOTP/reauth reales y no añadir bypass de autenticación.
+El flujo U1/U2 debe cubrir carga privada, cuarentena, texto plano, mención/notificación, revocación y papelera reversible. U3/U4 también tienen recorrido de navegador: crear/editar/completar/reabrir tarea y agregar/quitar vínculo, además de integración MySQL y unitarias Angular. El recorrido debe conservar MFA/TOTP/reauth reales y no añadir bypass de autenticación.
 
 ## Pruebas de seguridad mínimas
 

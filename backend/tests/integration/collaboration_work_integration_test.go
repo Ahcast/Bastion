@@ -2,6 +2,8 @@ package integration
 
 import (
 	"context"
+	"encoding/json"
+	"sync"
 	"testing"
 	"time"
 
@@ -157,5 +159,96 @@ func TestCollaborationApprovalInboxIsWorkflowReadOnly(t *testing.T) {
 	var status string
 	if e = s.DB.QueryRow(`SELECT status FROM approvals WHERE entity_id=77 AND action='synthetic.review'`).Scan(&status); e != nil || status != "pending" {
 		t.Fatal("read-only inbox mutated workflow", status, e)
+	}
+}
+
+func TestCollaborationTaskAtomicityContentionAndIsolation(t *testing.T) {
+	s := fixture(t)
+	creator := admin(t, s)
+	grantCollaboration(t, s, creator, "all")
+	assignee := customerActor(t, s, "self")
+	grantCollaboration(t, s, assignee, "self")
+	service := &collaboration.Service{Core: s, ResourcePolicies: map[string]collaboration.ResourcePolicy{}}
+	input := collaboration.TaskInput{AssigneeID: assignee.UserID, Title: "Revisar entrega"}
+	var wg sync.WaitGroup
+	errs := make(chan error, 12)
+	for i := 0; i < 12; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			_, err := service.CreateTask(ctx, creator, "same-task-intent", input)
+			errs <- err
+		}()
+	}
+	wg.Wait()
+	close(errs)
+	for err := range errs {
+		if err != nil {
+			t.Fatal("create contention", err)
+		}
+	}
+	var id string
+	var count int
+	if err := s.DB.QueryRow(`SELECT COUNT(*),CAST(MIN(id) AS CHAR) FROM collaboration_tasks`).Scan(&count, &id); err != nil || count != 1 {
+		t.Fatal("duplicate task", count, id, err)
+	}
+	if _, err := s.DB.Exec(`CREATE TRIGGER reject_task_status BEFORE INSERT ON domain_events FOR EACH ROW BEGIN IF NEW.topic='collaboration.task_status_changed' THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='synthetic event failure'; END IF; END`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := service.ChangeTaskStatus(ctx, assignee, id, "rollback-task-status", collaboration.TaskStatusInput{Version: 1, Status: "done"}); err == nil {
+		t.Fatal("missing event did not rollback")
+	}
+	if _, err := s.DB.Exec(`DROP TRIGGER reject_task_status`); err != nil {
+		t.Fatal(err)
+	}
+	var status string
+	var version uint64
+	if err := s.DB.QueryRow(`SELECT status,version FROM collaboration_tasks WHERE id=?`, id).Scan(&status, &version); err != nil || status != "open" || version != 1 {
+		t.Fatal("rollback state", status, version, err)
+	}
+	// Two different authenticated actors race to update the same version; task
+	// locking must not lock the assignee user as part of a joined SELECT.
+	results := make(chan error, 2)
+	wg.Add(2)
+	go func() {
+		defer wg.Done()
+		_, err := service.UpdateTask(ctx, creator, id, "task-edit-race", collaboration.TaskUpdate{Version: 1, AssigneeID: assignee.UserID, Title: "Revisión corregida"})
+		results <- err
+	}()
+	go func() {
+		defer wg.Done()
+		_, err := service.ChangeTaskStatus(ctx, assignee, id, "task-done-race", collaboration.TaskStatusInput{Version: 1, Status: "done"})
+		results <- err
+	}()
+	wg.Wait()
+	close(results)
+	success, conflicts := 0, 0
+	for err := range results {
+		if err == nil {
+			success++
+		} else if err == core.Conflict {
+			conflicts++
+		} else {
+			t.Fatal("task race", err)
+		}
+	}
+	if success != 1 || conflicts != 1 {
+		t.Fatal("optimistic task race", success, conflicts)
+	}
+	outsider := customerActor(t, s, "all")
+	grantCollaboration(t, s, outsider, "all")
+	page, err := service.Tasks(ctx, outsider, collaboration.TaskFilter{View: "mine", Page: 1, PerPage: 25})
+	if err != nil || page.Total != 0 {
+		t.Fatal("unrelated actor enumerated personal task", page, err)
+	}
+	// Replay remains the same identity even after the task progressed.
+	replay, err := service.CreateTask(ctx, creator, "same-task-intent", input)
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, _ := json.Marshal(replay)
+	var recovered map[string]string
+	if json.Unmarshal(b, &recovered) != nil || recovered["id"] != id {
+		t.Fatal("create replay identity", string(b))
 	}
 }

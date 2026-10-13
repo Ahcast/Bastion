@@ -201,7 +201,7 @@ func (s *Service) task(ctx context.Context, q core.Querier, a core.Actor, id str
 	if lock {
 		suffix = " FOR UPDATE"
 	}
-	e := q.QueryRowContext(ctx, `SELECT CAST(t.id AS CHAR),CAST(t.creator_id AS CHAR),CAST(t.assignee_id AS CHAR),u.name,t.resource_type,CAST(t.resource_id AS CHAR),t.title,t.note,CAST(t.due_date AS CHAR),t.status,t.version,t.created_at,t.updated_at FROM collaboration_tasks t JOIN users u ON u.id=t.assignee_id WHERE t.id=?`+suffix, id).Scan(&t.ID, &t.CreatorID, &t.AssigneeID, &t.AssigneeName, &rt, &rid, &t.Title, &t.Note, &due, &t.Status, &t.Version, &t.CreatedAt, &t.UpdatedAt)
+	e := q.QueryRowContext(ctx, `SELECT CAST(t.id AS CHAR),CAST(t.creator_id AS CHAR),CAST(t.assignee_id AS CHAR),t.resource_type,CAST(t.resource_id AS CHAR),t.title,t.note,CAST(t.due_date AS CHAR),t.status,t.version,t.created_at,t.updated_at FROM collaboration_tasks t WHERE t.id=?`+suffix, id).Scan(&t.ID, &t.CreatorID, &t.AssigneeID, &rt, &rid, &t.Title, &t.Note, &due, &t.Status, &t.Version, &t.CreatedAt, &t.UpdatedAt)
 	if e == sql.ErrNoRows {
 		return Task{}, core.Missing
 	}
@@ -210,6 +210,9 @@ func (s *Service) task(ctx context.Context, q core.Querier, a core.Actor, id str
 	}
 	if a.UserID != t.CreatorID && a.UserID != t.AssigneeID {
 		return Task{}, core.Missing
+	}
+	if e = q.QueryRowContext(ctx, `SELECT name FROM users WHERE id=?`, t.AssigneeID).Scan(&t.AssigneeName); e != nil {
+		return Task{}, e
 	}
 	t.ResourceType, t.ResourceID, t.DueDate = rt.String, rid.String, due.String
 	if t.ResourceType != "" {

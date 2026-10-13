@@ -430,3 +430,12 @@ Reportes canónicos cerrado; README/plan/checkpoint/runbook actualizados. Siguie
 El código vigente ya contiene U1–U4 (0034–0037): biblioteca/conversación/tareas/vínculos y bandeja Workflow. El checkpoint anterior sólo registraba Reportes y quedó desactualizado. `4211f5e`, Core 38331234661: backend fmt/vet/race/MySQL5.7/builds y Angular aprobados; browser 18/20 falló selector Asignar a y destinatario Para. Corrección UI `43418a7` con etiqueta explícita/estado reactivo, build y 163 unitarias locales aprobados; CI 38332910384 en validación.
 
 Revisión de tareas: permiso view vigente en tareas personales/escrituras/replays; validación de estado dentro de efecto idempotente permite recuperar ACK de completar/reabrir después del cambio. Cursor de asignados cerrado antes de autorizar candidatos. Integración ampliada con replays, revocación de view y pool de una conexión; requiere MySQL5.7/CI antes de certificar. Contrato U3/U4 detallado junto a implementación; no nueva migración ni grants. Colaboración permanece activa hasta aceptación integral; no producción ni integraciones externas acreditadas.
+
+
+## 2026-10-12 — Colaboración: edición y recuperación U3/U4
+
+Corrección UI `43418a7`, Core 38332910384: backend Go fmt/vet/race/MySQL5.7/builds, Angular build/163 pruebas y navegador 20/20 aprobados; documentación 38332910388/rama única 38332910353 verdes. Corrige los dos fallos de browser previos sin omitir escenarios.
+
+Continuación de aceptación: UI de tareas ahora edita/reasigna/vencimiento por PATCH versionado, pagina y conserva intención ante ACK incierto; éxito con recarga fallida conserva confirmación y bloquea escrituras hasta actualizar. Vínculos tienen bloqueo/recuperación equivalente, descarte de respuestas tardías y limpieza tras denegación. Bandeja de aprobaciones pagina y abre el ID propietario correcto. Browser agrega edición de tarea real. Angular build/169 pruebas locales aprobados.
+
+Backend evita bloquear usuario asignado mediante JOIN al bloquear tarea; prueba real de dos actores (editar vs completar), rollback por evento fallido, doce creates concurrentes y aislamiento de terceros añadida. Formato/vet/pruebas locales aprobados; integración MySQL omitida localmente por ausencia de DSN. Revisión completa nueva requiere CI MySQL5.7/race/20 browser antes de cerrar aceptación. No iniciar fase siguiente ni acreditar producción por estos resultados.

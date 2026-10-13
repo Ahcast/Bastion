@@ -140,3 +140,10 @@ GET /api/v1/collaboration/approvals?page=&per_page=
 PUT recibe `{version,links:[{resource_type,resource_id,resource_version}]}`; máximo 20 vínculos únicos a `processes|quotes|purchase_orders|invoices`. Requiere permiso de entrada/Core, `colaboracion.link`, reauth, versión actual de entrada/recurso e intención idempotente. Reemplazo, incremento de versión, auditoría y evento son atómicos. Lectura reautoriza ambos extremos mediante puertos propietarios, omite recursos terminales o revocados y devuelve snapshot/current/stale. No modifica fuentes comerciales.
 
 Bandeja Workflow devuelve pendientes no vencidas donde el actor posee lectura y decisión; excluye solicitudes del propio actor/propietario. No decide ni revoca; enlaces deben abrir el registro propietario usando su ID. Workflow deshabilitado responde error explícito. La certificación integral vigente se registra en el checkpoint, sin inferirla de esta definición de contrato.
+
+
+### Recuperación en UI U3/U4
+
+Tareas permiten editar título/nota/asignado/vencimiento conservando versión y recurso. Listas tienen paginación; lectura fallida limpia filas y las respuestas tardías se descartan por secuencia/destrucción de componente. Formularios/acciones quedan bloqueados mientras se guarda. Una respuesta de red incierta conserva método/ruta/cuerpo/clave; «Reintentar operación» repite esa intención y no genera otra tarea o actualización. Rechazo HTTP definitivo libera la intención. Escritura confirmada seguida de recarga fallida conserva confirmación y exige actualizar antes de otra mutación. La bandeja de vínculos usa la misma recuperación; aprobaciones son paginadas y abren el módulo propietario con `?id=entity_id`.
+
+Locks de tareas: actor autenticado primero, fila de tarea después; nombre del asignado se lee por separado, sin bloquear su usuario en un JOIN de la fila de tarea. Prueba de creator/update contra assignee/status exige un éxito y un conflicto de versión, sin deadlock. Fallo de evento revierte estado/versión/evidencia; doce creates concurrentes con una intención generan una sola tarea.

@@ -64,4 +64,25 @@ describe("Colaboración integraciones", () => {
     });
     expect(call[3]).toBeTruthy();
   });
+  it("recupera un vínculo incierto usando la intención original", async () => {
+    const client=api(); const component=fixture(client);
+    component.entryID="44"; await component.loadLinks();
+    component.newID="8"; component.newVersion="4";
+    client.write.mockRejectedValueOnce(new Error("Respuesta perdida"));
+    await component.add(); const first=client.write.mock.calls[0];
+    await component.add(); expect(client.write).toHaveBeenCalledTimes(1);
+    await component.retry(); expect(client.write.mock.calls[1]).toEqual(first);
+  });
+  it("preserva confirmación cuando falla recarga y limpia datos revocados", async () => {
+    const client=api(); const component=fixture(client);
+    component.entryID="44"; await component.loadLinks();
+    component.newID="8"; component.newVersion="4";
+    client.get.mockRejectedValue(new Error("Sin acceso"));
+    await component.add();
+    expect(component.confirmed()).toBe(true);
+    expect(component.entry()).toBeNull(); expect(component.links()).toEqual([]);
+    expect(component.message()).toBe("Vínculos actualizados.");
+    await component.loadApprovals(); expect(component.approvals()).toEqual([]);
+  });
+
 });

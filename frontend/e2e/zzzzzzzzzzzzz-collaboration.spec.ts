@@ -112,6 +112,12 @@ test("Colaboración: carga privada, cuarentena y papelera reversible", async ({
   await page.getByRole("button", { name: "Crear tarea", exact: true }).click();
   await taskCreated;
   await expect(page.getByText("Revisar archivo sintético", { exact: true })).toBeVisible();
+  await page.getByRole("button", {name:"Editar tarea",exact:true}).click();
+  await page.getByLabel("Título", {exact:true}).fill("Revisar entrega sintética");
+  const taskEdited = page.waitForResponse(r => r.request().method() === "PATCH" && /\/api\/v1\/collaboration\/tasks\/[0-9]+$/.test(r.url()) && r.status() === 200);
+  await page.getByRole("button", {name:"Guardar tarea",exact:true}).click();
+  await taskEdited;
+  await expect(page.getByText("Revisar entrega sintética", {exact:true})).toBeVisible();
   const taskDone = page.waitForResponse(
     (r) => r.request().method() === "POST" &&
       /\/api\/v1\/collaboration\/tasks\/[0-9]+\/status$/.test(r.url()) &&
