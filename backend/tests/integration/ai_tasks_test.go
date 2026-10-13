@@ -294,6 +294,9 @@ func TestAITasksSourceChangedAndRevokedRequester(t *testing.T) {
 	if _, e := p.Import(ctx, m, "HC-synthetic-test", b.ID, b); e != nil {
 		t.Fatal(e)
 	}
+	if d, e := s.Get(ctx, a, task.ID); e != nil || d.CurrentInput || d.CurrentInputVersion != 2 {
+		t.Fatal("stale input metadata", d, e)
+	}
 	if _, e := s.Fail(ctx, a, task.ID, security.ID(), ai.FailInput{ExecutionInput: aiEnvelope(r), Code: "transient"}); e != ai.InputStale {
 		t.Fatal("stale source", e)
 	}
@@ -505,5 +508,63 @@ func TestAITasksRESTAndMCPRealSDKPolicies(t *testing.T) {
 	}
 	if code, _ := req("POST", "/api/v1/ai-tasks/"+taskID+"/complete", security.ID(), map[string]string{}, true); code != 404 {
 		t.Fatal("generic completion exposed", code)
+	}
+}
+
+func TestAITasksLiveTeamScopeAndLeaseActorBinding(t *testing.T) {
+	s, a, _, _, id := aiFixture(t)
+	task := aiCreate(t, s, a, id)
+	other := customerActor(t, s.Core, "all")
+	aiGrant(t, s.Core, other, "team")
+	team, e := s.Core.DB.Exec(`INSERT INTO teams(name) VALUES('Equipo IA sintético')`)
+	if e != nil {
+		t.Fatal(e)
+	}
+	tid, e := team.LastInsertId()
+	if e != nil {
+		t.Fatal(e)
+	}
+	if _, e = s.Core.DB.Exec(`INSERT INTO team_members VALUES(?,?)`, tid, other.UserID); e != nil {
+		t.Fatal(e)
+	}
+	if v, e := s.List(ctx, other, ai.Filter{Page: 1, PerPage: 25}); e != nil || v.Total != 0 {
+		t.Fatal("foreign team", v, e)
+	}
+	if _, e = s.Core.DB.Exec(`UPDATE processes SET team_id=? WHERE id=?`, tid, id); e != nil {
+		t.Fatal(e)
+	}
+	if v, e := s.List(ctx, other, ai.Filter{Page: 1, PerPage: 25}); e != nil || v.Total != 1 {
+		t.Fatal("live team unavailable", v, e)
+	}
+	r := aiClaim(t, s, other)
+	if _, e = s.Renew(ctx, a, task.ID, security.ID(), aiEnvelope(r)); e != ai.LeaseExpired {
+		t.Fatal("reservation stolen by another authorized actor", e)
+	}
+	if _, e = s.Core.DB.Exec(`DELETE FROM team_members WHERE user_id=?`, other.UserID); e != nil {
+		t.Fatal(e)
+	}
+	if _, e = s.Renew(ctx, other, task.ID, security.ID(), aiEnvelope(r)); e != core.Forbidden {
+		t.Fatal("team revocation", e)
+	}
+}
+
+func TestAITasksNewAttemptRejectsFailedOldReplay(t *testing.T) {
+	s, a, _, _, id := aiFixture(t)
+	task := aiCreate(t, s, a, id)
+	old := aiClaim(t, s, a)
+	first := ai.FailInput{ExecutionInput: aiEnvelope(old), Code: "transient"}
+	key := security.ID()
+	if _, e := s.Fail(ctx, a, task.ID, key, first); e != nil {
+		t.Fatal(e)
+	}
+	if _, e := s.Core.DB.Exec(`UPDATE ai_tasks SET available_at=UTC_TIMESTAMP(6)-INTERVAL 1 SECOND WHERE id=?`, task.ID); e != nil {
+		t.Fatal(e)
+	}
+	newer := aiClaim(t, s, a)
+	if _, e := s.Fail(ctx, a, task.ID, security.ID(), ai.FailInput{ExecutionInput: aiEnvelope(newer), Code: "invalid_input"}); e != nil {
+		t.Fatal(e)
+	}
+	if _, e := s.Fail(ctx, a, task.ID, key, first); e != ai.LeaseExpired {
+		t.Fatal("prior attempt replay survived replacement", e)
 	}
 }

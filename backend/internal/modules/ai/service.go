@@ -69,7 +69,7 @@ func (s *Service) access(ctx context.Context, q core.Querier, a core.Actor, id, 
 }
 func current(t Task, p SourceInput) bool { return t.InputVersion == p.Version && t.InputHash == p.Hash }
 func (s *Service) event(ctx context.Context, tx *sql.Tx, a core.Actor, t Task, action string) error {
-	if e := s.Core.Audit(ctx, tx, a, action, "ai_task", t.ID, "success", map[string]any{"status": t.Status, "version": t.Version, "attempts": t.Attempts}); e != nil {
+	if e := s.Core.Audit(ctx, tx, a, action, "ai_task", t.ID, "success", map[string]any{"status": t.Status, "version": t.Version, "attempts": t.Attempts, "input_version": t.InputVersion, "input_hash": t.InputHash, "skill_version": t.SkillVersion, "run_id": t.CurrentRun}); e != nil {
 		return e
 	}
 	return s.Core.EmitEvent(ctx, tx, a, action, "ai_task", t.ID, t.Version)
@@ -149,11 +149,13 @@ func (s *Service) Create(ctx context.Context, a core.Actor, key string, p Create
 func (s *Service) Get(ctx context.Context, a core.Actor, id string) (Detail, error) {
 	out := Detail{Runs: []Run{}}
 	e := s.Core.Transact(ctx, func(tx *sql.Tx) error {
-		t, _, e := s.access(ctx, tx, a, id, "ai.tasks.read")
+		t, src, e := s.access(ctx, tx, a, id, "ai.tasks.read")
 		if e != nil {
 			return e
 		}
 		out.Task = t
+		out.CurrentInput = current(t, src)
+		out.CurrentInputVersion = src.Version
 		rows, e := tx.QueryContext(ctx, `SELECT CAST(id AS CHAR),attempt,status,skill_version,lease_expires_at,renewals,started_at,finished_at,error_code FROM ai_runs WHERE task_id=? ORDER BY attempt DESC LIMIT 3`, id)
 		if e != nil {
 			return e
@@ -166,7 +168,11 @@ func (s *Service) Get(ctx context.Context, a core.Actor, id string) (Detail, err
 			}
 			out.Runs = append(out.Runs, r)
 		}
-		return rows.Err()
+		if e := rows.Err(); e != nil {
+			return e
+		}
+		rows.Close()
+		return s.Core.Audit(ctx, tx, a, "ai.task_read", "ai_task", t.ID, "success", map[string]string{})
 	})
 	return out, e
 }
@@ -212,7 +218,11 @@ func (s *Service) List(ctx context.Context, a core.Actor, f Filter) (Listing, er
 			}
 			out.Data = append(out.Data, t)
 		}
-		return rows.Err()
+		if e := rows.Err(); e != nil {
+			return e
+		}
+		rows.Close()
+		return s.Core.Audit(ctx, tx, a, "ai.tasks_read", "ai_task", "", "success", map[string]int{"returned": len(out.Data)})
 	})
 	return out, e
 }

@@ -14,7 +14,7 @@ Processes aporta puerto de snapshot y proyección autorizada; AI no escribe tabl
 
 - POST `/api/v1/ai-tasks`: schema_version `1.0`, process_id, input_version string, skill_version (identificador ASCII 1–100). Captura hash/snapshot desde propietario; rechaza versión stale. Deduplicación concurrente conserva tarea inicial, incluidas canceladas/completadas.
 - GET `/api/v1/ai-tasks`: page/per_page, process_id/status opcionales, filtros y count autorizados antes de paginar; máximo 100.
-- GET `/api/v1/ai-tasks/{id}`: metadata y máximo tres ejecuciones sin tokens ni snapshot. Reautoriza fuente actual; historial no modifica datos comerciales.
+- GET `/api/v1/ai-tasks/{id}`: metadata, current_input/current_input_version y máximo tres ejecuciones sin tokens ni snapshot. Reautoriza fuente actual; historial no modifica datos comerciales.
 - POST `/api/v1/ai-tasks/claim`: schema_version `1.0`, limit 1–10. Toma pendientes elegibles y reservas expiradas; incluye rezagadas, sin filtro por día. Claim devuelve tarea, run_id, lease_token, vencimiento, snapshot y aviso `UNTRUSTED_EXTERNAL_CONTENT`. MySQL 5.7, sin SKIP LOCKED. Bloqueos actor→procesos en orden numérico→tarea. Revalida fuente, solicitante y reserva después de locks.
 - POST `/api/v1/ai-tasks/{id}/renew`: sobre de ejecución; reserva cinco minutos, máximo dos renovaciones y quince minutos desde inicio. No revive reserva expirada.
 - POST `/api/v1/ai-tasks/{id}/fail`: sobre más error_code (`transient`, `executor_limit`, `invalid_input`, `permission_denied`). Transitorios vuelven a pending con backoff 1/2 minutos y máximo tres intentos; agotamiento failed. Datos/permisos requieren needs_review. Conserva run fallido y limpia reserva.

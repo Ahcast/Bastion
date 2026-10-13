@@ -91,7 +91,9 @@ type Run struct {
 }
 type Detail struct {
 	Task
-	Runs []Run `json:"runs"`
+	CurrentInput        bool   `json:"current_input"`
+	CurrentInputVersion uint64 `json:"current_input_version,string"`
+	Runs                []Run  `json:"runs"`
 }
 type Listing struct {
 	Data    []Task `json:"data"`

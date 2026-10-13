@@ -1265,6 +1265,13 @@
             "items": {
               "$ref": "#/components/schemas/Run"
             }
+          },
+          "current_input": {
+            "type": "boolean"
+          },
+          "current_input_version": {
+            "type": "string",
+            "pattern": "^[1-9][0-9]*$"
           }
         },
         "required": [
@@ -1282,7 +1289,9 @@
           "current_run_id",
           "created_at",
           "updated_at",
-          "runs"
+          "runs",
+          "current_input",
+          "current_input_version"
         ],
         "additionalProperties": false
       },
