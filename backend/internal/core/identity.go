@@ -331,6 +331,9 @@ func (s *Service) CreateIdentityToken(ctx context.Context, a Actor, kind, email 
 			if e != nil {
 				return e
 			}
+			if e = s.protectSystemAdministrator(ctx, tx, uid); e != nil {
+				return e
+			}
 		}
 		expires := time.Now().UTC().Add(24 * time.Hour)
 		if _, e = tx.ExecContext(ctx, "UPDATE identity_tokens SET consumed_at=UTC_TIMESTAMP(6) WHERE email=? AND kind=? AND consumed_at IS NULL", email, kind); e != nil {
@@ -373,6 +376,11 @@ func (s *Service) AcceptIdentityToken(ctx context.Context, token, name, password
 		}
 		if consumed.Valid || time.Now().After(expires) {
 			return Unauthorized
+		}
+		if kind == "reset" && uid.Valid {
+			if e := s.protectSystemAdministrator(ctx, tx, uid.String); e != nil {
+				return e
+			}
 		}
 		var user string
 		if kind == "invite" {

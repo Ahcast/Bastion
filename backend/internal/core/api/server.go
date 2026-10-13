@@ -92,6 +92,28 @@ func Decode(r *http.Request, v any) error {
 	}
 	return nil
 }
+
+// clientIP trusts X-Real-IP only from the local reverse proxy. A direct client
+// cannot select its own limiter bucket by spoofing forwarding headers.
+func clientIP(r *http.Request) string {
+	host, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		host = strings.TrimSpace(r.RemoteAddr)
+	}
+	remote := net.ParseIP(strings.Trim(host, "[]"))
+	if remote == nil {
+		return host
+	}
+	host = remote.String()
+	if !remote.IsLoopback() {
+		return host
+	}
+	if real := net.ParseIP(strings.TrimSpace(r.Header.Get("X-Real-IP"))); real != nil {
+		return real.String()
+	}
+	return host
+}
+
 func (s *Server) handle(pattern string, authenticated bool, f endpoint) {
 	s.mux.HandleFunc(pattern, func(w http.ResponseWriter, r *http.Request) {
 		x, _ := r.Context().Value(contextKey{}).(request)
@@ -193,12 +215,9 @@ func (s *Server) middleware(next http.Handler) http.Handler {
 			bodyLimit = 24 * 1024 * 1024
 		}
 		r.Body = http.MaxBytesReader(w, r.Body, bodyLimit)
-		ip, _, _ := net.SplitHostPort(r.RemoteAddr)
-		if ip == "" {
-			ip = r.RemoteAddr
-		}
-		if e := s.Service.Limit(r.Context(), "api-ip:"+ip, 3000); e != nil {
-			s.error(w, r, e)
+		ip := clientIP(r)
+		if !apiIPLimiter.Allow(ip) {
+			s.error(w, r, &core.Error{Code: "rate_limited", Message: "Demasiadas solicitudes. Intente más tarde.", Status: 429})
 			return
 		}
 		if strings.HasPrefix(r.URL.Path, "/api/internal/v1/crawler/") {
@@ -332,7 +351,7 @@ func (s *Server) routes() {
 		if e := Decode(r, &p); e != nil {
 			return nil, e
 		}
-		ip, _, _ := net.SplitHostPort(r.RemoteAddr)
+		ip := clientIP(r)
 		if e := s.Service.Limit(r.Context(), "login-ip:"+ip, 60); e != nil {
 			return nil, e
 		}

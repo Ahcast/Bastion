@@ -111,6 +111,9 @@ func (s *Service) ResetMFA(ctx context.Context, a Actor, id, verification string
 		if e := s.Authorize(ctx, tx, a, "core.users.manage", "", "", true); e != nil {
 			return e
 		}
+		if e := s.protectSystemAdministrator(ctx, tx, id); e != nil {
+			return e
+		}
 		if e := Changed(tx.ExecContext(ctx, "UPDATE users SET totp_secret=NULL,totp_pending=NULL,totp_last_step=-1,version=version+1,updated_at=UTC_TIMESTAMP(6) WHERE id=?", id)); e != nil {
 			return e
 		}
@@ -132,6 +135,9 @@ func (s *Service) RevokeSessions(ctx context.Context, a Actor, id string) error 
 	}
 	return s.Transact(ctx, func(tx *sql.Tx) error {
 		if e := s.Authorize(ctx, tx, a, "core.users.manage", "", "", true); e != nil {
+			return e
+		}
+		if e := s.protectSystemAdministrator(ctx, tx, id); e != nil {
 			return e
 		}
 		if _, e := tx.ExecContext(ctx, "DELETE FROM sessions WHERE user_id=?", id); e != nil {
