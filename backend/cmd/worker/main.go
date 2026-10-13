@@ -33,6 +33,15 @@ func main() {
 		os.Exit(1)
 	}
 
+	cleaned, e := s.CleanupExpiredAuthState(ctx)
+	if e != nil {
+		logger.Error("authentication state cleanup failed")
+		os.Exit(1)
+	}
+	if cleaned.Sessions > 0 || cleaned.AuthLimits > 0 {
+		logger.Info("authentication state cleaned", "sessions", cleaned.Sessions, "auth_limits", cleaned.AuthLimits)
+	}
+
 	var reader quotes.EmailObjectReader
 	if s.Config.Files {
 		reader, e = adapters.NewS3(ctx, s.Config.Bucket, s.Config.Region)
