@@ -22,6 +22,22 @@ export const routes: Routes = [
           import("./modules/reports/reports").then((m) => m.Reports),
       },
       {
+        path: "collaboration/work",
+        canActivate: [permitted],
+        data: { permission: "colaboracion.view", module: "collaboration" },
+        loadComponent: () =>
+          import("./modules/collaboration/work").then((m) => m.CollaborationWork),
+      },
+      {
+        path: "collaboration/integrations",
+        canActivate: [permitted],
+        data: { permission: "colaboracion.view", module: "collaboration" },
+        loadComponent: () =>
+          import("./modules/collaboration/integrations").then(
+            (m) => m.CollaborationIntegrations,
+          ),
+      },
+      {
         path: "collaboration",
         canActivate: [permitted],
         data: { permission: "colaboracion.view", module: "collaboration" },
