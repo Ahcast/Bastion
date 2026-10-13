@@ -57,7 +57,11 @@ func (s *Service) Links(ctx context.Context, a core.Actor, entryID string) ([]Li
 	if core.ID(entryID) != nil {
 		return nil, core.Invalid
 	}
-	if _, e := s.entry(ctx, s.Core.DB, a, entryID, "colaboracion.view"); e != nil {
+	entry, e := s.entry(ctx, s.Core.DB, a, entryID, "colaboracion.view")
+	if e != nil {
+		return nil, e
+	}
+	if _, e = s.Core.DocumentMetadata(ctx, s.Core.DB, a, entry.DocumentID); e != nil {
 		return nil, e
 	}
 	rows, e := s.Core.DB.QueryContext(ctx, `SELECT resource_type,CAST(resource_id AS CHAR),resource_version,label_snapshot,CAST(linked_by AS CHAR),linked_at FROM collaboration_links WHERE entry_id=? ORDER BY resource_type,resource_id`, entryID)
@@ -102,6 +106,9 @@ func (s *Service) SetLinks(ctx context.Context, a core.Actor, entryID, key strin
 	e := s.Core.Transact(ctx, func(tx *sql.Tx) error {
 		entry, e := s.entry(ctx, tx, a, entryID, "colaboracion.link")
 		if e != nil {
+			return e
+		}
+		if _, e = s.Core.DocumentMetadata(ctx, tx, a, entry.DocumentID); e != nil {
 			return e
 		}
 		owner := entry.UploadedBy

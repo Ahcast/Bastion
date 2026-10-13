@@ -136,6 +136,34 @@ func TestCollaborationLinksReauthorizeAndPreserveSnapshot(t *testing.T) {
 	if e != nil || len(links) != 0 {
 		t.Fatal("terminal resource still disclosed", links, e)
 	}
+	if _, e = s.DB.Exec(`DELETE rp FROM role_permissions rp JOIN user_roles ur ON ur.role_id=rp.role_id WHERE ur.user_id=? AND rp.permission='core.documents.read'`, a.UserID); e != nil {
+		t.Fatal(e)
+	}
+	if _, e = service.Links(ctx, a, entry.ID); e != core.Missing {
+		t.Fatal("document read revocation leaked links", e)
+	}
+	if _, e = service.SetLinks(ctx, a, entry.ID, "collab-links-revoked", collaboration.SetLinksInput{Version: 2, Links: []collaboration.LinkInput{}}); e != core.Missing {
+		t.Fatal("document read revocation allowed replace", e)
+	}
+	var retained uint64
+	if e = s.DB.QueryRow(`SELECT version FROM collaboration_entries WHERE id=?`, entry.ID).Scan(&retained); e != nil || retained != 2 {
+		t.Fatal("denied link mutation changed entry", retained, e)
+	}
+
+	if _, e = service.SetLinks(ctx, a, entry.ID, "collab-links-set", collaboration.SetLinksInput{Version: 1, Links: []collaboration.LinkInput{{ResourceType: "processes", ResourceID: "77", ResourceVersion: 2}}}); e != core.Missing {
+		t.Fatal("revoked document replay", e)
+	}
+	grantCollaboration(t, s, a, "all")
+	if _, e = service.TrashEntry(ctx, a, entry.ID, "collab-link-trash", collaboration.VersionInput{Version: entry.DocumentVersion}, false); e != nil {
+		t.Fatal(e)
+	}
+	if _, e = service.Links(ctx, a, entry.ID); e != core.Missing {
+		t.Fatal("trashed document links", e)
+	}
+	if _, e = service.SetLinks(ctx, a, entry.ID, "collab-link-trash-write", collaboration.SetLinksInput{Version: 2, Links: []collaboration.LinkInput{}}); e != core.Missing {
+		t.Fatal("trashed document link write", e)
+	}
+
 }
 
 func TestCollaborationApprovalInboxIsWorkflowReadOnly(t *testing.T) {
