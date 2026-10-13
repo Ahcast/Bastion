@@ -64,25 +64,34 @@ func (s *Service) Links(ctx context.Context, a core.Actor, entryID string) ([]Li
 	if e != nil {
 		return nil, e
 	}
-	defer rows.Close()
-	out := []Link{}
+	candidates := []Link{}
 	for rows.Next() {
 		var item Link
 		if e = rows.Scan(&item.ResourceType, &item.ResourceID, &item.ResourceVersion, &item.Label, &item.LinkedBy, &item.LinkedAt); e != nil {
+			rows.Close()
 			return nil, e
 		}
-		r, e := s.resource(ctx, s.Core.DB, a, item.ResourceType, item.ResourceID)
-		if e == core.Missing || e == core.Forbidden {
+		candidates = append(candidates, item)
+	}
+	e = rows.Err()
+	rows.Close()
+	if e != nil {
+		return nil, e
+	}
+	out := make([]Link, 0, len(candidates))
+	for _, item := range candidates {
+		r, resourceErr := s.resource(ctx, s.Core.DB, a, item.ResourceType, item.ResourceID)
+		if resourceErr == core.Missing || resourceErr == core.Forbidden {
 			continue
 		}
-		if e != nil {
-			return nil, e
+		if resourceErr != nil {
+			return nil, resourceErr
 		}
 		item.CurrentVersion, item.CurrentLabel = r.Version, r.Label
 		item.Stale = r.Version != item.ResourceVersion || strings.TrimSpace(r.Label) != strings.TrimSpace(item.Label)
 		out = append(out, item)
 	}
-	return out, rows.Err()
+	return out, nil
 }
 
 func (s *Service) SetLinks(ctx context.Context, a core.Actor, entryID, key string, p SetLinksInput) (any, error) {
