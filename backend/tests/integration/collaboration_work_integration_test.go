@@ -46,6 +46,9 @@ func TestCollaborationTasksLifecycleAndViews(t *testing.T) {
 	if e != nil || done.(map[string]string)["version"] != "3" {
 		t.Fatal("task done", done, e)
 	}
+	if _, e = service.ChangeTaskStatus(ctx, a, id, "task-done", collaboration.TaskStatusInput{Version: 2, Status: "done"}); e != nil {
+		t.Fatal("lost done ACK", e)
+	}
 	if _, e = service.ChangeTaskStatus(ctx, a, id, "task-reactivate-wrong-route", collaboration.TaskStatusInput{Version: 3, Status: "open"}); e != core.Conflict {
 		t.Fatal("closed task reactivated without explicit action", e)
 	}
@@ -56,8 +59,26 @@ func TestCollaborationTasksLifecycleAndViews(t *testing.T) {
 	if e != nil || reopened.(map[string]string)["status"] != "open" || reopened.(map[string]string)["version"] != "4" {
 		t.Fatal("explicit reopen", reopened, e)
 	}
+	if _, e = service.ReopenTask(ctx, a, id, "task-reopen", collaboration.TaskReopenInput{Version: 3}); e != nil {
+		t.Fatal("lost reopen ACK", e)
+	}
+	s.DB.SetMaxOpenConns(1)
+	bounded, cancel := context.WithTimeout(ctx, 3*time.Second)
+	defer cancel()
+	if users, err := service.TaskAssignees(bounded, a, "", "", ""); err != nil || len(users) != 1 {
+		t.Fatal("single-connection assignees", users, err)
+	}
 	if _, e = service.UpdateTask(ctx, a, id, "task-stale-update", collaboration.TaskUpdate{Version: 3, AssigneeID: a.UserID, Title: "Stale", DueDate: today}); e != core.Conflict {
 		t.Fatal("stale task version accepted", e)
+	}
+	if _, e = s.DB.Exec(`DELETE rp FROM role_permissions rp JOIN user_roles ur ON ur.role_id=rp.role_id WHERE ur.user_id=? AND rp.permission='colaboracion.view'`, a.UserID); e != nil {
+		t.Fatal(e)
+	}
+	if _, e = service.ChangeTaskStatus(ctx, a, id, "task-done", collaboration.TaskStatusInput{Version: 2, Status: "done"}); e != core.Forbidden {
+		t.Fatal("revoked view replay", e)
+	}
+	if _, e = service.ChangeTaskStatus(ctx, a, id, "task-done-after-revoke", collaboration.TaskStatusInput{Version: 4, Status: "done"}); e != core.Forbidden {
+		t.Fatal("revoked view mutation", e)
 	}
 }
 

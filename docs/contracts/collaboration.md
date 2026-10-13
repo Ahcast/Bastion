@@ -101,8 +101,42 @@ La bandeja muestra únicamente la actividad mínima de U2 (`comment_added` y `co
 - Destinatario inactivo, duplicado, no registrado o sin acceso vigente no puede recibir mención. Notificaciones no almacenan extractos y se omiten tras perder acceso.
 - MySQL 5.7 verifica rollback atómico, carreras de borrado/mención, aislamiento de destinatario y cursores sin conteo lateral. Navegador verifica comentario, sugerencia, mención, notificación, actividad y eliminación/revocación.
 
-## Unidades siguientes — contratos previos
+## Unidad 3 — trabajo y recuperación de intención
 
 Unidad 3 añade tareas independientes de Workflow: asignado, creador, título, nota, fecha límite `DATE` en Honduras, estado `open|in_progress|done|cancelled`, versión y timestamps. Para recursos vinculados, asignado debe tener permiso de lectura vigente; tareas personales sin recurso solo las ven creador/asignado. El asignado puede cambiar estado; editar destino/vencimiento requiere `colaboracion.task`; una tarea cerrada no se reactiva sin acción explícita y auditoría. «Mi trabajo», «Hoy» y «Vencidas» son proyecciones sobre estas tareas, sin copiar tareas de otros dueños.
 
 Unidad 4 introduce relaciones documentales sin duplicar bytes y una vista de aprobaciones pendientes ya registradas por Workflow. La política del módulo dueño se comprueba en cada acceso; Workflow decide/aprueba/revoca y conserva su versión/hash. Colaboración no crea aprobaciones ni ejecuta cambios comerciales.
+
+
+### API y reglas exactas U3
+
+Migración 0036 `collaboration_tasks`: IDs de creador/asignado con FK, recurso opcional tipo/ID pareados, título 180 caracteres, nota 4000, vencimiento DATE nullable, estado/versión y timestamps UTC; índices por asignado/estado/fecha, creador y recurso. MySQL 5.7 no aplica CHECK: el servicio valida pares y estados. `colaboracion.task` se registra sin grants.
+
+```http
+GET   /api/v1/collaboration/tasks?view=mine|today|overdue&status=&page=&per_page=
+GET   /api/v1/collaboration/task-assignees?resource_type=&resource_id=&search=
+POST  /api/v1/collaboration/tasks
+PATCH /api/v1/collaboration/tasks/{id}
+POST  /api/v1/collaboration/tasks/{id}/status
+POST  /api/v1/collaboration/tasks/{id}/reopen
+```
+
+Crear recibe `{assignee_id,resource_type,resource_id,title,note,due_date}`; recurso ausente usa ambas cadenas vacías. Editar recibe `{version,assignee_id,title,note,due_date}` y conserva recurso/creador. Estado recibe `{version,status}`; reapertura `{version}`. DTO estricto, IDs/versiones strings y `Idempotency-Key` requerido en escrituras. Usuarios sugeridos solo ID/nombre, activos con MFA y acceso vigente; máximo 50 de un conjunto acotado de 200 candidatos. El cursor SQL se cierra antes de consultas de autorización.
+
+Solo creador/asignado lee una tarea y cada operación/replay exige `colaboracion.view` actual y sesión humana vigente; tarea vinculada agrega permiso propietario/Core si corresponde. Crear/editar/reabrir exige `colaboracion.task`; editar/reabrir solo creador y cambio de estado solo asignado. Reapertura requiere reauth. Las restricciones de estado/versión se aplican dentro del efecto idempotente: el replay exacto recupera un resultado ya confirmado, tras reautorizar al actor, aunque la tarea haya cambiado de estado. Una clave distinta no puede reactivar una tarea cerrada mediante `/status`. Datos, auditoría, evento y resultado idempotente se confirman o revierten juntos.
+
+«Mi trabajo» incluye creadas/asignadas al actor. «Hoy»/«Vencidas» incluyen únicamente abiertas/en progreso con fecha igual/anterior al día Honduras; sin fecha no está vencida. Count/página se calcula después del acceso al recurso. Errores usan catálogo Core 401/403/404/409/422; ningún permiso se concede al asignar.
+
+### API y reglas exactas U4
+
+Migración 0037 `collaboration_links`: clave única entrada/tipo/ID, versión/etiqueta observada, autor/fecha y FK de entrada/autor. Registro `colaboracion.link` sin grants. No duplica bytes.
+
+```http
+GET /api/v1/collaboration/{id}/links
+PUT /api/v1/collaboration/{id}/links
+GET /api/v1/collaboration/approvals?page=&per_page=
+```
+
+PUT recibe `{version,links:[{resource_type,resource_id,resource_version}]}`; máximo 20 vínculos únicos a `processes|quotes|purchase_orders|invoices`. Requiere permiso de entrada/Core, `colaboracion.link`, reauth, versión actual de entrada/recurso e intención idempotente. Reemplazo, incremento de versión, auditoría y evento son atómicos. Lectura reautoriza ambos extremos mediante puertos propietarios, omite recursos terminales o revocados y devuelve snapshot/current/stale. No modifica fuentes comerciales.
+
+Bandeja Workflow devuelve pendientes no vencidas donde el actor posee lectura y decisión; excluye solicitudes del propio actor/propietario. No decide ni revoca; enlaces deben abrir el registro propietario usando su ID. Workflow deshabilitado responde error explícito. La certificación integral vigente se registra en el checkpoint, sin inferirla de esta definición de contrato.

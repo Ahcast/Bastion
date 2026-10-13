@@ -145,6 +145,9 @@ func (s *Service) CreateTask(ctx context.Context, a core.Actor, key string, p Ta
 	}
 	var out any
 	e := s.Core.Transact(ctx, func(tx *sql.Tx) error {
+		if e := s.authorizeAny(ctx, tx, a, "colaboracion.view"); e != nil {
+			return e
+		}
 		var resource *Resource
 		if p.ResourceType != "" {
 			r, e := s.resource(ctx, tx, a, p.ResourceType, p.ResourceID)
@@ -187,6 +190,9 @@ func (s *Service) CreateTask(ctx context.Context, a core.Actor, key string, p Ta
 
 func (s *Service) task(ctx context.Context, q core.Querier, a core.Actor, id string, lock bool) (Task, error) {
 	var t Task
+	if e := s.authorizeAny(ctx, q, a, "colaboracion.view"); e != nil {
+		return t, e
+	}
 	if a.Type != "user" || core.ID(id) != nil {
 		return t, core.Missing
 	}
@@ -287,7 +293,7 @@ func (s *Service) UpdateTask(ctx context.Context, a core.Actor, id, key string, 
 		if e != nil {
 			return e
 		}
-		if !activeTaskStatus(t.Status) || t.CreatorID != a.UserID {
+		if t.CreatorID != a.UserID {
 			return core.Conflict
 		}
 		var resource *Resource
@@ -307,7 +313,7 @@ func (s *Service) UpdateTask(ctx context.Context, a core.Actor, id, key string, 
 			return e
 		}
 		out, e = s.Core.Idempotent(ctx, tx, a, "collaboration.task.update:"+id, key, p, func() (any, error) {
-			if t.Version != p.Version {
+			if t.Version != p.Version || !activeTaskStatus(t.Status) {
 				return nil, core.Conflict
 			}
 			if e := core.Changed(tx.ExecContext(ctx, `UPDATE collaboration_tasks SET assignee_id=?,title=?,note=?,due_date=?,version=version+1,updated_at=UTC_TIMESTAMP(6) WHERE id=? AND version=?`, p.AssigneeID, p.Title, p.Note, nullableString(p.DueDate), id, p.Version)); e != nil {
@@ -339,11 +345,8 @@ func (s *Service) ChangeTaskStatus(ctx context.Context, a core.Actor, id, key st
 		if a.UserID != t.AssigneeID {
 			return core.Forbidden
 		}
-		if !activeTaskStatus(t.Status) {
-			return core.Conflict
-		}
 		out, e = s.Core.Idempotent(ctx, tx, a, "collaboration.task.status:"+id, key, p, func() (any, error) {
-			if t.Version != p.Version {
+			if t.Version != p.Version || !activeTaskStatus(t.Status) {
 				return nil, core.Conflict
 			}
 			if e := core.Changed(tx.ExecContext(ctx, `UPDATE collaboration_tasks SET status=?,version=version+1,updated_at=UTC_TIMESTAMP(6) WHERE id=? AND version=?`, p.Status, id, p.Version)); e != nil {
@@ -372,7 +375,7 @@ func (s *Service) ReopenTask(ctx context.Context, a core.Actor, id, key string, 
 		if e != nil {
 			return e
 		}
-		if t.CreatorID != a.UserID || (t.Status != "done" && t.Status != "cancelled") {
+		if t.CreatorID != a.UserID {
 			return core.Conflict
 		}
 		if t.ResourceType != "" {
@@ -387,7 +390,7 @@ func (s *Service) ReopenTask(ctx context.Context, a core.Actor, id, key string, 
 			return e
 		}
 		out, e = s.Core.Idempotent(ctx, tx, a, "collaboration.task.reopen:"+id, key, p, func() (any, error) {
-			if t.Version != p.Version {
+			if t.Version != p.Version || (t.Status != "done" && t.Status != "cancelled") {
 				return nil, core.Conflict
 			}
 			if e := core.Changed(tx.ExecContext(ctx, `UPDATE collaboration_tasks SET status='open',version=version+1,updated_at=UTC_TIMESTAMP(6) WHERE id=? AND version=?`, id, p.Version)); e != nil {
@@ -433,13 +436,22 @@ func (s *Service) TaskAssignees(ctx context.Context, a core.Actor, resourceType,
 	if e != nil {
 		return nil, e
 	}
-	defer rows.Close()
-	out := []Assignee{}
+	candidates := []Assignee{}
 	for rows.Next() {
 		var item Assignee
 		if e = rows.Scan(&item.ID, &item.Name); e != nil {
+			rows.Close()
 			return nil, e
 		}
+		candidates = append(candidates, item)
+	}
+	e = rows.Err()
+	rows.Close()
+	if e != nil {
+		return nil, e
+	}
+	out := []Assignee{}
+	for _, item := range candidates {
 		if resource != nil {
 			e = s.grantHolderCanResource(ctx, s.Core.DB, item.ID, *resource)
 		} else {
@@ -456,5 +468,5 @@ func (s *Service) TaskAssignees(ctx context.Context, a core.Actor, resourceType,
 			break
 		}
 	}
-	return out, rows.Err()
+	return out, nil
 }

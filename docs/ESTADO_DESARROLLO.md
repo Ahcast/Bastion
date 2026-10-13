@@ -22,7 +22,7 @@ Actualizado: 2026-10-12. Checkpoint vigente para reanudar. Arquitectura, contrat
 | Facturas/pagos | Siete unidades y aceptación cerradas: borradores, fiscal interno/emisión, pagos, conversiones, PDF, anulación conservadora y clonación |
 | Gastos | Tres unidades y aceptación integral cerradas: registro/cálculo/proveedor/categorías, scopes/filtros/totales/duplicados/papelera, referencias y comprobantes privados |
 | Reportes | Tres unidades canónicas cerradas/certificadas: consultas Facturas/Órdenes/Gastos, Inicio, Excel privado y aceptación integral |
-| Colaboración | **Siguiente módulo**, reutilizando Core.Files y permisos propietarios |
+| Colaboración | U1–U4 implementadas; aceptación integral en revisión. No certificada aún |
 | Workflows configurables e IA | Fases posteriores según dependencias; no confundir Workflow de aprobación ya integrado con configuración futura |
 | Producción | No desplegada ni migrada; integraciones externas no acreditadas por CI |
 
@@ -51,9 +51,11 @@ Migración 0033 registra permisos sin grants. Reportes intersecta scopes propios
 
 Excel privado por stream, sin URL reutilizable/archivo persistido: texto exacto, fórmulas auxiliares de centavos con cota SUM ABS SQL, dos hojas, filtros/UTC, auditoría antes de bytes y errores explícitos por 10001 filas/24MiB XML/concurrencia. Tests incluyen exportación de 128 filas independiente de página, límite 10001, montos grandes/utilidad negativa, permisos, reauth, CSRF, revocación y rollback de auditoría.
 
-## Próximo paso exacto — Colaboración
+## Próximo paso exacto — aceptación integral de Colaboración
 
-Leer [spec de Colaboración](modules/collaboration.md), Core.Files/datos, plan y contratos documentales de propietarios existentes. Definir contrato/migración/DTO/permisos/errores/aceptación antes de código. Conservar documentos privados/versiones/cuarentena/papelera de Core y vínculos propietarios; implementar carpetas, organización/comentarios y colaboración según capacidades reales, con permisos por registro y auditoría. Una unidad a la vez, con MySQL5.7/UI/navegador/CI antes de la siguiente.
+Código base `4211f5e` y corrección UI `43418a7`: unidades U1–U4 ya existen. Última CI base 38331234661 aprobó backend Go/race/MySQL5.7/builds y Angular; browser 18/20, con fallos en selector de asignado y campo Para de correo. `43418a7` agrega etiqueta explícita y destinatario reactivo; build/163 pruebas Angular locales aprobados, CI 38332910384 en revisión.
+
+Revisión de aceptación agrega reautorización `colaboracion.view` para tareas personales y recuperación de replay tras completar/reabrir; restricciones de estado/version se ejecutan dentro del efecto idempotente. Cierra cursor de candidatos antes de autorizar asignados, probado con pool de una conexión. Pruebas MySQL de esos cambios pendientes; no cerrar módulo ni empezar la siguiente fase hasta regresión completa verde. Contrato/OpenAPI/matriz/runbook son la entrada actual.
 
 Ampliaciones analíticas de RFQ/IA, competitividad de proveedores y estados de procesos no modelados se integran por contratos propietarios en sus fases, sin datos fabricados ni cálculos de modelos. No se acredita aún el alcance completo de todas las categorías analíticas futuras del maestro. Reportes canónicos funciona sin IA.
 
