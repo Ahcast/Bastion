@@ -18,7 +18,15 @@ test("Colaboración: carga privada, cuarentena y papelera reversible", async ({
   await page.getByLabel("Nueva carpeta", { exact: true }).fill("Biblioteca sintética");
   const folderCreated = page.waitForResponse((r) => r.request().method() === "POST" && r.url().endsWith("/api/v1/collaboration/folders") && r.status() === 200);
   await page.getByRole("button", { name: "Crear carpeta", exact: true }).click();
-  const folder = await (await folderCreated).json();
+  await folderCreated;
+  const foldersResponse = await page.request.get(
+    "http://localhost:8080/api/v1/collaboration/folders?scope=company&parent_id=root",
+  );
+  expect(foldersResponse.ok()).toBeTruthy();
+  const folder = (await foldersResponse.json()).data.find(
+    (item: { name: string }) => item.name === "Biblioteca sintética",
+  );
+  expect(folder?.id).toBeTruthy();
   await page.getByRole("button", { name: /Biblioteca sintética \(0\)/ }).click();
 
   await page.getByText("Confirmar identidad para vincular, editar, eliminar o moderar contenido", { exact: true }).click();
@@ -35,7 +43,16 @@ test("Colaboración: carga privada, cuarentena y papelera reversible", async ({
   });
   const linked = page.waitForResponse((r) => r.request().method() === "POST" && r.url().endsWith("/api/v1/collaboration") && r.status() === 200).then((r) => r.json());
   await page.getByRole("button", { name: "Cargar y registrar en biblioteca", exact: true }).click();
-  const entry = await linked;
+  await linked;
+  const entriesResponse = await page.request.get(
+    "http://localhost:8080/api/v1/collaboration?scope=company&folder_id=" +
+      folder.id + "&search=Manual&page=1&per_page=100",
+  );
+  expect(entriesResponse.ok()).toBeTruthy();
+  const entry = (await entriesResponse.json()).data.find(
+    (item: { title: string }) => item.title === "Manual sintético",
+  );
+  expect(entry?.id).toBeTruthy();
   expect(entry.document_id).toBeTruthy();
   await expect(page.getByText("manual.pdf", { exact: true })).toBeVisible();
   await expect(page.getByText(/En cuarentena/)).toBeVisible();
