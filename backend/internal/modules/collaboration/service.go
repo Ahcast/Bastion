@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/Ahcast/Bastion/backend/internal/core"
+	"github.com/Ahcast/Bastion/backend/internal/modules/workflow"
 )
 
 var Permissions = []string{
@@ -16,12 +17,17 @@ var Permissions = []string{
 	"colaboracion.delete",
 	"colaboracion.comment",
 	"colaboracion.moderate",
+	"colaboracion.task",
+	"colaboracion.link",
 }
 
 type Resource struct {
 	ID              string
 	OwnerID         string
 	TeamID          string
+	ViewPermission  string
+	Label           string
+	Version         uint64
 	DocumentID      string
 	DocumentOwnerID string
 	DocumentTeamID  string
@@ -32,6 +38,7 @@ type ResourcePolicy func(context.Context, core.Querier, string) (Resource, error
 type Service struct {
 	Core             *core.Service
 	ResourcePolicies map[string]ResourcePolicy
+	Approvals        *workflow.Service
 }
 
 type Folder struct {
@@ -193,8 +200,6 @@ func (s *Service) DocumentPolicy(ctx context.Context, q core.Querier, a core.Act
 		return core.Forbidden
 	}
 	if generated || documentEntity.String != "collaboration" || documentEntityID.String != id {
-		// BindDocument calls the destination policy before writing the link. That
-		// one transition starts with an unbound, live document.
 		if documentEntity.Valid || generated {
 			return core.Missing
 		}
@@ -226,8 +231,6 @@ func (s *Service) DocumentVersionPolicy(ctx context.Context, q core.Querier, a c
 	return s.gate(ctx, q, a, "colaboracion.upload", r.UploadedBy, r.TeamID, false)
 }
 
-// DocumentTrashPolicy prevents a caller with generic Core.Files write access
-// from bypassing the module's explicit delete grant.
 func (s *Service) DocumentTrashPolicy(ctx context.Context, q core.Querier, a core.Actor, id string) error {
 	r, e := s.entry(ctx, q, a, id, "colaboracion.delete")
 	if e != nil {
@@ -328,9 +331,6 @@ func (s *Service) Entry(ctx context.Context, a core.Actor, id string) (Entry, er
 	return s.entryWithMetadata(ctx, s.Core.DB, a, id, false)
 }
 
-// entryWithMetadata can read from either the connection pool or a transaction.
-// Mutations use the transaction so their response reflects the row they just
-// wrote without depending on an uncommitted read through the pool.
 func (s *Service) entryWithMetadata(ctx context.Context, q core.Querier, a core.Actor, id string, deleted bool) (Entry, error) {
 	r, e := s.entry(ctx, q, a, id, "colaboracion.view")
 	if e != nil {
