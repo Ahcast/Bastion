@@ -161,3 +161,6 @@ Aceptación: concurrencia y rollback de lotes, reanudación/revocación, estados
 ## Conversión propietaria a OC de cliente — unidad 3
 
 [Contrato normativo](quote-purchase-order-conversion.md): añade `cotizaciones.convert`, ruta `POST /quotes/{id}/convert-to-purchase-order`, estado `converted` y `purchase_order_id` nullable string en detalle/versiones. No se establece converted mediante PATCH status; sólo el efecto transaccional real lo produce. Quote convertida no se reabre ni edita; clonar crea un nuevo Borrador sin vínculo. Ambos módulos deben estar habilitados.
+
+
+Revisión de regresión 2026-10-12: formulario de autorización usa control Angular Forms independiente para destinatario, evita refresh solapado y descarta respuestas de otro ID/versión/página. Cambiar ficha limpia el contexto y las intenciones de UI; una carga/escritura vieja no reemplaza el ledger/documentos ni libera busy de la ficha nueva. Actualizar una misma ficha conserva el destinatario escrito. No cambia contrato backend ni habilita envío automático.

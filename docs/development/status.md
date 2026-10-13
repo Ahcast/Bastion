@@ -491,3 +491,6 @@ Local: npm ci/build y 169/169 pruebas Angular; go vet, race de paquetes sin BD y
 
 
 Corrección de validación U1: Core checks 38345463780 aprobó frontend/navegador y detectó incompatibilidad MySQL5.7 `Unknown column t.requested_by in on clause` en la proyección de elegibilidad. La correlación se trasladó al WHERE; Processes conserva un DTO propio sin importar AI. Se agregó validación temprana de invariantes IA antes de la regresión completa para hacer visible cualquier fallo de esta unidad. Ningún fallo se atribuye a infraestructura o se omite para certificarla.
+
+
+CI 38346213793 aprobó invariantes IA sobre MySQL5.7 tras corrección SQL y frontend; navegador detectó destinatario vacío intermitente en Cotizaciones (20/21). Se sincronizó formulario de correo con Angular Forms, se impidió refresh solapado y se descartaron respuestas de ID/versión/página anteriores. Se añadieron pruebas de lifecycle real setInput y respuestas tardías; la regresión completa se repite antes de cerrar U1.

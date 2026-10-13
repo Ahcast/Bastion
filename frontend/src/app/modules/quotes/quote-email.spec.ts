@@ -17,8 +17,7 @@ describe('Correo comercial de cotizaciones',()=>{
  it('conserva el destinatario introducido mientras finaliza la actualización del ledger',async()=>{
   api.has.mockImplementation((p:string)=>p!=='core.documents.read');
   const fixture=TestBed.createComponent(QuoteEmail);
-  fixture.componentInstance.quote={...quote,customer:{email:''}};
-  fixture.componentInstance.resetForm();
+  fixture.componentRef.setInput('quote',{...quote,customer:{email:''}});
   fixture.detectChanges();
   const input=fixture.nativeElement.querySelector('input[placeholder="cliente@ejemplo.com"]') as HTMLInputElement;
   input.value='destino@example.test';input.dispatchEvent(new Event('input',{bubbles:true}));
@@ -51,4 +50,34 @@ describe('Correo comercial de cotizaciones',()=>{
   expect(component.statusLabel('uncertain')).toBe('Resultado incierto');
   expect(component.errorLabel('external_result_uncertain')).toContain('resultado externo');
  });
+ it('una respuesta tardía de otra cotización no reemplaza documentos, ledger ni estado de carga',async()=>{
+  const requests=new Map<string,(value:unknown)=>void>();
+  api.get.mockImplementation((path:string)=>new Promise(resolve=>requests.set(path,resolve)));
+  component.ngOnChanges();
+  component.quote={...quote,id:'10',number:'COT-2026-10',customer:{email:'nuevo@example.test'}};
+  component.ngOnChanges();
+  component.to='seleccionado@example.test';
+  requests.get('/quotes/9/pdfs?per_page=100')!({data:[{id:'old-pdf',quote_version:'4',status:'available',kind:'issued'}]});
+  requests.get('/quotes/9/documents?per_page=100&deleted=false')!({data:[{id:'old-doc',status:'available'}]});
+  requests.get('/quotes/9/email-authorizations?page=1&per_page=25')!({data:[{id:'old-intent'}],total:1});
+  await Promise.resolve();await Promise.resolve();await Promise.resolve();
+  expect(component.busy()).toBe(true);
+  expect(component.issuedPDFs()).toEqual([]);expect(component.documents()).toEqual([]);expect(component.intents()).toEqual([]);expect(component.total()).toBe(0);
+  expect(component.to).toBe('seleccionado@example.test');
+  requests.get('/quotes/10/pdfs?per_page=100')!({data:[{id:'new-pdf',quote_version:'4',status:'available',kind:'issued'}]});
+  requests.get('/quotes/10/documents?per_page=100&deleted=false')!({data:[]});
+  requests.get('/quotes/10/email-authorizations?page=1&per_page=25')!({data:[],total:0});
+  await Promise.resolve();await Promise.resolve();await Promise.resolve();
+  expect(component.busy()).toBe(false);expect(component.pdfSnapshotId).toBe('new-pdf');expect(component.to).toBe('seleccionado@example.test');
+ });
+ it('no solapa actualizaciones y conserva el destinatario al actualizar la misma cotización',async()=>{
+  let finish!:(value:unknown)=>void;
+  api.has.mockImplementation((permission:string)=>permission!=='core.documents.read');
+  api.get.mockImplementation((path:string)=>path.includes('/pdfs?')?new Promise(resolve=>{finish=resolve}):Promise.resolve({data:[],total:0}));
+  const first=component.refresh();await component.refresh();
+  expect(api.get).toHaveBeenCalledTimes(2);expect(component.busy()).toBe(true);
+  component.to='seleccionado@example.test';finish({data:[]});await first;
+  expect(component.busy()).toBe(false);expect(component.to).toBe('seleccionado@example.test');
+ });
+
 });
