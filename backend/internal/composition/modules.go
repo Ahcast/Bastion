@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/Ahcast/Bastion/backend/internal/core"
 	"github.com/Ahcast/Bastion/backend/internal/core/registry"
+	"github.com/Ahcast/Bastion/backend/internal/modules/ai"
 	"github.com/Ahcast/Bastion/backend/internal/modules/collaboration"
 	"github.com/Ahcast/Bastion/backend/internal/modules/customers"
 	"github.com/Ahcast/Bastion/backend/internal/modules/expenses"
@@ -297,6 +298,24 @@ func RegisterFiles(s *core.Service, r *registry.Registry, logger *slog.Logger, o
 		delete(s.DocumentTrashPolicies, "collaboration")
 	}
 	if e := r.Register(collaborationService.Module(logger, collaborationEnabled, objects)); e != nil {
+		return e
+	}
+	aiEnabled := processEnabled
+	if v := os.Getenv("BASTION_AI_ENABLED"); v != "" {
+		if v != "true" && v != "false" {
+			return fmt.Errorf("invalid ai enable flag")
+		}
+		aiEnabled = v == "true"
+	}
+	aiService := &ai.Service{Core: s}
+	if processEnabled {
+		aiService.Processes = processService
+	}
+	if aiEnabled {
+		s.RegisterPermissions(ai.Permissions, []string{"ai.tasks.read"})
+		s.RegisterServiceWrites([]string{"ai.tasks.execute"})
+	}
+	if e := r.Register(aiService.Module(logger, aiEnabled)); e != nil {
 		return e
 	}
 	return r.Validate()

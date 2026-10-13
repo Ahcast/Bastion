@@ -250,3 +250,33 @@ func TestReportsCompositionFlagsAndSourceRoutes(t *testing.T) {
 		t.Fatal("invalid flag accepted")
 	}
 }
+
+func TestAICompositionFollowsSourceAndExplicitSwitch(t *testing.T) {
+	t.Setenv("BASTION_AI_ENABLED", "false")
+	s, r := compositionFixture(t, "false")
+	if moduleByID(t, r, "ai").Enabled || hasPermission(s.PermissionCatalog(), "ai.tasks.execute") {
+		t.Fatal("disabled AI grants access")
+	}
+	t.Setenv("BASTION_AI_ENABLED", "true")
+	r = registry.New()
+	_ = r.Register(registry.Module{ID: "core", Label: "Core", Version: "1", Enabled: true})
+	if e := Register(s, r, slog.New(slog.NewTextHandler(io.Discard, nil))); e == nil {
+		t.Fatal("AI allowed without Processes")
+	}
+	t.Setenv("BASTION_PROCESSES_ENABLED", "true")
+	s = &core.Service{DocumentPolicies: map[string]core.DocumentPolicy{}}
+	r = registry.New()
+	_ = r.Register(registry.Module{ID: "core", Label: "Core", Version: "1", Enabled: true})
+	if e := Register(s, r, slog.New(slog.NewTextHandler(io.Discard, nil))); e != nil {
+		t.Fatal(e)
+	}
+	if !moduleByID(t, r, "ai").Enabled || !hasPermission(s.PermissionCatalog(), "ai.tasks.execute") {
+		t.Fatal("AI missing")
+	}
+	t.Setenv("BASTION_AI_ENABLED", "invalid")
+	r = registry.New()
+	_ = r.Register(registry.Module{ID: "core", Label: "Core", Version: "1", Enabled: true})
+	if e := Register(s, r, slog.New(slog.NewTextHandler(io.Discard, nil))); e == nil || e.Error() != "invalid ai enable flag" {
+		t.Fatal(e)
+	}
+}

@@ -479,3 +479,12 @@ Código `70163c9cb074a6285188cc812bdf9a408dfe8659`: [Core checks 38338667906](ht
 Doce replays con menciones cruzadas, borrado concurrente (un éxito/otro conflicto), lectura de notificación contra borrado y aliases de IDs aprobados. Integraciones de Process/Quote/OC/Invoice reales preservan finanzas/estados; prueban stale, revocación, papelera y anulación por propietarios, evidencia retenida y replay reautorizado. Workflow real conserva decisión/versión; bandeja excluye solicitante, recursos sin policy y accesos revocados antes del count/página. Browser21 ejerce recorrido bandeja→ID cotización→decisión propietaria→salida de pendientes con MFA humano.
 
 README/plan/checkpoint/matriz/spec/runbook actualizados; siguiente fase 6 API/MCP IA, comenzando por contrato ejecutable de tareas/runs/reservas. Cierre de desarrollo sintético, no despliegue, OAuth/Work conectado, proveedor pagado, OCR ni aprobación fiscal/integración productiva externa.
+
+
+## 2026-10-12 — revisión de estado y fase 6 IA, Unidad 1 en validación
+
+HEAD de partida 0edb641; verificado CI de código 70163c9: Core checks 38338667906, documentación 38338667902 y rama 38338667908 success. Colaboración no conserva pendientes U1–U4. Corregidas referencias documentales antiguas que aún afirmaban módulos comerciales pendientes.
+
+Implementados contrato/0038, tareas iniciales deduplicadas, snapshots/version/hash, runs/reservas cifradas, renovación acotada, backoff/agotamiento, cancelación humana, scopes/revocación y transporte REST/MCP con SDK. No se inicia modelo, scheduler, correo, Work/OAuth ni completed sin validador de etapa. Proyecciones de elegibilidad del propietario excluyen entradas stale y solicitantes revocados antes del scan.
+
+Local: npm ci/build y 169/169 pruebas Angular; go vet, race de paquetes sin BD y builds server/worker/admin. Se preparó MySQL 5.7.44 oficial para prueba, pero el entorno rechaza UNIX Socket (Operation not permitted); las pruebas de integración omiten sin DSN y no acreditan persistencia. Validación MySQL/race y navegador integral se ejecutará en CI; U1 sigue abierta hasta ese resultado. Cliente SDK local valida esquema de versiones como strings y ausencia de actor libre.

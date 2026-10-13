@@ -1,5 +1,5 @@
 # Contrato propuesto del pipeline IA
-Fecha: 2026-10-07. Contrato de diseño; nombres de herramientas y esquemas pendientes de implementación y pruebas. Ver [arquitectura IA](../architecture/ai-integration.md).
+Revisión: 2026-10-12. Etapas de negocio aún son diseño; la administración U1 tiene [contrato ejecutable](ai-tasks.md) y [OpenAPI](ai-tasks-openapi.json). Ver [arquitectura IA](../architecture/ai-integration.md).
 
 ## Herramientas y límites
 | Herramienta | Entrada principal | Salida/efecto |
@@ -17,7 +17,7 @@ Fecha: 2026-10-07. Contrato de diseño; nombres de herramientas y esquemas pendi
 | register_artifact | carga autorizada, checksum, vínculos | documento verificado o pendiente |
 | complete_task | tarea, lease y resumen | cierre solo si cumple validaciones de etapa |
 
-Son herramientas propuestas, no endpoints ya disponibles. El catálogo no concede permisos. REST y MCP usan los mismos contratos, servicios de aplicación, políticas de autorización e idempotencia. Core mantiene OAuth/MCP según core.md y credenciales de servicio separadas para Grokbot/worker.
+U1 expone claim_scoring_tasks, list_ai_tasks, get_ai_task, renew_ai_task y fail_ai_task; su evidencia de aceptación está en el checkpoint. Las demás herramientas de etapas, incluidos guardado de scores y complete_task, siguen propuestas sin endpoints disponibles. El catálogo no concede permisos. REST y MCP usan los mismos contratos, servicios de aplicación, políticas de autorización e idempotencia. Core mantiene OAuth/MCP según core.md y credenciales de servicio separadas para Grokbot/worker.
 
 ## Sobre común
 Cada escritura incluye schema_version, task_id, run_id, input_version, input_hash, skill_version, idempotency_key y, cuando usa reserva, lease_token. Bastion deriva actor/requested_by de autenticación, nunca de un argumento libre.

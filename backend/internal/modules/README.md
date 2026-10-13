@@ -1,5 +1,5 @@
 # Módulos
 
-Customers y Suppliers implementados en customers/suppliers; catálogo de fuente/receptor crawler en processes. Demás módulos pendientes. [Índice funcional](../../../docs/modules/README.md) y [contrato modular](../../../docs/contracts/modules.md). Paquetes lowercase. Workflow y AI transversales, sin menú propio. Core no importa estos paquetes; internal/composition registra dependencias y rutas desde cmd/server.
+Customers, Suppliers, Processes/receptor crawler, Quotes, PurchaseOrders, Invoices/payments, Expenses, Reports y Collaboration tienen implementación y aceptación de desarrollo certificadas. Evidencia vigente: [checkpoint](../../../docs/ESTADO_DESARROLLO.md). [Índice funcional](../../../docs/modules/README.md) y [contrato modular](../../../docs/contracts/modules.md).
 
-quotes: unidad de borradores/cálculo/conversión implementada; contrato y límites en docs/contracts/quotes.md. No dar por completo el módulo ni avanzar a OC hasta su aceptación integral.
+AI U1 implementa tareas/ejecuciones/reservas mediante REST/MCP; [contrato](../../../docs/contracts/ai-tasks.md). Workflow de aprobaciones está integrado; su configuración futura conserva fase propia. Ambos son transversales sin menú adicional. Core no importa módulos concretos; internal/composition registra dependencias y rutas desde cmd/server. Pruebas sintéticas no acreditan producción ni integraciones externas.

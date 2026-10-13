@@ -63,7 +63,7 @@ Contratos: [Colaboración](contracts/collaboration.md), [OpenAPI](contracts/coll
 
 ## Próximo paso exacto — fase 6 API/MCP IA
 
-Leer [pipeline](contracts/ai-pipeline.md), [arquitectura IA](architecture/ai-integration.md), [resultados/UI](modules/ai-results.md), Core/API/MCP/datos y plan. Primera unidad: definir contrato ejecutable de tareas/runs/reservas (migración 0038, DTOs, scopes, estados, deduplicación/versiones/hash, leases, errores y aceptación), luego implementar su persistencia/servicios/transporte sobre REST/MCP existentes y probar MySQL5.7/concurrencia/revocación/cliente MCP. No crear tablas de etapas posteriores anticipadamente ni dar por conectado Work/OAuth.
+Leer [pipeline](contracts/ai-pipeline.md), [arquitectura IA](architecture/ai-integration.md), [resultados/UI](modules/ai-results.md), Core/API/MCP/datos y plan. Primera unidad implementada y en validación: [tareas/runs/reservas](contracts/ai-tasks.md), [OpenAPI](contracts/ai-tasks-openapi.json), migración 0038, scopes, deduplicación/version/hash, leases cifrados, reintentos/cancelación y servicios REST/MCP. Antes de avanzar, certificar MySQL5.7/race/concurrencia/revocación/cliente SDK y regresión navegador en CI. No crear tablas de etapas posteriores anticipadamente ni dar por conectado Work/OAuth.
 
 Puntuación/investigación/RFQ/precio/artefactos continúan por etapas tras certificar esa unidad; umbrales/automatización siguen configurables y desactivados sin criterio autorizado. Plus no se invoca como API, no proveedor pagado automático ni OCR/inferencia en Lightsail. Workflow configurable permanece en su fase; no se confunde con solicitudes/aprobaciones ya implementadas. Los reportes canónicos funcionan sin IA; métricas de RFQ/IA se amplían con sus propietarios reales.
 

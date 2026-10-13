@@ -175,6 +175,17 @@ if collaboration_contract and collaboration_dir.is_dir():
     for method, path in sorted(documented - registered):
         errors.append(f'Collaboration OpenAPI: nonexistent {method.upper()} {path}')
 
+# AI transport must remain covered by its executable task contract.
+ai_contract = openapi_docs.get('ai-tasks-openapi.json')
+ai_module = ROOT / 'backend/internal/modules/ai/module.go'
+if ai_contract and ai_module.exists():
+    registered = {(method.lower(), path) for method, path in re.findall(
+        r'register\("(GET|POST|PATCH|PUT|DELETE) (/api/v1/[^"\\]+)"', ai_module.read_text())}
+    documented = {(method.lower(), path) for path, operations in ai_contract['paths'].items()
+                  for method in operations if method.lower() in {'get','post','put','patch','delete'}}
+    if registered != documented:
+        errors.append('AI tasks OpenAPI: registered and documented routes differ')
+
 if errors:
     print('\n'.join(errors))
     sys.exit(1)
