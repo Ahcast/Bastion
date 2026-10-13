@@ -27,7 +27,11 @@ test("Reportes: filas y totales autorizados por moneda coinciden con Inicio", as
       (r) =>
         r.url().includes("/api/v1/reports/expenses?") && r.status() === 200,
     )
-    .then((r) => r.json());
+    .then(async (r) => {
+      const replay = await page.request.get(r.url());
+      expect(replay.ok()).toBeTruthy();
+      return replay.json();
+    });
   await page.getByLabel("Reporte", { exact: true }).selectOption("expenses");
   const expenses = await response;
   expect(expenses.total).toBeGreaterThan(0);
@@ -50,7 +54,9 @@ test("Reportes: filas y totales autorizados por moneda coinciden con Inicio", as
       r.status() === 200,
   );
   await page.getByRole("button", { name: "Consultar", exact: true }).click();
-  const report = await (await filtered).json();
+  const reportResponse = await page.request.get((await filtered).url());
+  expect(reportResponse.ok()).toBeTruthy();
+  const report = await reportResponse.json();
   await expect(
     page.getByRole("heading", { name: "Totales HNL", exact: true }),
   ).toHaveCount(0);
@@ -67,7 +73,9 @@ test("Reportes: filas y totales autorizados por moneda coinciden con Inicio", as
   await page
     .getByRole("button", { name: "Actualizar resumen", exact: true })
     .click();
-  expect((await (await home).json()).reports.expenses).toEqual(report.totals);
+  const homeResponse = await page.request.get((await home).url());
+  expect(homeResponse.ok()).toBeTruthy();
+  expect((await homeResponse.json()).reports.expenses).toEqual(report.totals);
   await page.getByRole("link", { name: "Reportes", exact: true }).click();
   await page.getByLabel("Reporte", { exact: true }).selectOption("orders");
   await expect(
