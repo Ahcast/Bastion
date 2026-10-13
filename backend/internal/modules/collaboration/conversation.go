@@ -126,29 +126,48 @@ func (s *Service) filterMentionIDs(ctx context.Context, q core.Querier, resource
 		index[comments[i].ID] = i
 	}
 	placeholders := strings.TrimRight(strings.Repeat("?,", len(ids)), ",")
-	collab, collabArgs := mentionGrantClause("colaboracion.view", resource.OwnerID, resource.TeamID)
-	docs, docArgs := mentionGrantClause("core.documents.read", resource.DocumentOwnerID, resource.DocumentTeamID)
-	args := stringArgs(ids)
-	args = append(args, collabArgs...)
-	args = append(args, docArgs...)
 	rows, e := q.QueryContext(ctx, `SELECT CAST(m.comment_id AS CHAR),CAST(u.id AS CHAR)
 		FROM collaboration_mentions m JOIN users u ON u.id=m.user_id
 		JOIN collaboration_comments c ON c.id=m.comment_id AND c.deleted_at IS NULL
 		WHERE m.comment_id IN (`+placeholders+`) AND u.active=TRUE AND u.totp_secret IS NOT NULL
-		AND `+collab+` AND `+docs+`
-		ORDER BY m.comment_id,u.name,u.id`, args...)
+		ORDER BY m.comment_id,u.name,u.id`, stringArgs(ids)...)
 	if e != nil {
 		return e
 	}
-	defer rows.Close()
+	type pair struct{ commentID, userID string }
+	pairs := []pair{}
+	users := map[string]bool{}
 	for rows.Next() {
-		var commentID, userID string
-		if e = rows.Scan(&commentID, &userID); e != nil {
+		var p pair
+		if e = rows.Scan(&p.commentID, &p.userID); e != nil {
+			rows.Close()
 			return e
 		}
-		comments[index[commentID]].MentionUserIDs = append(comments[index[commentID]].MentionUserIDs, userID)
+		pairs = append(pairs, p)
+		users[p.userID] = true
 	}
-	return rows.Err()
+	e = rows.Err()
+	rows.Close()
+	if e != nil {
+		return e
+	}
+	allowed := map[string]bool{}
+	for userID := range users {
+		e = s.grantHolderCanResource(ctx, q, userID, resource)
+		if e == core.Forbidden {
+			continue
+		}
+		if e != nil {
+			return e
+		}
+		allowed[userID] = true
+	}
+	for _, p := range pairs {
+		if allowed[p.userID] {
+			comments[index[p.commentID]].MentionUserIDs = append(comments[index[p.commentID]].MentionUserIDs, p.userID)
+		}
+	}
+	return nil
 }
 
 func stringArgs(values []string) []any {
@@ -180,13 +199,7 @@ func (s *Service) CreateComment(ctx context.Context, a core.Actor, resourceType,
 			return e
 		}
 		for _, userID := range p.MentionUserIDs {
-			if e = s.Core.AuthorizeGrantHolder(ctx, tx, userID, "colaboracion.view", resource.OwnerID, resource.TeamID); e != nil {
-				if e == core.Forbidden {
-					return core.Invalid
-				}
-				return e
-			}
-			if e = s.Core.AuthorizeGrantHolder(ctx, tx, userID, "core.documents.read", resource.DocumentOwnerID, resource.DocumentTeamID); e != nil {
+			if e = s.grantHolderCanResource(ctx, tx, userID, resource); e != nil {
 				if e == core.Forbidden {
 					return core.Invalid
 				}
