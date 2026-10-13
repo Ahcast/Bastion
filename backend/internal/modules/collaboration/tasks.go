@@ -11,20 +11,20 @@ import (
 )
 
 type Task struct {
-	ID           string    `json:"id"`
-	CreatorID    string    `json:"creator_id"`
-	AssigneeID   string    `json:"assignee_id"`
-	AssigneeName string    `json:"assignee_name"`
-	ResourceType string    `json:"resource_type,omitempty"`
-	ResourceID   string    `json:"resource_id,omitempty"`
-	ResourceLabel string   `json:"resource_label,omitempty"`
-	Title        string    `json:"title"`
-	Note         string    `json:"note,omitempty"`
-	DueDate      string    `json:"due_date,omitempty"`
-	Status       string    `json:"status"`
-	Version      uint64    `json:"version,string"`
-	CreatedAt    time.Time `json:"created_at"`
-	UpdatedAt    time.Time `json:"updated_at"`
+	ID            string    `json:"id"`
+	CreatorID     string    `json:"creator_id"`
+	AssigneeID    string    `json:"assignee_id"`
+	AssigneeName  string    `json:"assignee_name"`
+	ResourceType  string    `json:"resource_type,omitempty"`
+	ResourceID    string    `json:"resource_id,omitempty"`
+	ResourceLabel string    `json:"resource_label,omitempty"`
+	Title         string    `json:"title"`
+	Note          string    `json:"note,omitempty"`
+	DueDate       string    `json:"due_date,omitempty"`
+	Status        string    `json:"status"`
+	Version       uint64    `json:"version,string"`
+	CreatedAt     time.Time `json:"created_at"`
+	UpdatedAt     time.Time `json:"updated_at"`
 }
 
 type TaskPage struct {
@@ -127,6 +127,13 @@ func (s *Service) validateTaskAssignee(ctx context.Context, q core.Querier, id s
 			}
 			return e
 		}
+		return nil
+	}
+	if e := s.Core.AuthorizeGrantHolder(ctx, q, id, "colaboracion.view", id, ""); e != nil {
+		if e == core.Forbidden {
+			return core.Invalid
+		}
+		return e
 	}
 	return nil
 }
@@ -214,7 +221,7 @@ func (s *Service) Tasks(ctx context.Context, a core.Actor, f TaskFilter) (TaskPa
 	if !pageBounds(f.Page, f.PerPage) || (f.View != "" && f.View != "mine" && f.View != "today" && f.View != "overdue") || (f.Status != "" && !validTaskStatus(f.Status)) {
 		return out, core.Invalid
 	}
-	if e := s.Core.Authorize(ctx, s.Core.DB, a, "colaboracion.view", a.UserID, "", false); e != nil {
+	if e := s.authorizeAny(ctx, s.Core.DB, a, "colaboracion.view"); e != nil {
 		return out, e
 	}
 	rows, e := s.Core.DB.QueryContext(ctx, `SELECT CAST(t.id AS CHAR) FROM collaboration_tasks t WHERE t.creator_id=? OR t.assignee_id=? ORDER BY COALESCE(t.due_date,'9999-12-31'),t.updated_at DESC,t.id DESC`, a.UserID, a.UserID)
@@ -329,10 +336,10 @@ func (s *Service) ChangeTaskStatus(ctx context.Context, a core.Actor, id, key st
 		if e != nil {
 			return e
 		}
-		if a.UserID != t.AssigneeID || !activeTaskStatus(t.Status) || !activeTaskStatus(p.Status) && p.Status != "done" && p.Status != "cancelled" {
+		if a.UserID != t.AssigneeID {
 			return core.Forbidden
 		}
-		if (t.Status == "done" || t.Status == "cancelled") && activeTaskStatus(p.Status) {
+		if !activeTaskStatus(t.Status) {
 			return core.Conflict
 		}
 		out, e = s.Core.Idempotent(ctx, tx, a, "collaboration.task.status:"+id, key, p, func() (any, error) {
@@ -434,12 +441,15 @@ func (s *Service) TaskAssignees(ctx context.Context, a core.Actor, resourceType,
 			return nil, e
 		}
 		if resource != nil {
-			if e = s.grantHolderCanResource(ctx, s.Core.DB, item.ID, *resource); e != nil {
-				if e == core.Forbidden {
-					continue
-				}
-				return nil, e
+			e = s.grantHolderCanResource(ctx, s.Core.DB, item.ID, *resource)
+		} else {
+			e = s.Core.AuthorizeGrantHolder(ctx, s.Core.DB, item.ID, "colaboracion.view", item.ID, "")
+		}
+		if e != nil {
+			if e == core.Forbidden {
+				continue
 			}
+			return nil, e
 		}
 		out = append(out, item)
 		if len(out) == 50 {
