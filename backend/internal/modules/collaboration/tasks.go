@@ -4,6 +4,8 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -102,6 +104,57 @@ func validateTaskInput(p TaskInput) error {
 	return nil
 }
 
+// Task writes can require FK locks on both participants. Acquire user rows in
+// numeric order before authorization/task locks, then recheck the participant
+// snapshot under the task lock. This also protects concurrent reassignment.
+func lockTaskUsers(ctx context.Context, tx *sql.Tx, ids ...string) error {
+	values := make([]uint64, 0, len(ids))
+	seen := map[uint64]bool{}
+	for _, id := range ids {
+		n, e := strconv.ParseUint(id, 10, 64)
+		if e != nil || n == 0 {
+			return core.Invalid
+		}
+		if !seen[n] {
+			seen[n] = true
+			values = append(values, n)
+		}
+	}
+	sort.Slice(values, func(i, j int) bool { return values[i] < values[j] })
+	for _, id := range values {
+		var found uint64
+		if e := tx.QueryRowContext(ctx, `SELECT id FROM users WHERE id=? FOR UPDATE`, id).Scan(&found); e == sql.ErrNoRows {
+			return core.Missing
+		} else if e != nil {
+			return e
+		}
+	}
+	return nil
+}
+func (s *Service) lockTaskParticipants(ctx context.Context, tx *sql.Tx, a core.Actor, id string, extra ...string) error {
+	var creator, assignee string
+	if e := tx.QueryRowContext(ctx, `SELECT CAST(creator_id AS CHAR),CAST(assignee_id AS CHAR) FROM collaboration_tasks WHERE id=?`, id).Scan(&creator, &assignee); e == sql.ErrNoRows {
+		return core.Missing
+	} else if e != nil {
+		return e
+	}
+	if a.UserID != creator && a.UserID != assignee {
+		return core.Missing
+	}
+	ids := append([]string{creator, assignee, a.UserID}, extra...)
+	if e := lockTaskUsers(ctx, tx, ids...); e != nil {
+		return e
+	}
+	var currentCreator, currentAssignee string
+	if e := tx.QueryRowContext(ctx, `SELECT CAST(creator_id AS CHAR),CAST(assignee_id AS CHAR) FROM collaboration_tasks WHERE id=? FOR UPDATE`, id).Scan(&currentCreator, &currentAssignee); e != nil {
+		return e
+	}
+	if creator != currentCreator || assignee != currentAssignee {
+		return core.Conflict
+	}
+	return nil
+}
+
 func (s *Service) activeUser(ctx context.Context, q core.Querier, id string) error {
 	var active bool
 	var secret sql.NullString
@@ -145,6 +198,9 @@ func (s *Service) CreateTask(ctx context.Context, a core.Actor, key string, p Ta
 	}
 	var out any
 	e := s.Core.Transact(ctx, func(tx *sql.Tx) error {
+		if e := lockTaskUsers(ctx, tx, a.UserID, p.AssigneeID); e != nil {
+			return e
+		}
 		if e := s.authorizeAny(ctx, tx, a, "colaboracion.view"); e != nil {
 			return e
 		}
@@ -190,6 +246,15 @@ func (s *Service) CreateTask(ctx context.Context, a core.Actor, key string, p Ta
 
 func (s *Service) task(ctx context.Context, q core.Querier, a core.Actor, id string, lock bool) (Task, error) {
 	var t Task
+	if lock {
+		tx, ok := q.(*sql.Tx)
+		if !ok {
+			return t, core.Invalid
+		}
+		if e := s.lockTaskParticipants(ctx, tx, a, id); e != nil {
+			return t, e
+		}
+	}
 	if e := s.authorizeAny(ctx, q, a, "colaboracion.view"); e != nil {
 		return t, e
 	}
@@ -292,6 +357,9 @@ func (s *Service) UpdateTask(ctx context.Context, a core.Actor, id, key string, 
 	}
 	var out any
 	e := s.Core.Transact(ctx, func(tx *sql.Tx) error {
+		if e := s.lockTaskParticipants(ctx, tx, a, id, p.AssigneeID); e != nil {
+			return e
+		}
 		t, e := s.task(ctx, tx, a, id, true)
 		if e != nil {
 			return e

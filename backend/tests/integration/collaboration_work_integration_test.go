@@ -269,6 +269,26 @@ func TestCollaborationTaskAtomicityContentionAndIsolation(t *testing.T) {
 	if err != nil || page.Total != 0 {
 		t.Fatal("unrelated actor enumerated personal task", page, err)
 	}
+	// Opposite assignments must use the same participant lock order too.
+	crossed := make(chan error, 2)
+	wg.Add(2)
+	go func() {
+		defer wg.Done()
+		_, err := service.CreateTask(ctx, creator, "cross-assignment-a", collaboration.TaskInput{AssigneeID: assignee.UserID, Title: "Trabajo A"})
+		crossed <- err
+	}()
+	go func() {
+		defer wg.Done()
+		_, err := service.CreateTask(ctx, assignee, "cross-assignment-b", collaboration.TaskInput{AssigneeID: creator.UserID, Title: "Trabajo B"})
+		crossed <- err
+	}()
+	wg.Wait()
+	close(crossed)
+	for err := range crossed {
+		if err != nil {
+			t.Fatal("cross assignment locks", err)
+		}
+	}
 	// Replay remains the same identity even after the task progressed.
 	replay, err := service.CreateTask(ctx, creator, "same-task-intent", input)
 	if err != nil {

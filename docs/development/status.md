@@ -442,3 +442,6 @@ Backend evita bloquear usuario asignado mediante JOIN al bloquear tarea; prueba 
 
 
 Colaboración U4, revisión Core.Files: GET/PUT vínculos ahora llama DocumentMetadata para revalidar permiso Core, policy propietaria, binding y papelera antes de exponer/modificar/replay. Integración prueba revocación de core.documents.read y replay previo, versión sin cambio tras rechazo, y papelera por TrashEntry real seguida de lectura/escritura denegadas. No cambia bytes ni requiere grants nuevos. Requiere CI de esta revisión antes de aceptación.
+
+
+CI 38333700732 sobre 2ec3c03 aprobó Angular/169 y navegador20/20, pero la prueba nueva de dos actores detectó deadlock MySQL1213. Quitar JOIN no fue suficiente: UPDATE también requiere locks FK de participantes. Se corrige adquisición de usuarios creador/asignado/actor/nuevo asignado en orden numérico antes de autorización/fila de tarea, con revalidación de participantes al bloquear tarea. Creates cruzados usan mismo orden. No se oculta el deadlock ni se cambia la expectativa de éxito+conflicto; requiere nueva CI.
