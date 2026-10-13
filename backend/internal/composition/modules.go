@@ -269,12 +269,28 @@ func RegisterFiles(s *core.Service, r *registry.Registry, logger *slog.Logger, o
 		collaborationService.ResourcePolicies = map[string]collaboration.ResourcePolicy{
 			"collaboration": collaborationService.CollaborationEntryResource,
 		}
+		if processEnabled {
+			collaborationService.ResourcePolicies["processes"] = collaboration.OwnerResourcePolicy("procesos.view", processService)
+		}
+		if quoteEnabled {
+			collaborationService.ResourcePolicies["quotes"] = collaboration.OwnerResourcePolicy("cotizaciones.view", quoteService)
+		}
+		if purchaseOrderEnabled {
+			collaborationService.ResourcePolicies["purchase_orders"] = collaboration.OwnerResourcePolicy("ordenes.view", purchaseOrderService)
+		}
+		if invoiceEnabled {
+			collaborationService.ResourcePolicies["invoices"] = collaboration.OwnerResourcePolicy("facturas.view", invoiceService)
+		}
+		if workflowEnabled {
+			collaborationService.Approvals = approvalService
+		}
 		s.DocumentPolicies["collaboration"] = collaborationService.DocumentPolicy
 		s.DocumentBindingPolicies["collaboration"] = collaborationService.DocumentBindingPolicy
 		s.DocumentVersionPolicies["collaboration"] = collaborationService.DocumentVersionPolicy
 		s.DocumentTrashPolicies["collaboration"] = collaborationService.DocumentTrashPolicy
 	} else {
 		collaborationService.ResourcePolicies = nil
+		collaborationService.Approvals = nil
 		delete(s.DocumentPolicies, "collaboration")
 		delete(s.DocumentBindingPolicies, "collaboration")
 		delete(s.DocumentVersionPolicies, "collaboration")
