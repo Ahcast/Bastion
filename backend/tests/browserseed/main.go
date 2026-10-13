@@ -155,7 +155,7 @@ func main() {
 	if _, e = db.Exec(`INSERT INTO roles(name) VALUES('Colaboración sintético')`); e != nil {
 		log.Fatal(e)
 	}
-	if _, e = db.Exec(`INSERT INTO role_permissions SELECT r.id,p.name,'all' FROM roles r JOIN permissions p ON p.name IN ('colaboracion.view','colaboracion.upload','colaboracion.organize','colaboracion.delete','colaboracion.comment','core.documents.read','core.documents.write') WHERE r.name='Colaboración sintético'`); e != nil {
+	if _, e = db.Exec(`INSERT INTO role_permissions SELECT r.id,p.name,'all' FROM roles r JOIN permissions p ON p.name IN ('colaboracion.view','colaboracion.upload','colaboracion.organize','colaboracion.delete','colaboracion.comment','colaboracion.task','colaboracion.link','procesos.view','core.documents.read','core.documents.write') WHERE r.name='Colaboración sintético'`); e != nil {
 		log.Fatal(e)
 	}
 	if _, e = db.Exec(`INSERT INTO user_roles SELECT u.id,r.id FROM users u JOIN roles r ON r.name='Colaboración sintético' WHERE u.email='collaboration@example.test'`); e != nil {
