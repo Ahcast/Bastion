@@ -1,6 +1,7 @@
 package collaboration
 
 import (
+	"github.com/Ahcast/Bastion/backend/internal/core"
 	"strings"
 	"testing"
 )
@@ -35,5 +36,22 @@ func TestCommentBodyAndMentionGrantBoundary(t *testing.T) {
 	}
 	if len(args) != 4 || args[0] != "core.documents.read" || args[1] != "19" || args[2] != "27" || args[3] != "27" {
 		t.Fatalf("unexpected mention grant arguments: %#v", args)
+	}
+}
+
+func TestLinksRejectEquivalentNumericDuplicates(t *testing.T) {
+	input := SetLinksInput{Version: 1, Links: []LinkInput{{ResourceType: "quotes", ResourceID: "1", ResourceVersion: 1}, {ResourceType: "quotes", ResourceID: "01", ResourceVersion: 1}}}
+	if e := validateLinksInput(input); e != core.Invalid {
+		t.Fatal("equivalent IDs reached SQL duplicate constraint", e)
+	}
+	input.Links[1].ResourceType = "invoices"
+	if e := validateLinksInput(input); e != nil {
+		t.Fatal("different resource types rejected", e)
+	}
+	input.Links[0].ResourceID = "18446744073709551615"
+	input.Links[1].ResourceType = "quotes"
+	input.Links[1].ResourceID = "018446744073709551615"
+	if e := validateLinksInput(input); e != core.Invalid {
+		t.Fatal("BIGINT equivalent duplicate", e)
 	}
 }

@@ -464,3 +464,9 @@ Conversation: IDs de mención normalizados/copias privadas, locks numéricos de 
 Propietarios reales: nuevo collaboration_owner_acceptance_test.go crea Proceso por Import, Cotización/OC/Factura por Save, enlaza los cuatro, comenta y asigna tarea con acceso real. Verifica paridad de agregados comerciales, version/stale histórico, revocación por registro, papelera de Quote/OC y cancelación Invoice por servicios propietarios; evidencia conservada y replays denegados. Workflow RequestApproval/DecideApproval reales, bandeja readonly, exclusión del solicitante/revocación y recurso sin política. PendingInbox incorpora puerto de visibilidad propietario antes de total/página, sin escribir estados ni importar Colaboración.
 
 Navegador agrega escenario 21: solicitar aprobación, verla desde Colaboración con otro humano, abrir el ID de cotización, decidir en propietario y comprobar salida de bandeja. Dos identidades sintéticas nuevas con MFA, sin grants productivos. Local formato/vet/Go y build/169 unitarias Angular aprobados; integración local omitida por DSN ausente. MySQL5.7/race y browser21 pendientes de CI antes del cierre de módulo; producción y conexiones externas permanecen pendientes.
+
+
+Aceptación de DTO: vínculos detectan IDs numéricamente equivalentes (`1`/`01`, incluido BIGINT UNSIGNED máximo) como duplicados antes de escribir SQL. Antes alcanzaban la restricción única como error interno. Prueba pura conserva distinción por tipo de recurso y precisión exacta; sin nueva migración ni cambios de transporte.
+
+
+CI 38337809698 / 1e3be54: Angular169/browser21 aprobados; tres integraciones de propietarios/Workflow reales aprobadas. La prueba nueva de menciones concurrentes usaba claves de 7 caracteres y Core exige >=8; fue rechazada por validación antes de ejecutar la carrera. Se corrige sólo el fixture a claves largas, sin relajar Core. Requiere repetición completa, junto a validación de aliases de vínculos.

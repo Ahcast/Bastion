@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -44,8 +45,12 @@ func validateLinksInput(p SetLinksInput) error {
 	}
 	seen := map[string]bool{}
 	for _, l := range p.Links {
-		key := l.ResourceType + ":" + l.ResourceID
-		if !linkTypeAllowed(l.ResourceType) || core.ID(l.ResourceID) != nil || l.ResourceVersion == 0 || l.ResourceVersion == ^uint64(0) || seen[key] {
+		if !linkTypeAllowed(l.ResourceType) || core.ID(l.ResourceID) != nil || l.ResourceVersion == 0 || l.ResourceVersion == ^uint64(0) {
+			return core.Invalid
+		}
+		n, _ := strconv.ParseUint(l.ResourceID, 10, 64)
+		key := l.ResourceType + ":" + strconv.FormatUint(n, 10)
+		if seen[key] {
 			return core.Invalid
 		}
 		seen[key] = true

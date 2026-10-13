@@ -158,3 +158,6 @@ Los IDs de mención se normalizan como BIGINT decimal antes de comprobar unicida
 
 
 Bandeja Workflow: además de sus permisos lectura/decisión, cada candidato requiere política de recurso propietario registrada y acceso vigente a ese recurso. La comprobación se ejecuta antes de total/página; recurso eliminado/inaccesible o módulo sin policy no expone solicitud ni afecta conteos. Workflow recibe un puerto de visibilidad de Colaboración; no importa módulos concretos ni copia sus tablas. Una mención/aprobación nunca concede permisos.
+
+
+La unicidad de vínculos usa el valor BIGINT y el tipo de recurso: `1`/`01` identifican el mismo registro y se rechazan como duplicados antes de SQL. Esto evita un error interno/reintento persistente de la UI por aliases numéricos; conserva comparación exacta hasta BIGINT UNSIGNED sin float.

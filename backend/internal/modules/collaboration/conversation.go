@@ -3,6 +3,7 @@ package collaboration
 import (
 	"context"
 	"database/sql"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -186,7 +187,7 @@ func (s *Service) CreateComment(ctx context.Context, a core.Actor, resourceType,
 	}
 	// Normalize into a private slice before sorting: equivalent BIGINT IDs
 	// must not create self-notifications/duplicate mentions or mutate caller data.
-	p.MentionUserIDs = append([]string(nil), p.MentionUserIDs...)
+	p.MentionUserIDs = slices.Clone(p.MentionUserIDs)
 	for i, userID := range p.MentionUserIDs {
 		if core.ID(userID) != nil {
 			return nil, core.Invalid

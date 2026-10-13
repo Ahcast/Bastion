@@ -178,9 +178,9 @@ func TestCollaborationCrossedMentionsConcurrentReplayAndDeletion(t *testing.T) {
 		wg.Add(1)
 		go func(i int) {
 			defer wg.Done()
-			actor, recipient, key := a, b, "cross-a"
+			actor, recipient, key := a, b, "cross-actor-a"
 			if i%2 == 1 {
-				actor, recipient, key = b, a, "cross-b"
+				actor, recipient, key = b, a, "cross-actor-b"
 			}
 			_, err := service.CreateComment(ctx, actor, "collaboration", entry, key, collaboration.CommentInput{Body: "Comentario " + key, MentionUserIDs: []string{recipient.UserID}})
 			errs <- err
