@@ -448,3 +448,10 @@ CI 38333700732 sobre 2ec3c03 aprobó Angular/169 y navegador20/20, pero la prueb
 
 
 La revisión de log completo detectó además timeout global de paquete a los 360.027s en CI 38333700732, al iniciar TestPurchaseOrderHTTPStrictContract (0s), después de progresar por la suite. El límite 6m no alcanza de forma estable para la suite creciente de ~190 integraciones MySQL con reconstrucción de esquema. Se aumenta a 12m, conservando todos los tests/race y fallos explícitos. Este ajuste no elimina la prueba de deadlock ni su corrección de orden de locks.
+
+
+## 2026-10-12 — Colaboración: bloque de correcciones U3/U4 certificado
+
+Código `3af770964ebcea2cd87202211b8059ece1b1952a`, Core checks [38335121065](https://github.com/Ahcast/Bastion/actions/runs/38335121065), documentación [38335121107](https://github.com/Ahcast/Bastion/actions/runs/38335121107) y rama única [38335121100](https://github.com/Ahcast/Bastion/actions/runs/38335121100): success. Backend formato/vet/race/MySQL5.7 y builds; Angular build/169 pruebas; navegador 20/20. Edición real de tareas, cierres/reapertura y vínculos cubiertos en browser. Integración pasó doce creates, rollback por evento, carrera de dos actores con éxito+conflicto y asignaciones cruzadas; sorted participant locks eliminó deadlock observado. Revocación Core.Files/replay/papelera y view en tareas personales aprobados.
+
+Este bloque está certificado; módulo sigue activo para revisión/ampliación de aceptación transversal de conversación concurrente y recursos/Workflow con propietarios reales. No comenzar API/MCP IA ni declarar cierre integral antes de revisar esos casos de la matriz. No despliegue, migración productiva, S3/scanner/SMTP/Percona/DNS reales acreditados.

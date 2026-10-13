@@ -69,3 +69,10 @@ El módulo sólo se considera cerrado cuando la misma revisión de `main` aprueb
 ## Gates externos fuera de esta certificación
 
 S3/IAM y scanner reales, Percona Bluehost remoto, DNS/HTTPS/CSP/WAF, correo real, backups/restores, despliegue Lightsail/Bluehost y OAuth/ChatGPT Work siguen requiriendo validación productiva separada.
+
+
+## Evidencia del bloque de correcciones U3/U4
+
+`3af7709`, Core 38335121065: Go/race/MySQL5.7/builds, Angular169 y navegador20/20 aprobados. `collaboration_work_integration_test.go` cubre lifecycle/vistas/replays/revocación/pool de una conexión; snapshot/stale/terminal y Core.Files revocado/papelera/replay en vínculos; bandeja Workflow de solo lectura; doce creates, rollback, aislamiento y carrera creator/update vs assignee/status/asignaciones cruzadas. `work.spec.ts` e `integrations.spec.ts` verifican recuperación de intención y recarga fallida; browser verifica editar/completar/reabrir y agregar/quitar vínculo.
+
+Esta evidencia certifica el bloque corregido. La revisión final debe ampliar conversación concurrente y comprobar integración de recursos/bandeja con propietarios reales antes del cierre integral del módulo; no confundir una política sintética de recurso en una prueba aislada con aceptación transversal completa.
