@@ -2,7 +2,6 @@ package workflow
 
 import (
 	"context"
-	"database/sql"
 	"time"
 
 	"github.com/Ahcast/Bastion/backend/internal/core"
@@ -35,21 +34,30 @@ func (s *Service) PendingInbox(ctx context.Context, a core.Actor, page, perPage 
 	if a.Type != "user" || page < 1 || page > 100000 || perPage < 1 || perPage > 100 {
 		return out, core.Invalid
 	}
-	rows, e := s.Core.DB.QueryContext(ctx, `SELECT CAST(id AS CHAR),action,entity_type,CAST(entity_id AS CHAR),entity_version,CAST(owner_id AS CHAR),team_id,view_permission,decision_permission,CAST(requested_by AS CHAR),status,reason,expires_at,version FROM approvals WHERE status='pending' AND expires_at>UTC_TIMESTAMP(6) ORDER BY expires_at,id`)
-	if e != nil {
-		return out, e
-	}
-	defer rows.Close()
 	type candidate struct {
 		InboxItem
 		owner, team, viewPermission, decisionPermission string
 	}
-	visible := []InboxItem{}
+	rows, e := s.Core.DB.QueryContext(ctx, `SELECT CAST(id AS CHAR),action,entity_type,CAST(entity_id AS CHAR),entity_version,CAST(owner_id AS CHAR),team_id,view_permission,decision_permission,CAST(requested_by AS CHAR),status,reason,expires_at,version FROM approvals WHERE status='pending' AND expires_at>UTC_TIMESTAMP(6) ORDER BY expires_at,id`)
+	if e != nil {
+		return out, e
+	}
+	candidates := []candidate{}
 	for rows.Next() {
 		var c candidate
 		if e = rows.Scan(&c.ID, &c.Action, &c.EntityType, &c.EntityID, &c.EntityVersion, &c.owner, &c.team, &c.viewPermission, &c.decisionPermission, &c.RequestedBy, &c.Status, &c.Reason, &c.ExpiresAt, &c.Version); e != nil {
+			rows.Close()
 			return out, e
 		}
+		candidates = append(candidates, c)
+	}
+	e = rows.Err()
+	rows.Close()
+	if e != nil {
+		return out, e
+	}
+	visible := []InboxItem{}
+	for _, c := range candidates {
 		if c.RequestedBy == a.UserID || c.owner == a.UserID {
 			continue
 		}
@@ -66,9 +74,6 @@ func (s *Service) PendingInbox(ctx context.Context, a core.Actor, page, perPage 
 			return out, e
 		}
 		visible = append(visible, c.InboxItem)
-	}
-	if e = rows.Err(); e != nil && e != sql.ErrNoRows {
-		return out, e
 	}
 	out.Total = len(visible)
 	start := (page - 1) * perPage
