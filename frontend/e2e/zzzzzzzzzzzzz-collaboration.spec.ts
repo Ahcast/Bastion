@@ -80,6 +80,66 @@ test("Colaboración: carga privada, cuarentena y papelera reversible", async ({
   await markedRead;
   await reviewerContext.close();
 
+  await page.goto("/collaboration/work");
+  await expect(page.getByRole("heading", { name: "Mi trabajo", exact: true })).toBeVisible();
+  await page.getByLabel("Título", { exact: true }).fill("Revisar archivo sintético");
+  await page.getByLabel("Asignar a", { exact: true }).selectOption({
+    label: "Operador Colaboración sintético",
+  });
+  const taskCreated = page.waitForResponse(
+    (r) => r.request().method() === "POST" &&
+      r.url().endsWith("/api/v1/collaboration/tasks") && r.status() === 200,
+  );
+  await page.getByRole("button", { name: "Crear tarea", exact: true }).click();
+  await taskCreated;
+  await expect(page.getByText("Revisar archivo sintético", { exact: true })).toBeVisible();
+  const taskDone = page.waitForResponse(
+    (r) => r.request().method() === "POST" &&
+      /\/api\/v1\/collaboration\/tasks\/[0-9]+\/status$/.test(r.url()) &&
+      r.status() === 200,
+  );
+  await page.getByRole("button", { name: "Completar", exact: true }).click();
+  await taskDone;
+  await expect(page.getByRole("button", { name: "Reabrir", exact: true })).toBeVisible();
+  const taskReopened = page.waitForResponse(
+    (r) => r.request().method() === "POST" &&
+      /\/api\/v1\/collaboration\/tasks\/[0-9]+\/reopen$/.test(r.url()) &&
+      r.status() === 200,
+  );
+  await page.getByRole("button", { name: "Reabrir", exact: true }).click();
+  await taskReopened;
+  await expect(page.getByRole("button", { name: "Completar", exact: true })).toBeVisible();
+
+  const processResponse = await page.request.get("http://localhost:8080/api/v1/processes/1");
+  expect(processResponse.ok()).toBeTruthy();
+  const process = await processResponse.json();
+  await page.goto("/collaboration/integrations");
+  await expect(page.getByRole("heading", { name: "Integraciones y aprobaciones" })).toBeVisible();
+  await expect(page.getByText("Las decisiones se realizan únicamente en el módulo propietario.")).toBeVisible();
+  await page.getByLabel("ID de biblioteca", { exact: true }).fill(entry.id);
+  await page.getByRole("button", { name: "Cargar vínculos", exact: true }).click();
+  await expect(page.getByText("Archivo: Manual sintético", { exact: false })).toBeVisible();
+  await page.getByLabel("ID", { exact: true }).fill("1");
+  await page.getByLabel("Versión actual", { exact: true }).fill(String(process.version));
+  const linkSaved = page.waitForResponse(
+    (r) => r.request().method() === "PUT" &&
+      r.url().endsWith("/api/v1/collaboration/" + entry.id + "/links") &&
+      r.status() === 200,
+  );
+  await page.getByRole("button", { name: "Agregar y guardar", exact: true }).click();
+  await linkSaved;
+  await expect(page.getByRole("button", { name: "Quitar", exact: true })).toBeVisible();
+  const linkRemoved = page.waitForResponse(
+    (r) => r.request().method() === "PUT" &&
+      r.url().endsWith("/api/v1/collaboration/" + entry.id + "/links") &&
+      r.status() === 200,
+  );
+  await page.getByRole("button", { name: "Quitar", exact: true }).click();
+  await linkRemoved;
+  await expect(page.getByText("No hay vínculos cargados.", { exact: true })).toBeVisible();
+  await page.goto("/collaboration");
+  await page.getByRole("button", { name: /Biblioteca sintética/ }).click();
+
   const trashed = page.waitForResponse((r) => r.request().method() === "DELETE" && /\/api\/v1\/collaboration\/[0-9]+$/.test(r.url()) && r.status() === 200);
   await page.getByRole("button", { name: "Enviar a papelera", exact: true }).click();
   await trashed;
