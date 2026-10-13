@@ -110,7 +110,7 @@ interface Assignee { id: string; name: string }
           } @empty { <li>No hay tareas para esta vista.</li> }
         </ul>
       </section>
-      <app-reauthentication />
+      <bastion-reauthentication />
     </section>
   `,
 })
