@@ -75,7 +75,7 @@ interface Entry { id: string; version: string; title: string }
             <label>Versión actual<input [(ngModel)]="newVersion" inputmode="numeric" /></label>
             <button type="button" (click)="add()">Agregar y guardar</button>
           </fieldset>
-          <app-reauthentication />
+          <bastion-reauthentication />
         }
       </section>
     </section>
