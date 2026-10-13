@@ -17,7 +17,7 @@ describe('Correo comercial de cotizaciones',()=>{
  it('conserva el destinatario introducido mientras finaliza la actualización del ledger',async()=>{
   api.has.mockImplementation((p:string)=>p!=='core.documents.read');
   const fixture=TestBed.createComponent(QuoteEmail);
-  fixture.componentInstance.quote=quote;
+  fixture.componentInstance.quote={...quote,customer:{email:''}};
   fixture.componentInstance.resetForm();
   fixture.detectChanges();
   const input=fixture.nativeElement.querySelector('input[placeholder="cliente@ejemplo.com"]') as HTMLInputElement;

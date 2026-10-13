@@ -32,6 +32,22 @@ function fixture(client: ReturnType<typeof api>) {
 }
 
 describe("Colaboración trabajo", () => {
+  it("asocia el selector de asignado a una etiqueta estable", async () => {
+    const client = api();
+    TestBed.configureTestingModule({ providers: [{ provide: Client, useValue: client }] });
+    const fixture = TestBed.createComponent(CollaborationWork);
+    await fixture.componentInstance.ngOnInit();
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+    const select = fixture.nativeElement.querySelector('select[aria-label="Asignar a"]') as HTMLSelectElement;
+    expect(select).toBeTruthy();
+    expect(Array.from(select.options).map(o => o.textContent?.trim())).toContain("Operador");
+    select.value = "11";
+    select.dispatchEvent(new Event("change", { bubbles: true }));
+    await fixture.whenStable();
+    expect(fixture.componentInstance.assigneeID).toBe("11");
+  });
   it("consulta Mi trabajo con filtros canónicos", async () => {
     const client = api();
     const component = fixture(client);

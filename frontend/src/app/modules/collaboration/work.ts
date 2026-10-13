@@ -64,7 +64,7 @@ interface Assignee { id: string; name: string }
           <label>Título<input [(ngModel)]="title" maxlength="180" /></label>
           <label>Nota<textarea [(ngModel)]="note" maxlength="4000"></textarea></label>
           <label>Asignar a
-            <select [(ngModel)]="assigneeID">
+            <select aria-label="Asignar a" [(ngModel)]="assigneeID">
               <option value="">Seleccione</option>
               @for (u of assignees(); track u.id) { <option [value]="u.id">{{ u.name }}</option> }
             </select>

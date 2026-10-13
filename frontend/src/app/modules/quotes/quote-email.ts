@@ -56,7 +56,10 @@ interface EmailIntent {id:string;quote_version:string;pdf_snapshot_id:string;cre
 export class QuoteEmail implements OnChanges{
  @Input({required:true}) quote!:EmailQuote;
  api=inject(Client);busy=signal(false);error=signal('');issuedPDFs=signal<PDFSnapshot[]>([]);documents=signal<DocumentRef[]>([]);intents=signal<EmailIntent[]>([]);total=signal(0);page=1;
- pdfSnapshotId='';to='';cc='';bcc='';subject='';message='';scheduledAt='';expiresAt='';reason='';decisionReason='';attachmentIds:string[]=[];private pending=new Map<string,string>();private quoteKey='';
+ private recipient=signal('');
+ get to(){return this.recipient()}
+ set to(value:string){this.recipient.set(value)}
+ pdfSnapshotId='';cc='';bcc='';subject='';message='';scheduledAt='';expiresAt='';reason='';decisionReason='';attachmentIds:string[]=[];private pending=new Map<string,string>();private quoteKey='';
  ngOnChanges(){if(!this.quote||this.quote.id===this.quoteKey)return;this.quoteKey=this.quote.id;this.page=1;this.resetForm();void this.refresh()}
  private localInput(ms:number){return new Date(Date.now()+ms-6*60*60*1000).toISOString().slice(0,16)}
  private hondurasISO(v:string){if(!v)throw new Error('Indique fecha y hora.');const d=new Date(v+'-06:00');if(Number.isNaN(d.getTime()))throw new Error('Fecha u hora inválida.');return d.toISOString()}
