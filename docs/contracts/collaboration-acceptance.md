@@ -75,10 +75,10 @@ S3/IAM y scanner reales, Percona Bluehost remoto, DNS/HTTPS/CSP/WAF, correo real
 
 `3af7709`, Core 38335121065: Go/race/MySQL5.7/builds, Angular169 y navegador20/20 aprobados. `collaboration_work_integration_test.go` cubre lifecycle/vistas/replays/revocación/pool de una conexión; snapshot/stale/terminal y Core.Files revocado/papelera/replay en vínculos; bandeja Workflow de solo lectura; doce creates, rollback, aislamiento y carrera creator/update vs assignee/status/asignaciones cruzadas. `work.spec.ts` e `integrations.spec.ts` verifican recuperación de intención y recarga fallida; browser verifica editar/completar/reabrir y agregar/quitar vínculo.
 
-Esta evidencia certifica el bloque corregido. La revisión final debe ampliar conversación concurrente y comprobar integración de recursos/bandeja con propietarios reales antes del cierre integral del módulo; no confundir una política sintética de recurso en una prueba aislada con aceptación transversal completa.
+Esta evidencia histórica certificó el bloque corregido; la ampliación transversal y su cierre se documentan a continuación.
 
 
-## Aceptación transversal final preparada
+## Aceptación transversal final certificada
 
 | Caso | Prueba |
 | --- | --- |
@@ -88,4 +88,4 @@ Esta evidencia certifica el bloque corregido. La revisión final debe ampliar co
 | Workflow real, permisos, propietario registrado, solicitud propia, decisión y sólo lectura | TestCollaborationRealWorkflowInboxUsesOwnerAccessAndDecisionState |
 | Navegador con dos humanos, bandeja→ID propietario→decisión→salida de bandeja | collaboration-approvals.spec.ts |
 
-Pruebas nuevas deben pasar junto a regresión completa en CI antes de certificar esta aceptación. Las políticas sintéticas aisladas se conservan como pruebas unitarias de contrato; estos nuevos casos usan servicios y tablas propietarias reales sobre MySQL5.7 sintético, sin sustituir conexiones productivas.
+Código `70163c9cb074a6285188cc812bdf9a408dfe8659`: [Core checks 38338667906](https://github.com/Ahcast/Bastion/actions/runs/38338667906), [documentación 38338667902](https://github.com/Ahcast/Bastion/actions/runs/38338667902) y [rama única 38338667908](https://github.com/Ahcast/Bastion/actions/runs/38338667908): success. Go fmt/vet/race sobre MySQL5.7 y builds server/worker/admin; Angular build/169 pruebas; navegador 21/21. Todas las unidades U1–U4 y aceptación integral cerradas para el alcance de desarrollo sintético. Las políticas sintéticas aisladas se conservan como pruebas unitarias de contrato; estos nuevos casos usan servicios y tablas propietarias reales sobre MySQL5.7 sintético, sin sustituir conexiones productivas.

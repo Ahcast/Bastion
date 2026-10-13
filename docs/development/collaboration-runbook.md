@@ -76,3 +76,10 @@ Sólo cerrar el módulo cuando el mismo HEAD tenga verdes:
 3. Single branch policy.
 
 Después registrar SHA/run IDs en `docs/ESTADO_DESARROLLO.md`. La certificación no equivale a despliegue ni valida S3/scanner/SMTP/Percona/DNS productivos.
+
+
+## Evidencia vigente de cierre
+
+Código `70163c9cb074a6285188cc812bdf9a408dfe8659`: [Core checks 38338667906](https://github.com/Ahcast/Bastion/actions/runs/38338667906), [documentación 38338667902](https://github.com/Ahcast/Bastion/actions/runs/38338667902) y [rama única 38338667908](https://github.com/Ahcast/Bastion/actions/runs/38338667908): success. Go fmt/vet/race sobre MySQL5.7 y builds server/worker/admin; Angular build/169 pruebas; navegador 21/21. Todas las unidades U1–U4 y aceptación integral cerradas para el alcance de desarrollo sintético.
+
+La aceptación transversal usa servicios propietarios reales y dos humanos en navegador. Casos y resultados exactos en la matriz de aceptación y checkpoint.

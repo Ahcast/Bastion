@@ -470,3 +470,12 @@ Aceptación de DTO: vínculos detectan IDs numéricamente equivalentes (`1`/`01`
 
 
 CI 38337809698 / 1e3be54: Angular169/browser21 aprobados; tres integraciones de propietarios/Workflow reales aprobadas. La prueba nueva de menciones concurrentes usaba claves de 7 caracteres y Core exige >=8; fue rechazada por validación antes de ejecutar la carrera. Se corrige sólo el fixture a claves largas, sin relajar Core. Requiere repetición completa, junto a validación de aliases de vínculos.
+
+
+## 2026-10-12 — Colaboración completada: U1–U4 y aceptación integral
+
+Código `70163c9cb074a6285188cc812bdf9a408dfe8659`: [Core checks 38338667906](https://github.com/Ahcast/Bastion/actions/runs/38338667906), [documentación 38338667902](https://github.com/Ahcast/Bastion/actions/runs/38338667902) y [rama única 38338667908](https://github.com/Ahcast/Bastion/actions/runs/38338667908): success. Go fmt/vet/race sobre MySQL5.7 y builds server/worker/admin; Angular build/169 pruebas; navegador 21/21. Todas las unidades U1–U4 y aceptación integral cerradas para el alcance de desarrollo sintético.
+
+Doce replays con menciones cruzadas, borrado concurrente (un éxito/otro conflicto), lectura de notificación contra borrado y aliases de IDs aprobados. Integraciones de Process/Quote/OC/Invoice reales preservan finanzas/estados; prueban stale, revocación, papelera y anulación por propietarios, evidencia retenida y replay reautorizado. Workflow real conserva decisión/versión; bandeja excluye solicitante, recursos sin policy y accesos revocados antes del count/página. Browser21 ejerce recorrido bandeja→ID cotización→decisión propietaria→salida de pendientes con MFA humano.
+
+README/plan/checkpoint/matriz/spec/runbook actualizados; siguiente fase 6 API/MCP IA, comenzando por contrato ejecutable de tareas/runs/reservas. Cierre de desarrollo sintético, no despliegue, OAuth/Work conectado, proveedor pagado, OCR ni aprobación fiscal/integración productiva externa.

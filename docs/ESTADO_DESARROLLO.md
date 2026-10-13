@@ -22,7 +22,7 @@ Actualizado: 2026-10-12. Checkpoint vigente para reanudar. Arquitectura, contrat
 | Facturas/pagos | Siete unidades y aceptación cerradas: borradores, fiscal interno/emisión, pagos, conversiones, PDF, anulación conservadora y clonación |
 | Gastos | Tres unidades y aceptación integral cerradas: registro/cálculo/proveedor/categorías, scopes/filtros/totales/duplicados/papelera, referencias y comprobantes privados |
 | Reportes | Tres unidades canónicas cerradas/certificadas: consultas Facturas/Órdenes/Gastos, Inicio, Excel privado y aceptación integral |
-| Colaboración | U1–U4 implementadas; aceptación integral en revisión. No certificada aún |
+| Colaboración | U1–U4 y aceptación integral cerradas/certificadas: biblioteca, conversación, tareas, vínculos y bandeja Workflow |
 | Workflows configurables e IA | Fases posteriores según dependencias; no confundir Workflow de aprobación ya integrado con configuración futura |
 | Producción | No desplegada ni migrada; integraciones externas no acreditadas por CI |
 
@@ -51,17 +51,21 @@ Migración 0033 registra permisos sin grants. Reportes intersecta scopes propios
 
 Excel privado por stream, sin URL reutilizable/archivo persistido: texto exacto, fórmulas auxiliares de centavos con cota SUM ABS SQL, dos hojas, filtros/UTC, auditoría antes de bytes y errores explícitos por 10001 filas/24MiB XML/concurrencia. Tests incluyen exportación de 128 filas independiente de página, límite 10001, montos grandes/utilidad negativa, permisos, reauth, CSRF, revocación y rollback de auditoría.
 
-## Próximo paso exacto — aceptación integral de Colaboración
+## Colaboración — aceptación integral cerrada
 
-Revisión de correcciones certificada: `3af770964ebcea2cd87202211b8059ece1b1952a`, [Core checks 38335121065](https://github.com/Ahcast/Bastion/actions/runs/38335121065), [documentación 38335121107](https://github.com/Ahcast/Bastion/actions/runs/38335121107) y [rama única 38335121100](https://github.com/Ahcast/Bastion/actions/runs/38335121100): success. Go fmt/vet/race con MySQL5.7, builds server/worker/admin, Angular build/169 pruebas y navegador 20/20 aprobados sobre la misma revisión de código.
+Código `70163c9cb074a6285188cc812bdf9a408dfe8659`: [Core checks 38338667906](https://github.com/Ahcast/Bastion/actions/runs/38338667906), [documentación 38338667902](https://github.com/Ahcast/Bastion/actions/runs/38338667902) y [rama única 38338667908](https://github.com/Ahcast/Bastion/actions/runs/38338667908): success. Go fmt/vet/race sobre MySQL5.7 y builds server/worker/admin; Angular build/169 pruebas; navegador 21/21. Todas las unidades U1–U4 y aceptación integral cerradas para el alcance de desarrollo sintético.
 
-U1–U4 implementadas. Este bloque completó edición/reasignación/vencimiento/paginación de tareas; recuperación de intención ante ACK incierto y confirmación ante recarga fallida en tareas/vínculos; descarte de respuestas tardías y limpieza tras denegación; enlaces de aprobación al ID propietario. Tareas personales revalidan view y recuperan replays tras completar/reabrir. GET/PUT vínculos y replays revalidan Core.Files, revocación y papelera.
+Biblioteca conserva Core.Files/cuarentena/versiones/papelera. Conversación conserva texto plano y destinatarios con acceso vigente; menciones cruzadas por dos actores, doce replays, doble borrado y lectura de notificación frente a borrado aprobados. Tareas permiten editar/reasignar/vencimiento, estado y reapertura explícita; locks numéricos, replays, rollback, scopes y recuperación UI certificados. Vínculos revalidan Core y ambos propietarios, conservan snapshots y omiten terminales/revocados; aliases numéricos duplicados se rechazan antes de SQL. Bandeja Workflow es readonly, aplica recurso propietario registrado antes de count/página y abre el ID correcto.
 
-Pruebas nuevas certifican doce creates concurrentes, aislamiento de terceros, rollback de estado por fallo de evento, dos actores editando/completando una misma versión y asignaciones cruzadas. Usuarios participantes se bloquean en orden numérico antes de autorizar/bloquear tarea; la prueba detectó deadlock y verificó la corrección. Cursores de candidatos se cierran antes de autorización; pool de una conexión aprobado. Suite completa conserva todos los escenarios y timeout acotado 12m por crecimiento real de la suite; no se ocultaron fallos.
+Aceptación usa Process.Import, Quote/OC/Invoice.Save, Quote/OC.Trash, Invoice.Emit/Cancel y Workflow RequestApproval/DecideApproval reales sobre la BD sintética. Comprueba paridad de agregados comerciales, tareas/conversación autorizadas, revocación, stale, módulos sin policy y evidencia no borrada. Browser con dos humanos consulta bandeja y decide sólo en Cotizaciones. No se acredita producción ni servicio externo con estos adaptadores.
 
-**Siguiente pendiente:** revisar y ampliar la matriz final de aceptación transversal de Colaboración, especialmente conversación concurrente entre actores y recursos/Workflow con propietarios reales, antes de declarar el módulo completo y avanzar a fase 6 API/MCP IA. Contrato/OpenAPI/matriz/runbook siguen siendo la entrada. Producción y conexiones externas no acreditadas.
+Contratos: [Colaboración](contracts/collaboration.md), [OpenAPI](contracts/collaboration-openapi.json), [aceptación](contracts/collaboration-acceptance.md), [runbook](development/collaboration-runbook.md).
 
-Ampliaciones analíticas de RFQ/IA, competitividad de proveedores y estados de procesos no modelados se integran por contratos propietarios en sus fases, sin datos fabricados ni cálculos de modelos. No se acredita aún el alcance completo de todas las categorías analíticas futuras del maestro. Reportes canónicos funciona sin IA.
+## Próximo paso exacto — fase 6 API/MCP IA
+
+Leer [pipeline](contracts/ai-pipeline.md), [arquitectura IA](architecture/ai-integration.md), [resultados/UI](modules/ai-results.md), Core/API/MCP/datos y plan. Primera unidad: definir contrato ejecutable de tareas/runs/reservas (migración 0038, DTOs, scopes, estados, deduplicación/versiones/hash, leases, errores y aceptación), luego implementar su persistencia/servicios/transporte sobre REST/MCP existentes y probar MySQL5.7/concurrencia/revocación/cliente MCP. No crear tablas de etapas posteriores anticipadamente ni dar por conectado Work/OAuth.
+
+Puntuación/investigación/RFQ/precio/artefactos continúan por etapas tras certificar esa unidad; umbrales/automatización siguen configurables y desactivados sin criterio autorizado. Plus no se invoca como API, no proveedor pagado automático ni OCR/inferencia en Lightsail. Workflow configurable permanece en su fase; no se confunde con solicitudes/aprobaciones ya implementadas. Los reportes canónicos funcionan sin IA; métricas de RFQ/IA se amplían con sus propietarios reales.
 
 ## Gates externos pendientes
 

@@ -64,3 +64,8 @@ Permisos por acción y fila se validan en backend para cada lectura/escritura y 
 ## Certificación
 
 El cierre exige una única revisión `main` con backend Go fmt/vet/race sobre MySQL 5.7 y builds, Angular build/unitarias, navegador real, documentación y política de rama única verdes. Las conexiones productivas externas se validan aparte y no quedan acreditadas por CI sintético.
+
+
+Cierre U1–U4 y aceptación integral: Código `70163c9cb074a6285188cc812bdf9a408dfe8659`: [Core checks 38338667906](https://github.com/Ahcast/Bastion/actions/runs/38338667906), [documentación 38338667902](https://github.com/Ahcast/Bastion/actions/runs/38338667902) y [rama única 38338667908](https://github.com/Ahcast/Bastion/actions/runs/38338667908): success. Go fmt/vet/race sobre MySQL5.7 y builds server/worker/admin; Angular build/169 pruebas; navegador 21/21. Todas las unidades U1–U4 y aceptación integral cerradas para el alcance de desarrollo sintético.
+
+Las capacidades externas de S3/scanner/Percona/SMTP/DNS y despliegue siguen fuera de este cierre. Próxima fase API/MCP IA; sin nuevo menú.
