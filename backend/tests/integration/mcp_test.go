@@ -2,8 +2,10 @@ package integration
 
 import (
 	"context"
+	"github.com/Ahcast/Bastion/backend/internal/core"
 	"github.com/Ahcast/Bastion/backend/internal/core/api"
 	"github.com/Ahcast/Bastion/backend/internal/core/registry"
+	"github.com/Ahcast/Bastion/backend/internal/core/security"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"io"
 	"log/slog"
@@ -23,6 +25,49 @@ func (b bearer) RoundTrip(r *http.Request) (*http.Response, error) {
 func TestMCPStreamableSDKMatchesRESTPolicy(t *testing.T) {
 	s := fixture(t)
 	a := admin(t, s)
+
+	// Human business read permissions are not service-token scopes. Registering
+	// a module permission must not make it machine-readable implicitly.
+	s.RegisterPermissions([]string{"cotizaciones.view"}, []string{"cotizaciones.view"})
+	if _, e := s.DB.Exec("INSERT IGNORE INTO permissions VALUES('cotizaciones.view')"); e != nil {
+		t.Fatal(e)
+	}
+	if _, e := s.DB.Exec("INSERT IGNORE INTO role_permissions VALUES(1,'cotizaciones.view','all')"); e != nil {
+		t.Fatal(e)
+	}
+	if _, e := s.CreateService(ctx, a, "Unsafe business read", []string{"cotizaciones.view"}, time.Now().Add(time.Hour)); e != core.Forbidden {
+		t.Fatalf("business read became a service scope: %v", e)
+	}
+
+	// Existing/legacy tokens that already contain a human business permission
+	// must also lose that privilege after M3, even when the owning user retains it.
+	legacyToken := security.Token()
+	if _, e := s.DB.Exec(`INSERT INTO service_identities(name,token_hash,user_id,scopes,active,expires_at,created_at) VALUES(?,?,?,JSON_ARRAY('cotizaciones.view'),TRUE,?,UTC_TIMESTAMP(6))`, "Legacy quote read", security.Hash(legacyToken), a.UserID, time.Now().Add(time.Hour)); e != nil {
+		t.Fatal(e)
+	}
+	legacyActor, e := s.AuthenticateService(ctx, legacyToken)
+	if e != nil {
+		t.Fatal(e)
+	}
+	if e = s.Authorize(ctx, s.DB, legacyActor, "cotizaciones.view", a.UserID, "", false); e != core.Forbidden {
+		t.Fatalf("legacy business read scope remained authorized: %v", e)
+	}
+
+	// The legacy service-creation surface may still accept the document scope,
+	// but authorization rejects it for service actors and MCP no longer exposes
+	// a document-download tool.
+	doc, e := s.CreateService(ctx, a, "Document scope", []string{"core.documents.read"}, time.Now().Add(time.Hour))
+	if e != nil {
+		t.Fatal(e)
+	}
+	docActor, e := s.AuthenticateService(ctx, doc.(map[string]any)["token"].(string))
+	if e != nil {
+		t.Fatal(e)
+	}
+	if e = s.Authorize(ctx, s.DB, docActor, "core.documents.read", a.UserID, "", false); e != core.Forbidden {
+		t.Fatalf("service actor received private document read access: %v", e)
+	}
+
 	v, e := s.CreateService(ctx, a, "SDK Test", []string{"core.modules.read"}, time.Now().Add(time.Hour))
 	if e != nil {
 		t.Fatal(e)
@@ -48,6 +93,10 @@ func TestMCPStreamableSDKMatchesRESTPolicy(t *testing.T) {
 	denied, e := session.CallTool(connectCtx, &mcp.CallToolParams{Name: "core_jobs", Arguments: map[string]any{}})
 	if e == nil && !denied.IsError {
 		t.Fatal("MCP scope bypass")
+	}
+	download, e := session.CallTool(connectCtx, &mcp.CallToolParams{Name: "core_document_download", Arguments: map[string]any{"id": "1"}})
+	if e == nil && download != nil && !download.IsError {
+		t.Fatal("private document download remained exposed through MCP")
 	}
 	actor, e := s.AuthenticateService(ctx, token)
 	if e != nil {

@@ -5,7 +5,6 @@ import (
 	"github.com/Ahcast/Bastion/backend/internal/core"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"net/http"
-	"strconv"
 	"strings"
 )
 
@@ -49,22 +48,11 @@ func (s *Server) serveMCP(w http.ResponseWriter, r *http.Request, id string) {
 			}
 			return nil, v.(map[string]any), nil
 		})
-		mcp.AddTool(server, &mcp.Tool{Name: "core_document_download", Description: "Obtener acceso temporal a un documento privado autorizado y analizado."}, func(ctx context.Context, req *mcp.CallToolRequest, args struct {
-			ID     string `json:"id"`
-			Number int    `json:"number,omitempty"`
-		}) (*mcp.CallToolResult, map[string]any, error) {
-			if core.ID(args.ID) != nil || args.Number < 0 {
-				return nil, nil, core.Invalid
-			}
-			v, e := s.Service.DownloadFile(ctx, a, args.ID, args.Number, s.Objects)
-			if e != nil {
-				return nil, nil, e
-			}
-			if e = s.Service.Audit(ctx, s.Service.DB, a, "mcp.core_document_download", "document", args.ID, "success", map[string]string{"number": strconv.Itoa(args.Number)}); e != nil {
-				return nil, nil, e
-			}
-			return nil, v.(map[string]any), nil
-		})
+
+		// Private document delivery is deliberately not an MCP capability. A
+		// service identity must never receive presigned S3 download URLs.
+		// Module tools remain registered, but Authorize applies the explicit
+		// service-permission allowlist before any underlying user grant.
 		s.Registry.Tools(server)
 		return server
 	}, &mcp.StreamableHTTPOptions{Stateless: true, JSONResponse: true})

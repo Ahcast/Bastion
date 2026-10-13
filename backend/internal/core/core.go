@@ -72,10 +72,17 @@ func New(db *sql.DB, c config.Config) *Service {
 	return &Service{DB: db, Config: c, DummyHash: security.Password(security.Token()), DocumentPolicies: map[string]DocumentPolicy{}, DocumentBindingPolicies: map[string]DocumentBindingPolicy{}, DocumentVersionPolicies: map[string]DocumentVersionPolicy{}, DocumentTrashPolicies: map[string]DocumentTrashPolicy{}}
 }
 
-// RegisterPermissions is called by composition before serving requests, never by HTTP input.
-func (s *Service) RegisterPermissions(permissions, serviceReads []string) {
+// RegisterPermissions registers human/user permissions only. Service identities
+// do not inherit module read permissions implicitly; service reads must be
+// explicitly reviewed and registered through RegisterServiceReads.
+func (s *Service) RegisterPermissions(permissions, _ []string) {
 	s.ModulePermissions = append(s.ModulePermissions, permissions...)
-	s.ServiceReadPermissions = append(s.ServiceReadPermissions, serviceReads...)
+}
+
+// RegisterServiceReads permits only explicitly reviewed machine-readable
+// surfaces. Do not use this for ordinary UI/API read permissions.
+func (s *Service) RegisterServiceReads(permissions []string) {
+	s.ServiceReadPermissions = append(s.ServiceReadPermissions, permissions...)
 }
 
 // RegisterServiceWrites permits only explicitly composed technical ingestion scopes.
@@ -84,6 +91,17 @@ func (s *Service) RegisterServiceWrites(permissions []string) {
 }
 func (s *Service) PermissionCatalog() []string {
 	return append(append([]string{}, Permissions...), s.ModulePermissions...)
+}
+
+// servicePermissionAllowed is the service-identity allowlist. Core document
+// reads are intentionally absent: MCP/service actors must never mint private
+// file download URLs. Business module reads are deny-by-default until a
+// purpose-built reduced DTO has been reviewed and registered explicitly.
+func (s *Service) servicePermissionAllowed(permission string) bool {
+	if permission == "core.modules.read" || permission == "core.jobs.read" {
+		return true
+	}
+	return contains(s.ServiceReadPermissions, permission) || contains(s.ServiceWritePermissions, permission)
 }
 
 type Querier interface {
@@ -169,7 +187,7 @@ func (s *Service) Authorize(ctx context.Context, q Querier, a Actor, permission,
 		if json.Unmarshal([]byte(raw), &scopes) != nil {
 			return Forbidden
 		}
-		if !enabled || time.Now().After(expires) || !contains(scopes, permission) || sensitive {
+		if !enabled || time.Now().After(expires) || !s.servicePermissionAllowed(permission) || !contains(scopes, permission) || sensitive {
 			return Forbidden
 		}
 	} else {
