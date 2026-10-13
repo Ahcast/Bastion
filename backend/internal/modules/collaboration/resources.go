@@ -164,13 +164,22 @@ func (s *Service) MentionableUsers(ctx context.Context, a core.Actor, resourceTy
 	if e != nil {
 		return nil, e
 	}
-	defer rows.Close()
-	out := []MentionableUser{}
+	candidates := []MentionableUser{}
 	for rows.Next() {
 		var item MentionableUser
 		if e = rows.Scan(&item.ID, &item.Name); e != nil {
+			rows.Close()
 			return nil, e
 		}
+		candidates = append(candidates, item)
+	}
+	e = rows.Err()
+	rows.Close()
+	if e != nil {
+		return nil, e
+	}
+	out := []MentionableUser{}
+	for _, item := range candidates {
 		if e = s.grantHolderCanResource(ctx, s.Core.DB, item.ID, r); e != nil {
 			if e == core.Forbidden {
 				continue
@@ -182,5 +191,5 @@ func (s *Service) MentionableUsers(ctx context.Context, a core.Actor, resourceTy
 			break
 		}
 	}
-	return out, rows.Err()
+	return out, nil
 }
