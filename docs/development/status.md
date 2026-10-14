@@ -537,3 +537,10 @@ Cerrada la corrección de menús/disposición para esta unidad de interfaz. Inic
 Ajustes Angular del shell, Inicio, resumen comercial y componentes compartidos: iconos/búsqueda de módulos con permisos, indicadores con importe canónico cuando existe, primer indicador oscuro, controles de período plegables, jerarquía de gráficos, tablas y formularios en dos columnas dentro del detalle. Referencia vigente en docs/ui/PANEL-REFERENCE.md. Sin cambios de API, dominio, BD o despliegue. Datos de ejemplo del adjunto excluidos de Git.
 
 Validación local: instalación npm ci; build Angular y 171 pruebas unitarias aprobadas también después del último ajuste del shell. check_repository.py aprobado. Prueba de navegador pendiente de CI: el entorno no tiene Chromium y la descarga devuelve un ZIP inválido. No declarar comparación visual final ni actualizar capturas antiguas sin navegador.
+
+
+## 2026-10-14 — CSS productivo bloqueado por CSP: corrección
+
+Las capturas del sitio muestran HTML sin estilos completos. Inspección HTTP de bastion.castilloit.net: script-src self y build con stylesheet media=print/data-beasties-media más activador JavaScript inline. El navegador bloquea el activador y mantiene la hoja en modo impresión. Desactivar optimization.styles.inlineCritical en producción conserva minificación y carga el CSS directamente mediante link rel=stylesheet, sin script inline. No relajar CSP.
+
+Build productivo local aprobado. Nueva comprobación check-production-css.mjs verifica carga directa, existencia del CSS y ausencia de activación inline; integrada en Core checks. Aplicar recompilando y publicando frontend/dist/bastion-ui/browser completo. Producción permanece pendiente de republicación; el cambio en Git no actualiza Bluehost.
