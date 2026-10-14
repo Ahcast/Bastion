@@ -24,7 +24,10 @@
                 "input": "public"
               }
             ],
-            "styles": ["src/styles.css"]
+            "styles": [
+              "src/styles/bastion.css",
+              "src/styles.css"
+            ]
           },
           "configurations": {
             "production": {

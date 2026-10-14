@@ -2,12 +2,15 @@ import { Component, inject, signal } from "@angular/core";
 import { FormsModule } from "@angular/forms";
 import { Router } from "@angular/router";
 import { Client } from "../api/client";
+import { Logo } from "../ui/logo";
 @Component({
   selector: "bastion-login",
-  imports: [FormsModule],
-  template: ` <section class="auth card">
-    <h1>Bastion</h1>
-    <p>Acceso a la plataforma de Castillo IT</p>
+  imports: [FormsModule, Logo],
+  template: ` <section class="auth">
+    <header class="bs-login-mark">
+      <bs-logo variant="mark" [size]="56" />
+      <h1 class="bs-login-name">Bastion</h1>
+    </header>
     @if (error()) {
       <p role="alert" class="error">{{ error() }}</p>
     }

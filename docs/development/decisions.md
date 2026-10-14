@@ -1,5 +1,9 @@
 # Decisiones de consolidación — 9 de octubre de 2026
 
+## 2026-10-13 — Dirección visual Bastion
+
+`docs/ui/BASTION-UI.md` y `docs/ui/tokens.json` son la referencia visual para el frontend. Se integra la base Concreto del kit entregado: barra superior, logo, íconos, fuentes locales y estilos `bs-*`. La migración de las pantallas de negocio al detalle en línea y patrones de indicadores sigue la secuencia de la sección 13 de la guía; este cambio de base no acredita que cada módulo ya haya completado esa migración. Mantener contratos, permisos y flujos vigentes durante la transición.
+
 | Contradicción o redundancia | Resolución vigente |
 | --- | --- |
 | Backend Bluehost/PHP frente a Go AWS | Go en Lightsail; Angular/BD/correo Bluehost |

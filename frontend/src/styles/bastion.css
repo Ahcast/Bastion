@@ -1,0 +1,358 @@
+/* =====================================================================
+   Bastion · Concreto
+   Hoja de estilos única de la interfaz. Brutalismo gris mate:
+   fondo de concreto, carbón para todo lo que importa, reglas de carbón
+   como estructura. Sin radios, sin sombras (salvo menús), sin adornos.
+   Un solo color de alerta (óxido) y uno de variación positiva (verde).
+
+   Uso: copiar a frontend/src/styles/bastion.css y declararlo primero en
+   angular.json > styles. Fuentes en public/assets/fonts/ (servidas en
+   /assets/fonts/). No cargar Google Fonts: la CSP solo permite 'self'.
+   ===================================================================== */
+
+/* ---------- 1. Fuentes (autoalojadas, subconjunto latin: cubre español) ---------- */
+@font-face { font-family: "IBM Plex Sans"; font-style: normal; font-weight: 400; font-display: swap; src: url("/assets/fonts/ibm-plex-sans-latin-400-normal.woff2") format("woff2"); }
+@font-face { font-family: "IBM Plex Sans"; font-style: normal; font-weight: 500; font-display: swap; src: url("/assets/fonts/ibm-plex-sans-latin-500-normal.woff2") format("woff2"); }
+@font-face { font-family: "IBM Plex Sans"; font-style: normal; font-weight: 600; font-display: swap; src: url("/assets/fonts/ibm-plex-sans-latin-600-normal.woff2") format("woff2"); }
+@font-face { font-family: "IBM Plex Mono"; font-style: normal; font-weight: 400; font-display: swap; src: url("/assets/fonts/ibm-plex-mono-latin-400-normal.woff2") format("woff2"); }
+@font-face { font-family: "IBM Plex Mono"; font-style: normal; font-weight: 500; font-display: swap; src: url("/assets/fonts/ibm-plex-mono-latin-500-normal.woff2") format("woff2"); }
+
+/* ---------- 2. Tokens ---------- */
+:root {
+  /* Concreto (superficies) */
+  --canvas: #ececec;        /* fondo de página */
+  --panel: #f8ffff;         /* encabezados de tabla, franja de KPIs, detalle en línea */
+  --panel-raised: #d2d6d6;  /* fila seleccionada, campos, menús */
+  /* Juntas (líneas) */
+  --line: #9aa2a3;          /* entre filas, 1px */
+  --line-strong: #404649;   /* reglas y marcos de controles */
+  /* Tinta (texto). Todas ≥ 7:1 sobre cualquier superficie */
+  --ink: #25292d;           /* carbón: texto, cifras, acciones, barra superior */
+  --ink-muted: #2f3438;
+  --ink-subtle: #3c4246;    /* rótulos Mono */
+  /* Acción */
+  --accent: #25292d;
+  --accent-strong: #3a3f44; /* hover de masas de carbón */
+  --on-accent: #eef0f0;     /* texto sobre carbón */
+  --accent-dim: rgba(37, 41, 45, 0.07); /* hover de filas */
+  /* Señales */
+  --signal: #852a12;        /* óxido: vence, falla, error, prioridad crítica */
+  --signal-dim: rgba(156, 50, 22, 0.12);
+  --ok: #174d2e;            /* variación positiva, Adjudicado, Pagada */
+  /* Datos */
+  --chart-1: #34434b;       /* valor destacado */
+  --chart-2: #4d565a;
+  --chart-3: #7f888b;       /* contexto */
+  --chart-4: #a3abac;       /* pistas / fondo de barras */
+  /* Espacio (retícula de 4px) */
+  --space-1: 4px; --space-2: 8px; --space-3: 12px; --space-4: 16px;
+  --space-5: 24px; --space-6: 32px; --space-7: 48px;
+  --radius: 0;
+  --shadow-float: 0 12px 32px rgba(37, 41, 45, 0.18); /* solo menús desplegables */
+  /* Tipografía */
+  --font-sans: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  --topnav-h: 56px;
+  color-scheme: light;
+}
+
+/* ---------- 3. Base ---------- */
+*, *::before, *::after { box-sizing: border-box; }
+html, body { margin: 0; background: var(--canvas); }
+body, .bs-root {
+  font: 400 16px/24px var(--font-sans);
+  color: var(--ink);
+  -webkit-font-smoothing: antialiased;
+  font-variant-numeric: tabular-nums;
+}
+h1, h2, h3, h4, p { margin: 0; }
+a { color: var(--ink); text-underline-offset: 3px; }
+a:focus-visible, button:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+::selection { background: var(--ink); color: var(--on-accent); }
+[hidden] { display: none !important; }
+
+/* Estilos de texto (tokens tipográficos) */
+.readout { font: 500 56px/60px var(--font-sans); letter-spacing: -0.03em; }
+.kpi     { font: 500 34px/40px var(--font-sans); letter-spacing: -0.02em; }
+.h1, h1  { font: 500 32px/40px var(--font-sans); letter-spacing: -0.02em; color: var(--ink); }
+.h2, h2  { font: 600 18px/24px var(--font-sans); color: var(--ink); }
+h3       { font: 600 16px/22px var(--font-sans); color: var(--ink); }
+.body    { font: 400 16px/24px var(--font-sans); }
+.body-sm { font: 400 14px/20px var(--font-sans); }
+.label, .bs-label { font: 500 12px/16px var(--font-mono); letter-spacing: .05em; text-transform: uppercase; color: var(--ink-subtle); }
+.code, .bs-mono { font-family: var(--font-mono); font-size: 14px; letter-spacing: .02em; }
+.bs-num { font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
+.bs-muted { color: var(--ink-subtle); }
+.bs-alert-text { color: var(--signal); font-weight: 500; }
+.bs-ok-text { color: var(--ok); font-weight: 500; }
+.bs-sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+
+/* ---------- 4. Estructura de página ---------- */
+.bs-app { min-height: 100vh; background: var(--canvas); display: flex; flex-direction: column; }
+.bs-page { width: 100%; max-width: 1600px; margin: 0 auto; padding: var(--space-6) var(--space-6) var(--space-7); display: flex; flex-direction: column; gap: var(--space-6); }
+.bs-page-head { display: flex; justify-content: space-between; align-items: flex-end; gap: var(--space-5); flex-wrap: wrap; }
+.bs-page-head h1 { margin-top: 6px; }
+.bs-actions { display: flex; gap: var(--space-2); flex-wrap: wrap; align-items: center; }
+.bs-row { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr) minmax(0, 1fr); gap: 40px; align-items: start; }
+.bs-two { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 40px; }
+.bs-stack { display: flex; flex-direction: column; gap: var(--space-5); }
+
+/* ---------- 5. Logo ---------- */
+.bs-logo { display: block; flex: none; }
+.bs-logo-word, .bs-logo-core { fill: var(--ink); }
+.bs-logo-inverse .bs-logo-word, .bs-logo-inverse .bs-logo-core { fill: var(--on-accent); }
+.bs-icon { flex: none; display: block; width: 20px; height: 20px; }
+
+/* ---------- 6. Barra superior ---------- */
+.bs-topnav { position: sticky; top: 0; z-index: 30; display: flex; align-items: stretch; gap: var(--space-5); height: var(--topnav-h); padding: 0 var(--space-5) 0 0; background: var(--ink); color: var(--on-accent); }
+.bs-topnav .bs-logo-word, .bs-topnav .bs-logo-core { fill: var(--on-accent); }
+.bs-topnav-home { display: flex; align-items: center; align-self: stretch; padding: 0 var(--space-5); text-decoration: none; color: var(--on-accent); }
+.bs-topnav-home:hover { background: var(--accent-strong); }
+.bs-topnav-home.bs-tab-active, .bs-topnav-home.bs-tab-active:hover { background: var(--canvas); }
+.bs-topnav-home.bs-tab-active .bs-logo-word, .bs-topnav-home.bs-tab-active .bs-logo-core { fill: var(--ink); }
+.bs-topnav-home:focus-visible { outline: 2px solid var(--on-accent); outline-offset: -2px; }
+.bs-topnav-items { display: flex; align-items: stretch; flex: 1; min-width: 0; overflow-x: auto; scrollbar-width: none; }
+.bs-topnav-items::-webkit-scrollbar { display: none; }
+.bs-tab { display: inline-flex; align-items: center; gap: 6px; padding: 0 12px; font: 500 14px/20px var(--font-sans); color: #c4cacb; text-decoration: none; white-space: nowrap; flex: none; }
+.bs-tab:hover { color: var(--on-accent); }
+.bs-tab:focus-visible { outline: 2px solid var(--on-accent); outline-offset: -2px; }
+.bs-tab-active, .bs-tab-active:hover { background: var(--canvas); color: var(--ink); }
+.bs-tab-count { font: 500 13px/16px var(--font-mono); }
+.bs-topnav-tools { display: flex; align-items: center; gap: var(--space-3); }
+.bs-topnav-tools .bs-tab-icon { align-self: stretch; padding: 0 10px; color: var(--on-accent); }
+.bs-topnav-tools .bs-tab-icon.bs-tab-active { color: var(--ink); }
+.bs-iconbtn { display: inline-flex; align-items: center; justify-content: center; position: relative; width: 40px; height: 40px; padding: 0; border: 0; background: transparent; color: var(--on-accent); cursor: pointer; }
+.bs-iconbtn:hover { background: var(--accent-strong); }
+.bs-iconbtn[aria-expanded="true"], .bs-iconbtn[aria-pressed="true"] { background: var(--canvas); color: var(--ink); }
+.bs-iconbtn:focus-visible { outline: 2px solid var(--on-accent); outline-offset: -2px; }
+.bs-dot { position: absolute; top: 8px; right: 8px; min-width: 8px; height: 8px; background: var(--signal); }
+.bs-avatar { width: 34px; height: 34px; background: var(--canvas); color: var(--ink); display: inline-flex; align-items: center; justify-content: center; font: 500 13px/1 var(--font-mono); flex: none; border: 0; cursor: pointer; }
+.bs-searchbar { padding: 12px 24px; background: var(--panel); border-bottom: 1px solid var(--line); }
+.bs-searchbar .bs-field { max-width: 640px; }
+/* Menú de usuario y panel de alertas: única superficie flotante permitida */
+.bs-menu { position: absolute; z-index: 35; min-width: 240px; background: var(--panel); color: var(--ink); border: 1px solid var(--ink); box-shadow: var(--shadow-float); padding: var(--space-2) 0; }
+.bs-menu a, .bs-menu button { display: flex; width: 100%; gap: var(--space-2); align-items: center; padding: 10px 16px; font: 400 15px/22px var(--font-sans); color: var(--ink); text-decoration: none; background: none; border: 0; text-align: left; cursor: pointer; }
+.bs-menu a:hover, .bs-menu button:hover { background: var(--accent-dim); }
+.bs-menu hr { border: 0; border-top: 1px solid var(--line); margin: var(--space-2) 0; }
+
+/* ---------- 7. Botones ---------- */
+.bs-btn { display: inline-flex; align-items: center; justify-content: center; gap: var(--space-2); border: 1px solid transparent; border-radius: var(--radius); font: 500 15px/22px var(--font-sans); padding: 9px 18px; cursor: pointer; transition: background-color .12s, color .12s; white-space: nowrap; text-decoration: none; }
+.bs-btn .bs-icon { width: 18px; height: 18px; }
+.bs-btn-sm { font-size: 14px; line-height: 20px; padding: 5px 12px; gap: 6px; }
+.bs-btn:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+.bs-btn:disabled, .bs-btn[aria-disabled="true"] { opacity: .4; cursor: not-allowed; }
+.bs-btn-primary { background: var(--accent); color: var(--on-accent); }
+.bs-btn-primary:hover:not(:disabled) { background: var(--accent-strong); }
+.bs-btn-secondary { background: transparent; color: var(--ink); border-color: var(--ink); }
+.bs-btn-secondary:hover:not(:disabled) { background: var(--accent-dim); }
+.bs-btn-ghost { background: transparent; color: var(--ink); text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 4px; padding-left: 0; padding-right: 0; }
+.bs-btn-ghost:hover:not(:disabled) { text-decoration-thickness: 2px; }
+.bs-btn-danger { background: transparent; color: var(--signal); border-color: var(--signal); }
+.bs-btn-danger:hover:not(:disabled) { background: var(--signal-dim); }
+.bs-btn-block { width: 100%; }
+.bs-btn[aria-busy="true"] { cursor: progress; }
+
+/* ---------- 8. Insignias y estado ---------- */
+.bs-badge { display: inline-flex; align-items: center; gap: 6px; border: 1px solid transparent; padding: 2px 8px; font: 500 12px/18px var(--font-mono); letter-spacing: .05em; text-transform: uppercase; white-space: nowrap; }
+.bs-badge-solid { background: var(--ink); color: var(--on-accent); }
+.bs-badge-outline { border-color: var(--ink); color: var(--ink); }
+.bs-badge-muted { color: var(--ink-subtle); padding-left: 0; padding-right: 0; }
+.bs-badge-alert { background: var(--signal); color: var(--on-accent); }
+.bs-badge-ok { border-color: var(--ok); color: var(--ok); }
+/* Estado con cuadro: texto + marca cuadrada de 9px */
+.bs-st { display: inline-flex; align-items: center; gap: 8px; font: 400 15px/22px var(--font-sans); color: var(--ink); white-space: nowrap; }
+.bs-st::before { content: ""; width: 9px; height: 9px; background: var(--ink); flex: none; }
+.bs-st-open::before { background: transparent; border: 1.5px solid var(--ink); }
+.bs-st-muted { color: var(--ink-subtle); } .bs-st-muted::before { background: var(--chart-3); }
+.bs-st-ok { color: var(--ok); font-weight: 500; } .bs-st-ok::before { background: var(--ok); }
+.bs-st-alert { color: var(--signal); font-weight: 500; } .bs-st-alert::before { background: var(--signal); }
+/* Avance por etapas */
+.bs-stage { display: inline-flex; align-items: center; gap: 12px; white-space: nowrap; }
+.bs-segs { display: inline-flex; gap: 2px; }
+.bs-seg { width: 14px; height: 5px; background: var(--chart-4); }
+.bs-seg-on { background: var(--ink); }
+.bs-stage-label { font: 400 15px/22px var(--font-sans); color: var(--ink); }
+.bs-stage-done .bs-seg-on { background: var(--ok); } .bs-stage-done .bs-stage-label { color: var(--ok); font-weight: 500; }
+.bs-stage-off .bs-stage-label { color: var(--ink-subtle); text-decoration: line-through; }
+.bs-stage-alert .bs-seg-on { background: var(--signal); } .bs-stage-alert .bs-stage-label { color: var(--signal); font-weight: 500; }
+
+/* ---------- 9. Secciones ---------- */
+.bs-frame { border-top: 2px solid var(--ink); padding-top: 12px; display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.bs-frame-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); }
+.bs-frame-title { margin: 0; font: 600 18px/24px var(--font-sans); color: var(--ink); }
+
+/* ---------- 10. Indicadores (KPI) ---------- */
+.bs-kpis { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 1px; background: var(--ink); border: 1px solid var(--ink); }
+.bs-kpis-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.bs-kpi-tile { all: unset; box-sizing: border-box; display: flex; flex-direction: column; justify-content: space-between; gap: 14px; background: var(--panel); padding: 20px 22px; min-width: 0; cursor: pointer; }
+.bs-kpi-tile:hover { background: #e3e8e8; }
+.bs-kpi-tile:focus-visible { outline: 3px solid var(--ink); outline-offset: -3px; }
+.bs-kpi-tile[aria-selected="true"] { background: var(--ink); }
+.bs-kpi-tile[aria-selected="true"]:hover { background: var(--accent-strong); }
+.bs-kpi-tile[aria-selected="true"] :is(.bs-label, .bs-kpi-value, .bs-kpi-unit, .bs-kpi-foot, .bs-kpi-delta) { color: var(--on-accent); }
+.bs-kpi-tile[aria-selected="true"]:focus-visible { outline-color: var(--on-accent); }
+.bs-kpi-tile.bs-static { cursor: default; } .bs-kpi-tile.bs-static:hover { background: var(--panel); }
+.bs-kpi { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.bs-kpi-value { font: 500 34px/40px var(--font-sans); letter-spacing: -.02em; color: var(--ink); }
+.bs-kpi-unit { font: 500 14px/1 var(--font-mono); color: var(--ink-subtle); margin-left: 6px; }
+.bs-kpi-foot { display: flex; align-items: center; gap: var(--space-2); font: 400 14px/20px var(--font-sans); color: var(--ink-subtle); flex-wrap: wrap; }
+.bs-kpi-delta { display: inline-flex; align-items: center; gap: 2px; font: 500 14px/20px var(--font-mono); }
+.bs-kpi-up { color: var(--ok); } .bs-kpi-down { color: var(--signal); } .bs-kpi-flat { color: var(--ink-muted); }
+
+/* ---------- 11. Campos de formulario ---------- */
+.bs-form { display: flex; flex-direction: column; gap: var(--space-5); max-width: 960px; }
+.bs-form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-5) var(--space-5); }
+.bs-form-grid .bs-span-2 { grid-column: 1 / -1; }
+.bs-fieldset { border: 0; border-top: 2px solid var(--ink); margin: 0; padding: 12px 0 0; display: flex; flex-direction: column; gap: var(--space-5); min-width: 0; }
+.bs-fieldset > legend { padding: 0; margin-bottom: var(--space-3); font: 600 18px/24px var(--font-sans); color: var(--ink); float: left; width: 100%; }
+.bs-field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.bs-field > label, .bs-field-label { font: 500 12px/16px var(--font-mono); letter-spacing: .05em; text-transform: uppercase; color: var(--ink-subtle); }
+.bs-req { color: var(--signal); margin-left: 4px; }
+.bs-input-wrap { display: flex; align-items: center; background: var(--panel-raised); border: 1px solid var(--ink); padding: 0 10px; }
+.bs-input-wrap:focus-within { outline: 2px solid var(--ink); outline-offset: -2px; }
+.bs-input, .bs-select, .bs-textarea { flex: 1; min-width: 0; width: 100%; border: 0; border-radius: 0; background: transparent; outline: none; font: 400 16px/24px var(--font-sans); color: var(--ink); padding: 8px 0; }
+.bs-input.bs-mono, .bs-input.bs-num { font: 400 15px/24px var(--font-mono); }
+.bs-input.bs-num { text-align: right; }
+.bs-input::placeholder, .bs-textarea::placeholder { color: var(--ink-subtle); opacity: 1; }
+.bs-input-icon { color: var(--ink-subtle); margin-right: var(--space-2); width: 18px; height: 18px; }
+.bs-input-prefix, .bs-input-suffix { font: 500 13px/24px var(--font-mono); color: var(--ink-subtle); }
+.bs-input-prefix { margin-right: var(--space-2); } .bs-input-suffix { margin-left: var(--space-2); }
+.bs-input-btn { border: 0; background: none; color: var(--ink-subtle); padding: 4px; cursor: pointer; display: inline-flex; }
+.bs-input-btn:hover { color: var(--ink); }
+.bs-select { appearance: none; padding-right: 24px; cursor: pointer; background: transparent url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2325292d' stroke-width='2.5'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E") no-repeat right 2px center; }
+.bs-textarea { resize: vertical; min-height: 96px; padding: 8px 0; }
+.bs-input-wrap:has(.bs-textarea) { align-items: stretch; }
+.bs-field-msg { font: 400 14px/20px var(--font-sans); color: var(--ink-subtle); }
+.bs-field-error .bs-input-wrap { border-color: var(--signal); }
+.bs-field-error .bs-input-wrap:focus-within { outline-color: var(--signal); }
+.bs-field-msg-error { color: var(--signal); font-weight: 500; }
+.bs-field-readonly .bs-input-wrap { background: transparent; border-color: var(--line); }
+.bs-input:disabled, .bs-select:disabled, .bs-textarea:disabled { color: var(--ink-subtle); cursor: not-allowed; }
+.bs-input-wrap:has(:disabled) { background: transparent; border-style: dashed; }
+/* Casillas y opciones: cuadradas, sin radio */
+.bs-check { display: inline-flex; align-items: center; gap: 10px; font: 400 16px/24px var(--font-sans); color: var(--ink); cursor: pointer; }
+.bs-check input { appearance: none; width: 18px; height: 18px; margin: 0; border: 1.5px solid var(--ink); background: var(--panel); display: grid; place-content: center; cursor: pointer; flex: none; }
+.bs-check input[type="radio"]::before { content: ""; width: 8px; height: 8px; background: var(--ink); transform: scale(0); }
+.bs-check input[type="checkbox"]::before { content: ""; width: 10px; height: 6px; border-left: 2px solid var(--on-accent); border-bottom: 2px solid var(--on-accent); transform: rotate(-45deg) translate(1px, -1px) scale(0); }
+.bs-check input:checked { background: var(--ink); }
+.bs-check input[type="radio"]:checked { background: var(--panel); }
+.bs-check input:checked::before { transform: rotate(-45deg) translate(1px, -1px) scale(1); }
+.bs-check input[type="radio"]:checked::before { transform: scale(1); }
+.bs-check input:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+.bs-form-foot { display: flex; gap: var(--space-2); justify-content: flex-end; border-top: 1px solid var(--line-strong); padding-top: var(--space-4); }
+
+/* ---------- 12. Filtros (chips) ---------- */
+.bs-filters { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.bs-chip { font: 500 14px/20px var(--font-sans); color: var(--ink); padding: 6px 12px; border: 1px solid var(--ink); background: transparent; cursor: pointer; }
+.bs-chip b { font: 500 13px/20px var(--font-mono); color: var(--ink-subtle); margin-left: 8px; }
+.bs-chip[aria-pressed="true"] { color: var(--on-accent); background: var(--ink); }
+.bs-chip[aria-pressed="true"] b { color: var(--on-accent); }
+.bs-chip:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+
+/* ---------- 13. Tabla de trabajo ---------- */
+.bs-table-wrap { overflow-x: auto; }
+.bs-table { width: 100%; border-collapse: collapse; font: 400 16px/24px var(--font-sans); color: var(--ink); }
+.bs-table th { font: 500 12px/16px var(--font-mono); letter-spacing: .05em; text-transform: uppercase; color: var(--ink-subtle); padding: 10px 14px; background: var(--panel); border-bottom: 1px solid var(--ink); white-space: nowrap; text-align: left; }
+.bs-table th.bs-num, .bs-table td.bs-num { text-align: right; }
+.bs-table th button { all: unset; cursor: pointer; display: inline-flex; gap: 4px; align-items: center; }
+.bs-table td { padding: 14px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+.bs-table tbody tr:hover td { background: var(--accent-dim); }
+.bs-table td.bs-mono { color: var(--ink-muted); white-space: nowrap; }
+.bs-cell-title { color: var(--ink); font-weight: 500; }
+.bs-cell-sub { display: block; font: 400 14px/20px var(--font-sans); color: var(--ink-subtle); margin-top: 2px; }
+.bs-table tbody tr[tabindex] { cursor: pointer; }
+.bs-table tbody tr[tabindex]:focus-visible td { outline: none; background: var(--accent-dim); box-shadow: inset 0 2px 0 var(--ink), inset 0 -2px 0 var(--ink); }
+.bs-table td.bs-caret { width: 28px; text-align: center; font: 500 20px/24px var(--font-mono); color: var(--ink); }
+.bs-table tbody tr[aria-expanded="true"] td { background: var(--panel-raised); }
+.bs-table tbody tr[aria-expanded="true"] td:first-child { box-shadow: inset 4px 0 0 var(--ink); }
+/* Fila de detalle en línea (se abre debajo de la fila; nunca un modal) */
+.bs-table > tbody > tr.bs-xp-row > td { background: var(--panel); padding: 24px 24px 28px; border-bottom: 2px solid var(--ink); box-shadow: inset 4px 0 0 var(--ink); cursor: default; }
+.bs-table > tbody > tr.bs-xp-row:hover > td { background: var(--panel); }
+.bs-xp { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 32px; }
+.bs-xp-col { display: flex; flex-direction: column; gap: 24px; min-width: 0; }
+.bs-xp-actions { display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; }
+.bs-table-foot { display: flex; justify-content: space-between; align-items: center; gap: var(--space-4); padding-top: var(--space-3); flex-wrap: wrap; }
+.bs-pager { display: flex; gap: var(--space-2); align-items: center; }
+/* Tabla secundaria dentro del detalle */
+.bs-mini { width: 100%; border-collapse: collapse; font: 400 15px/22px var(--font-sans); color: var(--ink); }
+.bs-mini th { font: 500 12px/16px var(--font-mono); letter-spacing: .05em; text-transform: uppercase; color: var(--ink-subtle); text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--ink); }
+.bs-mini td { padding: 10px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+.bs-mini .bs-num { text-align: right; }
+.bs-mini tr.bs-best td { background: var(--canvas); }
+
+/* ---------- 14. Datos clave (ficha) ---------- */
+.bs-facts { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: var(--line); border: 1px solid var(--line); }
+.bs-facts > div { background: var(--canvas); padding: 12px 14px; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.bs-facts .bs-fv { font: 500 17px/24px var(--font-sans); color: var(--ink); overflow-wrap: anywhere; }
+.bs-facts .bs-fv.bs-mono { font: 500 15px/24px var(--font-mono); }
+.bs-sec { display: flex; flex-direction: column; gap: 12px; }
+.bs-sec > h3 { border-top: 2px solid var(--ink); padding-top: 10px; }
+
+/* ---------- 15. Listas de pendientes ---------- */
+.bs-list { display: flex; flex-direction: column; }
+.bs-item { all: unset; box-sizing: border-box; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 14px 8px; margin: 0 -8px; border-top: 1px solid var(--line); cursor: pointer; }
+.bs-item:first-child { border-top: 0; }
+.bs-item:hover { background: var(--accent-dim); }
+.bs-item:focus-visible { outline: 2px solid var(--ink); outline-offset: -2px; }
+.bs-item[aria-current="true"] { background: var(--panel-raised); box-shadow: inset 4px 0 0 var(--ink); }
+.bs-item-t { font: 500 16px/24px var(--font-sans); color: var(--ink); }
+.bs-item-s { font: 400 14px/20px var(--font-sans); color: var(--ink-subtle); }
+.bs-item-go { font: 500 14px/20px var(--font-sans); color: var(--ink); white-space: nowrap; }
+.bs-item-alert .bs-item-t { color: var(--signal); }
+.bs-timeline { list-style: none; margin: 0; padding: 0; }
+.bs-timeline li { display: grid; grid-template-columns: 92px 1fr; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--line); font: 400 15px/22px var(--font-sans); }
+.bs-timeline .bs-when { font: 500 13px/22px var(--font-mono); color: var(--ink-subtle); }
+
+/* ---------- 16. Gráficos simples ---------- */
+.bs-bars { display: flex; align-items: flex-end; gap: 10px; height: 180px; border-bottom: 1px solid var(--ink); }
+.bs-bars > div { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 6px; height: 100%; min-width: 0; }
+.bs-bars .bs-bar { width: 100%; max-width: 48px; background: var(--chart-4); }
+.bs-bars .bs-bar.bs-hi { background: var(--ink); }
+.bs-bars .bs-v { font: 500 13px/16px var(--font-mono); color: var(--ink-subtle); white-space: nowrap; }
+.bs-axis { display: flex; gap: 10px; margin-top: 8px; } .bs-axis span { flex: 1; text-align: center; }
+.bs-hbars { display: flex; flex-direction: column; gap: 14px; }
+.bs-hb { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 12px; }
+.bs-hb-l { font: 400 15px/22px var(--font-sans); color: var(--ink); }
+.bs-hb-n { font: 500 14px/22px var(--font-mono); color: var(--ink); text-align: right; }
+.bs-hb-track { grid-column: 1 / -1; height: 10px; background: var(--chart-4); }
+.bs-hb-fill { height: 100%; background: var(--ink); }
+.bs-hb-alert .bs-hb-fill { background: var(--signal); }
+.bs-hb-alert :is(.bs-hb-l, .bs-hb-n) { color: var(--signal); }
+
+/* ---------- 17. Estados: vacío, carga, error, confirmación ---------- */
+.bs-state { border: 1px dashed var(--line-strong); padding: var(--space-6); display: flex; flex-direction: column; gap: var(--space-3); align-items: flex-start; color: var(--ink-muted); }
+.bs-state h2 { font: 600 18px/24px var(--font-sans); color: var(--ink); }
+.bs-skeleton { background: linear-gradient(90deg, var(--panel-raised) 0, #dfe2e2 50%, var(--panel-raised) 100%); background-size: 200% 100%; animation: bs-shimmer 1.2s linear infinite; height: 16px; }
+@keyframes bs-shimmer { to { background-position: -200% 0; } }
+@media (prefers-reduced-motion: reduce) { .bs-skeleton { animation: none; } }
+/* Banda de aviso o confirmación: se inserta en el flujo, encima de la tabla o del formulario */
+.bs-band { display: flex; gap: var(--space-4); align-items: center; justify-content: space-between; flex-wrap: wrap; padding: 14px 18px; border-left: 4px solid var(--ink); background: var(--panel); }
+.bs-band-alert { border-left-color: var(--signal); background: var(--signal-dim); }
+.bs-band-alert strong { color: var(--signal); }
+.bs-band-ok { border-left-color: var(--ok); }
+
+/* ---------- 18. Acceso (login) ---------- */
+.bs-login { min-height: 100vh; display: grid; place-items: center; padding: 24px 16px; background: var(--canvas); }
+.bs-login-box { width: 100%; max-width: 340px; display: flex; flex-direction: column; gap: var(--space-6); }
+.bs-login-mark { display: flex; flex-direction: column; align-items: center; gap: var(--space-3); color: var(--ink); }
+.bs-login-name { margin: 0; font: 600 18px/24px var(--font-sans); letter-spacing: .24em; margin-right: -.24em; text-transform: uppercase; color: var(--ink); }
+.auth > .bs-login-mark { margin-bottom: var(--space-6); }
+.bs-login-error { color: var(--signal); font: 500 14px/20px var(--font-sans); min-height: 20px; }
+
+/* ---------- 19. Adaptación a pantalla ---------- */
+@media (max-width: 1280px) { .bs-kpis:not(.bs-kpis-4) { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 1100px) { .bs-row, .bs-two, .bs-xp { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 760px) {
+  .bs-page { padding: 20px 16px 32px; gap: 24px; }
+  .bs-kpis, .bs-kpis-4 { grid-template-columns: minmax(0, 1fr); }
+  .bs-form-grid, .bs-facts { grid-template-columns: 1fr; }
+  /* Teléfono: fila 1 = logo + herramientas; fila 2 = pestañas con desplazamiento lateral */
+  .bs-topnav { height: auto; flex-wrap: wrap; gap: 0; padding-right: 4px; }
+  .bs-topnav-home { height: var(--topnav-h); padding: 0 12px; margin-right: auto; }
+  .bs-topnav-tools { height: var(--topnav-h); gap: 4px; }
+  .bs-topnav-items { order: 3; flex: 1 0 100%; height: 44px; border-top: 1px solid var(--accent-strong); }
+}
+@media print {
+  .bs-topnav, .bs-searchbar, .bs-actions, .bs-filters { display: none !important; }
+  body { background: #fff; }
+}

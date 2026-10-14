@@ -1,102 +1,177 @@
-import { Component, inject, signal } from "@angular/core";
+import { Component, computed, inject, signal } from "@angular/core";
 import {
+  Router,
   RouterLink,
   RouterLinkActive,
   RouterOutlet,
-  Router,
 } from "@angular/router";
 import { Client } from "../api/client";
+import { Icon } from "../ui/icon";
+import { Logo } from "../ui/logo";
+
+/**
+ * Shell de Bastion · Concreto.
+ * Barra superior de carbón (56px): el logo es Inicio, nueve pestañas de
+ * texto en el orden aprobado y, a la derecha, alertas, Configuración
+ * (engranaje), usuario y cerrar sesión. Sin menú lateral.
+ * Mantiene los permisos y módulos del shell original.
+ */
+interface NavItem {
+  path: string;
+  label: string;
+  permission: string;
+  module: string;
+}
+
+const NAV: NavItem[] = [
+  { path: "/customers", label: "Clientes", permission: "clientes.view", module: "customers" },
+  { path: "/suppliers", label: "Proveedores", permission: "proveedores.view", module: "suppliers" },
+  { path: "/processes", label: "Procesos", permission: "procesos.view", module: "processes" },
+  { path: "/quotes", label: "Cotizaciones", permission: "cotizaciones.view", module: "quotes" },
+  // Etiqueta conservada con mayúscula por las pruebas e2e (purchase-orders.spec.ts).
+  { path: "/purchase-orders", label: "Órdenes de Compra", permission: "ordenes.view", module: "purchase-orders" },
+  { path: "/invoices", label: "Facturas", permission: "facturas.view", module: "invoices" },
+  { path: "/expenses", label: "Gastos", permission: "gastos.view", module: "expenses" },
+  { path: "/reports", label: "Reportes", permission: "reportes.view", module: "reports" },
+  { path: "/collaboration", label: "Colaboración", permission: "colaboracion.view", module: "collaboration" },
+];
+
 @Component({
-  imports: [RouterLink, RouterLinkActive, RouterOutlet],
-  template: `<header>
-      <a class="brand" routerLink="/">Bastion</a
-      ><span>{{ api.profile()?.user?.name }}</span
-      ><button (click)="logout()">Cerrar sesión</button>
-    </header>
-    <div class="layout">
-      <nav aria-label="Menú principal">
+  imports: [RouterLink, RouterLinkActive, RouterOutlet, Icon, Logo],
+  template: `
+    <div class="bs-app">
+      <header class="bs-topnav">
         <a
+          class="bs-topnav-home"
           routerLink="/"
-          routerLinkActive="active"
+          routerLinkActive="bs-tab-active"
           [routerLinkActiveOptions]="{ exact: true }"
-          >Inicio</a
-        >
-        @if (api.has("clientes.view") && api.moduleEnabled("customers")) {
-          <a routerLink="/customers" routerLinkActive="active">Clientes</a>
-        }
-        @if (api.has("proveedores.view") && api.moduleEnabled("suppliers")) {
-          <a routerLink="/suppliers" routerLinkActive="active">Proveedores</a>
-        }
-        @if (api.has("cotizaciones.view") && api.moduleEnabled("quotes")) {
-          <a routerLink="/quotes" routerLinkActive="active">Cotizaciones</a>
-        }
-        @if (api.has("ordenes.view") && api.moduleEnabled("purchase-orders")) {
-          <a routerLink="/purchase-orders" routerLinkActive="active"
-            >Órdenes de Compra</a
-          >
-        }
-        @if (api.has("facturas.view") && api.moduleEnabled("invoices")) {
-          <a routerLink="/invoices" routerLinkActive="active">Facturas</a>
-        }
-        @if (api.has("gastos.view") && api.moduleEnabled("expenses")) {
-          <a routerLink="/expenses" routerLinkActive="active">Gastos</a>
-        }
-        @if (api.has("procesos.view") && api.moduleEnabled("processes")) {
-          <a routerLink="/processes" routerLinkActive="active">Procesos</a>
-        }
-        @if (api.has("reportes.view") && api.moduleEnabled("reports")) {
-          <a routerLink="/reports" routerLinkActive="active">Reportes</a>
-        }
-        @if (
-          api.has("colaboracion.view") && api.moduleEnabled("collaboration")
-        ) {
-          <a routerLink="/collaboration" routerLinkActive="active"
-            >Colaboración</a
-          >
-        }
-        <a routerLink="/settings" routerLinkActive="active">Configuración</a>
-      </nav>
-      <main>
-        @if (api.has("core.notifications.read")) {
-          <details>
-            <summary>Notificaciones</summary>
-            <button (click)="loadNotifications()">
-              Actualizar notificaciones
+          aria-label="Inicio"
+          title="Inicio"
+          ><bs-logo [size]="30"
+        /></a>
+
+        <nav class="bs-topnav-items" aria-label="Menú principal">
+          @for (item of items(); track item.path) {
+            <a
+              class="bs-tab"
+              [routerLink]="item.path"
+              routerLinkActive="bs-tab-active"
+              ariaCurrentWhenActive="page"
+              >{{ item.label }}</a
+            >
+          }
+        </nav>
+
+        <div class="bs-topnav-tools">
+          @if (api.has("core.notifications.read")) {
+            <button
+              type="button"
+              class="bs-iconbtn"
+              aria-label="Notificaciones"
+              title="Notificaciones"
+              [attr.aria-expanded]="alertsOpen()"
+              aria-controls="bs-alerts"
+              (click)="toggleAlerts()"
+            >
+              <bs-icon name="bell" />
+              @if (unread() > 0) {
+                <span class="bs-dot" aria-hidden="true"></span>
+              }
             </button>
-            <ul>
+          }
+          <a
+            class="bs-tab bs-tab-icon"
+            routerLink="/settings"
+            routerLinkActive="bs-tab-active"
+            ariaCurrentWhenActive="page"
+            aria-label="Configuración"
+            title="Configuración"
+            ><bs-icon name="settings"
+          /></a>
+          <span class="bs-avatar" [title]="userName()" aria-hidden="true">{{
+            initials()
+          }}</span>
+          <button
+            type="button"
+            class="bs-iconbtn"
+            aria-label="Cerrar sesión"
+            title="Cerrar sesión"
+            (click)="logout()"
+          >
+            <bs-icon name="logout" />
+          </button>
+        </div>
+      </header>
+
+      @if (alertsOpen()) {
+        <section id="bs-alerts" class="bs-searchbar" aria-label="Notificaciones">
+          <div class="bs-frame">
+            <div class="bs-frame-head">
+              <h2 class="bs-frame-title">Notificaciones</h2>
+              <button type="button" class="bs-btn bs-btn-ghost bs-btn-sm" (click)="loadNotifications()">
+                Actualizar notificaciones
+              </button>
+            </div>
+            <div class="bs-list">
               @for (n of notifications(); track n["id"]) {
-                <li>
-                  {{ n["message"] }}
+                <div class="bs-item" [class.bs-item-alert]="!n['read_at']">
+                  <span class="bs-item-t">{{ n["message"] }}</span>
                   @if (!n["read_at"]) {
-                    <button (click)="readNotification(n['id'])">
+                    <button type="button" class="bs-btn bs-btn-ghost bs-btn-sm" (click)="readNotification(n['id'])">
                       Marcar leída
                     </button>
                   }
-                </li>
+                </div>
               } @empty {
-                <li>No hay notificaciones cargadas.</li>
+                <p class="bs-muted">No hay notificaciones cargadas.</p>
               }
-            </ul>
-          </details>
+            </div>
+          </div>
+        </section>
+      }
+
+      <main class="bs-page">
+        @if (error()) {
+          <div class="bs-band bs-band-alert" role="alert">
+            <strong>{{ error() }}</strong>
+          </div>
         }
-        <p role="alert">{{ error() }}</p>
         <router-outlet />
       </main>
-    </div>`,
+    </div>
+  `,
 })
 export class Shell {
   api = inject(Client);
   private router = inject(Router);
   error = signal("");
   notifications = signal<Record<string, string>[]>([]);
+  alertsOpen = signal(false);
+
+  items = computed(() =>
+    NAV.filter((i) => this.api.has(i.permission) && this.api.moduleEnabled(i.module)),
+  );
+  userName = computed(() => this.api.profile()?.user?.name ?? "");
+  initials = computed(() =>
+    this.userName()
+      .split(/\s+/)
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((p) => p[0]!.toUpperCase())
+      .join(""),
+  );
+  unread = computed(() => this.notifications().filter((n) => !n["read_at"]).length);
+
+  toggleAlerts() {
+    const open = !this.alertsOpen();
+    this.alertsOpen.set(open);
+    if (open) void this.loadNotifications();
+  }
   async loadNotifications() {
     try {
       this.notifications.set(
-        (
-          await this.api.get<{ data: Record<string, string>[] }>(
-            "/notifications",
-          )
-        ).data,
+        (await this.api.get<{ data: Record<string, string>[] }>("/notifications")).data,
       );
     } catch (e) {
       this.error.set(this.api.message(e));

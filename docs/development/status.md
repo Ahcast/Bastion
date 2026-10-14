@@ -494,3 +494,8 @@ Corrección de validación U1: Core checks 38345463780 aprobó frontend/navegado
 
 
 CI 38346213793 aprobó invariantes IA sobre MySQL5.7 tras corrección SQL y frontend; navegador detectó destinatario vacío intermitente en Cotizaciones (20/21). Se sincronizó formulario de correo con Angular Forms, se impidió refresh solapado y se descartaron respuestas de ID/versión/página anteriores. Se añadieron pruebas de lifecycle real setInput y respuestas tardías; la regresión completa se repite antes de cerrar U1.
+## 2026-10-13 — UI Concreto, integración base
+
+Fuente: kit de interfaz aportado por el usuario, `docs/ui/BASTION-UI.md` y `docs/ui/tokens.json`. Aplicado el parche sobre `d74570a`: estilos/tokens `bs-*`, barra superior, logo e íconos Angular, acceso discreto, favicon, fuentes IBM Plex y assets locales. Los patrones por pantalla (indicadores interactivos, detalle en línea y formularios de cada módulo) quedan pendientes de migración secuencial según la sección 13 de la guía; no se declaran terminados por el cambio global.
+
+Local: `npm ci`, `ng build`, 171/171 pruebas unitarias y `scripts/check_repository.py` aprobados. Sin prueba de navegador o despliegue productivo en esta unidad.

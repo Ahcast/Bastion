@@ -1,188 +1,105 @@
-:root {
-  font-family: system-ui, sans-serif;
-  color: #152b3e;
-  background: #f1f5f8;
-  font-size: 16px;
-}
-* {
-  box-sizing: border-box;
-}
-body {
-  margin: 0;
-}
-header {
-  background: #12354b;
-  color: white;
-  padding: 1rem 2rem;
-  display: flex;
-  gap: 1rem;
-  align-items: center;
-}
-.brand {
-  font-size: 1.4rem;
-  font-weight: 700;
-  color: white;
-  margin-right: auto;
-}
-a {
-  color: #075f83;
-}
-.layout {
-  display: grid;
-  grid-template-columns: 220px 1fr;
-  min-height: 90vh;
-}
-nav {
-  padding: 1.4rem;
-  background: white;
-  display: flex;
-  flex-direction: column;
-  gap: 0.7rem;
-}
-nav a {
-  padding: 0.7rem;
-  text-decoration: none;
-  border-radius: 6px;
-}
-.active {
-  background: #dfedf4;
-}
-main {
-  padding: 1.5rem 2rem;
-  max-width: 1200px;
-  min-width: 0;
-}
-.card {
-  background: white;
-  padding: 1.5rem;
-  margin: 1rem 0;
-  border: 1px solid #d6e1e8;
-  border-radius: 10px;
-}
-.auth {
-  max-width: 560px;
-  margin: 5vh auto;
-}
-form {
-  display: grid;
-  gap: 0.9rem;
-  margin: 1rem 0;
-}
-label {
-  display: grid;
-  gap: 0.4rem;
-}
-input,
-textarea,
-select {
-  padding: 0.7rem;
-  font: inherit;
-  border: 1px solid #8197a7;
-  border-radius: 4px;
-  width: 100%;
-}
-input[type="checkbox"] {
-  width: auto;
-}
-textarea {
-  min-height: 90px;
-}
-button {
-  background: #075f83;
-  color: white;
-  border: 0;
-  border-radius: 4px;
-  padding: 0.65rem 1rem;
-  font: inherit;
-  cursor: pointer;
-  margin: 0.2rem;
-}
-button:disabled {
-  opacity: 0.5;
-  cursor: wait;
-}
-.secondary {
-  background: #526472;
-}
-button:focus-visible,
-input:focus-visible,
-a:focus-visible,
-textarea:focus-visible,
-select:focus-visible {
-  outline: 3px solid #de8e12;
-  outline-offset: 2px;
-}
-.error {
-  color: #a52020;
-}
-.message {
-  white-space: pre-wrap;
-}
-pre {
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-  background: #f1f5f8;
-  padding: 1rem;
-}
-table {
-  width: 100%;
-  border-collapse: collapse;
-  text-align: left;
-}
-th,
-td {
-  padding: 0.7rem;
-  border-bottom: 1px solid #d6e1e8;
-}
-.table-scroll {
-  overflow: auto;
-}
-dt {
-  font-weight: bold;
-}
-dd {
-  margin: 0 0 1rem;
-}
-@media (max-width: 720px) {
-  .layout {
-    grid-template-columns: 1fr;
-  }
-  nav {
-    flex-direction: row;
-    padding: 0.5rem;
-  }
-  main {
-    padding: 1rem;
-  }
-  .auth {
-    margin: 1rem;
-  }
-  .card {
-    padding: 1rem;
-  }
-  header {
-    padding: 1rem;
-  }
-}
+/* =====================================================================
+   Bastion · Concreto — capa base
+   Reemplaza frontend/src/styles.css. Da el estilo Concreto a los
+   elementos HTML sin clase (h1, p, form, label, input, select, button,
+   table, dl, details) y a las clases que ya usan las pantallas actuales
+   (.card, .secondary, .table-scroll, .muted, .actions, .message, .error,
+   .auth, .summary). Así toda la aplicación cambia de estilo sin reescribir
+   cada pantalla; después cada módulo puede migrar a los componentes bs-*.
+   Requiere bastion.css cargado antes.
+   ===================================================================== */
 
-:root[data-theme="dark"] {
-  color: #dce8f0;
-  background: #142632;
+/* ---------- Texto ---------- */
+:where(.bs-page, .auth) :where(h1) { font: 500 32px/40px var(--font-sans); letter-spacing: -0.02em; color: var(--ink); margin: 0 0 var(--space-5); }
+:where(.bs-page, .auth) :where(h2) { font: 600 18px/24px var(--font-sans); color: var(--ink); margin: 0 0 var(--space-4); }
+:where(.bs-page, .auth) :where(h3) { font: 600 16px/22px var(--font-sans); color: var(--ink); margin: 0 0 var(--space-3); }
+:where(.bs-page, .auth) :where(p) { margin: 0 0 var(--space-3); }
+:where(.bs-page) :where(small) { font-size: 14px; color: var(--ink-subtle); }
+:where(.bs-page, .auth) :where(code, kbd, samp) { font: 400 14px/20px var(--font-mono); }
+:where(.bs-page, .auth) :where(pre) { font: 400 14px/20px var(--font-mono); white-space: pre-wrap; overflow-wrap: anywhere; background: var(--panel); border: 1px solid var(--line); padding: var(--space-4); margin: 0 0 var(--space-4); }
+.muted { color: var(--ink-subtle); }
+.message { white-space: pre-wrap; }
+.error, :where(.bs-page, .auth) [role="alert"]:not(:empty) { color: var(--signal); font-weight: 500; }
+:where(.bs-page, .auth) [role="status"]:not(:empty) { display: block; padding: 10px 14px; border-left: 4px solid var(--ok); background: var(--panel); color: var(--ink); margin: 0 0 var(--space-4); }
+:where(.bs-page, .auth) [role="alert"]:not(:empty):not(.bs-band) { display: block; padding: 10px 14px; border-left: 4px solid var(--signal); background: var(--signal-dim); margin: 0 0 var(--space-4); }
+
+/* ---------- Secciones: .card pasa a ser una regla de carbón + título ---------- */
+.card { background: transparent; border: 0; border-top: 2px solid var(--ink); border-radius: 0; padding: 12px 0 0; margin: 0 0 var(--space-6); }
+.card > h2:first-child, .card > h3:first-child { margin-top: 0; }
+.card .card { border-top-width: 1px; border-top-color: var(--line-strong); }
+.actions { display: flex; gap: var(--space-2); flex-wrap: wrap; align-items: center; margin: var(--space-3) 0; }
+.summary { display: flex; gap: var(--space-6); flex-wrap: wrap; font: 500 15px/22px var(--font-sans); }
+
+/* ---------- Formularios ---------- */
+:where(.bs-page, .auth) :where(form) { display: flex; flex-wrap: wrap; gap: var(--space-4) var(--space-5); align-items: flex-end; margin: 0 0 var(--space-5); }
+:where(.bs-page, .auth) :where(form) > :where(label, .bs-field) { flex: 1 1 220px; }
+:where(.bs-page, .auth) :where(form) > :where(button) { flex: none; }
+:where(.bs-page, .auth) :where(label) { display: flex; flex-direction: column; gap: 6px; font: 500 12px/16px var(--font-mono); letter-spacing: .05em; text-transform: uppercase; color: var(--ink-subtle); min-width: 0; }
+:where(.bs-page, .auth) :where(label:has(> input[type="checkbox"], > input[type="radio"])) { flex-direction: row; align-items: center; gap: 10px; font: 400 16px/24px var(--font-sans); letter-spacing: 0; text-transform: none; color: var(--ink); flex: 0 0 auto; }
+:where(.bs-page, .auth) :where(input:not([type="checkbox"], [type="radio"], [type="file"], [type="range"], [type="color"]), select, textarea) {
+  width: 100%; min-width: 0; font: 400 16px/24px var(--font-sans); letter-spacing: 0; text-transform: none; color: var(--ink);
+  background: var(--panel-raised); border: 1px solid var(--ink); border-radius: 0; padding: 7px 10px; margin: 0;
 }
-:root[data-theme="dark"] .card,
-:root[data-theme="dark"] nav {
-  background: #1b3343;
-  border-color: #385263;
+:where(.bs-page, .auth) :where(input[type="number"], input[inputmode="decimal"], input[inputmode="numeric"]) { font-family: var(--font-mono); font-size: 15px; text-align: right; }
+:where(.bs-page, .auth) :where(input[type="date"], input[type="datetime-local"]) { font-family: var(--font-mono); font-size: 15px; }
+:where(.bs-page, .auth) :where(select) { appearance: none; padding-right: 30px; cursor: pointer; background: var(--panel-raised) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2325292d' stroke-width='2.5'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E") no-repeat right 10px center; }
+:where(.bs-page, .auth) :where(select[multiple]) { background-image: none; padding-right: 10px; }
+:where(.bs-page, .auth) :where(textarea) { min-height: 96px; resize: vertical; }
+:where(.bs-page, .auth) :where(input, select, textarea):focus-visible { outline: 2px solid var(--ink); outline-offset: -2px; }
+:where(.bs-page, .auth) :where(input, select, textarea)[aria-invalid="true"] { border-color: var(--signal); }
+:where(.bs-page, .auth) :where(input, select, textarea):disabled { background: transparent; border-style: dashed; color: var(--ink-subtle); cursor: not-allowed; }
+:where(.bs-page, .auth) :where(input[readonly]) { background: transparent; border-color: var(--line); }
+:where(.bs-page, .auth) :where(input::placeholder, textarea::placeholder) { color: var(--ink-subtle); opacity: 1; }
+:where(.bs-page, .auth) :where(input[type="checkbox"], input[type="radio"]) { appearance: none; width: 18px; height: 18px; margin: 0; border: 1.5px solid var(--ink); background: var(--panel); display: inline-grid; place-content: center; cursor: pointer; flex: none; }
+:where(.bs-page, .auth) :where(input[type="checkbox"]:checked) { background: var(--ink); }
+:where(.bs-page, .auth) :where(input[type="checkbox"])::before { content: ""; width: 10px; height: 6px; border-left: 2px solid var(--on-accent); border-bottom: 2px solid var(--on-accent); transform: rotate(-45deg) translate(1px, -1px) scale(0); }
+:where(.bs-page, .auth) :where(input[type="checkbox"]:checked)::before { transform: rotate(-45deg) translate(1px, -1px) scale(1); }
+:where(.bs-page, .auth) :where(input[type="radio"])::before { content: ""; width: 8px; height: 8px; background: var(--ink); transform: scale(0); }
+:where(.bs-page, .auth) :where(input[type="radio"]:checked)::before { transform: scale(1); }
+:where(.bs-page, .auth) :where(input[type="file"]) { font: 400 15px/22px var(--font-sans); color: var(--ink); }
+:where(.bs-page, .auth) :where(input[type="file"])::file-selector-button { font: 500 15px/22px var(--font-sans); color: var(--ink); background: transparent; border: 1px solid var(--ink); padding: 7px 14px; margin-right: 12px; cursor: pointer; }
+:where(.bs-page, .auth) :where(fieldset) { border: 0; border-top: 2px solid var(--ink); margin: 0 0 var(--space-5); padding: 12px 0 0; min-width: 0; }
+:where(.bs-page, .auth) :where(legend) { font: 600 18px/24px var(--font-sans); color: var(--ink); padding: 0; }
+
+/* ---------- Botones: por defecto secundario; primario el que envía un formulario ---------- */
+:where(.bs-page, .auth) :where(button:not([class*="bs-"])) {
+  display: inline-flex; align-items: center; justify-content: center; gap: var(--space-2);
+  font: 500 15px/22px var(--font-sans); letter-spacing: 0; text-transform: none;
+  padding: 8px 16px; margin: 0; border: 1px solid var(--ink); border-radius: 0;
+  background: transparent; color: var(--ink); cursor: pointer; white-space: nowrap;
 }
-:root[data-theme="dark"] a {
-  color: #88c5e2;
-}
-:root[data-theme="dark"] pre {
-  background: #142632;
-}
-:root[data-theme="dark"] input,
-:root[data-theme="dark"] textarea,
-:root[data-theme="dark"] select {
-  color: #dce8f0;
-  background: #142632;
+:where(.bs-page, .auth) :where(button:not([class*="bs-"]):hover:not(:disabled)) { background: var(--accent-dim); }
+:where(.bs-page, .auth) :where(form button:not([type="button"], [type="reset"], .secondary, [class*="bs-"]), button[type="submit"]:not([class*="bs-"]), button.primary) { background: var(--ink); color: var(--on-accent); }
+:where(.bs-page, .auth) :where(form button:not([type="button"], [type="reset"], .secondary, [class*="bs-"]):hover:not(:disabled), button[type="submit"]:not([class*="bs-"]):hover:not(:disabled), button.primary:hover:not(:disabled)) { background: var(--accent-strong); }
+:where(.bs-page, .auth) :where(button.secondary) { background: transparent; color: var(--ink); }
+:where(.bs-page, .auth) :where(button.danger) { border-color: var(--signal); color: var(--signal); background: transparent; }
+:where(.bs-page, .auth) :where(button:disabled) { opacity: .4; cursor: not-allowed; }
+:where(.bs-page, .auth) :where(button:focus-visible) { outline: 2px solid var(--ink); outline-offset: 2px; }
+
+/* ---------- Tablas ---------- */
+.table-scroll { overflow-x: auto; margin: 0 0 var(--space-4); }
+:where(.bs-page) :where(table:not(.bs-table, .bs-mini)) { width: 100%; border-collapse: collapse; font: 400 16px/24px var(--font-sans); color: var(--ink); text-align: left; }
+:where(.bs-page) :where(table:not(.bs-table, .bs-mini)) :where(th) { font: 500 12px/16px var(--font-mono); letter-spacing: .05em; text-transform: uppercase; color: var(--ink-subtle); padding: 10px 14px; background: var(--panel); border-bottom: 1px solid var(--ink); white-space: nowrap; }
+:where(.bs-page) :where(table:not(.bs-table, .bs-mini)) :where(td) { padding: 12px 14px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+:where(.bs-page) :where(table:not(.bs-table, .bs-mini)) :where(tbody tr:hover td) { background: var(--accent-dim); }
+:where(.bs-page) :where(caption) { text-align: left; font: 600 18px/24px var(--font-sans); padding-bottom: var(--space-3); }
+
+/* ---------- Listas de datos ---------- */
+:where(.bs-page) :where(dl) { display: grid; grid-template-columns: max-content 1fr; gap: 8px 24px; margin: 0 0 var(--space-4); }
+:where(.bs-page) :where(dt) { font: 500 12px/24px var(--font-mono); letter-spacing: .05em; text-transform: uppercase; color: var(--ink-subtle); }
+:where(.bs-page) :where(dd) { margin: 0; font: 500 16px/24px var(--font-sans); }
+:where(.bs-page) :where(ul, ol) { padding-left: 20px; margin: 0 0 var(--space-4); }
+:where(.bs-page) :where(details) { border-top: 1px solid var(--line-strong); padding: 10px 0; }
+:where(.bs-page) :where(summary) { font: 500 15px/22px var(--font-sans); cursor: pointer; }
+:where(.bs-page) :where(hr) { border: 0; border-top: 1px solid var(--line); margin: var(--space-5) 0; }
+
+/* ---------- Acceso (login, MFA, invitación) ---------- */
+.auth { max-width: 380px; margin: 12vh auto 0; padding: 0 16px; }
+.auth :where(form) { flex-direction: column; align-items: stretch; }
+.auth :where(form) > :where(label) { flex: none; }
+.auth :where(form button:not([type="button"])) { width: 100%; padding: 11px 16px; }
+
+@media (max-width: 760px) {
+  :where(.bs-page) :where(dl) { grid-template-columns: 1fr; gap: 2px; }
+  :where(.bs-page) :where(dd) { margin-bottom: 10px; }
 }
