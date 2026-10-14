@@ -36,7 +36,7 @@ const states: Record<string, string> = {
       class="bs-kpis bs-kpis-4"
       aria-label="Resumen de la consulta"
     >
-      <div class="bs-kpi-tile bs-static">
+      <div class="bs-kpi-tile bs-static bs-kpi-leading">
         <span class="bs-label">Registros encontrados</span
         ><span class="bs-kpi-value">{{ total }}</span
         ><span class="bs-kpi-foot">Consulta autorizada</span>

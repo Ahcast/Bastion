@@ -18,22 +18,7 @@ interface Metrics {
 @Component({
   selector: "bastion-home-metrics",
   imports: [FormsModule, RouterLink],
-  template: `<section class="bs-frame bs-home-summary">
-    <div class="bs-frame-head">
-      <h2 class="bs-frame-title">Resumen comercial</h2>
-      <span class="bs-label">Período autorizado</span>
-    </div>
-    <form class="bs-filter-form" (ngSubmit)="load()">
-      <label>Desde<input name="from" type="date" [(ngModel)]="from" /></label
-      ><label>Hasta<input name="to" type="date" [(ngModel)]="to" /></label
-      ><label
-        >Moneda<select aria-label="Moneda" name="currency" [(ngModel)]="currency">
-          <option value="">Todas, separadas</option>
-          <option>HNL</option>
-          <option>USD</option>
-        </select></label
-      ><button [disabled]="busy()">Actualizar resumen</button>
-    </form>
+  template: `<section class="bs-home-summary">
     @if (error()) {
       <p class="error" role="alert">{{ error() }}</p>
     }
@@ -57,9 +42,7 @@ interface Metrics {
               }
             }
           </div>
-          <p class="bs-muted">
-            El saldo y los estados se confirman en la ficha de cada factura.
-          </p>
+          @if (!(m.reports["invoices"] || []).length) {<p class="bs-muted">Sin saldos por revisar en el período.</p>}
         </section>
         <section class="bs-frame">
           <h3>Documentos del período</h3>
@@ -97,8 +80,20 @@ interface Metrics {
           }
         </section>
       </div>
-      <details>
-        <summary>Consultar todos los totales del período</summary>
+      <details class="bs-period-controls">
+        <summary>Período y totales del resumen comercial</summary>
+    <form class="bs-filter-form" (ngSubmit)="load()">
+      <label>Desde<input name="from" type="date" [(ngModel)]="from" /></label
+      ><label>Hasta<input name="to" type="date" [(ngModel)]="to" /></label
+      ><label
+        >Moneda<select aria-label="Moneda" name="currency" [(ngModel)]="currency">
+          <option value="">Todas, separadas</option>
+          <option>HNL</option>
+          <option>USD</option>
+        </select></label
+      ><button [disabled]="busy()">Actualizar resumen</button>
+    </form>
+
         <p>
           Período: {{ m.filters["date_from"] || "Sin límite inicial" }} —
           {{ m.filters["date_to"] || "Sin límite final" }}

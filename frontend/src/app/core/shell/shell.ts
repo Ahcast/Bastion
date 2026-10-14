@@ -5,6 +5,7 @@ import {
   RouterLinkActive,
   RouterOutlet,
 } from "@angular/router";
+import { FormsModule } from "@angular/forms";
 import { Client } from "../api/client";
 import { Icon } from "../ui/icon";
 import { Logo } from "../ui/logo";
@@ -21,22 +22,23 @@ interface NavItem {
   label: string;
   permission: string;
   module: string;
+  icon: string;
 }
 
 const NAV: NavItem[] = [
-  { path: "/customers", label: "Clientes", permission: "clientes.view", module: "customers" },
-  { path: "/suppliers", label: "Proveedores", permission: "proveedores.view", module: "suppliers" },
-  { path: "/processes", label: "Procesos", permission: "procesos.view", module: "processes" },
-  { path: "/quotes", label: "Cotizaciones", permission: "cotizaciones.view", module: "quotes" },
-  { path: "/purchase-orders", label: "Órdenes de compra", permission: "ordenes.view", module: "purchase-orders" },
-  { path: "/invoices", label: "Facturas", permission: "facturas.view", module: "invoices" },
-  { path: "/expenses", label: "Gastos", permission: "gastos.view", module: "expenses" },
-  { path: "/reports", label: "Reportes", permission: "reportes.view", module: "reports" },
-  { path: "/collaboration", label: "Colaboración", permission: "colaboracion.view", module: "collaboration" },
+  { path: "/customers", label: "Clientes", permission: "clientes.view", module: "customers", icon: "clients" },
+  { path: "/suppliers", label: "Proveedores", permission: "proveedores.view", module: "suppliers", icon: "suppliers" },
+  { path: "/processes", label: "Procesos", permission: "procesos.view", module: "processes", icon: "tenders" },
+  { path: "/quotes", label: "Cotizaciones", permission: "cotizaciones.view", module: "quotes", icon: "quotes" },
+  { path: "/purchase-orders", label: "Órdenes de compra", permission: "ordenes.view", module: "purchase-orders", icon: "orders" },
+  { path: "/invoices", label: "Facturas", permission: "facturas.view", module: "invoices", icon: "invoices" },
+  { path: "/expenses", label: "Gastos", permission: "gastos.view", module: "expenses", icon: "expenses" },
+  { path: "/reports", label: "Reportes", permission: "reportes.view", module: "reports", icon: "reports" },
+  { path: "/collaboration", label: "Colaboración", permission: "colaboracion.view", module: "collaboration", icon: "team" },
 ];
 
 @Component({
-  imports: [RouterLink, RouterLinkActive, RouterOutlet, Icon, Logo],
+  imports: [RouterLink, RouterLinkActive, RouterOutlet, Icon, Logo, FormsModule],
   template: `
     <div class="bs-app">
       <header class="bs-topnav">
@@ -57,12 +59,13 @@ const NAV: NavItem[] = [
               [routerLink]="item.path"
               routerLinkActive="bs-tab-active"
               ariaCurrentWhenActive="page"
-              >{{ item.label }}</a
+              ><bs-icon [name]="item.icon" [size]="16" />{{ item.label }}</a
             >
           }
         </nav>
 
         <div class="bs-topnav-tools">
+          <button type="button" class="bs-iconbtn" aria-label="Buscar módulo" [attr.aria-expanded]="searchOpen()" aria-controls="bs-module-search" (click)="searchOpen.set(!searchOpen())"><bs-icon name="search" /></button>
           @if (api.has("core.notifications.read")) {
             <button
               type="button"
@@ -104,6 +107,12 @@ const NAV: NavItem[] = [
         </div>
       </header>
 
+      @if (searchOpen()) {
+        <section id="bs-module-search" class="bs-searchbar" aria-label="Buscar módulo">
+          <label class="bs-field">Buscar módulo<input class="bs-input" [(ngModel)]="moduleSearch" placeholder="Clientes, procesos, cotizaciones…" (keydown.escape)="searchOpen.set(false)" /></label>
+          <nav class="bs-search-results" aria-label="Resultados de módulos">@for(item of searchItems(); track item.path){<a [routerLink]="item.path" (click)="searchOpen.set(false)">{{item.label}} →</a>} @empty {<p>No hay módulos disponibles con ese nombre.</p>}</nav>
+        </section>
+      }
       @if (alertsOpen()) {
         <section id="bs-alerts" class="bs-searchbar" aria-label="Notificaciones">
           <div class="bs-frame">
@@ -146,6 +155,12 @@ export class Shell {
   api = inject(Client);
   private router = inject(Router);
   userOpen=signal(false);
+  searchOpen = signal(false);
+  moduleSearch = "";
+  searchItems() {
+    const query = this.moduleSearch.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+    return this.items().filter(item => item.label.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().includes(query));
+  }
   error = signal("");
   notifications = signal<Record<string, string>[]>([]);
   alertsOpen = signal(false);

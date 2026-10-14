@@ -315,3 +315,21 @@ test('Concreto password visibility keeps the input accessible by its visible lab
  await page.getByRole('button',{name:'Ocultar contraseña',exact:true}).click();
  await expect(password).toHaveAttribute('type','password');
 });
+
+// Regression for the Panel reference: module search respects the same grants as navigation.
+test("Panel search filters authorized modules and navigates", async ({page}) => {
+  await fixture(page);
+  await page.goto("/");
+  await page.getByRole("button", {name:"Buscar módulo",exact:true}).click();
+  await page.locator("#bs-module-search input").fill("cotiz");
+  const results = page.getByRole("navigation", {name:"Resultados de módulos"});
+  await expect(results.getByRole("link")).toHaveCount(1);
+  await results.getByRole("link").click();
+  await expect(page).toHaveURL(/quotes/);
+  await expect(page.locator("#bs-module-search")).toHaveCount(0);
+  await fixture(page,true);
+  await page.goto("/customers");
+  await page.getByRole("button", {name:"Buscar módulo",exact:true}).click();
+  await page.locator("#bs-module-search input").fill("cotiz");
+  await expect(results.getByRole("link")).toHaveCount(0);
+});

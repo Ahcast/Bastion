@@ -70,7 +70,7 @@ const workspaces: {
       <div>
         <span class="bs-label">{{ today }}</span>
         <h1>Inicio</h1>
-        <p>Seleccione un indicador para trabajar en ese módulo.</p>
+
       </div>
       <div class="bs-actions">
         <button class="bs-btn bs-btn-secondary" (click)="loadCounts()">
@@ -99,15 +99,16 @@ const workspaces: {
           (keydown)="key($event, w.id)"
         >
           <span class="bs-label">{{ w.title }}</span
-          ><span class="bs-kpi-value">{{ counts()[w.id] ?? "—" }}</span
+          ><span class="bs-kpi-value">{{ primaryValue(w.id) }}</span
           ><span class="bs-kpi-foot">{{
             allowed(w.id)
               ? w.id === "invoices"
                 ? "Facturas consultables"
-                : "Registros autorizados"
+                : (counts()[w.id] ?? "—") + " registros autorizados"
               : "Sin permiso de consulta"
           }}</span>
-          @for (t of amounts(w.id); track t.currency) {
+          <span class="bs-kpi-more">{{ selected() === w.id ? "En la tabla ↓" : "Ver en la tabla" }}</span>
+          @for (t of amounts(w.id).slice(1); track t.currency) {
             <span class="bs-kpi-foot bs-mono"
               >Período · {{ t.currency }} {{ t.value }}</span
             >
@@ -166,6 +167,11 @@ export class Dashboard implements OnDestroy {
     return this.allowed(this.selected())
       ? workspaces.find((w) => w.id === this.selected())!.component
       : null;
+  }
+  primaryValue(id: Workspace) {
+    const amount = this.amounts(id)[0];
+    if (amount) return amount.currency + " " + amount.value;
+    return String(this.counts()[id] ?? "—");
   }
   amounts(id: Workspace) {
     const field = id === "invoices" ? "balance" : "total";
