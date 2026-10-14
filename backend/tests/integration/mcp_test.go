@@ -42,7 +42,7 @@ func TestMCPStreamableSDKMatchesRESTPolicy(t *testing.T) {
 	// Existing/legacy tokens that already contain a human business permission
 	// must also lose that privilege after M3, even when the owning user retains it.
 	legacyToken := security.Token()
-	if _, e := s.DB.Exec(`INSERT INTO service_identities(name,token_hash,user_id,scopes,active,expires_at,created_at) VALUES(?,?,?,JSON_ARRAY('cotizaciones.view'),TRUE,?,UTC_TIMESTAMP(6))`, "Legacy quote read", security.Hash(legacyToken), a.UserID, time.Now().Add(time.Hour)); e != nil {
+	if _, e := s.DB.Exec(`INSERT INTO service_identities(name,token_hash,user_id,scopes,active,expires_at) VALUES(?,?,?,JSON_ARRAY('cotizaciones.view'),TRUE,?)`, "Legacy quote read", security.Hash(legacyToken), a.UserID, time.Now().Add(time.Hour)); e != nil {
 		t.Fatal(e)
 	}
 	legacyActor, e := s.AuthenticateService(ctx, legacyToken)

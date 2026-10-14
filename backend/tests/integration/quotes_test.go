@@ -1,7 +1,6 @@
 package integration
 
 import (
-	"encoding/json"
 	"fmt"
 	"github.com/Ahcast/Bastion/backend/internal/composition"
 	"github.com/Ahcast/Bastion/backend/internal/core"
@@ -18,7 +17,6 @@ import (
 	"sync"
 	"sync/atomic"
 	"testing"
-	"time"
 )
 
 func quotesFixture(t *testing.T) (*quotes.Service, core.Actor, *registry.Registry) {
@@ -320,7 +318,7 @@ func TestQuotesScopesRevocationReauthAndProtectedInputs(t *testing.T) {
 		t.Fatal(status)
 	}
 }
-func TestQuotesMCPStringsParityAndDisabledModule(t *testing.T) {
+func TestQuotesHumanStringsServiceMCPDeniedAndDisabledModule(t *testing.T) {
 	s, a, r := quotesFixture(t)
 	grantQuote(t, s.Core, a, "all")
 	if _, e := s.Core.DB.Exec(`ALTER TABLE quotes AUTO_INCREMENT=9007199254740993`); e != nil {
@@ -330,11 +328,7 @@ func TestQuotesMCPStringsParityAndDisabledModule(t *testing.T) {
 	if id != "9007199254740993" {
 		t.Fatal(id)
 	}
-	v, e := s.Core.CreateService(ctx, a, "Quotes SDK", []string{"cotizaciones.view"}, time.Now().Add(time.Hour))
-	if e != nil {
-		t.Fatal(e)
-	}
-	token := v.(map[string]any)["token"].(string)
+	token := deniedLegacyBusinessToken(t, s.Core, a, "cotizaciones.view")
 	server := httptest.NewServer(api.New(s.Core, r, nil, slog.New(slog.NewTextHandler(io.Discard, nil))))
 	defer server.Close()
 	client := mcp.NewClient(&mcp.Implementation{Name: "test", Version: "1"}, nil)
@@ -344,13 +338,10 @@ func TestQuotesMCPStringsParityAndDisabledModule(t *testing.T) {
 	}
 	defer session.Close()
 	result, e := session.CallTool(ctx, &mcp.CallToolParams{Name: "get_quote", Arguments: map[string]any{"id": id}})
-	if e != nil || result.IsError {
-		t.Fatal(result, e)
-	}
-	b, _ := json.Marshal(result.StructuredContent)
-	var q quotes.Quote
-	if e = json.Unmarshal(b, &q); e != nil || q.ID != id || q.Version != 1 || q.Calculation.Total != "201.25" {
-		t.Fatal(string(b), e)
+	requireMCPBusinessDenied(t, result, e)
+	q, e := s.Get(ctx, a, id)
+	if e != nil || q.ID != id || q.Version != 1 || q.Calculation.Total != "201.25" {
+		t.Fatal(q, e)
 	}
 	if _, e = s.Core.DB.Exec(`DELETE FROM role_permissions WHERE permission='cotizaciones.view'`); e != nil {
 		t.Fatal(e)

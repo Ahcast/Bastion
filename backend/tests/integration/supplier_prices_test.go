@@ -165,7 +165,7 @@ func TestSupplierPriceRollbackIdempotencyAndConcurrentVersion(t *testing.T) {
 		t.Fatal("conflicting prices persisted", count)
 	}
 }
-func TestSupplierPriceRESTMCPParityAndRestrictedReaders(t *testing.T) {
+func TestSupplierPriceRESTAllowedServiceMCPDeniedAndRestrictedReaders(t *testing.T) {
 	s, a, r := suppliersFixture(t)
 	grantSupplier(t, s.Core, a, "all")
 	id := makeSupplier(t, s, a, "sdk-price-supplier", supplierInput("Proveedor SDK precios"))
@@ -176,11 +176,7 @@ func TestSupplierPriceRESTMCPParityAndRestrictedReaders(t *testing.T) {
 	if _, e := s.PriceHistory(ctx, owner, id, "", 1, 25); e != core.Missing {
 		t.Fatal("price IDOR", e)
 	}
-	v, e := s.Core.CreateService(ctx, a, "Precios proveedores", []string{"proveedores.view"}, time.Now().Add(time.Hour))
-	if e != nil {
-		t.Fatal(e)
-	}
-	token := v.(map[string]any)["token"].(string)
+	token := deniedLegacyBusinessToken(t, s.Core, a, "proveedores.view")
 	server := httptest.NewServer(api.New(s.Core, r, nil, slog.New(slog.NewTextHandler(io.Discard, nil))))
 	defer server.Close()
 	client := mcp.NewClient(&mcp.Implementation{Name: "supplier-price-test", Version: "1"}, nil)
@@ -190,17 +186,16 @@ func TestSupplierPriceRESTMCPParityAndRestrictedReaders(t *testing.T) {
 	}
 	defer session.Close()
 	result, e := session.CallTool(ctx, &mcp.CallToolParams{Name: "get_supplier_price_history", Arguments: map[string]any{"id": id, "page": 1, "per_page": 25, "part_number": "SKU-1"}})
-	if e != nil || result.IsError {
-		t.Fatal("price MCP", result, e)
-	}
-	var output suppliers.PricePage
-	b, _ := json.Marshal(result.StructuredContent)
-	if e = json.Unmarshal(b, &output); e != nil || output.Total != 1 || output.Data[0].Price != "12.345678" {
-		t.Fatal(string(b), e)
+	requireMCPBusinessDenied(t, result, e)
+	output, e := s.PriceHistory(ctx, a, id, "SKU-1", 1, 25)
+	if e != nil || output.Total != 1 || len(output.Data) != 1 || output.Data[0].Price != "12.345678" {
+		t.Fatal(output, e)
 	}
 	result, e = session.CallTool(ctx, &mcp.CallToolParams{Name: "resolve_supplier_exact", Arguments: map[string]any{"name": "Proveedor SDK precios"}})
-	if e != nil || result.IsError {
-		t.Fatal("exact supplier SDK", result, e)
+	requireMCPBusinessDenied(t, result, e)
+	resolved, e := s.ResolveExact(ctx, a, "Proveedor SDK precios", "")
+	if e != nil || resolved == nil || resolved.ID == nil || *resolved.ID != id {
+		t.Fatal(resolved, e)
 	}
 	actor, e := s.Core.AuthenticateService(ctx, token)
 	if e != nil {

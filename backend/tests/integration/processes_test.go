@@ -238,9 +238,9 @@ func TestProcessesHTTPMCPAndScopedReadRevocation(t *testing.T) {
 	}
 	defer session.Close()
 	result, e := session.CallTool(ctx, &mcp.CallToolParams{Name: "get_process", Arguments: map[string]any{"id": id}})
-	if e != nil || result.IsError {
-		t.Fatal(result, e)
-	}
+	// The legacy marker is usable by the independently authorized IA task surface,
+	// but must never authorize generic process-module reads.
+	requireMCPBusinessDenied(t, result, e)
 	var rid string
 	s.Core.DB.QueryRow(`SELECT role_id FROM user_roles WHERE user_id=? ORDER BY role_id DESC LIMIT 1`, human.UserID).Scan(&rid)
 	s.Core.DB.Exec(`UPDATE role_permissions SET scope='self' WHERE role_id=? AND permission='procesos.view'`, rid)

@@ -369,7 +369,7 @@ func TestSuppliersSelfTeamIDORAndImmediateRevocation(t *testing.T) {
 	if e != nil || list.Total != 1 || list.Data[0].ID != teamID {
 		t.Fatal("team list", list, e)
 	}
-	// A narrowly granted operator can create a read-only connection for its own team.
+	// A connection operator retains human team access without granting it to service tokens.
 	r, e := s.Core.DB.Exec(`INSERT INTO roles(name) VALUES('Conexiones técnicas de prueba')`)
 	if e != nil {
 		t.Fatal(e)
@@ -384,17 +384,14 @@ func TestSuppliersSelfTeamIDORAndImmediateRevocation(t *testing.T) {
 	if _, e = s.Core.DB.Exec(`INSERT INTO user_roles VALUES(?,?)`, teamActor.UserID, rid); e != nil {
 		t.Fatal(e)
 	}
-	tokenResult, e := s.Core.CreateService(ctx, teamActor, "Equipo lectura", []string{"proveedores.view"}, time.Now().Add(time.Hour))
-	if e != nil {
-		t.Fatal("team token creation", e)
-	}
-	serviceActor, e := s.Core.AuthenticateService(ctx, tokenResult.(map[string]any)["token"].(string))
+	// Technical connections do not inherit the operator's business team scope.
+	token := deniedLegacyBusinessToken(t, s.Core, teamActor, "proveedores.view")
+	serviceActor, e := s.Core.AuthenticateService(ctx, token)
 	if e != nil {
 		t.Fatal(e)
 	}
-	serviceList, e := s.List(ctx, serviceActor, suppliers.Filter{Page: 1, PerPage: 10})
-	if e != nil || serviceList.Total != 1 || serviceList.Data[0].ID != teamID {
-		t.Fatal("MCP team scope", serviceList, e)
+	if _, e = s.List(ctx, serviceActor, suppliers.Filter{Page: 1, PerPage: 10}); e != core.Forbidden {
+		t.Fatal("legacy service read team data", e)
 	}
 	c, e := s.Get(ctx, teamActor, teamID)
 	if e != nil {
@@ -532,7 +529,7 @@ func TestSuppliersDocumentLinkRequiresBothPoliciesAndKeepsQuarantine(t *testing.
 		t.Fatal("entity permission bypass", e)
 	}
 }
-func TestSuppliersRESTMCPParityAndDisabledModule(t *testing.T) {
+func TestSuppliersRESTAllowedServiceMCPDeniedAndDisabledModule(t *testing.T) {
 	s, a, r := suppliersFixture(t)
 	grantSupplier(t, s.Core, a, "all")
 	if _, e := s.Core.DB.Exec(`ALTER TABLE suppliers AUTO_INCREMENT=9007199254740993`); e != nil {
@@ -542,11 +539,7 @@ func TestSuppliersRESTMCPParityAndDisabledModule(t *testing.T) {
 	if id != "9007199254740993" {
 		t.Fatal("BIGINT precision", id)
 	}
-	v, e := s.Core.CreateService(ctx, a, "Proveedores SDK", []string{"proveedores.view"}, time.Now().Add(time.Hour))
-	if e != nil {
-		t.Fatal(e)
-	}
-	token := v.(map[string]any)["token"].(string)
+	token := deniedLegacyBusinessToken(t, s.Core, a, "proveedores.view")
 	h := api.New(s.Core, r, nil, slog.New(slog.NewTextHandler(io.Discard, nil)))
 	server := httptest.NewServer(h)
 	defer server.Close()
@@ -557,17 +550,13 @@ func TestSuppliersRESTMCPParityAndDisabledModule(t *testing.T) {
 	}
 	defer session.Close()
 	result, e := session.CallTool(ctx, &mcp.CallToolParams{Name: "get_supplier", Arguments: map[string]any{"id": id}})
-	if e != nil || result.IsError {
-		t.Fatal("MCP registered actor missing", e, result)
-	}
-	var out suppliers.Supplier
-	b, _ := json.Marshal(result.StructuredContent)
-	if e = json.Unmarshal(b, &out); e != nil || out.ID != id || out.Name != "Proveedor SDK" {
-		t.Fatal(string(b), e)
-	}
+	requireMCPBusinessDenied(t, result, e)
 	result, e = session.CallTool(ctx, &mcp.CallToolParams{Name: "search_suppliers", Arguments: map[string]any{"page": 1, "per_page": 1}})
-	if e != nil || result.IsError {
-		t.Fatal(result, e)
+	requireMCPBusinessDenied(t, result, e)
+	// Human reads retain the exact ID and canonical name.
+	out, e := s.Get(ctx, a, id)
+	if e != nil || out.ID != id || out.Name != "Proveedor SDK" {
+		t.Fatal(out, e)
 	}
 	actor, e := s.Core.AuthenticateService(ctx, token)
 	if e != nil {

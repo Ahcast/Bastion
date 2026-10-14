@@ -515,3 +515,12 @@ Validación local: npm ci, build de producción, 171 pruebas unitarias y checks 
 ### Regresión de navegador de la estructura
 
 `3f2df794aa401d72a579686ffee3fb16bdf72a91`, [Core checks 38514730123](https://github.com/Ahcast/Bastion/actions/runs/38514730123): frontend aprobado, navegador 20/24. Tres fallos identificaron texto vacío de Procesos, título del módulo Colaboración y etiqueta exacta de Moneda en Inicio. Se conservan los dos textos del módulo y se restaura aria-label de Moneda. El caso de comprobantes seleccionaba un archivo con el input aún deshabilitado durante la recarga de referencias/documentos; Playwright setInputFiles puede hacerlo aunque una interacción humana esté bloqueada. Se espera explícitamente que se habilite antes de seleccionar, manteniendo todas las comprobaciones de versiones, cuarentena y papelera. Se corrige además el nombre accesible de la contraseña con el botón de visibilidad y se agrega su prueba. Repetir Core checks antes de certificar la unidad.
+
+
+### Pruebas MCP heredadas alineadas con las restricciones vigentes
+
+El backend del primer Core checks falló en ocho pruebas de integración que aún esperaban lectura comercial por conexiones técnicas, o insertaban una columna `created_at` inexistente en `service_identities`. Se ajustan las expectativas a las restricciones de seguridad ya implementadas: se verifica que no puedan crearse tokens con scopes comerciales ordinarios y que tokens heredados tampoco puedan ejecutar sus tools, aun con permisos humanos del titular. Las lecturas humanas conservan precisión, nombres, cálculo e historial de precios; se mantienen IDOR/equipo/revocación, rechazo de escrituras, entradas falsificadas y módulos deshabilitados. `procesos.view` permite el marcador de compatibilidad de IA, pero rechaza lectura genérica. No se modifican Core, servicios de dominio, permisos ni migraciones.
+
+La corrección UI `3e97bc88e7d08edda6a594d922f100f69bb9519d`, [Core checks 38515749037](https://github.com/Ahcast/Bastion/actions/runs/38515749037), aprobó frontend y las 25 pruebas de navegador, incluidas las 21 de API/MySQL y cuatro de estructura/accesibilidad. La certificación del backend actualizado con MySQL/race sigue pendiente en el siguiente commit.
+
+Validación previa de estas pruebas: gofmt y go vet del paquete de integración aprobados; selección local compilada, casos MySQL omitidos explícitamente porque no hay DSN local. La ejecución efectiva de los ocho escenarios y su regresión con race detector requiere Core checks sobre MySQL 5.7.
