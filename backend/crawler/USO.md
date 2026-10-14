@@ -1,6 +1,6 @@
 # Ejecutar el crawler en tu máquina
 
-Esta guía corre una extracción completa de HonduCompras y guarda los resultados **solo en tu máquina**. El crawler ya está versionado en `main`, dentro de `backend/crawler`. Requiere Python 3.12 o posterior, Git y acceso a Internet. La primera corrida puede durar horas porque consulta el sitio de forma secuencial y espera entre peticiones.
+Esta guía ejecuta el crawler de HonduCompras y guarda los resultados **solo en tu máquina**. El crawler ya está versionado en `main`, dentro de `backend/crawler`. Requiere Python 3.12 o posterior, Git y acceso a Internet. Consulta el listado de forma secuencial y conserva sus pausas entre peticiones.
 
 ## Preparación
 
@@ -35,7 +35,7 @@ REQUEST_DELAY=3
 .venv/bin/python -m bastion_crawler run
 ```
 
-Déjalo terminar. **No uses `--dry-run` para esta prueba:** ese modo descarta sus archivos al salir. `MAX_PAGES` (500) y `MAX_RUN_SECONDS` (4 horas) son topes de protección. Si se alcanzan, la corrida queda parcial; no son una promesa de recorrer todo HonduCompras. Para una corrida más larga, aumenta ambos en `.env` con prudencia. Mantén `REQUEST_DELAY=3` o más para respetar el ritmo conservador. Solo una instancia debe ejecutarse a la vez.
+Déjalo terminar. **No uses `--dry-run` para esta prueba:** ese modo descarta sus archivos al salir. Por defecto, el crawler concluye cuando encuentra tres procesos consecutivos con `Fecha Recepción Ofertas` de ayer según la fecha de Honduras; incluye el tercero y no consulta los siguientes detalles ni las páginas posteriores. Un vencimiento diferente, ilegible o un detalle fallido reinicia el conteo. `MAX_PAGES` (500) y `MAX_RUN_SECONDS` (4 horas) son topes de protección; si se alcanzan antes del criterio, la corrida queda parcial. Mantén `REQUEST_DELAY=3` o más para respetar el ritmo conservador. Solo una instancia debe ejecutarse a la vez.
 
 La salida del comando vale 0 si terminó la extracción, 2 si fue parcial y 1 si falló. La entrega a S3/API está desactivada en esta prueba y no afecta ese estado.
 

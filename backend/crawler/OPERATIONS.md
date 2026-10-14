@@ -40,9 +40,18 @@ S3, descargar el directorio de lote bajo data/batches/BATCH_ID y sus raw bajo
 - Reintento programado de pendientes cada hora. Una ejecución no se superpone a otra.
 - Guardas de 4 horas, 500 páginas, 10 MB por respuesta y 2 GB de disco libre.
 - No se recorre con navegadores, pandas, Redis, Celery o procesos permanentes.
-- Se recorre el histórico filtrado (Compra Menor + Suministros). No se descartan
-  vencidos o vacíos. El límite de páginas es una guarda, NO prueba de cobertura.
-  Si se alcanza, queda parcial; aumentar MAX_PAGES requiere evaluar duración/carga.
+- Se conservan vencidos y vacíos. En el orden que entrega HonduCompras, se procesa
+  cada detalle y se detiene después de guardar tres procesos consecutivos cuya
+  Fecha Recepción Ofertas corresponda al día calendario anterior en
+  America/Tegucigalpa. Un vencimiento de hoy, anterior a ayer, ausente o ilegible,
+  y un detalle fallido rompen la secuencia. El tercer proceso se incluye; no se
+  consultan los detalles que le siguen ni las páginas siguientes. La página que
+  contiene el tercer proceso ya tuvo que descargarse para enumerar sus enlaces.
+- El motivo del corte queda en `runs.stop_reason` y en `run.json`; la corrida
+  concluye normalmente con ese criterio, conserva `coverage=null` y explica el
+  corte en `coverage_note`. No afirma haber recorrido el catálogo completo.
+- `MAX_PAGES` y `MAX_RUN_SECONDS` siguen siendo guardas adicionales: alcanzarlos
+  antes del criterio dejan el listado incompleto.
 
 ## Persistencia y resultados
 Cada detalle confirmado se confirma en SQLite inmediatamente. No hay TRUNCATE.
@@ -77,7 +86,8 @@ tras comprobar importaciones y respaldo. La guarda de espacio evita agotar el di
 - Pruebas offline con fixtures sintéticas; faltan HTML reales de página inicial,
   última página, cero resultados y pestañas de adjuntos.
 - Se conserva el parser ASP.NET actual. Al reanudar paginación se reconstruye sesión
-  y se recorren listados desde el inicio, saltando detalles ya completados.
+  y se recorren listados desde el inicio, saltando detalles ya completados. El
+  contador de tres vencimientos consecutivos se reconstruye siguiendo el listado.
   Un índice de página no es un cursor estable del sitio.
 - Descarga enlaces directos con extensiones documentales en el mismo host.
   Adjuntos por postback/JavaScript u otros dominios necesitan adaptar el parser.

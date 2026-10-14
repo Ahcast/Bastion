@@ -10,9 +10,10 @@ import shutil
 import time
 import uuid
 from contextlib import contextmanager
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from urllib.parse import urljoin, urlsplit, urlunsplit, parse_qsl, urlencode
+from zoneinfo import ZoneInfo
 
 import requests
 from bs4 import BeautifulSoup
@@ -21,6 +22,8 @@ from .legacy import extraer_formulario, texto_limpio, convertir_fecha
 SOURCE = 'honducompras'
 TABLE = 'ctl00_cphCuerpo_gvResultados'
 FIELDS = ['Entidad', 'Expediente', 'Fecha Recepción Ofertas', 'Especificaciones']
+HONDURAS = ZoneInfo('America/Tegucigalpa')
+YESTERDAY_STREAK_LIMIT = 3
 
 def now():
     return datetime.now(timezone.utc).isoformat()
@@ -72,7 +75,7 @@ class Store:
         PRAGMA journal_mode=WAL;
         PRAGMA synchronous=FULL;
         CREATE TABLE IF NOT EXISTS runs(id TEXT PRIMARY KEY, started TEXT, finished TEXT,
-          status TEXT, listing_complete INTEGER DEFAULT 0);
+          status TEXT, listing_complete INTEGER DEFAULT 0, stop_reason TEXT);
         CREATE TABLE IF NOT EXISTS tasks(run TEXT, kind TEXT, key TEXT, status TEXT DEFAULT 'PENDING',
           attempts INTEGER DEFAULT 0, next_at REAL DEFAULT 0, error TEXT,
           PRIMARY KEY(run,kind,key));
@@ -84,6 +87,10 @@ class Store:
           status TEXT DEFAULT 'PENDING', attempts INTEGER DEFAULT 0, next_at REAL DEFAULT 0,
           ack TEXT, PRIMARY KEY(batch,target));
         ''')
+        # Existing SQLite state is upgraded additively; prior observations and ACKs stay intact.
+        run_columns = {row['name'] for row in self.db.execute('PRAGMA table_info(runs)')}
+        if 'stop_reason' not in run_columns:
+            self.db.execute('ALTER TABLE runs ADD COLUMN stop_reason TEXT')
     def create(self):
         run = 'HC-' + datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ-') + uuid.uuid4().hex[:8]
         with self.db:
@@ -239,19 +246,41 @@ def parse_detail(body,url):
             'completeness':'COMPLETE' if complete else ('PARTIAL' if data.get('description') else 'EMPTY'),
             'content_hash':digest(dumps(data).encode()),'raw_sha256':digest(body)}
 
+
+def deadline_is_yesterday(value, today=None):
+    """Compare an offer-receipt deadline to yesterday in Honduras local time."""
+    if not value:
+        return False
+    try:
+        deadline = datetime.fromisoformat(value)
+        if deadline.tzinfo is None:
+            deadline = deadline.replace(tzinfo=HONDURAS)
+        deadline_date = deadline.astimezone(HONDURAS).date()
+    except (TypeError, ValueError, OverflowError):
+        return False
+    today = today or datetime.now(HONDURAS).date()
+    return deadline_date == today - timedelta(days=1)
+
 class Engine:
     def __init__(self,c):
         self.c=c
         self.s=Store(c.root)
+        self.observations_by_url={}
+        for row in self.s.db.execute('SELECT run,payload FROM observations'):
+            observation=json.loads(row['payload'])
+            if observation.get('source_url'):
+                self.observations_by_url[(row['run'],observation['source_url'])]=observation
     def run(self,run=None):
         run=run or self.s.create()
         if not self.s.db.execute('SELECT 1 FROM runs WHERE id=?',(run,)).fetchone():
             raise ValueError('Unknown run')
         with self.s.db:
-            self.s.db.execute("UPDATE runs SET listing_complete=0,status='RUNNING' WHERE id=?",(run,))
+            self.s.db.execute("UPDATE runs SET listing_complete=0,stop_reason=NULL,status='RUNNING' WHERE id=?",(run,))
         started=time.monotonic()
         path=self.c.root/'runs'/run
         adapter=HonduCompras(HTTP(self.c,path),self.c)
+        yesterday_streak=0
+        cutoff_reached=False
         try:
             soup=adapter.search()
             page=1
@@ -264,9 +293,27 @@ class Engine:
                 seen.add(signature)
                 with self.s.db:
                     self.s.add(run,'page',str(page))
-                    for url in urls: self.s.add(run,'detail',url)
                     self.s.success(run,'page',str(page))
-                self.details(run,adapter,started)
+                for url in urls:
+                    if time.monotonic()-started>self.c.max_seconds:
+                        raise TimeoutError('Configured run limit reached; listing remains incomplete')
+                    with self.s.db:
+                        self.s.add(run,'detail',url)
+                    observations=self.details(run,adapter,started,[url])
+                    observation=observations.get(url)
+                    if observation and deadline_is_yesterday(observation.get('data',{}).get('deadline')):
+                        yesterday_streak+=1
+                    else:
+                        # Unknown dates and failed details cannot prove a consecutive sequence.
+                        yesterday_streak=0
+                    if yesterday_streak>=YESTERDAY_STREAK_LIMIT:
+                        cutoff_reached=True
+                        with self.s.db:
+                            self.s.db.execute("UPDATE runs SET listing_complete=1,stop_reason=? WHERE id=?",
+                                ('three_consecutive_offer_deadlines_yesterday',run))
+                        break
+                if cutoff_reached:
+                    break
                 if time.monotonic()-started>self.c.max_seconds or page>=self.c.max_pages:
                     raise TimeoutError('Configured run limit reached; listing remains incomplete')
                 next_soup=adapter.next_page(soup,page)
@@ -286,11 +333,23 @@ class Engine:
             with self.s.db: self.s.success(run,'listing','scan')
         self.finish(run)
         return run
-    def details(self,run,adapter,started):
-        tasks=self.s.db.execute("SELECT key FROM tasks WHERE run=? AND kind='detail' AND status!='SUCCEEDED' AND next_at<=?",(run,time.time())).fetchall()
-        for task in tasks:
-            if time.monotonic()-started>self.c.max_seconds: return
-            url=task['key']
+    def details(self,run,adapter,started,urls=None):
+        if urls is None:
+            urls=[row['key'] for row in self.s.db.execute(
+                "SELECT key FROM tasks WHERE run=? AND kind='detail' AND status!='SUCCEEDED' AND next_at<=? ORDER BY rowid",
+                (run,time.time())).fetchall()]
+        observations={}
+        for url in urls:
+            saved=self.observations_by_url.get((run,url))
+            if saved:
+                observations[url]=saved
+                continue
+            task=self.s.db.execute("SELECT status,next_at FROM tasks WHERE run=? AND kind='detail' AND key=?",
+                                   (run,url)).fetchone()
+            if not task or task['status']=='SUCCEEDED' or task['next_at']>time.time():
+                continue
+            if time.monotonic()-started>self.c.max_seconds:
+                return observations
             try:
                 obs=adapter.detail(url)
                 with self.s.db:
@@ -298,10 +357,13 @@ class Engine:
                     self.s.success(run,'detail',url)
                     for doc in obs['data']['documents']:
                         self.s.add(run,'document',doc['url'])
+                self.observations_by_url[(run,url)]=obs
+                observations[url]=obs
                 print(dumps(dict(timestamp=now(),run_id=run,severity='INFO',component='detail',process_id=obs['external_id'])),flush=True)
             except Exception as exc:
                 self.s.error(run,'detail',url,exc)
                 if adapter.http.failures>=3: break
+        return observations
     def retry(self,run):
         row=self.s.db.execute('SELECT * FROM runs WHERE id=?',(run,)).fetchone()
         if row is None: raise ValueError('Unknown run')
@@ -349,8 +411,11 @@ class Engine:
         info['run_id']=run
         info['pages_processed']=self.s.db.execute("SELECT count(*) FROM tasks WHERE run=? AND kind='page' AND status='SUCCEEDED'",(run,)).fetchone()[0]
         info['pages_expected']=info['pages_processed'] if listing else None
-        info.update(records=len(records),pending_units=failed,coverage=100 if status=='SUCCESS' else None,
-                    coverage_note='Unknown total until verified end of pagination',schema_version='1.0')
+        info.update(records=len(records),pending_units=failed,
+                    coverage=100 if status=='SUCCESS' and not info.get('stop_reason') else None,
+                    coverage_note=('Stopped after three consecutive offer-receipt deadlines dated yesterday in America/Tegucigalpa'
+                                   if info.get('stop_reason') else 'Unknown total until verified end of pagination'),
+                    schema_version='1.0')
         # Immutable snapshot per attempt; never alter an already queued batch.
         batch=run+'-'+uuid.uuid4().hex[:12]
         path=self.c.root/'batches'/batch

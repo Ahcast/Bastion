@@ -6,6 +6,11 @@ Crawler Python de Bastion, ubicado en `backend/crawler` y destinado a ejecutarse
 
 **Para operación en Lightsail:** [detalles y límites](OPERATIONS.md), [instalación](deploy/INSTALL.md) y [contrato API/ACK](docs/IMPORT_CONTRACT.md).
 
+El recorrido de listado termina tras procesar tres procesos consecutivos cuyo
+`Fecha Recepción Ofertas` es ayer en la zona horaria de Honduras. Incluye esos
+tres procesos; detalles posteriores quedan sin consultar. El corte se registra
+en el estado de ejecución y no se informa como cobertura completa del catálogo.
+
 ## Pruebas offline
 
 ```bash

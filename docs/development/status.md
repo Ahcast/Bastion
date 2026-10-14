@@ -544,3 +544,10 @@ Validación local: instalación npm ci; build Angular y 171 pruebas unitarias ap
 Las capturas del sitio muestran HTML sin estilos completos. Inspección HTTP de bastion.castilloit.net: script-src self y build con stylesheet media=print/data-beasties-media más activador JavaScript inline. El navegador bloquea el activador y mantiene la hoja en modo impresión. Desactivar optimization.styles.inlineCritical en producción conserva minificación y carga el CSS directamente mediante link rel=stylesheet, sin script inline. No relajar CSP.
 
 Build productivo local aprobado. Nueva comprobación check-production-css.mjs verifica carga directa, existencia del CSS y ausencia de activación inline; integrada en Core checks. Aplicar recompilando y publicando frontend/dist/bastion-ui/browser completo. Producción permanece pendiente de republicación; el cambio en Git no actualiza Bluehost.
+
+
+## 2026-10-14 — Corte diario del crawler por vencimientos consecutivos
+
+Solicitud del usuario: terminar una ejecución al encontrar tres procesos consecutivos con `Fecha Recepción Ofertas` del día anterior. El crawler procesa cada enlace en el orden entregado por HonduCompras, compara la fecha calendario en `America/Tegucigalpa`, incluye el tercer detalle y detiene el recorrido antes del siguiente detalle o página. Una fecha diferente/ilegible o un detalle fallido reinicia el conteo. Registra el motivo de cierre aditivo en SQLite y `run.json`; `coverage` permanece null para no presentar el corte como histórico completo. Store migra las bases SQLite existentes con ALTER TABLE aditivo, conservando runs/observations/ACK. README, guía de uso y operaciones actualizados.
+
+Pruebas locales offline: 21/21 crawler unittest aprobados, incluyendo zonas horarias, cruce de páginas, reinicio de secuencia y migración del estado SQLite existente; CLI `--help` y `scripts/check_repository.py` aprobados. No se ejecutó extracción externa; la ordenación real del listado/estructura viva requiere una corrida operativa autorizada.

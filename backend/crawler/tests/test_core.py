@@ -1,6 +1,8 @@
 import json
+import sqlite3
 import tempfile
 import unittest
+from datetime import date
 from pathlib import Path
 from unittest.mock import patch, MagicMock
 from bastion_crawler.core import *
@@ -8,6 +10,68 @@ from bastion_crawler.delivery import deliver, api_send
 
 HTML=b'''<table id="ctl00_cphCuerpo_dvProceso"><tr><td>Entidad</td><td> ENEE </td></tr><tr><td>Expediente</td><td>X-1</td></tr></table>'''
 class Tests(unittest.TestCase):
+    def test_deadline_yesterday_uses_honduras_calendar(self):
+        today=date(2025,1,2)
+        self.assertTrue(deadline_is_yesterday('2025-01-02T01:00:00+00:00',today))
+        self.assertFalse(deadline_is_yesterday('2025-01-02T12:00:00-06:00',today))
+        self.assertFalse(deadline_is_yesterday('not a date',today))
+        self.assertFalse(deadline_is_yesterday(None,today))
+
+    def test_cutoff_after_three_consecutive_yesterday_deadlines_across_pages(self):
+        with tempfile.TemporaryDirectory() as d:
+            c=Config(); c.root=Path(d); e=Engine(c)
+            adapter=MagicMock(); adapter.http.failures=0
+            adapter.search.return_value='page1'
+            adapter.links.side_effect=[['u1','u2'],['u3','u4']]
+            adapter.next_page.return_value='page2'
+            adapter.detail.side_effect=lambda url: {
+                'external_id':url,'source_url':url,'data':{'deadline':'2025-01-01T12:00:00-06:00','documents':[]}}
+            today=date(2025,1,2)
+            with patch('bastion_crawler.core.HonduCompras',return_value=adapter), \
+                 patch('bastion_crawler.core.deadline_is_yesterday',side_effect=lambda value: deadline_is_yesterday(value,today)):
+                run=e.run()
+            self.assertEqual([call.args[0] for call in adapter.detail.call_args_list],['u1','u2','u3'])
+            adapter.next_page.assert_called_once_with('page1',1)
+            row=e.s.db.execute('SELECT listing_complete,stop_reason,status FROM runs WHERE id=?',(run,)).fetchone()
+            self.assertEqual(tuple(row),(1,'three_consecutive_offer_deadlines_yesterday','SUCCESS'))
+            batch=next((Path(d)/'batches').iterdir())
+            info=json.loads((batch/'run.json').read_text())
+            self.assertIsNone(info['coverage'])
+            self.assertIn('three consecutive',info['coverage_note'])
+            self.assertEqual(info['records'],3)
+            e.s.db.close()
+
+    def test_non_yesterday_deadline_resets_consecutive_count(self):
+        with tempfile.TemporaryDirectory() as d:
+            c=Config(); c.root=Path(d); e=Engine(c)
+            adapter=MagicMock(); adapter.http.failures=0
+            adapter.search.return_value='page1'; adapter.links.return_value=['u1','u2','u3','u4','u5']
+            adapter.next_page.return_value=None
+            deadlines=['2025-01-01T12:00:00-06:00','2025-01-01T12:00:00-06:00',
+                       '2025-01-02T12:00:00-06:00','2025-01-01T12:00:00-06:00',
+                       '2025-01-01T12:00:00-06:00']
+            adapter.detail.side_effect=lambda url: {
+                'external_id':url,'source_url':url,'data':{'deadline':deadlines[int(url[1:])-1],'documents':[]}}
+            today=date(2025,1,2)
+            with patch('bastion_crawler.core.HonduCompras',return_value=adapter), \
+                 patch('bastion_crawler.core.deadline_is_yesterday',side_effect=lambda value: deadline_is_yesterday(value,today)):
+                run=e.run()
+            self.assertEqual(adapter.detail.call_count,5)
+            self.assertEqual(e.s.db.execute('SELECT stop_reason FROM runs WHERE id=?',(run,)).fetchone()[0],None)
+            self.assertEqual(e.s.db.execute('SELECT status FROM runs WHERE id=?',(run,)).fetchone()[0],'SUCCESS')
+            e.s.db.close()
+
+    def test_existing_state_adds_stop_reason_without_losing_runs(self):
+        with tempfile.TemporaryDirectory() as d:
+            db=sqlite3.connect(Path(d)/'state.sqlite3')
+            db.execute('CREATE TABLE runs(id TEXT PRIMARY KEY,started TEXT,finished TEXT,status TEXT,listing_complete INTEGER DEFAULT 0)')
+            db.execute("INSERT INTO runs(id,started,status) VALUES('existing','2025-01-01','SUCCESS')")
+            db.commit(); db.close()
+            store=Store(d)
+            row=store.db.execute('SELECT id,started,status,stop_reason FROM runs').fetchone()
+            self.assertEqual(tuple(row),('existing','2025-01-01','SUCCESS',None))
+            store.db.close()
+
     def test_empty_retained(self):
         x=parse_detail(HTML,'http://host/p?id=1')
         self.assertEqual(x['completeness'],'EMPTY')
