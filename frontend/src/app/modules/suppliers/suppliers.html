@@ -1,13 +1,18 @@
-<h1>Proveedores</h1>
+<div class="bs-workspace"><header class="bs-page-head"><div><span class="bs-label">Bastion · Operación</span><h1>Proveedores</h1><p>Catálogo, contactos y evidencia de precios.</p></div><div class="bs-actions">@if(api.has('proveedores.create')){<button class="bs-btn bs-btn-primary"
+    (click)="create()"
+    [disabled]="busy()"
+  >
+    Nuevo proveedor</button
+  >}</div></header>@if(!!editor()&&!inlineId()){<section class="bs-inline-new"><ng-container [ngTemplateOutlet]="recordDetail"/></section>}<bs-workspace-summary [rows]="rows()" [total]="total()" [financial]="false" [processes]="false"/>
 <p>
   Catálogo de proveedores y evidencia de precios. Las observaciones conservan su
   fuente; no representan una cotización oficial ni confirman entrega, impuestos
   o inventario.
 </p>
-<p class="error" role="alert">{{error()}}</p>
-<p role="status">{{message()}}</p>
-<section class="card" aria-label="Buscar proveedores">
-  <form (ngSubmit)="load(true)">
+@if(error()){<p class="error" role="alert">{{error()}}</p>}
+@if(message()){<p role="status">{{message()}}</p>}
+<section class="bs-frame" aria-label="Buscar proveedores">
+  <form class="bs-filter-form" (ngSubmit)="load(true)">
     <label
       >Buscar proveedor<input
         name="search"
@@ -29,62 +34,23 @@
     >
     <button [disabled]="loading()">Buscar</button>
   </form>
-  @if(api.has('proveedores.create')){<button
-    (click)="create()"
-    [disabled]="busy()"
-  >
-    Nuevo proveedor</button
-  >} @if(loading()){
+   @if(loading()){
   <p role="status">Cargando proveedores…</p>
-  }@else{
+  }
   <p>{{total()}} proveedores encontrados · Página {{page}}</p>
-  <div class="table-scroll">
-    <table>
-      <thead>
-        <tr>
-          <th>Nombre</th>
-          <th>País</th>
-          <th>Correo</th>
-          <th>Estado</th>
-          <th>Ficha</th>
-        </tr>
-      </thead>
-      <tbody>
-        @for(c of rows();track c.id){
-        <tr>
-          <td>{{c.name}}</td>
-          <td>{{c.country || 'Sin país'}}</td>
-          <td>{{c.email}}</td>
-          <td>{{c.is_active?'Activo':'Inactivo'}}</td>
-          <td>
-            <button
-              (click)="open(c.id)"
-              [disabled]="busy()"
-              [attr.aria-label]="'Abrir proveedor '+c.name"
-            >
-              Abrir
-            </button>
-          </td>
-        </tr>
-        }@empty{
-        <tr>
-          <td colspan="5">No se encontraron proveedores.</td>
-        </tr>
-        }
-      </tbody>
-    </table>
-  </div>
-  <button (click)="page=page-1;load()" [disabled]="page<=1||loading()">
+  <section class="bs-frame bs-work-table" aria-label="Tabla de trabajo"><div class="bs-frame-head"><h2 class="bs-frame-title">Tabla de trabajo</h2><span class="bs-label">Clic en una fila para abrir su detalle</span></div><div class="bs-table-wrap"><table class="bs-table bs-workspace-table"><thead><tr><th scope="col"></th><th scope="col">Proveedor</th><th scope="col">País</th><th scope="col">Correo</th><th scope="col">Estado</th></tr></thead><tbody>@for(c of rows();track c.id){<tr tabindex="0" [class.bs-row-open]="inlineId()===c.id" [attr.aria-expanded]="inlineId()===c.id" [attr.aria-controls]="'detail-'+c.id" (click)="toggleInline(c.id,$event)" (keydown.enter)="toggleInline(c.id,$event)" (keydown.space)="toggleInline(c.id,$event)"><td class="bs-caret">{{inlineId()===c.id?'−':'+'}}</td><td><button class="bs-record-button bs-cell-title" [attr.aria-label]="'Abrir proveedor '+c.name" (click)="open(c.id);$event.stopPropagation()" [disabled]="busy()">{{c.name}}</button></td><td>{{c.country||'—'}}</td><td>{{c.email||'—'}}</td><td>{{c.is_active?'Activo':'Inactivo'}}</td></tr>@if(inlineId()===c.id){<tr class="bs-xp-row" [id]="'detail-'+c.id"><td colspan="5"><ng-container [ngTemplateOutlet]="recordDetail"/></td></tr>}}@empty{<tr><td colspan="5"><div class="bs-state"><h3>Sin registros con estos filtros</h3><p>Puede cambiar los filtros de la consulta.</p></div></td></tr>}@if(inlineId()&&!inlineInPage()){<tr><td>−</td><td colspan="4">Registro abierto #{{inlineId()}} · fuera de esta página</td></tr><tr class="bs-xp-row" [id]="'detail-'+inlineId()"><td colspan="5"><ng-container [ngTemplateOutlet]="recordDetail"/></td></tr>}</tbody></table></div></section>
+  <div class="bs-pagination"><button (click)="page=page-1;load()" [disabled]="page<=1||loading()">
     Anterior</button
   ><button
     (click)="page=page+1;load()"
     [disabled]="page*perPage>=total()||loading()"
   >
     Siguiente</button
-  >}
+  ></div>
 </section>
-@if(editor();as c){
-<section class="card" aria-label="Ficha del proveedor">
+
+<ng-template #recordDetail><div class="bs-detail">@if(editor();as c){
+<section class="bs-frame" aria-label="Ficha del proveedor">
   <h2>{{c.id?'Ficha del proveedor':'Nuevo proveedor'}}</h2>
   @if(c.id){
   <p>
@@ -349,7 +315,7 @@
   </details>
 </section>
 @if(c.id){
-<section class="card">
+<section class="bs-frame">
   <h2>Notas del proveedor</h2>
   @if(api.has('proveedores.update')){
   <form (ngSubmit)="addNote()">
@@ -379,7 +345,7 @@
     Más notas
   </button>
 </section>
-<section class="card">
+<section class="bs-frame">
   <h2>Precios observados</h2>
   <p>
     Valores registrados con fuente y fecha. Disponibilidad, entrega, impuestos y
@@ -510,7 +476,7 @@
     Más precios
   </button>
 </section>
-<section class="card">
+<section class="bs-frame">
   <h2>Historial del proveedor</h2>
   <button (click)="loadHistory()">Actualizar historial</button>@for(h of
   history();track h.id){
@@ -534,7 +500,7 @@
   </button>
 </section>
 @if(api.has('core.documents.read')){
-<section class="card">
+<section class="bs-frame">
   <h2>Documentos del proveedor</h2>
   <button (click)="loadDocuments()">Actualizar documentos</button>@for(d of
   documents();track d.id){
@@ -591,4 +557,4 @@
   </form>
   }
 </section>
-} }}
+} }}</div></ng-template></div>

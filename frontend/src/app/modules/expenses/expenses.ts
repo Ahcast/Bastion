@@ -1,3 +1,5 @@
+import {NgTemplateOutlet} from "@angular/common";
+import {WorkspaceSummary} from "../../shared/ui/workspace-summary";
 import {Component,OnInit,inject,signal} from '@angular/core';
 import {FormsModule} from '@angular/forms';
 import {ActivatedRoute} from '@angular/router';
@@ -12,7 +14,7 @@ interface Page {data:Expense[];total:number;page:number;per_page:number}
 interface Total {currency:string;count:number;taxable_amount:string;exempt_amount:string;tax_amount:string;total:string}
 const today=()=>{const p=new Intl.DateTimeFormat('en',{timeZone:'America/Tegucigalpa',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date());return ['year','month','day'].map(x=>p.find(v=>v.type===x)!.value).join('-')};
 export const emptyExpense=():ExpenseInput=>({invoice_number:'',expense_date:today(),supplier:{id:'',name:''},category:'other',currency:'HNL',taxable_amount:'0',exempt_amount:'0',notes:'',team_id:'',version:'0'});
-@Component({selector:'bastion-expenses',imports:[FormsModule,Reauthentication,ExpenseLinks],templateUrl:'./expenses.html'})
+@Component({selector:'bastion-expenses',imports:[NgTemplateOutlet,WorkspaceSummary,FormsModule,Reauthentication,ExpenseLinks],templateUrl:'./expenses.html'})
 export class Expenses implements OnInit {
  api=inject(Client);route=inject(ActivatedRoute,{optional:true});categories=categories;
  rows=signal<Expense[]>([]);totals=signal<Total[]>([]);total=signal(0);page=1;search='';supplierFilter='';dateFrom='';dateTo='';currencyFilter='';categoryFilter='';deleted=false;
@@ -42,4 +44,8 @@ export class Expenses implements OnInit {
  async chooseSupplier(){if(!this.form.supplier.id){this.form.supplier={id:'',name:''};return};if(this.form.supplier.id===this.selected()?.supplier.id){this.form.supplier={...this.selected()!.supplier};return};if(this.busy()||this.childBusy()||!this.catalogEnabled()||!this.writable())return;this.busy.set(true);try{const s=await this.api.get<{id:string;name:string}>('/suppliers/'+this.form.supplier.id);this.form.supplier={id:s.id,name:s.name}}catch(e){this.error.set(this.api.message(e));this.form.supplier={...(this.selected()?.supplier||{id:'',name:''})}}finally{this.busy.set(false)}}
  async findDuplicates(){const o=this.selected();if(!o||this.busy()||this.childBusy()||o.deleted_at||this.needsReload()||this.dirty())return;this.busy.set(true);try{this.duplicates.set(await this.api.get<Page>('/expenses/'+o.id+'/duplicates?page=1&per_page=25'))}catch(e){this.error.set(this.api.message(e))}finally{this.busy.set(false)}}
  allowedTeams(){return this.teams().filter(t=>this.api.profile()?.grants.some(g=>g.permission===(this.selected()?'gastos.update':'gastos.create')&&g.scope==='all')||t.members.includes(this.api.profile()?.user.id||''))}
+
+ inlineId(){return this.selected()?.id||''}
+ inlineInPage(){return this.rows().some(row=>row.id===this.inlineId())}
+ toggleInline(id:string,event:Event){const target=event.target as HTMLElement;if(target.closest('button,a,input,select,textarea'))return;if(event.type==='keydown'){if(event.target!==event.currentTarget)return;event.preventDefault()}if(this.busy()||this.childBusy())return;if(this.inlineId()===id){this.close()}else{void this.open(id)}}
 }

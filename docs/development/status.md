@@ -499,3 +499,14 @@ CI 38346213793 aprobó invariantes IA sobre MySQL5.7 tras corrección SQL y fron
 Fuente: kit de interfaz aportado por el usuario, `docs/ui/BASTION-UI.md` y `docs/ui/tokens.json`. Aplicado el parche sobre `d74570a`: estilos/tokens `bs-*`, barra superior, logo e íconos Angular, acceso discreto, favicon, fuentes IBM Plex y assets locales. Los patrones por pantalla (indicadores interactivos, detalle en línea y formularios de cada módulo) quedan pendientes de migración secuencial según la sección 13 de la guía; no se declaran terminados por el cambio global.
 
 Local: `npm ci`, `ng build`, 171/171 pruebas unitarias y `scripts/check_repository.py` aprobados. Sin prueba de navegador o despliegue productivo en esta unidad.
+
+
+## 2026-10-14 — UI Concreto, estructura de pantallas
+
+Revisión del usuario: la integración base solo aplicaba estilo global; faltaban menús y disposición. Se migraron Clientes, Proveedores, Procesos, Cotizaciones, Órdenes de compra, Facturas y Gastos a tablas `bs-table` con una sola ficha abierta inmediatamente bajo su fila. Las altas se muestran bajo el encabezado y los campos se agrupan en dos columnas, una en teléfono. Se preservan campos, permisos, validadores, versiones, confirmaciones e idempotencia existentes.
+
+Inicio ahora tiene cinco indicadores que seleccionan el módulo de la tabla de trabajo; conserva los totales canónicos de HomeMetrics, separados por moneda/período. Requiere acción enlaza a Facturas desde los saldos autorizados. Los módulos muestran resumen y gráficos de conteos de la página, con alcance explícito; los chips de Procesos/Cotizaciones/Órdenes/Facturas filtran solo la página actual, sin alterar la consulta canónica ni calcular dinero en JavaScript. Las filas abiertas fuera de la página mantienen su ficha identificada.
+
+Navegación superior con menú corto de usuario; Colaboración con submenú Biblioteca/Mi trabajo/Integraciones y aprobaciones, listas y conversación cronológica; Configuración con enlaces de secciones y tema Concreto único; Reportes conserva filtros/exportación. Acceso incorpora visibilidad de contraseña. Sin cambios de dominio/backend ni activación de infraestructura.
+
+Validación local: npm ci, build de producción, 171 pruebas unitarias y checks documentales aprobados; tres pruebas de navegador de estructura con datos exclusivamente sintéticos verifican 1440/390 px, teclado, fila/ficha adyacente, chips, menús, altas de siete módulos, ausencia de desbordamiento de página y solo lectura. [Capturas reproducibles](../ui/capturas/README.md). La regresión completa con API real/MySQL 5.7 queda a cargo de Core checks después de publicar; este registro no acredita despliegue productivo.

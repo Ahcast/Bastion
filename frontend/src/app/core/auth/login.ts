@@ -2,10 +2,11 @@ import { Component, inject, signal } from "@angular/core";
 import { FormsModule } from "@angular/forms";
 import { Router } from "@angular/router";
 import { Client } from "../api/client";
+import { Icon } from "../ui/icon";
 import { Logo } from "../ui/logo";
 @Component({
   selector: "bastion-login",
-  imports: [FormsModule, Logo],
+  imports: [FormsModule, Logo, Icon],
   template: ` <section class="auth">
     <header class="bs-login-mark">
       <bs-logo variant="mark" [size]="56" />
@@ -26,10 +27,10 @@ import { Logo } from "../ui/logo";
         ><label
           >Contraseña<input
             name="password"
-            type="password"
+            [type]="showPassword()?'text':'password'"
             autocomplete="current-password"
             [(ngModel)]="password"
-            required /></label
+            required /><button type="button" class="bs-password-toggle" [attr.aria-label]="showPassword()?'Ocultar contraseña':'Mostrar contraseña'" (click)="showPassword.set(!showPassword())"><bs-icon [name]="showPassword()?'eye-off':'eye'"/></button></label
         ><button [disabled]="busy()">Ingresar</button>
       </form>
     } @else if (api.mfa() !== "complete") {
@@ -83,6 +84,7 @@ export class Login {
   api = inject(Client);
   private router = inject(Router);
   email = "";
+  showPassword=signal(false);
   password = "";
   code = "";
   busy = signal(false);

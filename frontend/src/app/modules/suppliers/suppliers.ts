@@ -1,3 +1,5 @@
+import {NgTemplateOutlet} from "@angular/common";
+import {WorkspaceSummary} from "../../shared/ui/workspace-summary";
 import { Component, inject, signal, OnInit } from "@angular/core";
 import { FormsModule } from "@angular/forms";
 import { DatePipe } from "@angular/common";
@@ -132,24 +134,8 @@ const empty = (): Supplier => ({
 });
 
 @Component({
-  imports: [FormsModule, DatePipe],
+  imports:[NgTemplateOutlet,WorkspaceSummary,FormsModule, DatePipe],
   templateUrl: "./suppliers.html",
-  styles: [
-    `
-      fieldset {
-        display: grid;
-        gap: 0.9rem;
-        border: 1px solid #d6e1e8;
-        margin: 0.5rem 0;
-        padding: 1rem;
-        min-width: 0;
-      }
-      legend {
-        padding: 0 0.4rem;
-        font-weight: 600;
-      }
-    `,
-  ],
 })
 export class Suppliers implements OnInit {
   api = inject(Client);
@@ -591,4 +577,8 @@ export class Suppliers implements OnInit {
       )[value] || "Sin confirmar"
     );
   }
+
+ inlineId(){return this.editor()?.id||''}
+ inlineInPage(){return this.rows().some(row=>row.id===this.inlineId())}
+ toggleInline(id:string,event:Event){const target=event.target as HTMLElement;if(target.closest('button,a,input,select,textarea'))return;if(event.type==='keydown'){if(event.target!==event.currentTarget)return;event.preventDefault()}if(this.busy())return;if(this.inlineId()===id){this.editor.set(null)}else{void this.open(id)}}
 }

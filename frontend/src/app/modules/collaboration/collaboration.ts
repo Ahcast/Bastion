@@ -1,4 +1,5 @@
 import { Component, inject, OnInit, signal } from "@angular/core";
+import {RouterLink,RouterLinkActive} from "@angular/router";
 import { FormsModule } from "@angular/forms";
 import { Client } from "../../core/api/client";
 import { Reauthentication } from "../../core/security/reauthentication";
@@ -120,10 +121,10 @@ const MEDIA: Record<string, string> = {
 const ACCEPT = ".pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.jpg,.jpeg,.png";
 
 @Component({
-  imports: [FormsModule, Reauthentication],
+  imports: [FormsModule,RouterLink,RouterLinkActive,Reauthentication],
   template: `
     <section aria-labelledby="collab-title" class="workspace">
-      <h1 id="collab-title">Colaboración</h1>
+      <header class="bs-page-head"><div><span class="bs-label">Bastion · Colaboración</span><h1 id="collab-title">Biblioteca</h1><p>Archivos, conversaciones y vínculos del equipo.</p></div></header><nav class="bs-section-menu" aria-label="Colaboración"><a routerLink="/collaboration" routerLinkActive="active" [routerLinkActiveOptions]="{exact:true}" ariaCurrentWhenActive="page">Biblioteca</a><a routerLink="/collaboration/work" routerLinkActive="active" ariaCurrentWhenActive="page">Mi trabajo</a><a routerLink="/collaboration/integrations" routerLinkActive="active" ariaCurrentWhenActive="page">Integraciones y aprobaciones</a></nav>
       <p>
         Biblioteca privada de archivos. Los documentos siguen protegidos por
         Core.Files y no salen de cuarentena hasta completar su análisis.
@@ -135,7 +136,7 @@ const ACCEPT = ".pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.jpg,.jpeg,.png";
         <p role="status">{{ message() }}</p>
       }
 
-      <section class="filters" aria-label="Filtros de biblioteca">
+      <section class="filters bs-frame" aria-label="Filtros de biblioteca">
         <label
           >Biblioteca
           <select
@@ -166,7 +167,7 @@ const ACCEPT = ".pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.jpg,.jpeg,.png";
         >
       </section>
 
-      <section class="folders" aria-label="Carpetas">
+      <section class="folders bs-frame" aria-label="Carpetas">
         <div class="folder-heading">
           <div>
             <h2>Carpetas</h2>
@@ -273,7 +274,7 @@ const ACCEPT = ".pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.jpg,.jpeg,.png";
       </section>
 
       @if (!trash && canUpload()) {
-        <section class="upload" aria-label="Subir archivo">
+        <section class="upload bs-frame" aria-label="Subir archivo">
           <h2>Subir archivo a esta ubicación</h2>
           <label
             >Título<input
@@ -367,7 +368,7 @@ const ACCEPT = ".pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.jpg,.jpeg,.png";
       </section>
 
       @if (conversationEntry(); as conversation) {
-        <section aria-label="Conversación del recurso" class="conversation">
+        <section aria-label="Conversación del recurso" class="conversation bs-frame">
           <div class="file-heading">
             <h2>Conversación: {{ conversation.title }}</h2>
             <button type="button" (click)="closeConversation()">
@@ -375,12 +376,10 @@ const ACCEPT = ".pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.jpg,.jpeg,.png";
             </button>
           </div>
           <h3>Comentarios</h3>
-          <ul>
+          <ul class="bs-timeline">
             @for (comment of comments(); track comment.id) {
-              <li>
-                <strong>{{ comment.author_name }}</strong>
-                <time>{{ comment.created_at }}</time>
-                <p>{{ comment.body }}</p>
+              <li class="bs-tl-row">
+                <time class="bs-when">{{ comment.created_at }}</time><div><strong>{{ comment.author_name }}</strong><p>{{ comment.body }}</p></div>
                 @if (
                   comment.author_id === currentUserID() && canComment() ||
                   canModerate()
@@ -457,13 +456,13 @@ const ACCEPT = ".pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.jpg,.jpeg,.png";
         </section>
       }
 
-      <section aria-label="Archivos de la biblioteca">
+      <section class="bs-frame bs-library-list" aria-label="Archivos de la biblioteca">
         <div class="file-heading">
           <h2>{{ trash ? "Archivos en papelera" : "Archivos" }}</h2>
           <span>{{ total() }} resultados</span>
         </div>
         @for (entry of entries(); track entry.id) {
-          <article class="entry">
+          <article class="entry bs-item">
             @if (editing() === entry.id) {
               <label
                 >Título<input [(ngModel)]="editTitle" maxlength="180"
@@ -639,7 +638,7 @@ const ACCEPT = ".pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.jpg,.jpeg,.png";
       .workspace {
         display: grid;
         gap: 1rem;
-        max-width: 72rem;
+        width:100%;
       }
       .filters,
       .new-folder,
@@ -655,8 +654,8 @@ const ACCEPT = ".pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.jpg,.jpeg,.png";
       .folders,
       .upload,
       .entry {
-        border: 1px solid #d6e1e8;
-        border-radius: 0.5rem;
+        border: 1px solid var(--line);
+        border-radius:0;
         padding: 1rem;
       }
       .folders h2,
@@ -682,7 +681,7 @@ const ACCEPT = ".pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.jpg,.jpeg,.png";
         border: 0;
         padding: 0;
         background: transparent;
-        color: #145a78;
+        color: var(--ink);
         font-weight: 600;
         text-decoration: underline;
         cursor: pointer;
@@ -718,11 +717,11 @@ const ACCEPT = ".pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.jpg,.jpeg,.png";
       }
       .meta,
       .folder-heading p {
-        color: #4e626f;
+        color: var(--ink-subtle);
         margin: 0.2rem 0;
       }
       .reauth {
-        border: 1px solid #d6e1e8;
+        border: 1px solid var(--line);
         padding: 0.75rem;
       }
       .pagination {

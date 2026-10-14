@@ -76,3 +76,8 @@ Estos gates no se acreditan con adaptadores sintéticos. IA/OCR externa está en
 ## Evidencia histórica
 
 Detalle cronológico: [status](development/status.md), [plan](development/plan.md), [decisiones](development/decisions.md) y commits. El [checkpoint histórico previo](https://github.com/Ahcast/Bastion/blob/f3dd6121df2695cf89d9eb89c40dc28644f7a2c5/docs/ESTADO_DESARROLLO.md) conserva los cierres y bloqueos anteriores. Este documento compacto sustituye sus indicaciones de módulo activo antiguas.
+
+
+## Interfaz Concreto — disposición implementada
+
+La integración base del kit se amplió a la estructura de las pantallas: Inicio con cinco selectores y tabla del módulo activo; siete módulos con tablas, fichas en línea y altas bajo el encabezado; filtros de estado de página; submenús de Colaboración y Configuración; menú corto de cuenta y tema único. Datos, permisos y operaciones manuales existentes conservados. [Evidencia visual](ui/capturas/README.md) y detalle de pruebas en [status](development/status.md). Validación local de estructura aprobada; verificar Core checks del commit publicado para la regresión completa de API/MySQL. No implica despliegue.

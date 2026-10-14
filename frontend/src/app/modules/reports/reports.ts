@@ -129,7 +129,7 @@ export function periodQuery(
 @Component({
   selector: "bastion-reports",
   imports: [FormsModule, Reauthentication],
-  template: ` <h1>Reportes</h1>
+  template: ` <header class="bs-page-head"><div><span class="bs-label">Bastion · Consulta</span><h1>Reportes</h1><p>Datos canónicos por período y moneda.</p></div></header>
     <p>
       Totales del período autorizado, separados por moneda. Las referencias de
       gastos no modifican la utilidad de las órdenes.
@@ -215,10 +215,10 @@ export function periodQuery(
         {{ r.total }} registros.
       </p>
       @for (t of r.totals; track t.currency) {
-        <section class="card">
+        <section class="bs-frame">
           <h2>Totales {{ t.currency }}</h2>
           <p>{{ t.count }} registros del conjunto completo</p>
-          <dl>
+          <dl class="bs-facts">
             @for (f of moneyFields(r.report); track f) {
               <dt>{{ label(f) }}</dt>
               <dd>{{ t.values[f] }} {{ t.currency }}</dd>
@@ -227,7 +227,7 @@ export function periodQuery(
         </section>
       }
       <div style="overflow-x:auto">
-        <table>
+        <table class="bs-table">
           <caption>
             {{
               label(r.report)

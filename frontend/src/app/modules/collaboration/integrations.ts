@@ -1,6 +1,6 @@
 import { Component, OnDestroy, OnInit, inject, signal } from "@angular/core";
 import { FormsModule } from "@angular/forms";
-import { RouterLink } from "@angular/router";
+import { RouterLink,RouterLinkActive } from "@angular/router";
 import { Client } from "../../core/api/client";
 import { Reauthentication } from "../../core/security/reauthentication";
 
@@ -17,15 +17,12 @@ interface Link {
 interface Entry { id: string; version: string; title: string }
 
 @Component({
-  imports: [FormsModule, RouterLink, Reauthentication],
+  imports: [FormsModule,RouterLink,RouterLinkActive,Reauthentication],
   template: `
-    <section aria-labelledby="integration-title">
-      <h1 id="integration-title">Integraciones y aprobaciones</h1>
+    <section class="bs-workspace" aria-labelledby="integration-title">
+      <header class="bs-page-head"><div><span class="bs-label">Bastion · Colaboración</span><h1 id="integration-title">Integraciones y aprobaciones</h1></div></header>
       <p>Vista de solo lectura de Workflow y vínculos documentales de Colaboración.</p>
-      <nav aria-label="Colaboración">
-        <a routerLink="/collaboration">Biblioteca</a> ·
-        <a routerLink="/collaboration/work">Mi trabajo</a>
-      </nav>
+      <nav class="bs-section-menu" aria-label="Colaboración"><a routerLink="/collaboration" routerLinkActive="active" [routerLinkActiveOptions]="{exact:true}" ariaCurrentWhenActive="page">Biblioteca</a><a routerLink="/collaboration/work" routerLinkActive="active" ariaCurrentWhenActive="page">Mi trabajo</a><a routerLink="/collaboration/integrations" routerLinkActive="active" ariaCurrentWhenActive="page">Integraciones y aprobaciones</a></nav>
       @if (error()) { <p role="alert">{{ error() }}</p> }
       @if (message()) { <p role="status">{{ message() }}</p> }
 
@@ -33,38 +30,38 @@ interface Entry { id: string; version: string; title: string }
         <p role="status">La respuesta no está confirmada. Reintente la misma operación para recuperar el resultado.</p>
         <button type="button" (click)="retry()" [disabled]="busy()">Reintentar operación</button>
       }
-      <section aria-labelledby="approval-title">
+      <section class="bs-frame" aria-labelledby="approval-title">
         <h2 id="approval-title">Aprobaciones pendientes ({{ approvalsTotal() }})</h2>
         <button type="button" (click)="loadApprovals()" [disabled]="busy()">Actualizar aprobaciones</button>
-        <ul>
+        <ul class="bs-list">
           @for (a of approvals(); track a.id) {
-            <li>
+            <li class="bs-collab-item">
               <strong>{{ a.action }}</strong> · {{ entityLabel(a.entity_type) }} #{{ a.entity_id }}
               · vence {{ a.expires_at }}
               @if (a.reason) { <span> · {{ a.reason }}</span> }
               @if (entityPath(a)) { <a [routerLink]="entityPath(a)" [queryParams]="{id:a.entity_id}">Abrir en módulo propietario</a> }
             </li>
-          } @empty { <li>No hay aprobaciones pendientes visibles.</li> }
+          } @empty { <li class="bs-collab-item">No hay aprobaciones pendientes visibles.</li> }
         </ul>
         <p>Las decisiones se realizan únicamente en el módulo propietario.</p>
         <button type="button" (click)="approvalPage=approvalPage-1;loadApprovals()" [disabled]="approvalBusy() || approvalPage<=1">Anterior aprobación</button>
         <button type="button" (click)="approvalPage=approvalPage+1;loadApprovals()" [disabled]="approvalBusy() || approvalPage*100>=approvalsTotal()">Más aprobaciones</button>
       </section>
 
-      <section aria-labelledby="links-title">
+      <section class="bs-frame" aria-labelledby="links-title">
         <h2 id="links-title">Vínculos de un archivo</h2>
         <label>ID de biblioteca<input [(ngModel)]="entryID" [disabled]="blocked()" /></label>
         <button type="button" (click)="loadLinks()" [disabled]="busy() || !!pending()">Cargar vínculos</button>
         @if (entry()) { <p>Archivo: {{ entry()?.title }} · versión {{ entry()?.version }}</p> }
-        <ul>
+        <ul class="bs-list">
           @for (link of links(); track link.resource_type + ':' + link.resource_id) {
-            <li>
+            <li class="bs-collab-item">
               {{ entityLabel(link.resource_type) }} · {{ link.current_label || link.label }}
               · versión {{ link.current_version }}
               @if (link.stale) { <strong> · vínculo desactualizado</strong> }
               @if (api.has('colaboracion.link')) { <button type="button" (click)="remove(link)" [disabled]="blocked()">Quitar</button> }
             </li>
-          } @empty { <li>No hay vínculos cargados.</li> }
+          } @empty { <li class="bs-collab-item">No hay vínculos cargados.</li> }
         </ul>
         @if (api.has('colaboracion.link') && entry()) {
           <fieldset [disabled]="blocked()">

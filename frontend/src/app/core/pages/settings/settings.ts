@@ -24,10 +24,10 @@ interface Setting {
 @Component({
   imports: [FormsModule, Personal, FilePanel],
   template: `
-    <h1>Configuración</h1>
-    <bastion-personal />
+    <header class="bs-page-head"><div><span class="bs-label">Administración</span><h1>Configuración</h1></div></header><nav class="bs-section-menu" aria-label="Secciones de configuración"><a href="#personal">Personal</a>@if(api.has("core.users.read")){<a href="#usuarios">Usuarios</a>}@if(api.has("core.roles.read")){<a href="#roles">Roles</a>}@if(api.has("core.settings.read")){<a href="#empresa">Empresa y SMTP</a>}@if(api.has("core.settings.read")){<a href="#servicios">Servicios</a>}@if(api.has("core.audit.read")){<a href="#auditoria">Auditoría</a>}@if(api.has("core.documents.read")||api.has("core.documents.write")){<a href="#archivos">Archivos</a>}</nav>
+    <section id="personal"><bastion-personal/></section>
     <p role="status" class="message">{{ message() }}</p>
-    <section class="card">
+    <section class="bs-frame">
       <h2>Confirmar identidad</h2>
       <p>
         Las operaciones sensibles requieren confirmación reciente. Use un código
@@ -51,14 +51,14 @@ interface Setting {
       </form>
     </section>
     @if (api.has("core.documents.read") || api.has("core.documents.write")) {
-      <bastion-files />
+      <section id="archivos"><bastion-files/></section>
     }
     @if (api.has("core.users.read")) {
-      <section class="card">
-        <h2>Usuarios</h2>
+      <section class="bs-frame">
+        <h2 id="usuarios">Usuarios</h2>
         <button (click)="loadUsers()">Actualizar</button>
-        <div class="table-scroll">
-          <table>
+        <div class="bs-table-wrap">
+          <table class="bs-table">
             <thead>
               <tr>
                 <th>Usuario</th>
@@ -123,7 +123,7 @@ interface Setting {
       </section>
     }
     @if (api.has("core.users.manage")) {
-      <section class="card">
+      <section class="bs-frame">
         <h2>Invitación y recuperación</h2>
         <form (ngSubmit)="invite()">
           <label
@@ -170,8 +170,8 @@ interface Setting {
       </section>
     }
     @if (api.has("core.roles.read")) {
-      <section class="card">
-        <h2>Roles y permisos</h2>
+      <section class="bs-frame">
+        <h2 id="roles">Roles y permisos</h2>
         <button (click)="loadRoles()">Actualizar</button>
         <ul>
           @for (role of roles(); track role.id) {
@@ -217,7 +217,7 @@ interface Setting {
       </section>
     }
     @if (api.has("core.teams.read")) {
-      <section class="card">
+      <section class="bs-frame">
         <h2>Equipos</h2>
         <button (click)="loadTeams()">Actualizar</button>
         <ul>
@@ -251,8 +251,8 @@ interface Setting {
       </section>
     }
     @if (api.has("core.settings.read")) {
-      <section class="card">
-        <h2>Empresa y SMTP</h2>
+      <section class="bs-frame">
+        <h2 id="empresa">Empresa y SMTP</h2>
         <button (click)="loadSettings()">Actualizar</button>
         @if (api.has("core.settings.manage")) {
           <form (ngSubmit)="saveCompany()">
@@ -308,8 +308,8 @@ interface Setting {
       </section>
     }
     @if (api.has("core.settings.manage")) {
-      <section class="card">
-        <h2>Integraciones</h2>
+      <section class="bs-frame">
+        <h2 id="servicios">Integraciones</h2>
         <p>
           Los límites del entorno siguen vigentes. Estas opciones permiten
           desactivar conexiones; no crean credenciales ni recursos.
@@ -341,7 +341,7 @@ interface Setting {
       </section>
     }
     @if (api.has("core.services.manage")) {
-      <section class="card">
+      <section class="bs-frame">
         <h2>Conexiones técnicas MCP</h2>
         <p>Acceso limitado a lectura; OAuth externo pendiente de validar.</p>
         <form (ngSubmit)="createService()">
@@ -379,11 +379,11 @@ interface Setting {
       </section>
     }
     @if (api.has("core.audit.read")) {
-      <section class="card">
-        <h2>Auditoría</h2>
+      <section class="bs-frame">
+        <h2 id="auditoria">Auditoría</h2>
         <button (click)="loadAudit()">Actualizar</button>
-        <div class="table-scroll">
-          <table>
+        <div class="bs-table-wrap">
+          <table class="bs-table">
             <thead>
               <tr>
                 <th>Fecha</th>
@@ -410,7 +410,7 @@ interface Setting {
       </section>
     }
     @if (api.has("core.jobs.read")) {
-      <section class="card">
+      <section class="bs-frame">
         <h2>Trabajos</h2>
         <button (click)="loadJobs()">Actualizar</button>
         <ul>
@@ -427,7 +427,7 @@ interface Setting {
       </section>
     }
     @if (api.has("core.email.read")) {
-      <section class="card">
+      <section class="bs-frame">
         <h2>Estado del correo</h2>
         <button (click)="loadEmails()">Actualizar</button>
         <ul>

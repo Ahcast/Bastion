@@ -1,3 +1,5 @@
+import {NgTemplateOutlet} from "@angular/common";
+import {WorkspaceSummary} from "../../shared/ui/workspace-summary";
 import {ActivatedRoute,RouterLink} from "@angular/router";
 import {InvoicePayments,PaymentResult,collectionLabel} from "./invoice-payments";
 import {InvoiceEmission,InvoiceEmissionResult} from "./invoice-emission";
@@ -134,7 +136,7 @@ export const emptyInvoice = (): DraftInput => ({
 });
 @Component({
   selector: "bastion-invoices",
-  imports: [RouterLink,InvoicePayments,InvoiceCancellation,InvoiceCloning,FormsModule, Reauthentication, InvoiceFiscalSettings, InvoiceEmission],
+  imports:[NgTemplateOutlet,WorkspaceSummary,RouterLink,InvoicePayments,InvoiceCancellation,InvoiceCloning,FormsModule, Reauthentication, InvoiceFiscalSettings, InvoiceEmission],
   templateUrl: "./invoices.html",
 })
 export class Invoices implements OnInit {
@@ -471,4 +473,14 @@ export class Invoices implements OnInit {
       this.busy.set(false);
     }
   }
+
+ inlineId(){return this.selected()?.id||''}
+ inlineInPage(){return this.visibleRows().some(row=>row.id===this.inlineId())}
+ toggleInline(id:string,event:Event){const target=event.target as HTMLElement;if(target.closest('button,a,input,select,textarea'))return;if(event.type==='keydown'){if(event.target!==event.currentTarget)return;event.preventDefault()}if(this.busy()||this.emissionBusy())return;if(this.inlineId()===id){this.close()}else{void this.open(id)}}
+
+ pageState=signal('');
+ rowState(row:object){const r=row as Record<string,unknown>;if('is_current' in r)return r['is_current']===true?'current':r['is_current']===false?'expired':'unknown';return String(r['status']||'unknown')}
+ pageStates(){return [...new Set(this.rows().map(row=>this.rowState(row)))]}
+ visibleRows(){const state=this.pageState();return state?this.rows().filter(row=>this.rowState(row)===state):this.rows()}
+ stateName(key:string){return ({current:'Vigente',unknown:'Por verificar',expired:'Vencido',draft:'Borrador',costing:'Costeo',review:'Revisión',approved:'Aprobada',sent:'Enviada',accepted:'Aceptada',rejected:'Rechazada',converted:'Convertida',received:'Recibida',confirmed:'Confirmada',purchasing:'En compra',in_transit:'En tránsito',goods_received:'Mercadería recibida',preparing_delivery:'Preparando entrega',delivered:'Entregada',invoiced:'Facturada',closed:'Cerrada',issued:'Emitida',cancelled:'Anulada'} as Record<string,string>)[key]||'Registrado'}
 }

@@ -1,3 +1,5 @@
+import {NgTemplateOutlet} from "@angular/common";
+import {WorkspaceSummary} from "../../shared/ui/workspace-summary";
 import { Component, inject, signal, OnInit } from "@angular/core";
 import { FormsModule } from "@angular/forms";
 import { DatePipe } from "@angular/common";
@@ -13,7 +15,7 @@ interface History {id:string;action:string;actor_name:string;created_at:string;d
 interface Document {id:string;filename:string;status:string;version:string}
 const empty=():Customer=>({id:"",name:"",rtn:"",contact_name:"",phone:"",email:"",address:"",institution_type:"other",is_active:true,team_id:"",version:"0",contacts:[],addresses:[]});
 
-@Component({imports:[FormsModule,DatePipe],templateUrl:"./customers.html",styles:[`fieldset { display:grid; gap:.9rem; border:1px solid #d6e1e8; margin:.5rem 0; padding:1rem; min-width:0 } legend {padding:0 .4rem;font-weight:600}`]})
+@Component({imports:[NgTemplateOutlet,WorkspaceSummary,FormsModule,DatePipe],templateUrl:"./customers.html"})
 export class Customers implements OnInit {
  api=inject(Client);rows=signal<CustomerSummary[]>([]);total=signal(0);loading=signal(false);busy=signal(false);error=signal("");message=signal("");editor=signal<Customer|null>(null);
  teams=signal<{id:string;name:string}[]>([]);notes=signal<Note[]>([]);history=signal<History[]>([]);documents=signal<Document[]>([]);personalFiles=signal<Document[]>([]);
@@ -38,4 +40,8 @@ export class Customers implements OnInit {
  async linkDocument(){const c=this.editor(),doc=this.personalFiles().find(d=>d.id===this.selectedDocument);if(!c?.id||!doc||this.busy())return;this.busy.set(true);this.error.set("");const path="/customers/"+c.id+"/documents",body={document_id:doc.id,version:doc.version};try{await this.api.write("POST",path,body,this.key(path,body));this.pending.delete(path);this.selectedDocument="";await this.loadDocuments();await this.loadPersonalFiles();await this.loadHistory();this.message.set("Documento vinculado.")}catch(e){this.error.set(this.api.message(e))}finally{this.busy.set(false)}}
  async download(id:string){try{const value=await this.api.get<{url:string}>("/documents/"+id+"/download");const url=new URL(value.url);if(url.protocol!=="https:")throw new Error("Enlace de descarga inválido.");window.open(url.href,"_blank","noopener,noreferrer")}catch(e){this.error.set(this.api.message(e))}}
  state(status:string){return ({pending:"Carga pendiente",quarantined:"En cuarentena",available:"Disponible",rejected:"Rechazado"} as Record<string,string>)[status]||"No disponible"}
+
+ inlineId(){return this.editor()?.id||''}
+ inlineInPage(){return this.rows().some(row=>row.id===this.inlineId())}
+ toggleInline(id:string,event:Event){const target=event.target as HTMLElement;if(target.closest('button,a,input,select,textarea'))return;if(event.type==='keydown'){if(event.target!==event.currentTarget)return;event.preventDefault()}if(this.busy())return;if(this.inlineId()===id){this.editor.set(null)}else{void this.open(id)}}
 }

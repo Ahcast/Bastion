@@ -1,3 +1,5 @@
+import {NgTemplateOutlet} from "@angular/common";
+import {WorkspaceSummary} from "../../shared/ui/workspace-summary";
 import {OrderBilling,BillingResult} from "./order-billing";
 import { OrderDocuments } from "./order-documents";
 import { Component, inject, signal, OnInit } from "@angular/core";
@@ -172,7 +174,7 @@ export function emptyPurchaseOrder(): PurchaseOrderInput {
 }
 
 @Component({
-  imports: [OrderBilling,
+  imports:[NgTemplateOutlet,WorkspaceSummary,OrderBilling,
     OrderDocuments,
     RouterLink,
     FormsModule,
@@ -180,39 +182,6 @@ export function emptyPurchaseOrder(): PurchaseOrderInput {
     Reauthentication,
   ],
   templateUrl: "./purchase-orders.html",
-  styles: [
-    `
-      fieldset {
-        display: grid;
-        gap: 0.8rem;
-        border: 1px solid #d6e1e8;
-        margin: 0.7rem 0;
-        padding: 1rem;
-        min-width: 0;
-      }
-      legend {
-        padding: 0 0.4rem;
-        font-weight: 600;
-      }
-      .actions {
-        display: flex;
-        gap: 0.6rem;
-        flex-wrap: wrap;
-        align-items: center;
-      }
-      .summary {
-        display: grid;
-        gap: 0.3rem;
-        grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
-      }
-      .muted {
-        opacity: 0.75;
-      }
-      textarea {
-        min-height: 4rem;
-      }
-    `,
-  ],
 })
 export class PurchaseOrders implements OnInit {
  billingBusy=signal(false);
@@ -741,4 +710,14 @@ export class PurchaseOrders implements OnInit {
     };
     return labels[status] || status;
   }
+
+ inlineId(){return this.selected()?.id||''}
+ inlineInPage(){return this.visibleRows().some(row=>row.id===this.inlineId())}
+ toggleInline(id:string,event:Event){const target=event.target as HTMLElement;if(target.closest('button,a,input,select,textarea'))return;if(event.type==='keydown'){if(event.target!==event.currentTarget)return;event.preventDefault()}if(this.busy()||this.billingBusy())return;if(this.inlineId()===id){this.close()}else{void this.open(id)}}
+
+ pageState=signal('');
+ rowState(row:object){const r=row as Record<string,unknown>;if('is_current' in r)return r['is_current']===true?'current':r['is_current']===false?'expired':'unknown';return String(r['status']||'unknown')}
+ pageStates(){return [...new Set(this.rows().map(row=>this.rowState(row)))]}
+ visibleRows(){const state=this.pageState();return state?this.rows().filter(row=>this.rowState(row)===state):this.rows()}
+ stateName(key:string){return ({current:'Vigente',unknown:'Por verificar',expired:'Vencido',draft:'Borrador',costing:'Costeo',review:'Revisión',approved:'Aprobada',sent:'Enviada',accepted:'Aceptada',rejected:'Rechazada',converted:'Convertida',received:'Recibida',confirmed:'Confirmada',purchasing:'En compra',in_transit:'En tránsito',goods_received:'Mercadería recibida',preparing_delivery:'Preparando entrega',delivered:'Entregada',invoiced:'Facturada',closed:'Cerrada',issued:'Emitida',cancelled:'Anulada'} as Record<string,string>)[key]||'Registrado'}
 }

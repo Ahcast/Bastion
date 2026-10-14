@@ -1,5 +1,5 @@
 import { Component, OnDestroy, OnInit, inject, signal } from "@angular/core";
-import { RouterLink } from "@angular/router";
+import { RouterLink,RouterLinkActive } from "@angular/router";
 import { FormsModule } from "@angular/forms";
 import { Client } from "../../core/api/client";
 import { Reauthentication } from "../../core/security/reauthentication";
@@ -31,15 +31,12 @@ interface Intent {
 }
 
 @Component({
-  imports: [FormsModule, RouterLink, Reauthentication],
+  imports: [FormsModule,RouterLink,RouterLinkActive,Reauthentication],
   template: `
-    <section aria-labelledby="work-title">
-      <h1 id="work-title">Mi trabajo</h1>
+    <section class="bs-workspace" aria-labelledby="work-title">
+      <header class="bs-page-head"><div><span class="bs-label">Bastion · Colaboración</span><h1 id="work-title">Mi trabajo</h1></div></header>
       <p>Tareas de Colaboración. No modifica estados de los módulos comerciales.</p>
-      <nav aria-label="Colaboración">
-        <a routerLink="/collaboration">Biblioteca</a> ·
-        <a routerLink="/collaboration/integrations">Integraciones y aprobaciones</a>
-      </nav>
+      <nav class="bs-section-menu" aria-label="Colaboración"><a routerLink="/collaboration" routerLinkActive="active" [routerLinkActiveOptions]="{exact:true}" ariaCurrentWhenActive="page">Biblioteca</a><a routerLink="/collaboration/work" routerLinkActive="active" ariaCurrentWhenActive="page">Mi trabajo</a><a routerLink="/collaboration/integrations" routerLinkActive="active" ariaCurrentWhenActive="page">Integraciones y aprobaciones</a></nav>
       @if (error()) { <p role="alert">{{ error() }}</p> }
       @if (message()) { <p role="status">{{ message() }}</p> }
 
@@ -47,7 +44,7 @@ interface Intent {
         <p role="status">La respuesta no está confirmada. Reintente la misma operación para recuperar el resultado.</p>
         <button type="button" (click)="retry()" [disabled]="busy()">Reintentar operación</button>
       }
-      <section aria-label="Filtros de trabajo">
+      <section class="bs-frame bs-filter-form" aria-label="Filtros de trabajo">
         <label>Vista
           <select [(ngModel)]="view" (change)="page=1;load()">
             <option value="mine">Mi trabajo</option>
@@ -68,7 +65,7 @@ interface Intent {
       </section>
 
       @if (api.has('colaboracion.task')) {
-        <section aria-labelledby="new-task">
+        <section class="bs-frame" aria-labelledby="new-task">
           <h2 id="new-task">{{ editing() ? 'Editar tarea' : 'Nueva tarea' }}</h2>
           <fieldset [disabled]="blocked()">
           <legend>Datos de tarea</legend>
@@ -101,11 +98,11 @@ interface Intent {
         </section>
       }
 
-      <section aria-labelledby="task-list">
+      <section class="bs-frame" aria-labelledby="task-list">
         <h2 id="task-list">Tareas ({{ total() }})</h2>
-        <ul>
+        <ul class="bs-list">
           @for (task of tasks(); track task.id) {
-            <li>
+            <li class="bs-collab-item">
               <strong>{{ task.title }}</strong> — {{ label(task.status) }}
               <span> · {{ task.assignee_name }}</span>
               @if (task.due_date) { <span> · vence {{ task.due_date }}</span> }
@@ -123,7 +120,7 @@ interface Intent {
                 <button type="button" (click)="reopen(task)" [disabled]="blocked()">Reabrir</button>
               }
             </li>
-          } @empty { <li>No hay tareas para esta vista.</li> }
+          } @empty { <li class="bs-collab-item">No hay tareas para esta vista.</li> }
         </ul>
         <button type="button" (click)="page=page-1;load()" [disabled]="busy() || page<=1">Anterior</button>
         <button type="button" (click)="page=page+1;load()" [disabled]="busy() || page*100>=total()">Siguiente</button>

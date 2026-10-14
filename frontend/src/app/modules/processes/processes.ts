@@ -1,3 +1,5 @@
+import {NgTemplateOutlet} from "@angular/common";
+import {WorkspaceSummary} from "../../shared/ui/workspace-summary";
 import {Component,inject,signal,OnInit} from '@angular/core';
 import {ActivatedRoute,Router,RouterLink} from '@angular/router';
 import {JsonPipe} from '@angular/common';
@@ -5,7 +7,7 @@ import {FormsModule} from '@angular/forms';
 import {Client} from '../../core/api/client';
 export interface Process {id:string;entity:string;reference:string;description:string;deadline:string;is_source_active:boolean;is_current:boolean|null;version:string;personal_version:string;is_interesting:boolean;note:string;documents:{url:string;name:string;sha256?:string}[]}
 interface Page {data:Process[];total:number;page:number;per_page:number}
-@Component({imports:[FormsModule,JsonPipe,RouterLink],templateUrl:'./processes.html'})
+@Component({imports:[NgTemplateOutlet,WorkspaceSummary,FormsModule,JsonPipe,RouterLink],templateUrl:'./processes.html'})
 export class Processes implements OnInit {
  api=inject(Client);route=inject(ActivatedRoute);router=inject(Router);relatedPage=1;relatedTotal=signal(0);related=signal<{id:string;number:string;customer_name:string;total:string;currency:string}[]>([]);quoteDate=new Intl.DateTimeFormat("en-CA",{timeZone:"America/Tegucigalpa",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date());rows=signal<Process[]>([]);selected=signal<Process|null>(null);history=signal<{id:string;version:string;created_at:string;changes:string[];diff:{kind:string;field:string;before:unknown;after:unknown}[]}[]>([]);historyTotal=signal(0);runs=signal<Record<string,unknown>[]>([]);error=signal('');busy=signal(false);total=signal(0);search='';entity='';interesting='';current='';active='';hide=false;direction='desc';from='';to='';page=1;historyPage=1;note='';private pending=new Map<string,{body:string;key:string}>();
  changeLabel(k:string){return ({DESCRIPTION_CHANGED:'Especificaciones',DEADLINE_CHANGED:'Fecha de recepción',METADATA_CHANGED:'Datos de fuente',DOCUMENT_ADDED:'Documento agregado',DOCUMENT_REMOVED:'Documento retirado',DOCUMENT_CHANGED:'Documento actualizado'} as Record<string,string>)[k]||'Cambio de fuente'}
@@ -21,4 +23,14 @@ export class Processes implements OnInit {
  async createQuote(){const id=this.selected()?.id;if(!id||this.busy())return;const path="/processes/"+id+"/create-quote",body={date:this.quoteDate,version:"0"};this.busy.set(true);try{const r=await this.api.write<{id:string}>("POST",path,body,this.key(path,body));if(await this.router.navigate(["/quotes"],{queryParams:{id:r.id}}))this.pending.delete(path)}catch(e){this.error.set(this.api.message(e))}finally{this.busy.set(false)}}
  async status(){try{this.runs.set((await this.api.get<{data:Record<string,unknown>[]}>('/processes/status')).data)}catch(e){this.error.set(this.api.message(e))}}
  async export(){if(this.busy())return;this.busy.set(true);try{const v=await this.api.write<{content:string;filename:string}>('POST','/processes/export?'+this.query(),{});const u=URL.createObjectURL(new Blob([v.content],{type:'text/csv;charset=utf-8'}));const a=document.createElement('a');a.href=u;a.download='procesos.csv';a.click();URL.revokeObjectURL(u)}catch(e){this.error.set(this.api.message(e))}finally{this.busy.set(false)}}
+
+ inlineId(){return this.selected()?.id||''}
+ inlineInPage(){return this.visibleRows().some(row=>row.id===this.inlineId())}
+ toggleInline(id:string,event:Event){const target=event.target as HTMLElement;if(target.closest('button,a,input,select,textarea'))return;if(event.type==='keydown'){if(event.target!==event.currentTarget)return;event.preventDefault()}if(this.busy())return;if(this.inlineId()===id){this.selected.set(null)}else{void this.open(id)}}
+
+ pageState=signal('');
+ rowState(row:object){const r=row as Record<string,unknown>;if('is_current' in r)return r['is_current']===true?'current':r['is_current']===false?'expired':'unknown';return String(r['status']||'unknown')}
+ pageStates(){return [...new Set(this.rows().map(row=>this.rowState(row)))]}
+ visibleRows(){const state=this.pageState();return state?this.rows().filter(row=>this.rowState(row)===state):this.rows()}
+ stateName(key:string){return ({current:'Vigente',unknown:'Por verificar',expired:'Vencido',draft:'Borrador',costing:'Costeo',review:'Revisión',approved:'Aprobada',sent:'Enviada',accepted:'Aceptada',rejected:'Rechazada',converted:'Convertida',received:'Recibida',confirmed:'Confirmada',purchasing:'En compra',in_transit:'En tránsito',goods_received:'Mercadería recibida',preparing_delivery:'Preparando entrega',delivered:'Entregada',invoiced:'Facturada',closed:'Cerrada',issued:'Emitida',cancelled:'Anulada'} as Record<string,string>)[key]||'Registrado'}
 }

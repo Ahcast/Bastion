@@ -1,3 +1,5 @@
+import {NgTemplateOutlet} from "@angular/common";
+import {WorkspaceSummary} from "../../shared/ui/workspace-summary";
 import {QuoteInvoice,InvoiceConversionResult} from "./quote-invoice";
 import {Component,inject,signal,OnInit} from '@angular/core';
 import {FormsModule} from '@angular/forms';
@@ -16,7 +18,7 @@ export interface Quote extends Omit<Input,'items'>{purchase_order_id?:string|nul
 export interface PDFSnapshot{id:string;quote_version:string;status:string;kind:'draft'|'issued';approval_id?:string;issued_at?:string}
 export interface Approval{id:string;entity_version:string;version:string;requested_by:string;decided_by:string;status:string;reason:string;expires_at:string;valid:boolean;invalid_reason:string}
 export function empty():Input{return {customer:{id:'',name:'',rtn:'',contact:'',phone:'',email:'',address:''},reference:'',date:new Intl.DateTimeFormat('en-CA',{timeZone:'America/Tegucigalpa',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date()),validity_days:30,currency:'HNL',terms:'',private_notes:'',author_contact:'',exoneration_reference:'',general_discount_type:'amount',general_discount:'0',items:[],version:'0'}}
-@Component({imports:[FormsModule,JsonPipe,DatePipe,RouterLink,Reauthentication,QuoteEmail,QuoteBulk,QuotePurchaseOrder,QuoteInvoice],templateUrl:'./quotes.html'})
+@Component({imports:[NgTemplateOutlet,WorkspaceSummary,FormsModule,JsonPipe,DatePipe,RouterLink,Reauthentication,QuoteEmail,QuoteBulk,QuotePurchaseOrder,QuoteInvoice],templateUrl:'./quotes.html'})
 export class Quotes implements OnInit{
  conversionBusy=signal(false);
  api=inject(Client);route=inject(ActivatedRoute);router=inject(Router);rows=signal<Summary[]>([]);selected=signal<Quote|null>(null);history=signal<Quote[]>([]);historyTotal=signal(0);historyPage=1;error=signal('');busy=signal(false);total=signal(0);preview=signal<Record<string,string|number>|null>(null);editing=signal(false);form=empty();search='';deleted=false;page=1;private pending=new Map<string,{body:string;key:string}>();
@@ -72,5 +74,15 @@ export class Quotes implements OnInit{
  async clone(){const q=this.selected();if(!q||(this.busy()||this.conversionBusy()))return;const path='/quotes/'+q.id+'/clone',body={version:q.version};this.busy.set(true);try{const r=await this.api.write<{id:string}>('POST',path,body,this.key(path,body));this.pending.delete(path);await this.open(r.id);await this.load(false,false)}catch(e){this.error.set(this.api.message(e))}finally{this.busy.set(false)}}
  async trash(restore:boolean){const q=this.selected();if(!q||(this.busy()||this.conversionBusy()))return;const path='/quotes/'+q.id+(restore?'/restore':''),body={version:q.version};this.busy.set(true);try{const r=await this.api.write<{version:string}>(restore?'POST':'DELETE',path,body,this.key(path,body));this.pending.delete(path);this.selected.set({...q,version:r.version,deleted_at:restore?null:new Date().toISOString()});this.form.version=r.version;await this.load(false,false)}catch(e){this.error.set(this.api.message(e))}finally{this.busy.set(false)}}
  async versions(){const q=this.selected();if(!q)return;try{const r=await this.api.get<{data:Quote[];total:number}>('/quotes/'+q.id+'/versions?page='+this.historyPage);this.history.set(r.data);this.historyTotal.set(r.total)}catch(e){this.error.set(this.api.message(e))}}
+
+ inlineId(){return this.selected()?.id||''}
+ inlineInPage(){return this.visibleRows().some(row=>row.id===this.inlineId())}
+ toggleInline(id:string,event:Event){const target=event.target as HTMLElement;if(target.closest('button,a,input,select,textarea'))return;if(event.type==='keydown'){if(event.target!==event.currentTarget)return;event.preventDefault()}if(this.busy()||this.conversionBusy())return;if(this.inlineId()===id){this.close()}else{void this.open(id)}}
+
+ pageState=signal('');
+ rowState(row:object){const r=row as Record<string,unknown>;if('is_current' in r)return r['is_current']===true?'current':r['is_current']===false?'expired':'unknown';return String(r['status']||'unknown')}
+ pageStates(){return [...new Set(this.rows().map(row=>this.rowState(row)))]}
+ visibleRows(){const state=this.pageState();return state?this.rows().filter(row=>this.rowState(row)===state):this.rows()}
+ stateName(key:string){return ({current:'Vigente',unknown:'Por verificar',expired:'Vencido',draft:'Borrador',costing:'Costeo',review:'Revisión',approved:'Aprobada',sent:'Enviada',accepted:'Aceptada',rejected:'Rechazada',converted:'Convertida',received:'Recibida',confirmed:'Confirmada',purchasing:'En compra',in_transit:'En tránsito',goods_received:'Mercadería recibida',preparing_delivery:'Preparando entrega',delivered:'Entregada',invoiced:'Facturada',closed:'Cerrada',issued:'Emitida',cancelled:'Anulada'} as Record<string,string>)[key]||'Registrado'}
 }
 

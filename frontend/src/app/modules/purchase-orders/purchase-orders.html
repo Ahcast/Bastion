@@ -1,9 +1,11 @@
-<h1>Órdenes de Compra</h1>
+<div class="bs-workspace"><header class="bs-page-head"><div><span class="bs-label">Bastion · Operación</span><h1>Órdenes de compra</h1><p>Órdenes de compra recibidas de clientes.</p></div><div class="bs-actions">@if (api.has('ordenes.create')) {
+    <button class="bs-btn bs-btn-primary" type="button" (click)="create()" [disabled]="(busy()||billingBusy())">Nueva orden de compra</button>
+  }</div></header>@if(editorOpen()&&!inlineId()){<section class="bs-inline-new"><ng-container [ngTemplateOutlet]="recordDetail"/></section>}<bs-workspace-summary [rows]="visibleRows()" [total]="total()" [financial]="true" [processes]="false"/>
 <p class="muted">Órdenes de compra recibidas de clientes.</p>
-<p role="alert">{{ error() }}</p>
-@if (message()) { <p role="status">{{ message() }}</p> }
+@if(error()){<p role="alert">{{ error() }}</p>}
+@if (message()) { @if(message()){<p role="status">{{ message() }}</p>} }
 
-<form (ngSubmit)="load(true)" class="card">
+<form (ngSubmit)="load(true)" class="bs-frame">
   <fieldset [disabled]="loading() || (busy()||billingBusy())">
     <legend>Filtros</legend>
     <label>Buscar
@@ -30,34 +32,24 @@
 </form>
 
 <div class="actions">
-  @if (api.has('ordenes.create')) {
-    <button type="button" (click)="create()" [disabled]="(busy()||billingBusy())">Nueva orden de compra</button>
-  }
+
   <span>{{ total() }} órdenes · Página {{ page }}</span>
-  <button type="button" [disabled]="page <= 1 || loading() || (busy()||billingBusy())" (click)="page = page - 1; load()">Anterior</button>
-  <button type="button" [disabled]="page * perPage >= total() || loading() || (busy()||billingBusy())" (click)="page = page + 1; load()">Siguiente</button>
+  <div class="bs-pagination"><button type="button" [disabled]="page <= 1 || loading() || (busy()||billingBusy())" (click)="page = page - 1; load()">Anterior</button>
+  <button type="button" [disabled]="page * perPage >= total() || loading() || (busy()||billingBusy())" (click)="page = page + 1; load()">Siguiente</button></div>
 </div>
 
-@for (order of rows(); track order.id) {
-  <article class="card">
-    <h2>{{ order.order_number }}</h2>
-    <p>{{ order.customer.name || 'Cliente sin nombre' }}</p>
-    <p>{{ statusLabel(order.status) }} · {{ order.order_date }} · {{ order.currency }} {{ order.total }}</p>
-    <button type="button" (click)="open(order.id)" [disabled]="(busy()||billingBusy())">Ver orden {{ order.order_number }}</button>
-  </article>
-} @empty {
-  @if (!loading()) { <p>No hay órdenes de compra para estos filtros.</p> }
-}
+<div class="bs-filters" role="group" aria-label="Filtrar estados de esta página"><span class="bs-label">Estados · esta página</span><button type="button" class="bs-chip" [attr.aria-pressed]="pageState()===''" (click)="pageState.set('')">Todos</button>@for(state of pageStates();track state){<button type="button" class="bs-chip" [attr.aria-pressed]="pageState()===state" (click)="pageState.set(state)">{{stateName(state)}}</button>}</div><section class="bs-frame bs-work-table" aria-label="Tabla de trabajo"><div class="bs-frame-head"><h2 class="bs-frame-title">Tabla de trabajo</h2><span class="bs-label">Clic en una fila para abrir su detalle</span></div><div class="bs-table-wrap"><table class="bs-table bs-workspace-table"><thead><tr><th scope="col"></th><th scope="col">Orden / cliente</th><th scope="col">Estado</th><th scope="col">Total</th><th scope="col">Fecha</th></tr></thead><tbody>@for(order of visibleRows();track order.id){<tr tabindex="0" [class.bs-row-open]="inlineId()===order.id" [attr.aria-expanded]="inlineId()===order.id" [attr.aria-controls]="'detail-'+order.id" (click)="toggleInline(order.id,$event)" (keydown.enter)="toggleInline(order.id,$event)" (keydown.space)="toggleInline(order.id,$event)"><td class="bs-caret">{{inlineId()===order.id?'−':'+'}}</td><td><button class="bs-record-button bs-cell-title" [attr.aria-label]="'Ver orden '+order.order_number" (click)="open(order.id);$event.stopPropagation()" [disabled]="busy()||billingBusy()">{{order.order_number}}</button><span class="bs-cell-sub">{{order.customer.name}}</span></td><td>{{statusLabel(order.status)}}</td><td class="bs-num bs-mono">{{order.currency+" "+order.total}}</td><td>{{order.order_date}}</td></tr>@if(inlineId()===order.id){<tr class="bs-xp-row" [id]="'detail-'+order.id"><td colspan="5"><ng-container [ngTemplateOutlet]="recordDetail"/></td></tr>}}@empty{<tr><td colspan="5"><div class="bs-state"><h3>Sin registros con estos filtros</h3><p>Puede cambiar los filtros de la consulta.</p></div></td></tr>}@if(inlineId()&&!inlineInPage()){<tr><td>−</td><td colspan="4">Registro abierto #{{inlineId()}} · fuera de esta página</td></tr><tr class="bs-xp-row" [id]="'detail-'+inlineId()"><td colspan="5"><ng-container [ngTemplateOutlet]="recordDetail"/></td></tr>}</tbody></table></div></section>
 
-@if (editorOpen()) {
-  <section class="card">
+
+<ng-template #recordDetail><div class="bs-detail">@if (editorOpen()) {
+  <section class="bs-frame">
     <div class="actions">
       <h2>{{ selected()?.order_number || 'Nueva orden de compra' }}</h2>
       <button type="button" (click)="close()" [disabled]="(busy()||billingBusy())">Cerrar ficha</button>
     </div>
 
     @if (selected(); as saved) {
-      <div class="summary">
+      <div class="bs-facts">
         <p><strong>Estado:</strong> {{ statusLabel(saved.status) }}</p>
         <p><strong>Versión:</strong> {{ saved.version }}</p>
  <bastion-order-billing [order]="saved" [disabled]="busy()||billingBusy()||billingNeedsReload()" [changesPending]="dirty()" (busyChange)="billingBusy.set($event)" (changed)="billingConfirmed($event)"/>
@@ -329,7 +321,7 @@
     @if (preview(); as calculation) {
       <section>
         <h3>{{ selected() ? 'Cálculo de la orden' : 'Vista previa del cálculo' }}</h3>
-        <div class="summary">
+        <div class="bs-facts">
           <p><strong>Bruto:</strong> {{ form.currency }} {{ calculation.gross }}</p>
           <p><strong>Descuento de ítems:</strong> {{ form.currency }} {{ calculation.item_discount }}</p>
           <p><strong>Descuento general:</strong> {{ form.currency }} {{ calculation.general_discount }}</p>
@@ -349,4 +341,4 @@
       </section>
     }
   </section>
-}
+}</div></ng-template></div>

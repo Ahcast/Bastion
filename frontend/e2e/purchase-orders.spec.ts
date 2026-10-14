@@ -60,10 +60,10 @@ test("Órdenes de Compra: cálculo, alta, persistencia, edición y búsqueda con
   await page.getByRole("button", { name: "Verificar", exact: true }).click();
   await expect(page).toHaveURL(/\/$/);
   await page
-    .getByRole("link", { name: "Órdenes de Compra", exact: true })
+    .getByRole("link", { name: "Órdenes de compra", exact: true })
     .click();
   await expect(
-    page.getByRole("heading", { name: "Órdenes de Compra", exact: true }),
+    page.getByRole("heading", { name: "Órdenes de compra", exact: true }),
   ).toBeVisible();
   mark("login:done");
 

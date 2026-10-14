@@ -1,23 +1,22 @@
-<h1>Clientes</h1>
+<div class="bs-workspace"><header class="bs-page-head"><div><span class="bs-label">Bastion · Operación</span><h1>Clientes</h1><p>Relaciones comerciales y datos del cliente.</p></div><div class="bs-actions">@if(api.has('clientes.create')){<button class="bs-btn bs-btn-primary" (click)="create()" [disabled]="busy()">Nuevo cliente</button>}</div></header>@if(!!editor()&&!inlineId()){<section class="bs-inline-new"><ng-container [ngTemplateOutlet]="recordDetail"/></section>}<bs-workspace-summary [rows]="rows()" [total]="total()" [financial]="false" [processes]="false"/>
 <p>Catálogo y ficha de clientes. Los cambios del catálogo conservan los datos históricos de los documentos.</p>
-<p class="error" role="alert">{{error()}}</p><p role="status">{{message()}}</p>
-<section class="card" aria-label="Buscar clientes">
- <form (ngSubmit)="load(true)">
+@if(error()){<p class="error" role="alert">{{error()}}</p>}@if(message()){<p role="status">{{message()}}</p>}
+<section class="bs-frame" aria-label="Buscar clientes">
+ <form class="bs-filter-form" (ngSubmit)="load(true)">
   <label>Buscar cliente<input name="search" [(ngModel)]="search" maxlength="180" /></label>
   <label>Filtrar por RTN<input name="rtn_filter" [(ngModel)]="rtn" maxlength="30" /></label>
   <label>Estado del cliente<select name="active_filter" [(ngModel)]="active"><option value="true">Activos</option><option value="false">Inactivos</option><option value="">Todos</option></select></label>
   <button [disabled]="loading()">Buscar</button>
  </form>
- @if(api.has('clientes.create')){<button (click)="create()" [disabled]="busy()">Nuevo cliente</button>}
- @if(loading()){<p role="status">Cargando clientes…</p>}@else{
+
+ @if(loading()){<p role="status">Cargando clientes…</p>}
  <p>{{total()}} clientes encontrados · Página {{page}}</p>
- <div class="table-scroll"><table><thead><tr><th>Nombre</th><th>RTN</th><th>Correo</th><th>Estado</th><th>Ficha</th></tr></thead><tbody>
- @for(c of rows();track c.id){<tr><td>{{c.name}}</td><td>{{c.rtn || 'Sin RTN'}}</td><td>{{c.email}}</td><td>{{c.is_active?'Activo':'Inactivo'}}</td><td><button (click)="open(c.id)" [disabled]="busy()" [attr.aria-label]="'Abrir cliente '+c.name">Abrir</button></td></tr>}@empty{<tr><td colspan="5">No se encontraron clientes.</td></tr>}
- </tbody></table></div>
- <button (click)="page=page-1;load()" [disabled]="page<=1||loading()">Anterior</button><button (click)="page=page+1;load()" [disabled]="page*perPage>=total()||loading()">Siguiente</button>}
+ <section class="bs-frame bs-work-table" aria-label="Tabla de trabajo"><div class="bs-frame-head"><h2 class="bs-frame-title">Tabla de trabajo</h2><span class="bs-label">Clic en una fila para abrir su detalle</span></div><div class="bs-table-wrap"><table class="bs-table bs-workspace-table"><thead><tr><th scope="col"></th><th scope="col">Cliente</th><th scope="col">RTN</th><th scope="col">Correo</th><th scope="col">Estado</th></tr></thead><tbody>@for(c of rows();track c.id){<tr tabindex="0" [class.bs-row-open]="inlineId()===c.id" [attr.aria-expanded]="inlineId()===c.id" [attr.aria-controls]="'detail-'+c.id" (click)="toggleInline(c.id,$event)" (keydown.enter)="toggleInline(c.id,$event)" (keydown.space)="toggleInline(c.id,$event)"><td class="bs-caret">{{inlineId()===c.id?'−':'+'}}</td><td><button class="bs-record-button bs-cell-title" [attr.aria-label]="'Abrir cliente '+c.name" (click)="open(c.id);$event.stopPropagation()" [disabled]="busy()">{{c.name}}</button></td><td>{{c.rtn||'—'}}</td><td>{{c.email||'—'}}</td><td>{{c.is_active?'Activo':'Inactivo'}}</td></tr>@if(inlineId()===c.id){<tr class="bs-xp-row" [id]="'detail-'+c.id"><td colspan="5"><ng-container [ngTemplateOutlet]="recordDetail"/></td></tr>}}@empty{<tr><td colspan="5"><div class="bs-state"><h3>Sin registros con estos filtros</h3><p>Puede cambiar los filtros de la consulta.</p></div></td></tr>}@if(inlineId()&&!inlineInPage()){<tr><td>−</td><td colspan="4">Registro abierto #{{inlineId()}} · fuera de esta página</td></tr><tr class="bs-xp-row" [id]="'detail-'+inlineId()"><td colspan="5"><ng-container [ngTemplateOutlet]="recordDetail"/></td></tr>}</tbody></table></div></section>
+ <div class="bs-pagination"><button (click)="page=page-1;load()" [disabled]="page<=1||loading()">Anterior</button><button (click)="page=page+1;load()" [disabled]="page*perPage>=total()||loading()">Siguiente</button></div>
 </section>
-@if(editor();as c){
-<section class="card" aria-label="Ficha del cliente"><h2>{{c.id?'Ficha del cliente':'Nuevo cliente'}}</h2>
+
+<ng-template #recordDetail><div class="bs-detail">@if(editor();as c){
+<section class="bs-frame" aria-label="Ficha del cliente"><h2>{{c.id?'Ficha del cliente':'Nuevo cliente'}}</h2>
  @if(c.id){<p>Versión {{c.version}}. Si otro usuario modifica la ficha, vuelva a abrirla antes de guardar.</p>}
  <form (ngSubmit)="save()"><fieldset [disabled]="busy() || (c.id ? !api.has('clientes.update') : !api.has('clientes.create'))">
  <label>Nombre del cliente<input name="name" [(ngModel)]="c.name" required maxlength="180" /></label>
@@ -40,11 +39,11 @@
  <details><summary>Confirmar identidad para cambiar equipo, estado o vincular documentos</summary><form (ngSubmit)="reauthenticate()"><label>Contraseña de confirmación<input name="confirm_password" [(ngModel)]="password" type="password" autocomplete="current-password" required /></label><label>Código de confirmación<input name="confirm_factor" [(ngModel)]="factor" autocomplete="one-time-code" required /></label><button [disabled]="busy()">Confirmar identidad</button></form></details>
 </section>
 @if(c.id){
-<section class="card"><h2>Notas del cliente</h2>@if(api.has('clientes.update')){<form (ngSubmit)="addNote()"><label>Nueva nota<textarea name="note" [(ngModel)]="note" required maxlength="4000"></textarea></label><button [disabled]="busy()">Registrar nota</button></form>}
+<section class="bs-frame"><h2>Notas del cliente</h2>@if(api.has('clientes.update')){<form (ngSubmit)="addNote()"><label>Nueva nota<textarea name="note" [(ngModel)]="note" required maxlength="4000"></textarea></label><button [disabled]="busy()">Registrar nota</button></form>}
 @for(n of notes();track n.id){<article><p class="message">{{n.body}}</p><p>{{n.user_name}} · {{n.created_at|date:'short'}}</p></article>}@empty{<p>No hay notas registradas.</p>}
 <button (click)="notePage=notePage-1;loadNotes()" [disabled]="notePage<=1">Notas anteriores</button><button (click)="notePage=notePage+1;loadNotes()" [disabled]="notePage*25>=noteTotal()">Más notas</button></section>
-<section class="card"><h2>Historial del cliente</h2><button (click)="loadHistory()">Actualizar historial</button>@for(h of history();track h.id){<p>{{historyLabel(h.action)}} · {{h.actor_name}} · {{h.created_at|date:'short'}} @if(h.details.version){· Versión {{h.details.version}}}</p>}@empty{<p>No hay actividad cargada.</p>}<button (click)="historyPage=historyPage-1;loadHistory()" [disabled]="historyPage<=1">Historial anterior</button><button (click)="historyPage=historyPage+1;loadHistory()" [disabled]="historyPage*25>=historyTotal()">Más historial</button></section>
-@if(api.has('core.documents.read')){<section class="card"><h2>Documentos del cliente</h2><button (click)="loadDocuments()">Actualizar documentos</button>@for(d of documents();track d.id){<p>{{d.filename}} · {{state(d.status)}} <button (click)="download(d.id)" [disabled]="d.status!=='available'">Descargar</button></p>}@empty{<p>No hay documentos cargados. Suba el archivo desde Configuración y vincúlelo aquí.</p>}<button (click)="documentPage=documentPage-1;loadDocuments()" [disabled]="documentPage<=1">Documentos anteriores</button><button (click)="documentPage=documentPage+1;loadDocuments()" [disabled]="documentPage*25>=documentTotal()">Más documentos</button>
+<section class="bs-frame"><h2>Historial del cliente</h2><button (click)="loadHistory()">Actualizar historial</button>@for(h of history();track h.id){<p>{{historyLabel(h.action)}} · {{h.actor_name}} · {{h.created_at|date:'short'}} @if(h.details.version){· Versión {{h.details.version}}}</p>}@empty{<p>No hay actividad cargada.</p>}<button (click)="historyPage=historyPage-1;loadHistory()" [disabled]="historyPage<=1">Historial anterior</button><button (click)="historyPage=historyPage+1;loadHistory()" [disabled]="historyPage*25>=historyTotal()">Más historial</button></section>
+@if(api.has('core.documents.read')){<section class="bs-frame"><h2>Documentos del cliente</h2><button (click)="loadDocuments()">Actualizar documentos</button>@for(d of documents();track d.id){<p>{{d.filename}} · {{state(d.status)}} <button (click)="download(d.id)" [disabled]="d.status!=='available'">Descargar</button></p>}@empty{<p>No hay documentos cargados. Suba el archivo desde Configuración y vincúlelo aquí.</p>}<button (click)="documentPage=documentPage-1;loadDocuments()" [disabled]="documentPage<=1">Documentos anteriores</button><button (click)="documentPage=documentPage+1;loadDocuments()" [disabled]="documentPage*25>=documentTotal()">Más documentos</button>
 @if(api.has('clientes.update')&&api.has('core.documents.write')){<button (click)="loadPersonalFiles()">Cargar archivos sin vínculo</button><button (click)="personalPage=personalPage-1;loadPersonalFiles()" [disabled]="personalPage<=1">Archivos anteriores</button><button (click)="personalPage=personalPage+1;loadPersonalFiles()" [disabled]="personalFiles().length<25">Más archivos</button><form (ngSubmit)="linkDocument()"><label>Archivo para vincular<select name="document" [(ngModel)]="selectedDocument" required><option value="">Seleccione un archivo</option>@for(d of personalFiles();track d.id){<option [value]="d.id">{{d.filename}} · {{state(d.status)}}</option>}</select></label><button [disabled]="busy()">Vincular documento</button></form>}
 </section>}
-}}
+}}</div></ng-template></div>

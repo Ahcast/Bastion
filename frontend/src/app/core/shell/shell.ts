@@ -28,8 +28,7 @@ const NAV: NavItem[] = [
   { path: "/suppliers", label: "Proveedores", permission: "proveedores.view", module: "suppliers" },
   { path: "/processes", label: "Procesos", permission: "procesos.view", module: "processes" },
   { path: "/quotes", label: "Cotizaciones", permission: "cotizaciones.view", module: "quotes" },
-  // Etiqueta conservada con mayúscula por las pruebas e2e (purchase-orders.spec.ts).
-  { path: "/purchase-orders", label: "Órdenes de Compra", permission: "ordenes.view", module: "purchase-orders" },
+  { path: "/purchase-orders", label: "Órdenes de compra", permission: "ordenes.view", module: "purchase-orders" },
   { path: "/invoices", label: "Facturas", permission: "facturas.view", module: "invoices" },
   { path: "/expenses", label: "Gastos", permission: "gastos.view", module: "expenses" },
   { path: "/reports", label: "Reportes", permission: "reportes.view", module: "reports" },
@@ -46,7 +45,7 @@ const NAV: NavItem[] = [
           routerLink="/"
           routerLinkActive="bs-tab-active"
           [routerLinkActiveOptions]="{ exact: true }"
-          aria-label="Inicio"
+          aria-label="Inicio" ariaCurrentWhenActive="page"
           title="Inicio"
           ><bs-logo [size]="30"
         /></a>
@@ -89,9 +88,10 @@ const NAV: NavItem[] = [
             title="Configuración"
             ><bs-icon name="settings"
           /></a>
-          <span class="bs-avatar" [title]="userName()" aria-hidden="true">{{
+          <button type="button" class="bs-avatar bs-user-trigger" [title]="userName()" aria-label="Menú de usuario" [attr.aria-expanded]="userOpen()" aria-controls="bs-user-menu" (click)="userOpen.set(!userOpen())">{{
             initials()
-          }}</span>
+          }}</button>
+          @if(userOpen()){<nav id="bs-user-menu" class="bs-user-menu" aria-label="Cuenta de usuario"><a routerLink="/settings" fragment="personal" (click)="userOpen.set(false)">Mi cuenta</a><button type="button" (click)="logout()">Cerrar sesión</button></nav>}
           <button
             type="button"
             class="bs-iconbtn"
@@ -145,6 +145,7 @@ const NAV: NavItem[] = [
 export class Shell {
   api = inject(Client);
   private router = inject(Router);
+  userOpen=signal(false);
   error = signal("");
   notifications = signal<Record<string, string>[]>([]);
   alertsOpen = signal(false);

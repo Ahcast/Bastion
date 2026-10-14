@@ -356,3 +356,28 @@ h3       { font: 600 16px/22px var(--font-sans); color: var(--ink); }
   .bs-topnav, .bs-searchbar, .bs-actions, .bs-filters { display: none !important; }
   body { background: #fff; }
 }
+/* Operational workspaces: tables, grouped fields and inline records. */
+router-outlet{display:none}
+.bs-page>ng-component,.bs-workspace{display:flex;flex-direction:column;gap:var(--space-6);min-width:0}
+.bs-workspace>button{align-self:flex-start}.bs-page-head h1{margin:0}.bs-page-head p{margin:var(--space-2) 0 0;color:var(--ink-subtle)}
+.bs-filter-form,.bs-filter-form fieldset{display:flex;flex-wrap:wrap;gap:var(--space-4);align-items:flex-end;margin:0}.bs-filter-form fieldset{width:100%}.bs-filter-form label{min-width:150px;flex:1}
+.bs-workspace-table{table-layout:fixed;min-width:780px}.bs-workspace-table th:first-child{width:44px}.bs-cell-title,.bs-cell-sub{display:block;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bs-record-button{border:0;padding:0;background:none;color:var(--ink);font:inherit;text-align:left;cursor:pointer}.bs-record-button:hover{text-decoration:underline}.bs-cell-sub{font-size:14px;color:var(--ink-subtle);margin-top:4px}
+.bs-workspace-table tr[tabindex]{cursor:pointer}.bs-workspace-table tr[tabindex]:focus-visible{outline:2px solid var(--ink);outline-offset:-2px}.bs-row-open{background:var(--panel-raised)}
+.bs-xp-row>td{padding:24px;background:var(--panel);border:1px solid var(--ink)}.bs-detail{display:grid;gap:var(--space-6);min-width:0}
+.bs-detail fieldset{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--space-4)}.bs-detail fieldset>:is(h2,h3,fieldset,legend,button,p,.bs-actions,.bs-facts){grid-column:1/-1}.bs-detail fieldset>button{justify-self:end}
+.bs-detail fieldset fieldset{width:100%}.bs-detail label,.bs-field{min-width:0}.bs-detail input,.bs-detail select,.bs-detail textarea{max-width:100%}
+.bs-pagination{display:flex;gap:var(--space-3);flex-wrap:wrap;align-items:center;justify-content:flex-end}.bs-count-group{display:grid;grid-template-columns:minmax(120px,1fr) minmax(80px,2fr) 32px;gap:16px;align-items:center;margin:12px 0}
+.bs-count-track{height:6px;background:var(--panel-raised)}.bs-count-track>span{display:block;height:100%;background:var(--ink)}.bs-count-bar{width:100%;max-width:48px;background:var(--ink)}
+.bs-section-menu{display:flex;flex-wrap:wrap;gap:var(--space-2);border-bottom:1px solid var(--ink);padding-bottom:var(--space-4)}.bs-section-menu a{padding:var(--space-2) var(--space-3);text-decoration:none;border:1px solid var(--ink)}.bs-section-menu a.active{background:var(--ink);color:var(--on-accent)}.bs-section-menu a:hover{background:var(--panel-raised);color:var(--ink)}
+.bs-dashboard-work .bs-page-head>div:first-child{display:none}.bs-dashboard-work bs-workspace-summary{display:none}.bs-home-summary .bs-item-t,.bs-home-summary .bs-item-s{display:block}.bs-kpi-tile:disabled{cursor:default;opacity:.6}.bs-home-summary .bs-facts{grid-template-columns:repeat(4,minmax(0,1fr))}
+.bs-collab-item{list-style:none;padding:var(--space-5);border-bottom:1px solid var(--line);display:flex;flex-wrap:wrap;gap:var(--space-3);align-items:center}.bs-collab-item label{min-width:180px;flex:1}.bs-library-list .entry{margin:0;border:0;border-top:1px solid var(--line)}.bs-tl-row>button{grid-column:2;justify-self:start}
+.bs-section-menu,.bs-frame[id],.bs-frame [id]{scroll-margin-top:calc(var(--topnav-h) + 24px)}
+@media(max-width:760px){.bs-dashboard .bs-kpis{grid-template-columns:minmax(0,1fr)}.bs-kpi-tile{padding:16px;gap:10px}.bs-detail fieldset,.bs-timeline li{grid-template-columns:1fr}.bs-tl-row>button{grid-column:1}.bs-detail{width:calc(100vw - 82px);max-width:100%}.bs-xp-row>td{padding:16px}.bs-workspace-table{min-width:680px}.bs-count-group{grid-template-columns:minmax(90px,1fr) minmax(60px,1fr) 28px;gap:8px}.bs-home-summary .bs-facts{grid-template-columns:repeat(2,minmax(0,1fr))}.bs-filter-form label,.bs-collab-item label{min-width:0;width:100%}}
+
+.bs-user-trigger{border:0;cursor:pointer}.bs-user-trigger:focus-visible{outline:2px solid var(--on-accent);outline-offset:2px}
+.bs-user-menu{position:absolute;right:24px;top:calc(var(--topnav-h) - 1px);display:grid;min-width:180px;background:var(--panel);color:var(--ink);border:1px solid var(--ink);z-index:40}
+.bs-user-menu>a,.bs-user-menu>button{font:500 15px/22px var(--font-sans);padding:12px 16px;text-decoration:none;color:var(--ink);background:none;border:0;text-align:left;cursor:pointer}
+.bs-user-menu>a:hover,.bs-user-menu>button:hover{background:var(--panel-raised)}
+.auth label:has(.bs-password-toggle){position:relative}.auth label:has(.bs-password-toggle) input{padding-right:44px}
+.bs-password-toggle{position:absolute;right:0;bottom:0;width:40px;height:40px;display:grid;place-content:center;border:0;background:transparent;color:var(--ink);cursor:pointer}

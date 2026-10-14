@@ -4,7 +4,7 @@ import { Client } from "../../api/client";
 @Component({
   selector: "bastion-personal",
   imports: [FormsModule],
-  template: `<section class="card">
+  template: `<section class="bs-frame">
     <h2>Mi cuenta</h2>
     <p role="status">{{ message() }}</p>
     <h3>Cambiar contraseña</h3>
@@ -48,12 +48,6 @@ import { Client } from "../../api/client";
           <option [ngValue]="50">50</option>
           <option [ngValue]="100">100</option>
         </select></label
-      ><label
-        >Apariencia<select name="theme" [(ngModel)]="theme">
-          <option value="system">Sistema</option>
-          <option value="light">Clara</option>
-          <option value="dark">Oscura</option>
-        </select></label
       ><button [disabled]="busy()">Guardar preferencias</button>
     </form>
   </section>`,
@@ -61,7 +55,7 @@ import { Client } from "../../api/client";
 export class Personal {
   api = inject(Client);
   password = "";
-  theme = "system";
+  theme = "light";
   pageSize = 25;
   message = signal("");
   busy = signal(false);
@@ -74,7 +68,7 @@ export class Personal {
       const p = await this.api.get<{ theme: string; page_size: number }>(
         "/auth/preferences",
       );
-      this.theme = p.theme;
+      this.theme = "light";
       this.pageSize = p.page_size;
       this.applyTheme();
     } catch (e) {
@@ -122,6 +116,6 @@ export class Personal {
     });
   }
   applyTheme() {
-    document.documentElement.dataset["theme"] = this.theme;
+    document.documentElement.dataset["theme"] = "light";
   }
 }
