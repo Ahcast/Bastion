@@ -27,7 +27,7 @@ interface Metrics {
       <label>Desde<input name="from" type="date" [(ngModel)]="from" /></label
       ><label>Hasta<input name="to" type="date" [(ngModel)]="to" /></label
       ><label
-        >Moneda<select name="currency" [(ngModel)]="currency">
+        >Moneda<select aria-label="Moneda" name="currency" [(ngModel)]="currency">
           <option value="">Todas, separadas</option>
           <option>HNL</option>
           <option>USD</option>

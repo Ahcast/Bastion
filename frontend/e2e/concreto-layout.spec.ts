@@ -178,6 +178,7 @@ for (const width of [1440, 390]) {
     ).toBeVisible();
     await fits(page);
     await capture(page, `inicio-${width}`);
+    await expect(page.locator('bastion-home-metrics').getByLabel('Moneda',{exact:true})).toHaveCount(1);
     await page.getByRole("tab", { name: /Cotizaciones/ }).click();
     await expect(
       page
@@ -298,4 +299,19 @@ test("Concreto keeps restricted menus and customer fields read-only", async ({
     .getByRole("button", { name: "Abrir cliente Cliente de prueba Norte" })
     .click();
   await expect(page.getByLabel("Nombre del cliente")).toBeDisabled();
+});
+
+
+test('Concreto password visibility keeps the input accessible by its visible label',async({page})=>{
+ await fixture(page);
+ await page.route('**/api/v1/auth/status',r=>r.fulfill({status:401,json:{}}));
+ await page.goto('/login');
+ const password=page.getByLabel('Contraseña',{exact:true});
+ await expect(password).toHaveAttribute('type','password');
+ await password.fill('synthetic visibility test');
+ await page.getByRole('button',{name:'Mostrar contraseña',exact:true}).click();
+ await expect(password).toHaveAttribute('type','text');
+ await expect(page.getByRole('textbox',{name:'Contraseña',exact:true})).toHaveValue('synthetic visibility test');
+ await page.getByRole('button',{name:'Ocultar contraseña',exact:true}).click();
+ await expect(password).toHaveAttribute('type','password');
 });

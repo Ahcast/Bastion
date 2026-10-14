@@ -26,7 +26,7 @@ import { Logo } from "../ui/logo";
             required /></label
         ><label
           >Contraseña<input
-            name="password"
+            name="password" aria-label="Contraseña"
             [type]="showPassword()?'text':'password'"
             autocomplete="current-password"
             [(ngModel)]="password"

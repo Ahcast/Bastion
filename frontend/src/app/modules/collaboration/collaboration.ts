@@ -124,7 +124,7 @@ const ACCEPT = ".pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.jpg,.jpeg,.png";
   imports: [FormsModule,RouterLink,RouterLinkActive,Reauthentication],
   template: `
     <section aria-labelledby="collab-title" class="workspace">
-      <header class="bs-page-head"><div><span class="bs-label">Bastion · Colaboración</span><h1 id="collab-title">Biblioteca</h1><p>Archivos, conversaciones y vínculos del equipo.</p></div></header><nav class="bs-section-menu" aria-label="Colaboración"><a routerLink="/collaboration" routerLinkActive="active" [routerLinkActiveOptions]="{exact:true}" ariaCurrentWhenActive="page">Biblioteca</a><a routerLink="/collaboration/work" routerLinkActive="active" ariaCurrentWhenActive="page">Mi trabajo</a><a routerLink="/collaboration/integrations" routerLinkActive="active" ariaCurrentWhenActive="page">Integraciones y aprobaciones</a></nav>
+      <header class="bs-page-head"><div><span class="bs-label">Bastion · Colaboración</span><h1 id="collab-title">Colaboración</h1><p>Archivos, conversaciones y vínculos del equipo.</p></div></header><nav class="bs-section-menu" aria-label="Colaboración"><a routerLink="/collaboration" routerLinkActive="active" [routerLinkActiveOptions]="{exact:true}" ariaCurrentWhenActive="page">Biblioteca</a><a routerLink="/collaboration/work" routerLinkActive="active" ariaCurrentWhenActive="page">Mi trabajo</a><a routerLink="/collaboration/integrations" routerLinkActive="active" ariaCurrentWhenActive="page">Integraciones y aprobaciones</a></nav>
       <p>
         Biblioteca privada de archivos. Los documentos siguen protegidos por
         Core.Files y no salen de cuarentena hasta completar su análisis.

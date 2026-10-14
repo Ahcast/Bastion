@@ -42,6 +42,8 @@ test('Gastos Unidad 2: referencia viva, comprobante en cuarentena y política de
  await expect(links.getByText('Proceso: HC-TEST-001 · ID 1 · versión capturada 1',{exact:true})).toBeVisible();
 
  const receipt=Buffer.from('%PDF-1.4\nsynthetic expense receipt\n%%EOF');
+ // File selection through the browser is unavailable while references/documents reload.
+ await expect(links.getByLabel('Archivo comprobante',{exact:true})).toBeEnabled();
  await links.getByLabel('Archivo comprobante',{exact:true}).setInputFiles({name:'comprobante-gasto.pdf',mimeType:'application/pdf',buffer:receipt});
  await links.getByRole('button',{name:'Subir y vincular comprobante',exact:true}).click();
  await expect(page.getByText('Versión de gasto: 3',{exact:true})).toBeVisible();
