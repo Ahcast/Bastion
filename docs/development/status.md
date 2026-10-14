@@ -524,3 +524,10 @@ El backend del primer Core checks falló en ocho pruebas de integración que aú
 La corrección UI `3e97bc88e7d08edda6a594d922f100f69bb9519d`, [Core checks 38515749037](https://github.com/Ahcast/Bastion/actions/runs/38515749037), aprobó frontend y las 25 pruebas de navegador, incluidas las 21 de API/MySQL y cuatro de estructura/accesibilidad. La certificación del backend actualizado con MySQL/race sigue pendiente en el siguiente commit.
 
 Validación previa de estas pruebas: gofmt y go vet del paquete de integración aprobados; selección local compilada, casos MySQL omitidos explícitamente porque no hay DSN local. La ejecución efectiva de los ocho escenarios y su regresión con race detector requiere Core checks sobre MySQL 5.7.
+
+
+### Certificación final de la estructura Concreto
+
+Código `aca8513b644755a8c9ca31ea2d52d18bda008563`: [Core checks 38516368646](https://github.com/Ahcast/Bastion/actions/runs/38516368646), success. Backend Go fmt/vet, invariantes IA sobre MySQL primero, suite completa con race/MySQL 5.7 y builds; Angular build/171 pruebas; navegador 25/25. [Documentación 38516368649](https://github.com/Ahcast/Bastion/actions/runs/38516368649) y [rama única 38516368697](https://github.com/Ahcast/Bastion/actions/runs/38516368697), success. Los ocho escenarios MCP corregidos se ejecutaron realmente con MySQL en CI; no se usó la omisión local como aceptación.
+
+Cerrada la corrección de menús/disposición para esta unidad de interfaz. Inicio selecciona el espacio de trabajo; las siete tablas abren su ficha en línea; las altas conservan campos y permisos; filtros, submenús y teléfono verificados. Las 21 regresiones comerciales/API y las cuatro de estructura/accesibilidad pasan juntas. Capturas en Git con datos exclusivamente sintéticos. Los gates externos y las etapas posteriores de IA continúan según el plan; no se declara despliegue ni integración productiva.
