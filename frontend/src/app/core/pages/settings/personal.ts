@@ -1,9 +1,10 @@
 import { Component, inject, signal } from "@angular/core";
 import { FormsModule } from "@angular/forms";
+import { Devices } from "./devices";
 import { Client } from "../../api/client";
 @Component({
   selector: "bastion-personal",
-  imports: [FormsModule],
+  imports: [FormsModule, Devices],
   template: `<section class="bs-frame">
     <h2>Mi cuenta</h2>
     <p role="status">{{ message() }}</p>
@@ -40,6 +41,7 @@ import { Client } from "../../api/client";
       }}</pre>
       <button (click)="codes.set([])">Ocultar</button>
     }
+    <bastion-devices/>
     <h3>Preferencias</h3>
     <form (ngSubmit)="preferences()">
       <label

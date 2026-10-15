@@ -170,3 +170,5 @@ Colaboración, migración 0034, incorpora collaboration_folders y collaboration_
 ## OTP recordado (0040)
 
 Core posee `mfa_browser_verifications`: token_hash CSPRNG, user_id FK, ip_hash, created_at y expires_at; índices por usuario y vencimiento. `sessions.ip_hash/browser_hash/family_hash` vinculan sesión con IP, prueba y familia de rotaciones. Solo hashes de tokens/IP, nunca IP literal ni secreto TOTP en esas columnas. Logout/revocación/credenciales eliminan prueba y sesiones relacionadas transaccionalmente. Limpieza por expires_at independiente de la caducidad de sesión. Contrato vigente: [remembered-mfa.md](contracts/remembered-mfa.md).
+
+0041 amplía las pruebas con device_id opaco único, nombre navegador/sistema, fingerprint_hash del User-Agent (solo auxiliar, no credencial ni hardware) y last_seen_at. Backfill seguro de registros previos, compatibilidad MySQL 5.7. Reconfirmar OTP conserva el ID del navegador cuando presenta la credencial previa y revoca esa credencial/sesiones al rotarla. Lista paginada propia y revocación transaccional por dispositivo.

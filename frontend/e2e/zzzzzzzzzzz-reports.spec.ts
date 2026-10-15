@@ -16,7 +16,7 @@ test("Reportes: filas y totales autorizados por moneda coinciden con Inicio", as
     .fill(totp("JBSWY3DPEHPK3PXP"));
   await page.getByRole("button", { name: "Verificar", exact: true }).click();
   await expect(
-    page.getByRole("heading", { name: "Resumen comercial", exact: true }),
+    page.getByRole("heading", { name: "Inicio", exact: true }),
   ).toBeVisible();
   await page.getByRole("link", { name: "Reportes", exact: true }).click();
   await expect(
@@ -61,6 +61,7 @@ test("Reportes: filas y totales autorizados por moneda coinciden con Inicio", as
     page.getByRole("heading", { name: "Totales HNL", exact: true }),
   ).toHaveCount(0);
   await page.getByRole("link", { name: "Inicio", exact: true }).click();
+  await page.getByText("Período y totales del resumen comercial", {exact:true}).click();
   await page.getByLabel("Desde", { exact: true }).fill("2026-10-12");
   await page.getByLabel("Hasta", { exact: true }).fill("2026-10-12");
   await page.getByLabel("Moneda", { exact: true }).selectOption("USD");

@@ -173,7 +173,6 @@ export class Suppliers implements OnInit {
   personalPage = 1;
   selectedDocument = "";
   password = "";
-  factor = "";
   private pending = new Map<string, { body: string; key: string }>();
   async ngOnInit() {
     await this.load();
@@ -353,7 +352,6 @@ export class Suppliers implements OnInit {
       this.error.set(this.api.message(e));
     } finally {
       this.password = "";
-      this.factor = "";
       this.busy.set(false);
     }
   }

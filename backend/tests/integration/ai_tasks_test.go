@@ -422,6 +422,7 @@ func TestAITasksRESTAndMCPRealSDKPolicies(t *testing.T) {
 	req := func(method, path, key string, body any, withCSRF bool) (int, map[string]any) {
 		raw, _ := json.Marshal(body)
 		r := httptest.NewRequest(method, path, strings.NewReader(string(raw)))
+		r.RemoteAddr = "192.0.2.10:5000"
 		r.AddCookie(cookie)
 		r.Header.Set("Origin", s.Core.Config.Origin)
 		r.Header.Set("Content-Type", "application/json")

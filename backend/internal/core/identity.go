@@ -50,7 +50,14 @@ func (s *Service) RotateCSRF(ctx context.Context, x Session) (string, error) {
 	return token, Changed(s.DB.ExecContext(ctx, "UPDATE sessions SET csrf_hash=? WHERE token_hash=?", security.Hash(token), x.Hash))
 }
 func (s *Service) Touch(ctx context.Context, x Session) error {
-	return Changed(s.DB.ExecContext(ctx, "UPDATE sessions SET last_activity=UTC_TIMESTAMP(6) WHERE token_hash=?", x.Hash))
+	if e := Changed(s.DB.ExecContext(ctx, "UPDATE sessions SET last_activity=UTC_TIMESTAMP(6) WHERE token_hash=?", x.Hash)); e != nil {
+		return e
+	}
+	if x.BrowserHash != "" {
+		_, e := s.DB.ExecContext(ctx, "UPDATE mfa_browser_verifications SET last_seen_at=UTC_TIMESTAMP(6) WHERE token_hash=?", x.BrowserHash)
+		return e
+	}
+	return nil
 }
 func (s *Service) Limit(ctx context.Context, bucket string, max int) error {
 	return s.Transact(ctx, func(tx *sql.Tx) error {
@@ -211,7 +218,7 @@ func (s *Service) Factor(ctx context.Context, tx *sql.Tx, user, code string, enr
 	}
 	return Unauthorized
 }
-func (s *Service) CompleteMFA(ctx context.Context, x Session, a Actor, code string, enroll bool, ip string) (token, csrf, browser string, codes []string, err error) {
+func (s *Service) CompleteMFA(ctx context.Context, x Session, a Actor, code string, enroll bool, proof BrowserProof) (token, csrf, browser string, codes []string, err error) {
 	if x.UserID == "" || x.MFA {
 		return "", "", "", nil, Forbidden
 	}
@@ -222,6 +229,23 @@ func (s *Service) CompleteMFA(ctx context.Context, x Session, a Actor, code stri
 	err = s.Transact(ctx, func(tx *sql.Tx) error {
 		if e := s.Factor(ctx, tx, x.UserID, code, enroll); e != nil {
 			return e
+		}
+		deviceID := security.ID()
+		if proof.Token != "" {
+			var previous string
+			e := tx.QueryRowContext(ctx, "SELECT device_id FROM mfa_browser_verifications WHERE token_hash=? AND user_id=? FOR UPDATE", security.Hash(proof.Token), x.UserID).Scan(&previous)
+			if e != nil && e != sql.ErrNoRows {
+				return e
+			}
+			if e == nil {
+				deviceID = previous
+				if _, e = tx.ExecContext(ctx, "DELETE FROM mfa_browser_verifications WHERE token_hash=? AND user_id=?", security.Hash(proof.Token), x.UserID); e != nil {
+					return e
+				}
+				if _, e = tx.ExecContext(ctx, "DELETE FROM sessions WHERE browser_hash=? AND user_id=?", security.Hash(proof.Token), x.UserID); e != nil {
+					return e
+				}
+			}
 		}
 		if enroll {
 			if _, e := tx.ExecContext(ctx, "UPDATE users SET totp_secret=totp_pending,totp_pending=NULL,version=version+1,updated_at=UTC_TIMESTAMP(6) WHERE id=?", x.UserID); e != nil {
@@ -238,10 +262,10 @@ func (s *Service) CompleteMFA(ctx context.Context, x Session, a Actor, code stri
 		if e := Changed(tx.ExecContext(ctx, "DELETE FROM sessions WHERE token_hash=? AND mfa_complete=FALSE", x.Hash)); e != nil {
 			return e
 		}
-		if _, e := tx.ExecContext(ctx, `INSERT INTO sessions(token_hash,csrf_hash,user_id,mfa_complete,created_at,last_activity,expires_at,reauthenticated_at,ip_hash,browser_hash,family_hash) VALUES(?,?,?,TRUE,UTC_TIMESTAMP(6),UTC_TIMESTAMP(6),?,UTC_TIMESTAMP(6),?,?,?)`, security.Hash(token), security.Hash(csrf), x.UserID, x.Expires, security.Hash(ip), security.Hash(browser), sessionFamily(x)); e != nil {
+		if _, e := tx.ExecContext(ctx, `INSERT INTO sessions(token_hash,csrf_hash,user_id,mfa_complete,created_at,last_activity,expires_at,reauthenticated_at,ip_hash,browser_hash,family_hash) VALUES(?,?,?,TRUE,UTC_TIMESTAMP(6),UTC_TIMESTAMP(6),?,UTC_TIMESTAMP(6),?,?,?)`, security.Hash(token), security.Hash(csrf), x.UserID, x.Expires, security.Hash(proof.IP), security.Hash(browser), sessionFamily(x)); e != nil {
 			return e
 		}
-		if _, e := tx.ExecContext(ctx, "INSERT INTO mfa_browser_verifications(token_hash,user_id,ip_hash,created_at,expires_at) VALUES(?,?,?,UTC_TIMESTAMP(6),?)", security.Hash(browser), x.UserID, security.Hash(ip), time.Now().UTC().Add(RememberedMFALifetime)); e != nil {
+		if _, e := tx.ExecContext(ctx, "INSERT INTO mfa_browser_verifications(token_hash,user_id,ip_hash,created_at,expires_at,device_id,device_name,fingerprint_hash,last_seen_at) VALUES(?,?,?,UTC_TIMESTAMP(6),?,?,?,?,UTC_TIMESTAMP(6))", security.Hash(browser), x.UserID, security.Hash(proof.IP), time.Now().UTC().Add(RememberedMFALifetime), deviceID, BrowserName(proof.UserAgent), security.Hash(proof.UserAgent)); e != nil {
 			return e
 		}
 		return s.Audit(ctx, tx, a, "auth.mfa", "user", x.UserID, "success", map[string]bool{"enrollment": enroll})

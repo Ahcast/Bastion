@@ -40,6 +40,7 @@ func (b *mfaBrowser) call(method, path string, body any, want int) map[string]an
 	r.RemoteAddr = b.ip + ":5000"
 	r.Header.Set("Origin", "http://localhost:4200")
 	r.Header.Set("Content-Type", "application/json")
+	r.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0) Chrome/145.0.0.0 Safari/537.36")
 	r.Header.Set("X-CSRF-Token", b.csrf)
 	// Untrusted forwarding headers cannot turn a new IP into a remembered IP.
 	r.Header.Set("X-Real-IP", "192.0.2.10")
@@ -238,7 +239,7 @@ func seedRememberedUser(t *testing.T, s *core.Service) (*mfaBrowser, core.Actor)
 	}
 	b := newMFABrowser(t, s)
 	token := security.Token()
-	if _, e = s.DB.Exec("INSERT INTO mfa_browser_verifications(token_hash,user_id,ip_hash,created_at,expires_at) VALUES(?,2,?,UTC_TIMESTAMP(6),?)", security.Hash(token), security.Hash(b.ip), time.Now().UTC().Add(core.RememberedMFALifetime)); e != nil {
+	if _, e = s.DB.Exec("INSERT INTO mfa_browser_verifications(token_hash,user_id,ip_hash,created_at,expires_at,device_id,last_seen_at) VALUES(?,2,?,UTC_TIMESTAMP(6),?,?,UTC_TIMESTAMP(6))", security.Hash(token), security.Hash(b.ip), time.Now().UTC().Add(core.RememberedMFALifetime), security.ID()); e != nil {
 		t.Fatal(e)
 	}
 	b.cookies["bastion_dev_mfa"] = &http.Cookie{Name: "bastion_dev_mfa", Value: token}
@@ -370,7 +371,7 @@ func TestRememberedMFALogoutRevokesJustRotatedFactor(t *testing.T) {
 		t.Fatal(e)
 	}
 	actor := core.Actor{Type: "user", ID: "2", UserID: "2", Source: "web", RequestID: security.ID(), CorrelationID: security.ID()}
-	token, _, proof, _, e := s.CompleteMFA(ctx, partial, actor, recovery, false, b.ip)
+	token, _, proof, _, e := s.CompleteMFA(ctx, partial, actor, recovery, false, core.BrowserProof{IP: b.ip})
 	if e != nil {
 		t.Fatal(e)
 	}
@@ -383,5 +384,87 @@ func TestRememberedMFALogoutRevokesJustRotatedFactor(t *testing.T) {
 	var count int
 	if e = s.DB.QueryRow("SELECT COUNT(*) FROM mfa_browser_verifications WHERE token_hash=?", security.Hash(proof)).Scan(&count); e != nil || count != 0 {
 		t.Fatal("rotated proof survived logout", e)
+	}
+}
+
+func TestRecognizedDevicesOwnRegistryAndRevocation(t *testing.T) {
+	s := fixture(t)
+	b, _ := enrollMFABrowser(t, s)
+	list := b.call("GET", "/auth/devices?page=1&per_page=1", nil, 200)
+	data := list["data"].([]any)
+	if list["total"] != float64(1) || len(data) != 1 {
+		t.Fatal("device registry missing")
+	}
+	device := data[0].(map[string]any)
+	if device["current"] != true || device["name"] != "Chrome en Windows" {
+		t.Fatal("wrong browser identity")
+	}
+	id := device["id"].(string)
+	payload, _ := json.Marshal(list)
+	if strings.Contains(string(payload), b.cookies["bastion_dev_mfa"].Value) || strings.Contains(string(payload), "fingerprint_hash") || strings.Contains(string(payload), "token_hash") {
+		t.Fatal("credential disclosed in registry")
+	}
+	var fingerprint string
+	if e := s.DB.QueryRow("SELECT fingerprint_hash FROM mfa_browser_verifications WHERE device_id=?", id).Scan(&fingerprint); e != nil || fingerprint != security.Hash("Mozilla/5.0 (Windows NT 10.0) Chrome/145.0.0.0 Safari/537.36") {
+		t.Fatal("missing browser fingerprint", e)
+	}
+	// Same browser fingerprint without its persistent credential still requires OTP.
+	stranger := newMFABrowser(t, s)
+	if !stranger.login("admin@example.test") {
+		t.Fatal("fingerprint alone authorized browser")
+	}
+	b.call("GET", "/auth/devices?page=2&per_page=1", nil, 200)
+	if _, e := s.DB.Exec("UPDATE sessions SET reauthenticated_at=NULL WHERE token_hash=?", security.Hash(b.cookies["bastion_dev_session"].Value)); e != nil {
+		t.Fatal(e)
+	}
+	b.call("DELETE", "/auth/devices/"+id, nil, 403)
+	b.call("POST", "/auth/reauth", map[string]string{"password": "synthetic password secure 42"}, 200)
+	b.call("DELETE", "/auth/devices/"+security.ID(), nil, 404)
+	// A separate recognized browser remains independent of the current browser.
+	otherID, otherToken := security.ID(), security.Token()
+	if _, e := s.DB.Exec("INSERT INTO mfa_browser_verifications(token_hash,user_id,ip_hash,created_at,expires_at,device_id,last_seen_at) VALUES(?,1,?,UTC_TIMESTAMP(6),?,?,UTC_TIMESTAMP(6))", security.Hash(otherToken), security.Hash(b.ip), time.Now().UTC().Add(core.RememberedMFALifetime), otherID); e != nil {
+		t.Fatal(e)
+	}
+	r := b.call("DELETE", "/auth/devices/"+otherID, nil, 200)
+	if r["current"] != false {
+		t.Fatal("other browser considered current")
+	}
+	b.call("GET", "/auth/me", nil, 200)
+	other, _ := seedRememberedUser(t, s)
+	foreign := other.call("GET", "/auth/devices", nil, 200)["data"].([]any)[0].(map[string]any)["id"].(string)
+	b.call("DELETE", "/auth/devices/"+foreign, nil, 404)
+	r = b.call("DELETE", "/auth/devices/"+id, nil, 200)
+	if r["current"] != true || b.cookies["bastion_dev_mfa"] != nil || b.cookies["bastion_dev_session"] != nil {
+		t.Fatal("current browser revocation kept cookies")
+	}
+	b.call("GET", "/auth/me", nil, 401)
+	other.call("GET", "/auth/me", nil, 200)
+}
+
+func TestRecognizedDeviceKeepsIDWhenReverifiedFromNewIP(t *testing.T) {
+	s := fixture(t)
+	b, _ := seedRememberedUser(t, s)
+	first := b.call("GET", "/auth/devices", nil, 200)["data"].([]any)[0].(map[string]any)["id"]
+	previous := b.cookies["bastion_dev_mfa"].Value
+	delete(b.cookies, "bastion_dev_session")
+	b.ip = "198.51.100.34"
+	if !b.login("member@example.test") {
+		t.Fatal("new IP omitted OTP")
+	}
+	code := "synthetic-new-ip-device-recovery"
+	if _, e := s.DB.Exec("INSERT INTO recovery_codes VALUES(2,?)", security.Hash(code)); e != nil {
+		t.Fatal(e)
+	}
+	b.call("POST", "/auth/mfa/challenge", map[string]string{"code": code}, 200)
+	list := b.call("GET", "/auth/devices", nil, 200)
+	if list["total"] != float64(1) || list["data"].([]any)[0].(map[string]any)["id"] != first {
+		t.Fatal("same browser duplicated in registry")
+	}
+	if b.cookies["bastion_dev_mfa"].Value == previous {
+		t.Fatal("verification did not rotate credential")
+	}
+	var count int
+	if e := s.DB.QueryRow("SELECT COUNT(*) FROM sessions WHERE browser_hash=?", security.Hash(previous)).Scan(&count); e != nil || count != 0 {
+		t.Fatal("old credential retained sessions", e)
 	}
 }

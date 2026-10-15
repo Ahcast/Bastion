@@ -127,5 +127,31 @@ test("real two-origin login, MFA, administration and logout", async ({
   await expect(
     page.getByRole("heading", { name: "Inicio", exact: true }),
   ).toBeVisible();
-  await page.getByRole("button", { name: "Cerrar sesión" }).click();
+  await page.getByRole("link", { name: "Configuración", exact: true }).click();
+  const devices = page.locator("bastion-devices");
+  await devices
+    .getByRole("button", { name: "Consultar equipos reconocidos", exact: true })
+    .click();
+  await expect(
+    devices.getByText("· Este navegador", { exact: true }),
+  ).toBeVisible();
+  await devices
+    .getByLabel("Contraseña para confirmar", { exact: true })
+    .fill("synthetic browser password 42");
+  await devices
+    .getByRole("button", { name: "Confirmar identidad", exact: true })
+    .click();
+  await expect(
+    devices.getByText(
+      "Identidad confirmada. Puede continuar con la operación.",
+      { exact: true },
+    ),
+  ).toBeVisible();
+  await devices.getByRole("button", { name: /^Revocar / }).click();
+  await expect(
+    page.getByRole("button", { name: "Ingresar", exact: true }),
+  ).toBeVisible();
+  expect(
+    (await page.context().cookies()).find((c) => c.name === "bastion_dev_mfa"),
+  ).toBeUndefined();
 });

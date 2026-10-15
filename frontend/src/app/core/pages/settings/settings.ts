@@ -461,7 +461,6 @@ export class Settings {
   busy = signal(false);
   message = signal("");
   password = "";
-  code = "";
   users = signal<User[]>([]);
   selectedUser: User | null = null;
   userRoleIDs: string[] = [];
@@ -547,7 +546,6 @@ export class Settings {
 
       });
       this.password = "";
-      this.code = "";
     });
   }
   loadUsers() {

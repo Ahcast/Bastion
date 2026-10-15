@@ -38,6 +38,7 @@ func TestQuoteEmissionStrictHTTPAndDisabledWorkflow(t *testing.T) {
 	}
 	raw, _ := json.Marshal(p)
 	req := httptest.NewRequest("POST", "/api/v1/quotes/"+id+"/emit", bytes.NewReader(raw))
+	req.RemoteAddr = "192.0.2.10:5000"
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Origin", s.Core.Config.Origin)
 	req.Header.Set("X-CSRF-Token", csrf)

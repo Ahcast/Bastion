@@ -11,7 +11,7 @@ import (
 const RememberedMFALifetime = 30 * 24 * time.Hour
 
 type BrowserProof struct {
-	IP, Token string
+	IP, Token, UserAgent string
 }
 
 // SessionAtIP refuses a moved session before any application handler runs.
@@ -70,7 +70,8 @@ func (s *Service) rememberedMFA(ctx context.Context, tx *sql.Tx, user string, pr
 	if !security.Equal(ipHash, security.Hash(proof.IP)) || !time.Now().Before(expires) {
 		return false, nil
 	}
-	return true, nil
+	_, err = tx.ExecContext(ctx, "UPDATE mfa_browser_verifications SET last_seen_at=UTC_TIMESTAMP(6),fingerprint_hash=?,device_name=? WHERE token_hash=?", security.Hash(proof.UserAgent), BrowserName(proof.UserAgent), security.Hash(proof.Token))
+	return err == nil, err
 }
 
 func rememberedBrowserHash(remembered bool, token string) any {

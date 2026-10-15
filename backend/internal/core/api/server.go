@@ -330,6 +330,22 @@ func page(r *http.Request) (int, int, error) {
 	return limit, (p - 1) * limit, nil
 }
 func (s *Server) routes() {
+	s.handle("GET /api/v1/auth/devices", true, func(w http.ResponseWriter, r *http.Request, x request) (any, error) {
+		limit, offset, e := page(r)
+		if e != nil {
+			return nil, e
+		}
+		return s.Service.TrustedDevices(r.Context(), x.Actor, limit, offset)
+	})
+	s.handle("DELETE /api/v1/auth/devices/{id}", true, func(w http.ResponseWriter, r *http.Request, x request) (any, error) {
+		current, e := s.Service.RevokeDevice(r.Context(), x.Actor, r.PathValue("id"))
+		if e == nil && current {
+			s.cookie(w, "")
+			s.mfaCookie(w, "")
+		}
+		return map[string]bool{"current": current}, e
+	})
+
 	s.handle("GET /api/v1/auth/preferences", true, func(w http.ResponseWriter, r *http.Request, x request) (any, error) {
 		return s.Service.Preferences(r.Context(), x.Actor)
 	})
@@ -375,7 +391,7 @@ func (s *Server) routes() {
 		if e := s.Service.Limit(r.Context(), "login-ip:"+ip, 60); e != nil {
 			return nil, e
 		}
-		token, csrf, remembered, e := s.Service.Login(r.Context(), x.Session, x.Actor, p.Email, p.Password, core.BrowserProof{IP: ip, Token: s.browserToken(r)})
+		token, csrf, remembered, e := s.Service.Login(r.Context(), x.Session, x.Actor, p.Email, p.Password, core.BrowserProof{IP: ip, Token: s.browserToken(r), UserAgent: r.UserAgent()})
 		if e != nil {
 			return nil, e
 		}
@@ -406,7 +422,7 @@ func (s *Server) routes() {
 			if e := Decode(r, &p); e != nil {
 				return nil, e
 			}
-			token, csrf, browser, codes, e := s.Service.CompleteMFA(r.Context(), x.Session, x.Actor, p.Code, enroll, clientIP(r))
+			token, csrf, browser, codes, e := s.Service.CompleteMFA(r.Context(), x.Session, x.Actor, p.Code, enroll, core.BrowserProof{IP: clientIP(r), Token: s.browserToken(r), UserAgent: r.UserAgent()})
 			if e != nil {
 				return nil, e
 			}
