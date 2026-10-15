@@ -143,6 +143,14 @@ func (s *Service) RevokeSessions(ctx context.Context, a Actor, id string) error 
 		if e := s.Authorize(ctx, tx, a, "core.users.manage", "", "", true); e != nil {
 			return e
 		}
+		// Serialize with login and factor confirmation before deleting remembered proofs.
+		var lockedID string
+		if e := tx.QueryRowContext(ctx, "SELECT id FROM users WHERE id=? FOR UPDATE", id).Scan(&lockedID); e != nil {
+			if e == sql.ErrNoRows {
+				return Missing
+			}
+			return e
+		}
 		if e := s.protectSystemAdministrator(ctx, tx, id); e != nil {
 			return e
 		}

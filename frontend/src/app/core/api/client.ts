@@ -167,6 +167,7 @@ export class Client {
   message(error: unknown): string {
     if (error instanceof HttpErrorResponse) {
       if (error.status === 401) {
+        this.csrf = "";
         this.profile.set(null);
         this.mfa.set("anonymous");
         return "La sesión venció. Inicie sesión de nuevo.";

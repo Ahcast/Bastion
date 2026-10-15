@@ -468,3 +468,47 @@ func TestRecognizedDeviceKeepsIDWhenReverifiedFromNewIP(t *testing.T) {
 		t.Fatal("old credential retained sessions", e)
 	}
 }
+
+func TestRememberedMFAConcurrentFactorAndAdministrativeRevocation(t *testing.T) {
+	s := fixture(t)
+	_, administrator := seedRememberedUser(t, s)
+	b := newMFABrowser(t, s)
+	if !b.login("member@example.test") {
+		t.Fatal("new browser skipped OTP")
+	}
+	partial, e := s.Session(ctx, b.cookies["bastion_dev_session"].Value)
+	if e != nil {
+		t.Fatal(e)
+	}
+	recovery := "synthetic-factor-revocation-recovery"
+	if _, e = s.DB.Exec("INSERT INTO recovery_codes VALUES(2,?)", security.Hash(recovery)); e != nil {
+		t.Fatal(e)
+	}
+	actor := core.Actor{Type: "user", ID: "2", UserID: "2", Source: "web", RequestID: security.ID(), CorrelationID: security.ID()}
+	start := make(chan struct{})
+	factorResult := make(chan error, 1)
+	revocationResult := make(chan error, 1)
+	go func() {
+		<-start
+		_, _, _, _, err := s.CompleteMFA(ctx, partial, actor, recovery, false, core.BrowserProof{IP: b.ip})
+		factorResult <- err
+	}()
+	go func() { <-start; revocationResult <- s.RevokeSessions(ctx, administrator, "2") }()
+	close(start)
+	if e = <-factorResult; e != nil && e != core.Conflict && e != core.Unauthorized {
+		t.Fatal(e)
+	}
+	if e = <-revocationResult; e != nil {
+		t.Fatal(e)
+	}
+	var proofs, complete int
+	if e = s.DB.QueryRow("SELECT COUNT(*) FROM mfa_browser_verifications WHERE user_id=2").Scan(&proofs); e != nil {
+		t.Fatal(e)
+	}
+	if e = s.DB.QueryRow("SELECT COUNT(*) FROM sessions WHERE user_id=2 AND mfa_complete=TRUE").Scan(&complete); e != nil {
+		t.Fatal(e)
+	}
+	if proofs != 0 || complete != 0 {
+		t.Fatal("factor restored revoked account trust")
+	}
+}
