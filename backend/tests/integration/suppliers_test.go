@@ -64,7 +64,7 @@ func supplierActor(t *testing.T, s *core.Service, scope string) core.Actor {
 		t.Fatal(e)
 	}
 	user := core.WrapID(id)
-	token, _, e := s.NewSession(ctx, user, true)
+	token, _, e := s.NewSession(ctx, user, true, "192.0.2.10")
 	if e != nil {
 		t.Fatal(e)
 	}
@@ -565,7 +565,7 @@ func TestSuppliersRESTAllowedServiceMCPDeniedAndDisabledModule(t *testing.T) {
 	if _, e = s.Save(ctx, actor, "", "machine-create", supplierInput("Machine")); e != core.Forbidden {
 		t.Fatal("machine write", e)
 	}
-	cookieToken, csrf, e := s.Core.NewSession(ctx, "1", true)
+	cookieToken, csrf, e := s.Core.NewSession(ctx, "1", true, "192.0.2.10")
 	if e != nil {
 		t.Fatal(e)
 	}

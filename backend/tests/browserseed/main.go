@@ -253,7 +253,7 @@ func main() {
 	}
 	s.Config.Idle = 30 * time.Minute
 	s.Config.Absolute = 12 * time.Hour
-	token, _, e := s.NewSession(context.Background(), core.WrapID(user), true)
+	token, _, e := s.NewSession(context.Background(), core.WrapID(user), true, "127.0.0.1")
 	if e != nil {
 		log.Fatal(e)
 	}
@@ -372,7 +372,7 @@ func main() {
 	if _, e = db.Exec(`INSERT INTO user_roles VALUES(?,?)`, user, role); e != nil {
 		log.Fatal(e)
 	}
-	token, _, e = s.NewSession(context.Background(), core.WrapID(user), true)
+	token, _, e = s.NewSession(context.Background(), core.WrapID(user), true, "127.0.0.1")
 	if e != nil {
 		log.Fatal(e)
 	}
@@ -415,7 +415,7 @@ func main() {
 	if _, e = db.Exec(`INSERT INTO user_roles VALUES(?,?)`, user, role); e != nil {
 		log.Fatal(e)
 	}
-	token, _, e = s.NewSession(context.Background(), core.WrapID(user), true)
+	token, _, e = s.NewSession(context.Background(), core.WrapID(user), true, "127.0.0.1")
 	if e != nil {
 		log.Fatal(e)
 	}

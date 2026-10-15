@@ -263,9 +263,7 @@ test("Órdenes de Compra: cálculo, alta, persistencia, edición y búsqueda con
   await page
     .getByLabel("Contraseña para confirmar", { exact: true })
     .fill(syntheticPassword);
-  await page
-    .getByLabel("Código de confirmación", { exact: true })
-    .fill(["synthetic", "po", "reauth", "recovery"].join("-"));
+
   await page
     .getByRole("button", { name: "Confirmar identidad", exact: true })
     .click();

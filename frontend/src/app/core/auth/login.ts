@@ -26,30 +26,52 @@ import { Logo } from "../ui/logo";
             required /></label
         ><label
           >Contraseña<input
-            name="password" aria-label="Contraseña"
-            [type]="showPassword()?'text':'password'"
+            name="password"
+            aria-label="Contraseña"
+            [type]="showPassword() ? 'text' : 'password'"
             autocomplete="current-password"
             [(ngModel)]="password"
-            required /><button type="button" class="bs-password-toggle" [attr.aria-label]="showPassword()?'Ocultar contraseña':'Mostrar contraseña'" (click)="showPassword.set(!showPassword())"><bs-icon [name]="showPassword()?'eye-off':'eye'"/></button></label
+            required /><button
+            type="button"
+            class="bs-password-toggle"
+            [attr.aria-label]="
+              showPassword() ? 'Ocultar contraseña' : 'Mostrar contraseña'
+            "
+            (click)="showPassword.set(!showPassword())"
+          >
+            <bs-icon
+              [name]="showPassword() ? 'eye-off' : 'eye'"
+            /></button></label
         ><button [disabled]="busy()">Ingresar</button>
       </form>
     } @else if (api.mfa() !== "complete") {
       <h2>Verificación en dos pasos</h2>
       @if (api.mfa() === "enroll") {
         <p>
-          Registre Bastion en su aplicación de autenticación. La clave se
-          muestra únicamente para este enrolamiento.
+          Escanee este código QR con su aplicación de autenticación y escriba el
+          código de seis dígitos para terminar la vinculación.
         </p>
-        <button type="button" (click)="enroll()" [disabled]="busy()">
-          Generar clave TOTP
-        </button>
-        @if (uri()) {
-          <label
-            >URI para su autenticador<textarea
-              readonly
-              [value]="uri()"
-            ></textarea>
-          </label>
+        @if (qr()) {
+          <img
+            class="mfa-qr"
+            [src]="qr()"
+            alt="Código QR para vincular Bastion con su autenticador"
+            width="256"
+            height="256"
+          />
+          <details>
+            <summary>Vincular manualmente</summary>
+            <label
+              >URI para su autenticador<textarea
+                readonly
+                [value]="uri()"
+              ></textarea>
+            </label>
+          </details>
+        } @else {
+          <button type="button" (click)="enroll()" [disabled]="busy()">
+            Generar código QR
+          </button>
         }
       }
       <form (ngSubmit)="factor()">
@@ -82,9 +104,13 @@ import { Logo } from "../ui/logo";
 })
 export class Login {
   api = inject(Client);
+  qr = signal("");
+  ngOnInit() {
+    if (this.api.mfa() === "enroll") void this.enroll();
+  }
   private router = inject(Router);
   email = "";
-  showPassword=signal(false);
+  showPassword = signal(false);
   password = "";
   code = "";
   busy = signal(false);
@@ -92,6 +118,7 @@ export class Login {
   uri = signal("");
   codes = signal<string[]>([]);
   async run(action: () => Promise<void>) {
+    if (this.busy()) return;
     this.busy.set(true);
     this.error.set("");
     try {
@@ -106,16 +133,20 @@ export class Login {
     return this.run(async () => {
       await this.api.login(this.email, this.password);
       this.password = "";
+      if (this.api.mfa() === "complete") this.continue();
+      else if (this.api.mfa() === "enroll") await this.prepareEnrollment();
     });
   }
   enroll() {
-    return this.run(async () => {
-      const r = await this.api.write<{ otpauth_uri: string }>(
-        "POST",
-        "/auth/mfa/enroll",
-      );
-      this.uri.set(r.otpauth_uri);
-    });
+    return this.run(() => this.prepareEnrollment());
+  }
+  private async prepareEnrollment() {
+    const r = await this.api.write<{
+      otpauth_uri: string;
+      qr_data_url: string;
+    }>("POST", "/auth/mfa/enroll");
+    this.uri.set(r.otpauth_uri);
+    this.qr.set(r.qr_data_url);
   }
   factor() {
     return this.run(async () => {
@@ -124,6 +155,7 @@ export class Login {
       );
       this.code = "";
       this.uri.set("");
+      this.qr.set("");
       if (!this.codes().length) this.continue();
     });
   }
@@ -131,6 +163,7 @@ export class Login {
     return this.run(async () => {
       await this.api.logout();
       this.uri.set("");
+      this.qr.set("");
     });
   }
   continue() {

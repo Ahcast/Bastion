@@ -3491,7 +3491,8 @@
               }
             }
           }
-        }
+        },
+        "description": "Ver remembered-mfa.md. Cookie HttpOnly __Host-bastion_mfa vinculada a cuenta/IP permite omitir OTP tras contraseña correcta; caducidad de sesión no borra la verificación."
       }
     },
     "/api/v1/auth/logout": {
@@ -3597,7 +3598,8 @@
             }
           }
         ],
-        "security": []
+        "security": [],
+        "description": "Revoca sesión y verificación del navegador, incluidas sesiones que compartan prueba; exige CSRF incluso con sesión anónima nueva después de vencimiento."
       }
     },
     "/api/v1/auth/mfa/": {
@@ -5661,12 +5663,12 @@
             "type": "string"
           },
           "code": {
-            "type": "string"
+            "type": "string",
+            "description": "Opcional por compatibilidad; si se envía se valida y consume. La UI solo solicita contraseña."
           }
         },
         "required": [
-          "password",
-          "code"
+          "password"
         ]
       },
       "Accept": {
@@ -6009,7 +6011,8 @@
             "type": "string"
           },
           "mfa_required": {
-            "const": true
+            "type": "boolean",
+            "description": "False únicamente con contraseña correcta y prueba recordada válida del mismo usuario, navegador e IP."
           }
         },
         "required": [
@@ -6065,10 +6068,16 @@
         "properties": {
           "otpauth_uri": {
             "type": "string"
+          },
+          "qr_data_url": {
+            "type": "string",
+            "pattern": "^data:image/png;base64,",
+            "description": "QR generado localmente, secreto de enrolamiento; no almacenar ni registrar."
           }
         },
         "required": [
-          "otpauth_uri"
+          "otpauth_uri",
+          "qr_data_url"
         ]
       },
       "RecoveryCodes": {

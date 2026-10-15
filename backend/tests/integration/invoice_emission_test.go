@@ -325,7 +325,7 @@ func TestInvoiceEmissionHTTPStrictFieldsCSRFAndMissingCompany(t *testing.T) {
 		t.Fatal(e)
 	}
 	h := api.New(s.Core, r, nil, logger)
-	token, csrf, e := s.Core.NewSession(ctx, a.UserID, true)
+	token, csrf, e := s.Core.NewSession(ctx, a.UserID, true, "192.0.2.10")
 	if e != nil {
 		t.Fatal(e)
 	}

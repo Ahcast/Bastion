@@ -10,19 +10,19 @@ import (
 	"time"
 )
 
-func (s *Service) NewSession(ctx context.Context, user string, mfa bool) (token, csrf string, err error) {
+func (s *Service) NewSession(ctx context.Context, user string, mfa bool, ip string) (token, csrf string, err error) {
 	token, csrf = security.Token(), security.Token()
-	_, err = s.DB.ExecContext(ctx, `INSERT INTO sessions(token_hash,csrf_hash,user_id,mfa_complete,created_at,last_activity,expires_at) VALUES(?,?,?,?,UTC_TIMESTAMP(6),UTC_TIMESTAMP(6),?)`, security.Hash(token), security.Hash(csrf), nullable(user), mfa, time.Now().UTC().Add(s.Config.Absolute))
+	_, err = s.DB.ExecContext(ctx, `INSERT INTO sessions(token_hash,csrf_hash,user_id,mfa_complete,created_at,last_activity,expires_at,ip_hash,family_hash) VALUES(?,?,?,?,UTC_TIMESTAMP(6),UTC_TIMESTAMP(6),?,?,?)`, security.Hash(token), security.Hash(csrf), nullable(user), mfa, time.Now().UTC().Add(s.Config.Absolute), security.Hash(ip), security.Hash(token))
 	return
 }
 func (s *Service) Session(ctx context.Context, token string) (Session, error) {
 	var x Session
-	var uid sql.NullString
+	var uid, ipHash, browserHash, familyHash sql.NullString
 	if token == "" {
 		return x, Unauthorized
 	}
 	x.Hash = security.Hash(token)
-	e := s.DB.QueryRowContext(ctx, "SELECT csrf_hash,user_id,mfa_complete,created_at,last_activity,expires_at,reauthenticated_at FROM sessions WHERE token_hash=?", x.Hash).Scan(&x.CSRFHash, &uid, &x.MFA, &x.Created, &x.Last, &x.Expires, &x.Reauthenticated)
+	e := s.DB.QueryRowContext(ctx, "SELECT csrf_hash,user_id,mfa_complete,created_at,last_activity,expires_at,reauthenticated_at,ip_hash,browser_hash,family_hash FROM sessions WHERE token_hash=?", x.Hash).Scan(&x.CSRFHash, &uid, &x.MFA, &x.Created, &x.Last, &x.Expires, &x.Reauthenticated, &ipHash, &browserHash, &familyHash)
 	if e != nil {
 		if e == sql.ErrNoRows {
 			return x, Unauthorized
@@ -30,6 +30,7 @@ func (s *Service) Session(ctx context.Context, token string) (Session, error) {
 		return x, e
 	}
 	x.UserID = uid.String
+	x.IPHash, x.BrowserHash, x.FamilyHash = ipHash.String, browserHash.String, familyHash.String
 	if time.Now().After(x.Expires) || time.Since(x.Last) > s.Config.Idle {
 		return x, Unauthorized
 	}
@@ -76,16 +77,16 @@ func (s *Service) Limit(ctx context.Context, bucket string, max int) error {
 		return e
 	})
 }
-func (s *Service) Login(ctx context.Context, x Session, a Actor, email, password string) (string, string, error) {
+func (s *Service) Login(ctx context.Context, x Session, a Actor, email, password string, proof BrowserProof) (string, string, bool, error) {
 	email = strings.ToLower(strings.TrimSpace(email))
 	if e := s.Limit(ctx, "login-email:"+email, 10); e != nil {
-		return "", "", e
+		return "", "", false, e
 	}
 	var id, hash string
 	var active bool
 	e := s.DB.QueryRowContext(ctx, "SELECT id,password_hash,active FROM users WHERE email=?", email).Scan(&id, &hash, &active)
 	if e != nil && e != sql.ErrNoRows {
-		return "", "", e
+		return "", "", false, e
 	}
 	if e == sql.ErrNoRows {
 		hash = s.DummyHash
@@ -93,29 +94,42 @@ func (s *Service) Login(ctx context.Context, x Session, a Actor, email, password
 	valid := security.Verify(password, hash)
 	if !valid || !active || id == "" {
 		_ = s.Audit(ctx, s.DB, a, "auth.login", "user", "", "denied", map[string]string{})
-		return "", "", Unauthorized
+		return "", "", false, Unauthorized
 	}
 	token, csrf := security.Token(), security.Token()
+	remembered := false
 	e = s.Transact(ctx, func(tx *sql.Tx) error {
 		var current string
 		var enabled bool
-		if e := tx.QueryRowContext(ctx, "SELECT password_hash,active FROM users WHERE id=? FOR UPDATE", id).Scan(&current, &enabled); e != nil {
+		var secret sql.NullString
+		if e := tx.QueryRowContext(ctx, "SELECT password_hash,active,totp_secret FROM users WHERE id=? FOR UPDATE", id).Scan(&current, &enabled, &secret); e != nil {
 			return e
 		}
 		if !enabled || current != hash {
 			return Unauthorized
 		}
+		if secret.Valid {
+			var e error
+			remembered, e = s.rememberedMFA(ctx, tx, id, proof)
+			if e != nil {
+				return e
+			}
+		}
 		if e := Changed(tx.ExecContext(ctx, "DELETE FROM sessions WHERE token_hash=?", x.Hash)); e != nil {
 			return e
 		}
-		if _, e := tx.ExecContext(ctx, `INSERT INTO sessions(token_hash,csrf_hash,user_id,mfa_complete,created_at,last_activity,expires_at) VALUES(?,?,?,FALSE,UTC_TIMESTAMP(6),UTC_TIMESTAMP(6),?)`, security.Hash(token), security.Hash(csrf), id, time.Now().UTC().Add(s.Config.Absolute)); e != nil {
+		if _, e := tx.ExecContext(ctx, `INSERT INTO sessions(token_hash,csrf_hash,user_id,mfa_complete,created_at,last_activity,expires_at,ip_hash,browser_hash,reauthenticated_at,family_hash) VALUES(?,?,?,?,UTC_TIMESTAMP(6),UTC_TIMESTAMP(6),?,?,?,?,?)`, security.Hash(token), security.Hash(csrf), id, remembered, time.Now().UTC().Add(s.Config.Absolute), security.Hash(proof.IP), rememberedBrowserHash(remembered, proof.Token), recentAuthentication(remembered), sessionFamily(x)); e != nil {
 			return e
 		}
 		a.ID = id
 		a.UserID = id
-		return s.Audit(ctx, tx, a, "auth.login", "user", id, "partial", map[string]string{})
+		result := "partial"
+		if remembered {
+			result = "success"
+		}
+		return s.Audit(ctx, tx, a, "auth.login", "user", id, result, map[string]bool{"remembered_mfa": remembered})
 	})
-	return token, csrf, e
+	return token, csrf, remembered, e
 }
 func (s *Service) Enroll(ctx context.Context, x Session) (string, error) {
 	if x.UserID == "" || x.MFA {
@@ -134,13 +148,21 @@ func (s *Service) Enroll(ctx context.Context, x Session) (string, error) {
 		return "", e
 	}
 	e = s.Transact(ctx, func(tx *sql.Tx) error {
-		var existing sql.NullString
+		var existing, pending sql.NullString
 		var active bool
-		if e := tx.QueryRowContext(ctx, "SELECT totp_secret,active FROM users WHERE id=? FOR UPDATE", x.UserID).Scan(&existing, &active); e != nil {
+		if e := tx.QueryRowContext(ctx, "SELECT totp_secret,totp_pending,active FROM users WHERE id=? FOR UPDATE", x.UserID).Scan(&existing, &pending, &active); e != nil {
 			return e
 		}
 		if existing.Valid || !active {
 			return Forbidden
+		}
+		if pending.Valid {
+			secret, e := security.Decrypt(s.Config.Key, pending.String)
+			if e != nil {
+				return e
+			}
+			uri = security.TOTPURI(u.Email, secret)
+			return nil
 		}
 		if _, e := tx.ExecContext(ctx, "UPDATE users SET totp_pending=? WHERE id=?", encrypted, x.UserID); e != nil {
 			return e
@@ -189,14 +211,14 @@ func (s *Service) Factor(ctx context.Context, tx *sql.Tx, user, code string, enr
 	}
 	return Unauthorized
 }
-func (s *Service) CompleteMFA(ctx context.Context, x Session, a Actor, code string, enroll bool) (token, csrf string, codes []string, err error) {
+func (s *Service) CompleteMFA(ctx context.Context, x Session, a Actor, code string, enroll bool, ip string) (token, csrf, browser string, codes []string, err error) {
 	if x.UserID == "" || x.MFA {
-		return "", "", nil, Forbidden
+		return "", "", "", nil, Forbidden
 	}
 	if e := s.Limit(ctx, "factor:"+x.UserID, 10); e != nil {
-		return "", "", nil, e
+		return "", "", "", nil, e
 	}
-	token, csrf = security.Token(), security.Token()
+	token, csrf, browser = security.Token(), security.Token(), security.Token()
 	err = s.Transact(ctx, func(tx *sql.Tx) error {
 		if e := s.Factor(ctx, tx, x.UserID, code, enroll); e != nil {
 			return e
@@ -216,7 +238,10 @@ func (s *Service) CompleteMFA(ctx context.Context, x Session, a Actor, code stri
 		if e := Changed(tx.ExecContext(ctx, "DELETE FROM sessions WHERE token_hash=? AND mfa_complete=FALSE", x.Hash)); e != nil {
 			return e
 		}
-		if _, e := tx.ExecContext(ctx, `INSERT INTO sessions(token_hash,csrf_hash,user_id,mfa_complete,created_at,last_activity,expires_at,reauthenticated_at) VALUES(?,?,?,TRUE,UTC_TIMESTAMP(6),UTC_TIMESTAMP(6),?,UTC_TIMESTAMP(6))`, security.Hash(token), security.Hash(csrf), x.UserID, x.Expires); e != nil {
+		if _, e := tx.ExecContext(ctx, `INSERT INTO sessions(token_hash,csrf_hash,user_id,mfa_complete,created_at,last_activity,expires_at,reauthenticated_at,ip_hash,browser_hash,family_hash) VALUES(?,?,?,TRUE,UTC_TIMESTAMP(6),UTC_TIMESTAMP(6),?,UTC_TIMESTAMP(6),?,?,?)`, security.Hash(token), security.Hash(csrf), x.UserID, x.Expires, security.Hash(ip), security.Hash(browser), sessionFamily(x)); e != nil {
+			return e
+		}
+		if _, e := tx.ExecContext(ctx, "INSERT INTO mfa_browser_verifications(token_hash,user_id,ip_hash,created_at,expires_at) VALUES(?,?,?,UTC_TIMESTAMP(6),?)", security.Hash(browser), x.UserID, security.Hash(ip), time.Now().UTC().Add(RememberedMFALifetime)); e != nil {
 			return e
 		}
 		return s.Audit(ctx, tx, a, "auth.mfa", "user", x.UserID, "success", map[string]bool{"enrollment": enroll})
@@ -236,14 +261,18 @@ func (s *Service) Reauthenticate(ctx context.Context, x Session, a Actor, passwo
 	}
 	return s.Transact(ctx, func(tx *sql.Tx) error {
 		var hash string
-		if e := tx.QueryRowContext(ctx, "SELECT password_hash FROM users WHERE id=? FOR UPDATE", x.UserID).Scan(&hash); e != nil {
+		var active bool
+		var secret sql.NullString
+		if e := tx.QueryRowContext(ctx, "SELECT password_hash,active,totp_secret FROM users WHERE id=? FOR UPDATE", x.UserID).Scan(&hash, &active, &secret); e != nil {
 			return e
 		}
-		if !security.Verify(password, hash) {
+		if !active || !secret.Valid || !security.Verify(password, hash) {
 			return Unauthorized
 		}
-		if e := s.Factor(ctx, tx, x.UserID, code, false); e != nil {
-			return e
+		if code != "" {
+			if e := s.Factor(ctx, tx, x.UserID, code, false); e != nil {
+				return e
+			}
 		}
 		if e := Changed(tx.ExecContext(ctx, "UPDATE sessions SET reauthenticated_at=UTC_TIMESTAMP(6) WHERE token_hash=?", x.Hash)); e != nil {
 			return e
@@ -251,9 +280,42 @@ func (s *Service) Reauthenticate(ctx context.Context, x Session, a Actor, passwo
 		return s.Audit(ctx, tx, a, "auth.reauth", "user", x.UserID, "success", map[string]string{})
 	})
 }
-func (s *Service) Logout(ctx context.Context, x Session, a Actor) error {
+func (s *Service) Logout(ctx context.Context, x Session, a Actor, browserToken string) error {
 	return s.Transact(ctx, func(tx *sql.Tx) error {
-		if _, e := tx.ExecContext(ctx, "DELETE FROM sessions WHERE token_hash=?", x.Hash); e != nil {
+		browserHash := security.Hash(browserToken)
+		var proofUser string
+		var familyUser sql.NullString
+		if e := tx.QueryRowContext(ctx, "SELECT user_id FROM sessions WHERE family_hash=? LIMIT 1", sessionFamily(x)).Scan(&familyUser); e != nil && e != sql.ErrNoRows {
+			return e
+		}
+		e := tx.QueryRowContext(ctx, "SELECT user_id FROM mfa_browser_verifications WHERE token_hash=?", browserHash).Scan(&proofUser)
+		if e != nil && e != sql.ErrNoRows {
+			return e
+		}
+		// Lock both possible account owners in a deterministic order.
+		rows, e := tx.QueryContext(ctx, "SELECT id FROM users WHERE id=? OR id=? OR id=? ORDER BY id FOR UPDATE", nullable(x.UserID), nullable(proofUser), nullable(familyUser.String))
+		if e != nil {
+			return e
+		}
+		for rows.Next() {
+			var id string
+			if e = rows.Scan(&id); e != nil {
+				rows.Close()
+				return e
+			}
+		}
+		e = rows.Err()
+		rows.Close()
+		if e != nil {
+			return e
+		}
+		if _, e = tx.ExecContext(ctx, "DELETE v FROM mfa_browser_verifications v JOIN sessions x ON x.browser_hash=v.token_hash WHERE x.family_hash=?", sessionFamily(x)); e != nil {
+			return e
+		}
+		if _, e = tx.ExecContext(ctx, "DELETE FROM mfa_browser_verifications WHERE token_hash=? OR token_hash=?", browserHash, x.BrowserHash); e != nil {
+			return e
+		}
+		if _, e = tx.ExecContext(ctx, "DELETE FROM sessions WHERE token_hash=? OR browser_hash=? OR browser_hash=? OR family_hash=?", x.Hash, browserHash, nullable(x.BrowserHash), sessionFamily(x)); e != nil {
 			return e
 		}
 		return s.Audit(ctx, tx, a, "auth.logout", "session", "", "success", map[string]string{})
@@ -396,6 +458,9 @@ func (s *Service) AcceptIdentityToken(ctx context.Context, token, name, password
 		} else {
 			user = uid.String
 			if e := Changed(tx.ExecContext(ctx, "UPDATE users SET password_hash=?,version=version+1,updated_at=UTC_TIMESTAMP(6) WHERE id=? AND active=TRUE", security.Password(password), user)); e != nil {
+				return e
+			}
+			if _, e := tx.ExecContext(ctx, "DELETE FROM mfa_browser_verifications WHERE user_id=?", user); e != nil {
 				return e
 			}
 			if _, e := tx.ExecContext(ctx, "DELETE FROM sessions WHERE user_id=?", user); e != nil {

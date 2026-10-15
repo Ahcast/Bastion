@@ -36,7 +36,7 @@
  <button type="button" (click)="address()" [disabled]="c.addresses.length>=20">Agregar dirección</button>
  <button type="submit">Guardar cliente</button></fieldset></form>
  <button class="secondary" (click)="editor.set(null)" [disabled]="busy()">Cerrar ficha</button>
- <details><summary>Confirmar identidad para cambiar equipo, estado o vincular documentos</summary><form (ngSubmit)="reauthenticate()"><label>Contraseña de confirmación<input name="confirm_password" [(ngModel)]="password" type="password" autocomplete="current-password" required /></label><label>Código de confirmación<input name="confirm_factor" [(ngModel)]="factor" autocomplete="one-time-code" required /></label><button [disabled]="busy()">Confirmar identidad</button></form></details>
+ <details><summary>Confirmar identidad para cambiar equipo, estado o vincular documentos</summary><form (ngSubmit)="reauthenticate()"><label>Contraseña de confirmación<input name="confirm_password" [(ngModel)]="password" type="password" autocomplete="current-password" required /></label><button [disabled]="busy()">Confirmar identidad</button></form></details>
 </section>
 @if(c.id){
 <section class="bs-frame"><h2>Notas del cliente</h2>@if(api.has('clientes.update')){<form (ngSubmit)="addNote()"><label>Nueva nota<textarea name="note" [(ngModel)]="note" required maxlength="4000"></textarea></label><button [disabled]="busy()">Registrar nota</button></form>}

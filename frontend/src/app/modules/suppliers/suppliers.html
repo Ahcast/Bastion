@@ -304,12 +304,6 @@
           type="password"
           autocomplete="current-password"
           required /></label
-      ><label
-        >Código de confirmación<input
-          name="confirm_factor"
-          [(ngModel)]="factor"
-          autocomplete="one-time-code"
-          required /></label
       ><button [disabled]="busy()">Confirmar identidad</button>
     </form>
   </details>

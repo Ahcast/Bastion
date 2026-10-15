@@ -211,7 +211,7 @@ func TestInvoiceFiscalSettingsHTTPStrictFieldsCSRFAndReauth(t *testing.T) {
 	if rr.Code != 204 || !strings.Contains(rr.Header().Get("Access-Control-Allow-Methods"), "PUT") {
 		t.Fatal(rr.Code, rr.Header())
 	}
-	token, csrf, e := s.Core.NewSession(ctx, a.UserID, true)
+	token, csrf, e := s.Core.NewSession(ctx, a.UserID, true, "192.0.2.10")
 	if e != nil {
 		t.Fatal(e)
 	}

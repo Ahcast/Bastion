@@ -204,7 +204,7 @@ func TestSupplierPriceRESTAllowedServiceMCPDeniedAndRestrictedReaders(t *testing
 	if _, e = s.RecordPrice(ctx, actor, id, "machine-price", priceInput(2)); e != core.Forbidden {
 		t.Fatal("machine wrote evidence", e)
 	}
-	cookieToken, csrf, e := s.Core.NewSession(ctx, "1", true)
+	cookieToken, csrf, e := s.Core.NewSession(ctx, "1", true, "192.0.2.10")
 	if e != nil {
 		t.Fatal(e)
 	}

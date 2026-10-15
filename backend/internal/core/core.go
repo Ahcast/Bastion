@@ -37,10 +37,11 @@ type Actor struct {
 func (a Actor) Key() string { return a.Type + ":" + a.ID }
 
 type Session struct {
-	Hash, CSRFHash, UserID string
-	MFA                    bool
-	Created, Last, Expires time.Time
-	Reauthenticated        sql.NullTime
+	Hash, CSRFHash, UserID          string
+	IPHash, BrowserHash, FamilyHash string
+	MFA                             bool
+	Created, Last, Expires          time.Time
+	Reauthenticated                 sql.NullTime
 }
 type User struct {
 	Roles   []string `json:"roles"`
@@ -185,7 +186,7 @@ func (s *Service) Authorize(ctx context.Context, q Querier, a Actor, permission,
 			return Unauthorized
 		}
 		if sensitive && (!reauth.Valid || time.Since(reauth.Time) > s.Config.Reauth) {
-			return &Error{"reauth_required", "Confirme su contraseña y segundo factor.", 403}
+			return &Error{"reauth_required", "Confirme su contraseña.", 403}
 		}
 	} else if a.Type == "service" {
 		var enabled bool

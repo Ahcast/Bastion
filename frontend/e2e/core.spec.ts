@@ -28,7 +28,14 @@ test("real two-origin login, MFA, administration and logout", async ({
   await expect(
     page.getByRole("heading", { name: "Verificación en dos pasos" }),
   ).toBeVisible();
-  await page.getByRole("button", { name: "Generar clave TOTP" }).click();
+  const qr = page.getByRole("img", {
+    name: "Código QR para vincular Bastion con su autenticador",
+  });
+  await expect(qr).toBeVisible();
+  await expect
+    .poll(() => qr.evaluate((img: HTMLImageElement) => img.naturalWidth))
+    .toBe(256);
+  await page.getByText("Vincular manualmente", { exact: true }).click();
   const uri = await page.getByLabel("URI para su autenticador").inputValue();
   const secret = new URL(uri).searchParams.get("secret")!;
   await page
@@ -38,10 +45,35 @@ test("real two-origin login, MFA, administration and logout", async ({
   await expect(
     page.getByRole("heading", { name: "Guarde estos códigos de recuperación" }),
   ).toBeVisible();
+  const recovery = (await page.locator("pre").innerText())
+    .trim()
+    .split(/\s+/)[0];
   await page.getByRole("button", { name: "Continuar", exact: true }).click();
   await expect(
     page.getByRole("heading", { name: "Inicio", exact: true }),
   ).toBeVisible();
+  // Removing only the short session cookie simulates re-entry after session expiry.
+  // The remembered verification is independent; no second OTP challenge appears.
+  await page.context().clearCookies({ name: "bastion_dev_session" });
+  await page.goto("/login");
+  await page.getByLabel("Correo", { exact: true }).fill("browser@example.test");
+  await page
+    .getByLabel("Contraseña", { exact: true })
+    .fill("synthetic browser password 42");
+  await page.getByRole("button", { name: "Ingresar", exact: true }).click();
+  await expect(
+    page.getByRole("heading", { name: "Inicio", exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByLabel("Código de autenticación o recuperación"),
+  ).toHaveCount(0);
+  const remembered = (await page.context().cookies()).find(
+    (c) => c.name === "bastion_dev_mfa",
+  )!;
+  expect(remembered.httpOnly).toBe(true);
+  expect(await page.evaluate(() => document.cookie)).not.toContain(
+    "bastion_dev_mfa",
+  );
   await page.getByRole("link", { name: "Configuración", exact: true }).click();
   await page
     .getByLabel("Nombre de empresa", { exact: true })
@@ -77,4 +109,23 @@ test("real two-origin login, MFA, administration and logout", async ({
   await expect(
     page.getByRole("button", { name: "Ingresar", exact: true }),
   ).toBeVisible();
+  expect(
+    (await page.context().cookies()).find((c) => c.name === "bastion_dev_mfa"),
+  ).toBeUndefined();
+  await page.getByLabel("Correo", { exact: true }).fill("browser@example.test");
+  await page
+    .getByLabel("Contraseña", { exact: true })
+    .fill("synthetic browser password 42");
+  await page.getByRole("button", { name: "Ingresar", exact: true }).click();
+  await expect(
+    page.getByRole("heading", { name: "Verificación en dos pasos" }),
+  ).toBeVisible();
+  await page
+    .getByLabel("Código de autenticación o recuperación")
+    .fill(recovery);
+  await page.getByRole("button", { name: "Verificar", exact: true }).click();
+  await expect(
+    page.getByRole("heading", { name: "Inicio", exact: true }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Cerrar sesión" }).click();
 });

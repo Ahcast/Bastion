@@ -120,3 +120,6 @@
 .bs-searchbar .bs-field{max-width:640px}.bs-search-results{display:flex;flex-wrap:wrap;gap:12px 24px;margin-top:12px}.bs-search-results a{color:var(--ink);text-underline-offset:4px}
 @media(max-width:1100px){.bs-home-summary .bs-row{grid-template-columns:minmax(0,1fr);gap:32px}}
 @media(max-width:760px){.bs-workspace{gap:24px}.bs-kpi-tile{padding:20px 22px}.bs-detail fieldset{grid-template-columns:minmax(0,1fr)}.bs-workspace-table tr.bs-xp-row>td{padding:16px}.bs-detail{width:calc(100vw - 82px)}}
+
+/* Preserve a white quiet zone and readable contrast for authenticator scanning. */
+.mfa-qr{display:block;max-width:100%;height:auto;margin:1.25rem auto;background:#fff;padding:12px;border-radius:8px;box-sizing:content-box}

@@ -9,8 +9,9 @@ import (
 const authLimitWindow = 15 * time.Minute
 
 type AuthCleanupResult struct {
-	Sessions   int64
-	AuthLimits int64
+	Sessions             int64
+	AuthLimits           int64
+	BrowserVerifications int64
 }
 
 // CleanupExpiredAuthState removes authentication state that can no longer be
@@ -42,6 +43,14 @@ func (s *Service) CleanupExpiredAuthState(ctx context.Context) (AuthCleanupResul
 		}
 		cleaned.Sessions += n
 
+		proofs, err := tx.ExecContext(ctx, "DELETE FROM mfa_browser_verifications WHERE expires_at < ?", now)
+		if err != nil {
+			return err
+		}
+		cleaned.BrowserVerifications, err = proofs.RowsAffected()
+		if err != nil {
+			return err
+		}
 		limits, err := tx.ExecContext(ctx, "DELETE FROM auth_limits WHERE window_start < ?", limitCutoff)
 		if err != nil {
 			return err

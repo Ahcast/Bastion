@@ -40,7 +40,7 @@ func TestDelegatedUserManagerCannotTakeSystemAdministrator(t *testing.T) {
 	if _, err = s.DB.Exec("UPDATE users SET totp_secret=? WHERE id=2", encrypted); err != nil {
 		t.Fatal(err)
 	}
-	session, _, err := s.NewSession(ctx, "2", true)
+	session, _, err := s.NewSession(ctx, "2", true, "192.0.2.10")
 	if err != nil {
 		t.Fatal(err)
 	}

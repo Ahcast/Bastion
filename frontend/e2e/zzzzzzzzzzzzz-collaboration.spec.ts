@@ -31,7 +31,7 @@ test("Colaboración: carga privada, cuarentena y papelera reversible", async ({
 
   await page.getByText("Confirmar identidad para vincular, editar, eliminar o moderar contenido", { exact: true }).click();
   await page.getByLabel("Contraseña para confirmar", { exact: true }).fill("synthetic browser password 42");
-  await page.getByLabel("Código de confirmación", { exact: true }).fill("synthetic-collaboration-recovery");
+
   await page.getByRole("button", { name: "Confirmar identidad", exact: true }).click();
   await expect(page.getByText("Identidad confirmada. Puede continuar con la operación.", { exact: true })).toBeVisible();
 

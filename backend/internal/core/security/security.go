@@ -1,6 +1,7 @@
 package security
 
 import (
+	"bytes"
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
@@ -12,6 +13,8 @@ import (
 	"github.com/pquerna/otp"
 	"github.com/pquerna/otp/totp"
 	"golang.org/x/crypto/argon2"
+	"image/png"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -138,4 +141,29 @@ func TOTPStep(secret, code string, now time.Time) (int64, bool) {
 		}
 	}
 	return 0, false
+}
+
+// TOTPURI reconstructs pending enrollment without rotating its secret.
+func TOTPURI(email, secret string) string {
+	u := url.URL{Scheme: "otpauth", Host: "totp", Path: "/Bastion:" + email}
+	q := url.Values{"issuer": {"Bastion"}, "secret": {secret}, "period": {"30"}, "algorithm": {"SHA1"}, "digits": {"6"}}
+	u.RawQuery = q.Encode()
+	return u.String()
+}
+
+// TOTPQR renders entirely in-process; enrollment secrets never leave Bastion.
+func TOTPQR(uri string) (string, error) {
+	key, err := otp.NewKeyFromURL(uri)
+	if err != nil {
+		return "", err
+	}
+	img, err := key.Image(256, 256)
+	if err != nil {
+		return "", err
+	}
+	var data bytes.Buffer
+	if err := png.Encode(&data, img); err != nil {
+		return "", err
+	}
+	return "data:image/png;base64," + base64.StdEncoding.EncodeToString(data.Bytes()), nil
 }

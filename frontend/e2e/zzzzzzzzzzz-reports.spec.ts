@@ -87,9 +87,7 @@ test("Reportes: filas y totales autorizados por moneda coinciden con Inicio", as
   await page
     .getByLabel("Contraseña para confirmar", { exact: true })
     .fill("synthetic browser password 42");
-  await page
-    .getByLabel("Código de confirmación", { exact: true })
-    .fill("synthetic-reports-recovery");
+
   await page
     .getByRole("button", { name: "Confirmar identidad", exact: true })
     .click();

@@ -182,7 +182,7 @@ func TestQuoteStateLiveScopesRevocationAndREST(t *testing.T) {
 	if _, e := s.Transition(ctx, machine, id, "state-machine", p); e != core.Forbidden {
 		t.Fatal(e)
 	}
-	token, csrf, e := s.Core.NewSession(ctx, a.UserID, true)
+	token, csrf, e := s.Core.NewSession(ctx, a.UserID, true, "192.0.2.10")
 	if e != nil {
 		t.Fatal(e)
 	}

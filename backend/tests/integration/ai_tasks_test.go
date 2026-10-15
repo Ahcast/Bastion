@@ -414,7 +414,7 @@ func TestAITasksRESTAndMCPRealSDKPolicies(t *testing.T) {
 	_ = reg.Register(registry.Module{ID: "core", Label: "Core", Version: "1", Enabled: true})
 	_ = reg.Register(s.Module(slog.New(slog.NewTextHandler(io.Discard, nil)), true))
 	handler := api.New(s.Core, reg, nil, slog.New(slog.NewTextHandler(io.Discard, nil)))
-	token, csrf, e := s.Core.NewSession(ctx, a.UserID, true)
+	token, csrf, e := s.Core.NewSession(ctx, a.UserID, true, "192.0.2.10")
 	if e != nil {
 		t.Fatal(e)
 	}

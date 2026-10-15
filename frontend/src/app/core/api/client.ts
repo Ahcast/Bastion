@@ -126,8 +126,13 @@ export class Client {
       { email, password },
     );
     this.csrf = result.csrf_token;
-    const s = await this.get<{ mfa_enabled: boolean }>("/auth/status");
-    this.mfa.set(s.mfa_enabled ? "challenge" : "enroll");
+    const s = await this.get<{ mfa_enabled: boolean; mfa_complete: boolean }>(
+      "/auth/status",
+    );
+    this.mfa.set(
+      s.mfa_complete ? "complete" : s.mfa_enabled ? "challenge" : "enroll",
+    );
+    if (s.mfa_complete) await this.me();
   }
   async factor(code: string, enroll: boolean): Promise<string[]> {
     const r = await this.write<{
@@ -144,6 +149,7 @@ export class Client {
     this.profile.set(p);
   }
   async logout() {
+    await this.refreshCSRF();
     await this.write("POST", "/auth/logout");
     this.profile.set(null);
     this.csrf = "";

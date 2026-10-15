@@ -43,7 +43,7 @@ func TestSelfPasswordRecoveryAndPollingExpiry(t *testing.T) {
 	if e = s.Authorize(ctx, s.DB, a, "core.users.read", "", "", false); e != core.Unauthorized {
 		t.Fatal("password did not revoke sessions", e)
 	}
-	session, _, e := s.NewSession(ctx, "1", true)
+	session, _, e := s.NewSession(ctx, "1", true, "192.0.2.10")
 	if e != nil {
 		t.Fatal(e)
 	}

@@ -303,7 +303,7 @@ func TestQuotesScopesRevocationReauthAndProtectedInputs(t *testing.T) {
 	if _, e = s.Save(ctx, owner, "", "quote-own", quoteInput()); e != core.Forbidden {
 		t.Fatal("cached replay bypass", e)
 	}
-	token, csrf, e := s.Core.NewSession(ctx, a.UserID, true)
+	token, csrf, e := s.Core.NewSession(ctx, a.UserID, true, "192.0.2.10")
 	if e != nil {
 		t.Fatal(e)
 	}
@@ -356,7 +356,7 @@ func TestQuotesHumanStringsServiceMCPDeniedAndDisabledModule(t *testing.T) {
 	if e = composition.Register(s.Core, disabled, slog.Default()); e != nil {
 		t.Fatal(e)
 	}
-	tokenCookie, csrf, e := s.Core.NewSession(ctx, a.UserID, true)
+	tokenCookie, csrf, e := s.Core.NewSession(ctx, a.UserID, true, "192.0.2.10")
 	if e != nil {
 		t.Fatal(e)
 	}

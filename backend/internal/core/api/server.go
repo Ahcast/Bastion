@@ -52,6 +52,25 @@ func (s *Server) cookie(w http.ResponseWriter, token string) {
 	}
 	http.SetCookie(w, &http.Cookie{Name: s.CookieName(), Value: token, Path: "/", Secure: s.Service.Config.Env == "production", HttpOnly: true, SameSite: http.SameSiteLaxMode, MaxAge: maxAge})
 }
+func (s *Server) MFACookieName() string {
+	if s.Service.Config.Env == "production" {
+		return "__Host-bastion_mfa"
+	}
+	return "bastion_dev_mfa"
+}
+func (s *Server) browserToken(r *http.Request) string {
+	if c, e := r.Cookie(s.MFACookieName()); e == nil {
+		return c.Value
+	}
+	return ""
+}
+func (s *Server) mfaCookie(w http.ResponseWriter, token string) {
+	maxAge := int(core.RememberedMFALifetime.Seconds())
+	if token == "" {
+		maxAge = -1
+	}
+	http.SetCookie(w, &http.Cookie{Name: s.MFACookieName(), Value: token, Path: "/", Secure: s.Service.Config.Env == "production", HttpOnly: true, SameSite: http.SameSiteLaxMode, MaxAge: maxAge})
+}
 func (s *Server) json(w http.ResponseWriter, status int, v any) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.WriteHeader(status)
@@ -254,9 +273,9 @@ func (s *Server) middleware(next http.Handler) http.Handler {
 		if c, e := r.Cookie(s.CookieName()); e == nil {
 			token = c.Value
 		}
-		session, e := s.Service.Session(r.Context(), token)
+		session, e := s.Service.SessionAtIP(r.Context(), token, ip, s.browserToken(r))
 		if r.Method == "GET" && r.URL.Path == "/api/v1/auth/csrf" && e == core.Unauthorized {
-			token, csrf, e := s.Service.NewSession(r.Context(), "", false)
+			token, csrf, e := s.Service.NewSession(r.Context(), "", false, ip)
 			if e != nil {
 				s.error(w, r, e)
 				return
@@ -335,6 +354,7 @@ func (s *Server) routes() {
 		e := s.Service.ChangePassword(r.Context(), x.Actor, p.Password)
 		if e == nil {
 			s.cookie(w, "")
+			s.mfaCookie(w, "")
 		}
 		return nil, e
 	})
@@ -355,12 +375,12 @@ func (s *Server) routes() {
 		if e := s.Service.Limit(r.Context(), "login-ip:"+ip, 60); e != nil {
 			return nil, e
 		}
-		token, csrf, e := s.Service.Login(r.Context(), x.Session, x.Actor, p.Email, p.Password)
+		token, csrf, remembered, e := s.Service.Login(r.Context(), x.Session, x.Actor, p.Email, p.Password, core.BrowserProof{IP: ip, Token: s.browserToken(r)})
 		if e != nil {
 			return nil, e
 		}
 		s.cookie(w, token)
-		return map[string]any{"csrf_token": csrf, "mfa_required": true}, nil
+		return map[string]any{"csrf_token": csrf, "mfa_required": !remembered}, nil
 	})
 	s.handle("GET /api/v1/auth/status", false, func(w http.ResponseWriter, r *http.Request, x request) (any, error) {
 		if x.Actor.UserID == "" {
@@ -371,7 +391,11 @@ func (s *Server) routes() {
 	})
 	s.handle("POST /api/v1/auth/mfa/enroll", false, func(w http.ResponseWriter, r *http.Request, x request) (any, error) {
 		uri, e := s.Service.Enroll(r.Context(), x.Session)
-		return map[string]string{"otpauth_uri": uri}, e
+		if e != nil {
+			return nil, e
+		}
+		qr, e := security.TOTPQR(uri)
+		return map[string]string{"otpauth_uri": uri, "qr_data_url": qr}, e
 	})
 	for _, route := range []string{"confirm", "challenge"} {
 		enroll := route == "confirm"
@@ -382,11 +406,12 @@ func (s *Server) routes() {
 			if e := Decode(r, &p); e != nil {
 				return nil, e
 			}
-			token, csrf, codes, e := s.Service.CompleteMFA(r.Context(), x.Session, x.Actor, p.Code, enroll)
+			token, csrf, browser, codes, e := s.Service.CompleteMFA(r.Context(), x.Session, x.Actor, p.Code, enroll, clientIP(r))
 			if e != nil {
 				return nil, e
 			}
 			s.cookie(w, token)
+			s.mfaCookie(w, browser)
 			return map[string]any{"csrf_token": csrf, "recovery_codes": codes}, nil
 		})
 	}
@@ -401,9 +426,10 @@ func (s *Server) routes() {
 		return nil, s.Service.Reauthenticate(r.Context(), x.Session, x.Actor, p.Password, p.Code)
 	})
 	s.handle("POST /api/v1/auth/logout", false, func(w http.ResponseWriter, r *http.Request, x request) (any, error) {
-		e := s.Service.Logout(r.Context(), x.Session, x.Actor)
+		e := s.Service.Logout(r.Context(), x.Session, x.Actor, s.browserToken(r))
 		if e == nil {
 			s.cookie(w, "")
+			s.mfaCookie(w, "")
 		}
 		return nil, e
 	})

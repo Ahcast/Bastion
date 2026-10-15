@@ -107,3 +107,11 @@ Templates en backend/deploy: servicio server, timer worker y proxy nginx. Editar
 BASTION_INVOICES_ENABLED=true|false (true predeterminado). Migración 0021 y permisos facturas.view/create/update sin grants automáticos. UI y REST solo Borradores/cálculo; número/SAR NULL y pagos cero. Cambiar equipo exige update all y reauth. CI 38179176643 certificado; no aplicar migración productiva ni activar emisión/pagos con este flag.
 
 Configuración fiscal de desarrollo: migración 0022 y facturas.fiscal.read/manage globales explícitos. Guardado requiere reauth/CSRF/idempotencia; no configura series automáticamente, adelanta contador ni emite facturas. Primera configuración crea document_counters.invoice en la misma TX. CI 38180883877 aprobado (91 Angular/12 navegador). Autorización real y activación productiva pendientes.
+
+## OTP recordado y QR (0040)
+
+Aplicar migraciones antes de iniciar versión nueva; 0040 incorpora pruebas y vínculo de sesiones. Un despliegue de desarrollo no autoriza migración productiva. Sesiones previas sin IP se invalidan al usarse.
+
+Validar `go test -race -count=1 -run 'Test(RememberedMFA|AuthenticationCSRF|AuthMaintenance)' ./tests/integration` con MySQL 5.7 sintético: QR PNG/pending estable, cookies y contraseña/IP/cuenta, caducidad idle/absoluta, OTP recordado de 30 días sin prórroga, salida con sesión vencida, robo de cookie aislada, IP nueva con headers falsificados, cambio/reset de contraseña/MFA/roles/activo, revocación, competencia login/logout y sesión rotada. `core.spec.ts` comprueba QR cargado, reingreso sin cookie corta, HttpOnly, salida y nuevo desafío/recuperación con API real. Nunca capturar QR/URI/cookies de usuarios reales en logs o capturas de soporte.
+
+La prueba recordada es una credencial revocable: no garantiza inmunidad a malware, extensiones o robo de ambas cookies desde una IP compartida. Ante incidente revocar sesiones del usuario (también elimina pruebas); cambio de contraseña revoca igualmente. El vencimiento de 30 días y borrar cookies exigen OTP adicional aunque no se haya salido manualmente.

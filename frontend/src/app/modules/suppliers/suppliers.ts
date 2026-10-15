@@ -346,7 +346,7 @@ export class Suppliers implements OnInit {
     try {
       await this.api.write("POST", "/auth/reauth", {
         password: this.password,
-        code: this.factor,
+
       });
       this.message.set("Identidad confirmada durante cinco minutos.");
     } catch (e) {

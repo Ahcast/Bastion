@@ -106,7 +106,7 @@ func admin(t *testing.T, s *core.Service) core.Actor {
 	if _, e = s.DB.Exec("UPDATE users SET totp_secret=? WHERE id=1", encrypted); e != nil {
 		t.Fatal(e)
 	}
-	token, _, e := s.NewSession(ctx, "1", true)
+	token, _, e := s.NewSession(ctx, "1", true, "192.0.2.10")
 	if e != nil {
 		t.Fatal(e)
 	}
@@ -115,7 +115,7 @@ func admin(t *testing.T, s *core.Service) core.Actor {
 	}
 	return core.Actor{Type: "user", ID: "1", UserID: "1", SessionHash: security.Hash(token), Source: "web", RequestID: security.ID(), CorrelationID: security.ID()}
 }
-func execute(t *testing.T, h http.Handler, method, path string, body any, cookie *http.Cookie, csrf, origin string) (int, map[string]any, *http.Cookie) {
+func execute(t *testing.T, h http.Handler, method, path string, body any, cookie *http.Cookie, csrf, origin string, browser ...**http.Cookie) (int, map[string]any, *http.Cookie) {
 	t.Helper()
 	b, _ := json.Marshal(body)
 	r := httptest.NewRequest(method, path, bytes.NewReader(b))
@@ -128,6 +128,9 @@ func execute(t *testing.T, h http.Handler, method, path string, body any, cookie
 	if cookie != nil {
 		r.AddCookie(cookie)
 	}
+	if len(browser) > 0 && *browser[0] != nil {
+		r.AddCookie(*browser[0])
+	}
 	w := httptest.NewRecorder()
 	h.ServeHTTP(w, r)
 	result := w.Result()
@@ -136,6 +139,9 @@ func execute(t *testing.T, h http.Handler, method, path string, body any, cookie
 	_ = json.NewDecoder(result.Body).Decode(&v)
 	var c *http.Cookie
 	for _, x := range result.Cookies() {
+		if x.Name == "bastion_dev_mfa" && len(browser) > 0 {
+			*browser[0] = x
+		}
 		if x.Name == "bastion_dev_session" {
 			c = x
 		}
@@ -144,38 +150,39 @@ func execute(t *testing.T, h http.Handler, method, path string, body any, cookie
 }
 func TestAuthenticationCSRFAndRecovery(t *testing.T) {
 	s := fixture(t)
+	var remembered *http.Cookie
 	r := registry.New()
 	_ = r.Register(registry.Module{ID: "core", Label: "Core", Version: "1", Enabled: true})
 	h := api.New(s, r, nil, slog.New(slog.NewTextHandler(io.Discard, nil)))
-	status, v, c := execute(t, h, "GET", "/api/v1/auth/csrf", nil, nil, "", s.Config.Origin)
+	status, v, c := execute(t, h, "GET", "/api/v1/auth/csrf", nil, nil, "", s.Config.Origin, &remembered)
 	if status != 200 || c == nil {
 		t.Fatal(status, v)
 	}
 	csrf := v["csrf_token"].(string)
-	status, _, _ = execute(t, h, "POST", "/api/v1/auth/login", map[string]string{"email": "admin@example.test", "password": "synthetic password secure 42"}, c, "", s.Config.Origin)
+	status, _, _ = execute(t, h, "POST", "/api/v1/auth/login", map[string]string{"email": "admin@example.test", "password": "synthetic password secure 42"}, c, "", s.Config.Origin, &remembered)
 	if status != 403 {
 		t.Fatal("missing CSRF", status)
 	}
-	status, _, _ = execute(t, h, "POST", "/api/v1/auth/login", map[string]string{}, c, csrf, "http://evil.test")
+	status, _, _ = execute(t, h, "POST", "/api/v1/auth/login", map[string]string{}, c, csrf, "http://evil.test", &remembered)
 	if status != 403 {
 		t.Fatal("wrong origin", status)
 	}
-	status, v, newCookie := execute(t, h, "POST", "/api/v1/auth/login", map[string]string{"email": "admin@example.test", "password": "synthetic password secure 42"}, c, csrf, s.Config.Origin)
+	status, v, newCookie := execute(t, h, "POST", "/api/v1/auth/login", map[string]string{"email": "admin@example.test", "password": "synthetic password secure 42"}, c, csrf, s.Config.Origin, &remembered)
 	if status != 200 || newCookie == nil || newCookie.Value == c.Value {
 		t.Fatal(status, v)
 	}
 	old := c
 	c = newCookie
 	csrf = v["csrf_token"].(string)
-	status, _, _ = execute(t, h, "GET", "/api/v1/users", nil, c, "", s.Config.Origin)
+	status, _, _ = execute(t, h, "GET", "/api/v1/users", nil, c, "", s.Config.Origin, &remembered)
 	if status != 401 {
 		t.Fatal("partial session reached business", status)
 	}
-	status, _, _ = execute(t, h, "GET", "/api/v1/auth/status", nil, old, "", s.Config.Origin)
+	status, _, _ = execute(t, h, "GET", "/api/v1/auth/status", nil, old, "", s.Config.Origin, &remembered)
 	if status != 401 {
 		t.Fatal("old session survived login")
 	}
-	status, v, _ = execute(t, h, "POST", "/api/v1/auth/mfa/enroll", map[string]string{}, c, csrf, s.Config.Origin)
+	status, v, _ = execute(t, h, "POST", "/api/v1/auth/mfa/enroll", map[string]string{}, c, csrf, s.Config.Origin, &remembered)
 	if status != 200 {
 		t.Fatal(status, v)
 	}
@@ -185,7 +192,7 @@ func TestAuthenticationCSRFAndRecovery(t *testing.T) {
 	if e != nil {
 		t.Fatal(e)
 	}
-	status, v, newCookie = execute(t, h, "POST", "/api/v1/auth/mfa/confirm", map[string]string{"code": code}, c, csrf, s.Config.Origin)
+	status, v, newCookie = execute(t, h, "POST", "/api/v1/auth/mfa/confirm", map[string]string{"code": code}, c, csrf, s.Config.Origin, &remembered)
 	if status != 200 {
 		t.Fatal(status, v)
 	}
@@ -193,35 +200,35 @@ func TestAuthenticationCSRFAndRecovery(t *testing.T) {
 	c = newCookie
 	csrf = v["csrf_token"].(string)
 	recovery := v["recovery_codes"].([]any)[0].(string)
-	status, _, _ = execute(t, h, "GET", "/api/v1/auth/me", nil, c, "", s.Config.Origin)
+	status, _, _ = execute(t, h, "GET", "/api/v1/auth/me", nil, c, "", s.Config.Origin, &remembered)
 	if status != 200 {
 		t.Fatal(status)
 	}
-	status, _, _ = execute(t, h, "POST", "/api/v1/auth/reauth", map[string]string{"password": "synthetic password secure 42", "code": code}, c, csrf, s.Config.Origin)
+	status, _, _ = execute(t, h, "POST", "/api/v1/auth/reauth", map[string]string{"password": "synthetic password secure 42", "code": code}, c, csrf, s.Config.Origin, &remembered)
 	if status != 401 {
 		t.Fatal("TOTP replay accepted", status)
 	}
-	status, _, _ = execute(t, h, "POST", "/api/v1/auth/reauth", map[string]string{"password": "synthetic password secure 42", "code": recovery}, c, csrf, s.Config.Origin)
+	status, _, _ = execute(t, h, "POST", "/api/v1/auth/reauth", map[string]string{"password": "synthetic password secure 42", "code": recovery}, c, csrf, s.Config.Origin, &remembered)
 	if status != 200 {
 		t.Fatal(status)
 	}
-	status, _, _ = execute(t, h, "POST", "/api/v1/auth/reauth", map[string]string{"password": "synthetic password secure 42", "code": recovery}, c, csrf, s.Config.Origin)
+	status, _, _ = execute(t, h, "POST", "/api/v1/auth/reauth", map[string]string{"password": "synthetic password secure 42", "code": recovery}, c, csrf, s.Config.Origin, &remembered)
 	if status != 401 {
 		t.Fatal("recovery replay", status)
 	}
-	status, _, _ = execute(t, h, "GET", "/api/v1/auth/me", nil, old, "", s.Config.Origin)
+	status, _, _ = execute(t, h, "GET", "/api/v1/auth/me", nil, old, "", s.Config.Origin, &remembered)
 	if status != 401 {
 		t.Fatal("old MFA session")
 	}
-	status, v, _ = execute(t, h, "GET", "/api/v1/users?per_page=101", nil, c, "", s.Config.Origin)
+	status, v, _ = execute(t, h, "GET", "/api/v1/users?per_page=101", nil, c, "", s.Config.Origin, &remembered)
 	if status != 422 {
 		t.Fatal(status, v)
 	}
-	status, _, _ = execute(t, h, "POST", "/api/v1/auth/logout", nil, c, csrf, s.Config.Origin)
+	status, _, _ = execute(t, h, "POST", "/api/v1/auth/logout", nil, c, csrf, s.Config.Origin, &remembered)
 	if status != 200 {
 		t.Fatal(status)
 	}
-	status, _, _ = execute(t, h, "GET", "/api/v1/auth/me", nil, c, "", s.Config.Origin)
+	status, _, _ = execute(t, h, "GET", "/api/v1/auth/me", nil, c, "", s.Config.Origin, &remembered)
 	if status != 401 {
 		t.Fatal("logout ineffective")
 	}
@@ -253,7 +260,7 @@ func TestPermissionsVersionsAndRevocation(t *testing.T) {
 	}
 	secret, _ := security.Encrypt(s.Config.Key, "JBSWY3DPEHPK3PXP")
 	_, _ = s.DB.Exec("UPDATE users SET totp_secret=? WHERE id=2", secret)
-	session, _, e := s.NewSession(ctx, "2", true)
+	session, _, e := s.NewSession(ctx, "2", true, "192.0.2.10")
 	if e != nil {
 		t.Fatal(e)
 	}

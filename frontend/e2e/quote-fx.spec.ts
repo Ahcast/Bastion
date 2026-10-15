@@ -19,7 +19,7 @@ test('Cotizaciones FX: registra una observación exacta sin convertir cotizacion
  await expect(page.getByText('Este registro no convierte cotizaciones automáticamente.',{exact:false})).toBeVisible();
 
  await page.getByLabel('Contraseña para confirmar',{exact:true}).fill(syntheticPassword);
- await page.getByLabel('Código de confirmación',{exact:true}).fill(syntheticRecovery);
+
  await page.getByRole('button',{name:'Confirmar identidad',exact:true}).click();
  await expect(page.getByText('Identidad confirmada. Puede continuar con la operación.',{exact:true})).toBeVisible();
 

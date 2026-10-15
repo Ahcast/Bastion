@@ -129,15 +129,15 @@ Lineamientos del borrador:
 - La cookie de sesión no se comparte con WordPress. El aislamiento de cookies no sustituye el aislamiento de archivos y permisos dentro del hosting.
 - El token CSRF se entrega mediante JSON y Angular lo envía explícitamente en X-CSRF-Token; la cookie de sesión permanece HttpOnly. Ver contrato API/MCP.
 - No se almacenarán credenciales de sesión ni bearer tokens de la SPA en `localStorage`.
-- Se exigirá completar el enrolamiento y confirmación TOTP antes de acceder a datos de negocio. Un login parcial solo habilitará rutas de enrolamiento, desafío y salida.
+- Se exigirá completar el enrolamiento y confirmación TOTP antes de acceder a datos de negocio. Luego se permite recordar esa verificación en el mismo navegador/IP durante 30 días absolutos, con contraseña en cada nuevo login; ver [contrato de OTP recordado](../contracts/remembered-mfa.md). Una IP sola no acredita el factor. Un login parcial solo habilitará rutas de enrolamiento, desafío y salida.
 - Códigos de recuperación de un solo uso; secreto TOTP cifrado y nunca expuesto en logs.
 - Recuperar contraseña no elimina MFA. El restablecimiento de MFA exige verificación administrativa de identidad, auditoría y revocación de sesiones.
-- Renovar el identificador de sesión tras autenticación; invalidar sesión al salir y permitir revocación administrativa.
+- Renovar el identificador de sesión tras autenticación; invalidar sesión y verificación recordada al salir manualmente, cambiar IP, cambiar/recuperar contraseña o revocar administrativamente. Las sesiones completas verifican IP y cookie recordada en cada petición. Caducidad de sesión no borra la prueba vigente.
 - Denegar registro público; el alta de empleados se realizará mediante administración o invitación controlada.
 
 Valores iniciales propuestos: 30 minutos de inactividad, 12 horas de duración absoluta y 5 minutos de vigencia para reautenticación de operaciones sensibles. Deben ser configurables dentro de límites seguros y aplicarse en backend. La política de sesiones simultáneas sigue pendiente. El polling automático no debe mantener indefinidamente una sesión sin actividad humana.
 
-Para acciones críticas se exigirá reautenticación reciente. La aprobación de negocio y la reautenticación son controles diferentes: una no sustituye a la otra. Passkeys para administradores y aprobadores quedan como fase posterior.
+Para acciones críticas se exigirá reautenticación reciente con contraseña en sesión MFA vigente de la misma IP; no se solicita un nuevo OTP para cada operación. La aprobación de negocio y la reautenticación son controles diferentes: una no sustituye a la otra. Passkeys para administradores y aprobadores quedan como fase posterior.
 
 ### 6.2 Identidades de servicio y agentes
 

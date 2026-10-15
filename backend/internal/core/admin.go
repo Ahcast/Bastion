@@ -92,6 +92,9 @@ func (s *Service) UpdateUser(ctx context.Context, a Actor, id string, c UserChan
 				return e
 			}
 		}
+		if _, e := tx.ExecContext(ctx, "DELETE FROM mfa_browser_verifications WHERE user_id=?", id); e != nil {
+			return e
+		}
 		if _, e := tx.ExecContext(ctx, "DELETE FROM sessions WHERE user_id=?", id); e != nil {
 			return e
 		}
@@ -120,6 +123,9 @@ func (s *Service) ResetMFA(ctx context.Context, a Actor, id, verification string
 		if _, e := tx.ExecContext(ctx, "DELETE FROM recovery_codes WHERE user_id=?", id); e != nil {
 			return e
 		}
+		if _, e := tx.ExecContext(ctx, "DELETE FROM mfa_browser_verifications WHERE user_id=?", id); e != nil {
+			return e
+		}
 		if _, e := tx.ExecContext(ctx, "DELETE FROM sessions WHERE user_id=?", id); e != nil {
 			return e
 		}
@@ -138,6 +144,9 @@ func (s *Service) RevokeSessions(ctx context.Context, a Actor, id string) error 
 			return e
 		}
 		if e := s.protectSystemAdministrator(ctx, tx, id); e != nil {
+			return e
+		}
+		if _, e := tx.ExecContext(ctx, "DELETE FROM mfa_browser_verifications WHERE user_id=?", id); e != nil {
 			return e
 		}
 		if _, e := tx.ExecContext(ctx, "DELETE FROM sessions WHERE user_id=?", id); e != nil {

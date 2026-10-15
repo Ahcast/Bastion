@@ -30,8 +30,7 @@ interface Setting {
     <section class="bs-frame">
       <h2>Confirmar identidad</h2>
       <p>
-        Las operaciones sensibles requieren confirmación reciente. Use un código
-        nuevo.
+        Las operaciones sensibles requieren confirmación reciente de su contraseña.
       </p>
       <form (ngSubmit)="reauth()">
         <label
@@ -40,12 +39,6 @@ interface Setting {
             type="password"
             autocomplete="current-password"
             [(ngModel)]="password"
-            required /></label
-        ><label
-          >TOTP o código de recuperación<input
-            name="reauth-code"
-            autocomplete="one-time-code"
-            [(ngModel)]="code"
             required /></label
         ><button [disabled]="busy()">Confirmar</button>
       </form>
@@ -551,7 +544,7 @@ export class Settings {
     return this.run(async () => {
       await this.api.write("POST", "/auth/reauth", {
         password: this.password,
-        code: this.code,
+
       });
       this.password = "";
       this.code = "";

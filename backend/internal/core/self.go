@@ -77,6 +77,9 @@ func (s *Service) ChangePassword(ctx context.Context, a Actor, password string) 
 		if _, e := tx.ExecContext(ctx, "UPDATE users SET password_hash=?,version=version+1,updated_at=UTC_TIMESTAMP(6) WHERE id=?", security.Password(password), a.UserID); e != nil {
 			return e
 		}
+		if _, e := tx.ExecContext(ctx, "DELETE FROM mfa_browser_verifications WHERE user_id=?", a.UserID); e != nil {
+			return e
+		}
 		if _, e := tx.ExecContext(ctx, "DELETE FROM sessions WHERE user_id=?", a.UserID); e != nil {
 			return e
 		}

@@ -220,7 +220,7 @@ func exportHTTP(t *testing.T, h http.Handler, body any, cookie *http.Cookie, csr
 	t.Helper()
 	raw, _ := json.Marshal(body)
 	r := httptest.NewRequest("POST", "/api/v1/reports/orders/export", bytes.NewReader(raw))
-	r.RemoteAddr = "192.0.2.20:5000"
+	r.RemoteAddr = "192.0.2.10:5000"
 	r.Header.Set("Content-Type", "application/json")
 	r.Header.Set("Origin", "http://localhost:4200")
 	if cookie != nil {
@@ -241,7 +241,7 @@ func TestReportsExportHTTPStreamStrictDTOAndCSRF(t *testing.T) {
 	reg := registry.New()
 	_ = reg.Register(reportsService(s.Core).Module(logger, true))
 	h := api.New(s.Core, reg, nil, logger)
-	token, csrf, e := s.Core.NewSession(ctx, a.UserID, true)
+	token, csrf, e := s.Core.NewSession(ctx, a.UserID, true, "192.0.2.10")
 	if e != nil {
 		t.Fatal(e)
 	}
