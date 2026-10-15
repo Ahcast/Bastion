@@ -567,3 +567,11 @@ Primer CI 38779699715 sobre 286f0b6: frontend 176 success; navegador 25/26 (fluj
 Revisión adicional de concurrencia: revocación administrativa ahora bloquea explícitamente la cuenta objetivo antes de borrar pruebas y sesiones, alineando su orden con login/confirmación MFA. Se agrega carrera factor/revocación para impedir que una confirmación simultánea deje una prueba válida después de revocar. Se valida en la siguiente revisión de CI.
 
 Sobre 373f1b6, CI 38780983106: Angular build/179 success y navegador API/MySQL 26/26 success; backend todavía en ejecución. Revisión posterior corrige CSRF en memoria al recibir 401 para que reingreso tras caducidad obtenga sesión anónima/CSRF nuevos sin recargar ni perder la prueba OTP. 180 pruebas Angular locales pasan; nueva revisión requerirá CI completo para acreditar también bloqueo de revocación objetivo y carrera factor/revocación.
+
+## 2026-10-15 — Autenticación y equipos reconocidos certificados
+
+Código final `d7672e6ee441907648d283fd916a894b9c43c83b`: [Core checks 38781525969](https://github.com/Ahcast/Bastion/actions/runs/38781525969), [documentación 38781525987](https://github.com/Ahcast/Bastion/actions/runs/38781525987) y [rama única 38781525632](https://github.com/Ahcast/Bastion/actions/runs/38781525632), success. Go fmt/vet, suite completa con race/MySQL 5.7 y builds server/worker/admin; Angular build/CSS productivo/180 pruebas; navegador 26/26 contra API/base reales.
+
+QR PNG local automático y pendiente estable; OTP recordado cuenta/navegador/IP con 30 días absolutos; dos cookies protegidas, sesiones con expiración habitual, logout/credenciales/admin y CSRF recuperable después de caducidad. Registro propio de equipos con huella auxiliar, última actividad y revocación individual/actual certificado. Pruebas MySQL verifican cookies aisladas, cuenta/IP/contraseña incorrectas, limpieza/caducidades, replays, revocaciones, login concurrente con logout/admin, factor recién rotado/logout, factor simultáneo/revocación y equipo estable al reconfirmar en IP nueva.
+
+Cierre de desarrollo sintético; no despliegue, migración productiva ni prueba de hardware. Fingerprint de navegador es metadato auxiliar; DBSC/TPM requiere integración/compatibilidad propias y no se presenta como implementado. Riesgo residual ante robo de ambas cookies en la misma IP o equipo comprometido permanece documentado.
