@@ -434,17 +434,48 @@ async fn not_found() -> StatusCode {
     StatusCode::NOT_FOUND
 }
 
-async fn issue_csrf() -> Response {
-    let token = random_token();
+async fn issue_csrf(headers: axum::http::HeaderMap) -> Response {
+    // Reuse the browser's token: replacing it on reload or in another tab
+    // would break the hash bound to an existing authenticated session.
+    let existing = reusable_csrf_token(&headers);
+    let token = existing.clone().unwrap_or_else(random_token);
     let mut response = Json(serde_json::json!({"csrf_token":token.clone()})).into_response();
-    set_cookie(
-        &mut response,
-        "__Host-bastion_csrf",
-        &token,
-        "Path=/; Secure; SameSite=Lax",
-        None,
-    );
+    if existing.is_none() {
+        set_cookie(
+            &mut response,
+            "__Host-bastion_csrf",
+            &token,
+            "Path=/; Secure; SameSite=Lax",
+            None,
+        );
+    }
     response
+}
+
+fn reusable_csrf_token(headers: &axum::http::HeaderMap) -> Option<String> {
+    let token = cookie_value(headers, "__Host-bastion_csrf")?;
+    let decoded =
+        base64::Engine::decode(&base64::engine::general_purpose::URL_SAFE_NO_PAD, &token).ok()?;
+    (decoded.len() == 32).then_some(token)
+}
+
+fn requires_session_csrf_binding(method: &Method, path: &str) -> bool {
+    // These operations establish a new identity using their own password,
+    // challenge or one-time token. A stale/revoked session cookie must not
+    // prevent them. Exact Origin and cookie/header CSRF checks still apply.
+    !(method == Method::POST
+        && matches!(
+            path,
+            "/api/v1/bootstrap"
+                | "/api/v1/bootstrap/complete"
+                | "/api/v1/auth/activate"
+                | "/api/v1/auth/activate/complete"
+                | "/api/v1/auth/password-reset"
+                | "/api/v1/auth/password-reset/complete"
+                | "/api/v1/auth/login"
+                | "/api/v1/auth/totp"
+                | "/api/v1/auth/recovery-code"
+        ))
 }
 
 async fn bootstrap_status(
@@ -1387,7 +1418,9 @@ async fn csrf_guard(State(guard): State<CsrfGuardState>, request: Request, next:
         .get(COOKIE)
         .and_then(|v| v.to_str().ok())
         .and_then(|s| parse_cookie(s, "__Host-bastion_session"));
-    if let Some(session) = session {
+    if let Some(session) =
+        session.filter(|_| requires_session_csrf_binding(request.method(), request.uri().path()))
+    {
         let token = header.unwrap_or_default();
         match guard.core.csrf_matches(session, token).await {
             Ok(true) => {}
@@ -1564,6 +1597,94 @@ impl IntoResponse for ApiError {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[tokio::test]
+    async fn csrf_refresh_preserves_session_token_across_reloads_and_tabs() {
+        let token = random_token();
+        for session in ["", "; __Host-bastion_session=stale-or-revoked-session"] {
+            let mut headers = axum::http::HeaderMap::new();
+            headers.insert(
+                COOKIE,
+                format!("__Host-bastion_csrf={token}{session}")
+                    .parse()
+                    .unwrap(),
+            );
+            for _ in 0..2 {
+                let response = issue_csrf(headers.clone()).await;
+                // In particular, do not remove Max-Age from persistent cookies.
+                assert!(
+                    !response
+                        .headers()
+                        .contains_key(axum::http::header::SET_COOKIE)
+                );
+                let body = axum::body::to_bytes(response.into_body(), 1024)
+                    .await
+                    .unwrap();
+                let payload: serde_json::Value = serde_json::from_slice(&body).unwrap();
+                assert_eq!(payload["csrf_token"], token);
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn csrf_initialization_replaces_missing_invalid_or_duplicate_cookie() {
+        for cookie in [
+            "",
+            "__Host-bastion_csrf=invalid",
+            "__Host-bastion_csrf=a; __Host-bastion_csrf=b",
+        ] {
+            let mut headers = axum::http::HeaderMap::new();
+            headers.insert(COOKIE, cookie.parse().unwrap());
+            let response = issue_csrf(headers).await;
+            let set_cookie = response.headers()[axum::http::header::SET_COOKIE]
+                .to_str()
+                .unwrap()
+                .to_owned();
+            assert!(set_cookie.contains("; Path=/; Secure; SameSite=Lax"));
+            assert!(!set_cookie.contains("Domain="));
+            let body = axum::body::to_bytes(response.into_body(), 1024)
+                .await
+                .unwrap();
+            let payload: serde_json::Value = serde_json::from_slice(&body).unwrap();
+            let token = payload["csrf_token"].as_str().unwrap();
+            let mut issued = axum::http::HeaderMap::new();
+            issued.insert(
+                COOKIE,
+                format!("__Host-bastion_csrf={token}").parse().unwrap(),
+            );
+            assert_eq!(reusable_csrf_token(&issued).as_deref(), Some(token));
+            assert!(set_cookie.starts_with(&format!("__Host-bastion_csrf={token};")));
+        }
+    }
+
+    #[test]
+    fn stale_sessions_do_not_bind_preauth_flows_but_protected_changes_stay_bound() {
+        for path in [
+            "/api/v1/auth/login",
+            "/api/v1/auth/totp",
+            "/api/v1/auth/recovery-code",
+            "/api/v1/auth/activate",
+            "/api/v1/auth/activate/complete",
+            "/api/v1/auth/password-reset",
+            "/api/v1/auth/password-reset/complete",
+            "/api/v1/bootstrap",
+            "/api/v1/bootstrap/complete",
+        ] {
+            assert!(!requires_session_csrf_binding(&Method::POST, path));
+            assert!(requires_session_csrf_binding(&Method::PUT, path));
+        }
+        for path in [
+            "/api/v1/auth/logout",
+            "/api/v1/auth/reauth-totp",
+            "/api/v1/account/password",
+            "/api/v1/account/sessions/revoke-others",
+            "/api/v1/account/profile",
+            "/api/v1/settings/core/smtp",
+            "/api/v1/auth/login/extra",
+        ] {
+            assert!(requires_session_csrf_binding(&Method::POST, path));
+        }
+    }
 
     fn client_request(peer: &str, forwarded: Option<&str>) -> Request {
         let mut request = Request::new(axum::body::Body::empty());

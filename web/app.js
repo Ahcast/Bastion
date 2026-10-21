@@ -14,6 +14,11 @@ async function api(path,opt={}){
  let r;try{r=await fetch(base+path,{method,headers,credentials:"include",cache:"no-store",body:opt.body===undefined?undefined:JSON.stringify(opt.body)});}catch{throw Error("No se pudo conectar a la API; comprueba el origen y CORS.");}
  const data=r.status===204?null:await r.json().catch(()=>null);
  if(data&&data.csrf_token)s.csrf=data.csrf_token;
+ if(r.status===403&&data?.title==="CSRF Validation Failed"&&!["GET","HEAD","OPTIONS"].includes(method)){
+  if(!opt.csrfRetried){await api("/api/v1/auth/csrf");return api(path,{...opt,csrfRetried:true});}
+  const message="La verificación de seguridad venció. Inicia sesión de nuevo.";
+  if(s.user){s.user=null;s.access=null;login(message);}throw Error(message);
+ }
  if(!r.ok){if(r.status===428){s.resumePage=s.page;s.page="reauth";render();}if(r.status===401&&s.user){s.user=null;s.access=null;login("La sesión terminó. Inicia de nuevo.");}throw Error((data&&data.detail)||"La solicitud no se pudo completar.");}
  return data;
 }
@@ -90,7 +95,7 @@ function render(){
  const pages={inicio:home,personas:people,usuarios:users,roles:roles,ajustes:settings,cuenta:account,reauth:reauth};(pages[s.page]||home)($("#view"));
 }
 function reauth(v){v.innerHTML=head("Verifica tu identidad","Se requiere TOTP para continuar con esta operación.")+"<section class='card'><form id='reauth' class='stack'><label>Código del autenticador<input name='code' inputmode='numeric' autocomplete='one-time-code' required></label><button class='primary'>Verificar</button></form></section>";$("#reauth").onsubmit=async e=>{e.preventDefault();try{await api("/api/v1/auth/reauth-totp",{method:"POST",body:{code:new FormData(e.currentTarget).get("code")}});s.page=s.resumePage;render();note("Identidad verificada. Repite la operación.");}catch(z){note(z.message);}};}
-async function logout(){try{await api("/api/v1/auth/logout",{method:"POST"});}catch{}s.user=null;s.access=null;login("Sesión cerrada.");}
+async function logout(){try{await api("/api/v1/auth/logout",{method:"POST"});}catch(e){note(e.message);return;}s.user=null;s.access=null;login("Sesión cerrada.");}
 function head(t,d,action){return fmt("<div class='pagehead'><div><div class='eyebrow'>Bastion / Core</div><h1>{t}</h1><p>{d}</p></div>{a}</div>",{t:t,d:d,a:action||""});}
 function table(cols,rows){if(!rows.length)return "<div class='empty'>Sin registros.</div>";return "<div class='table-wrap'><table><thead><tr>"+cols.map(x=>"<th>"+esc(x)+"</th>").join("")+"</tr></thead><tbody>"+rows.map(r=>"<tr>"+r.map(x=>"<td>"+x+"</td>").join("")+"</tr>").join("")+"</tbody></table></div>";}
 function home(v){window.BastionDashboard.mount(v);}
