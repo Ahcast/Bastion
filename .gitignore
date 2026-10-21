@@ -1,0 +1,13 @@
+/target/
+/.tools/
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+*.log
+/rust-channel.toml
+.DS_Store
+Thumbs.db
