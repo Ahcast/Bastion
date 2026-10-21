@@ -4,9 +4,11 @@
 
 Copia inicial del código existente y de los lineamientos de `docs/`, publicada directamente en `main`, sin ramas de desarrollo. El workspace Rust está en la raíz; el frontend estático está en `web/`.
 
-El destino confirmado para las pruebas es `bastion.castilloit.net` y una instancia AWS Lightsail, con MySQL en Bluehost. Esta entrega solo publica código en GitHub: no configura ni despliega los servidores. Antes de probar, configurar el origen exacto del frontend en `BASTION_CORS_ALLOWED_ORIGIN` y el origen de la API en `web/config.js`.
+Los dominios confirmados para las pruebas son `bastion.castilloit.net` para el frontend en Bluehost (`162.241.224.215`) y `api.bastion.castilloit.net` para la API en AWS Lightsail (IP estática `34.236.78.141`, confirmada por el usuario y DNS verificado desde Lightsail); MySQL permanece en Bluehost. Configurar `BASTION_CORS_ALLOWED_ORIGIN` con el origen exacto del frontend y `web/config.js` con el origen de la API.
 
-La implementación es parcial y no se declara lista para producción. No se ha compilado ni ejecutado contra MySQL en este equipo, que todavía no dispone de Rust. Se comprobó la sintaxis de `web/app.js` con Node. Los flujos de cambio/restablecimiento administrativo de TOTP, cambio confirmado de correo, Empresa/SAR, OAuth/MCP y la verificación integral de seguridad/despliegue siguen pendientes; hay controles y pantallas existentes que deben validarse antes de considerar completo el Core.
+La implementación es parcial y no se declara lista para producción. GitHub Actions comprobó la compilación y las pruebas del código inicial; la conexión real con MySQL y la validación integral del despliegue siguen pendientes. Se comprobó la sintaxis de `web/app.js` con Node. Los flujos de cambio/restablecimiento administrativo de TOTP, cambio confirmado de correo, Empresa/SAR y OAuth/MCP siguen pendientes; hay controles y pantallas existentes que deben validarse antes de considerar completo el Core.
+
+El workflow `Rust checks` verifica formato, compilación y pruebas, y después genera un ejecutable de release para Lightsail: Linux x86_64 con Ubuntu 24.04. Usa `Cargo.lock` y `--locked` para conservar las versiones de dependencias. El paquete descargable `bastion-server-linux-x86_64` queda como artifact de la ejecución durante 30 días; incluye el ejecutable, una plantilla `.env.example`, el lockfile, el commit de origen y sumas SHA-256. Generar el paquete no instala ni inicia la API en el servidor.
 
 Rust backend for the new CastilloIT application. The runtime is a modular monolith: Core owns authentication, authorization, settings, the module registry, audit history, and shared API controls. Business modules are added separately and remain disabled until they are included in a release, allowed by the environment, and enabled by an administrator.
 
@@ -22,10 +24,11 @@ Rust backend for the new CastilloIT application. The runtime is a modular monoli
 
 ## Build and run
 
-Install the Rust toolchain from `rust-toolchain.toml`. Copy `.env.example` to `.env`, then set real database connection values, a TLS CA, a random bootstrap secret (at least 32 bytes), and a random 32-byte base64 data key. The normal server uses `MYSQL_USER`, which should have only the DML permissions needed by the app. Schema changes use the separate migrator account.
+Install the Rust toolchain from `rust-toolchain.toml`. Copy `.env.example` to `.env`, then set real database connection values, a TLS CA, a random bootstrap secret (at least 32 bytes), and a random 32-byte base64 data key. The normal server uses `MYSQL_USER`, which should have only the DML permissions needed by the app. Schema changes use the separate migrator credential, loaded only by `migrate`; omit it from the running server environment. `check-db` needs only the runtime MySQL configuration and CA, verifies TLS identity, and executes only `SELECT 1`, so it can test an empty database without creating tables or starting the server.
 
 ```powershell
 cargo test --workspace
+cargo run -p bastion-server -- check-db
 cargo run -p bastion-server -- migrate
 cargo run -p bastion-server -- serve
 ```

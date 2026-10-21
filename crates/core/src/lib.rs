@@ -1,11 +1,14 @@
 #![forbid(unsafe_code)]
 
+mod admin;
 mod config;
 mod database;
-mod admin;
 mod service;
 
-pub use admin::{AuditRecord, CoreAdmin, MailOutboxRecord, ModuleRecord, PersonInput, PersonRecord, RolePermissionInput, RoleRecord, SettingRecord, UserRecord};
+pub use admin::{
+    AuditRecord, CoreAdmin, MailOutboxRecord, ModuleRecord, PersonInput, PersonRecord,
+    RolePermissionInput, RoleRecord, SettingRecord, UserRecord,
+};
 pub use config::{AppConfig, ConfigError, DatabaseConfig};
 pub use database::Database;
 pub use service::{

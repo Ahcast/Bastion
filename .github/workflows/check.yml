@@ -25,7 +25,8 @@ jobs:
         run: cargo fmt --all -- --check
 
   compile-and-test:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    needs: format
     timeout-minutes: 30
     steps:
       - name: Check out source
@@ -36,6 +37,44 @@ jobs:
           toolchain: 1.99.1
           components: rustfmt
       - name: Compile workspace
-        run: cargo check --workspace
+        run: cargo check --workspace --locked
       - name: Run workspace tests
-        run: cargo test --workspace
+        run: cargo test --workspace --locked
+      - name: Build Lightsail executable
+        run: cargo build --release --locked --package bastion-server --target x86_64-unknown-linux-gnu
+      - name: Verify executable starts
+        shell: bash
+        run: |
+          set -euo pipefail
+          executable=target/x86_64-unknown-linux-gnu/release/bastion-server
+          file "$executable"
+          ldd "$executable"
+          if "$executable" invalid-command > startup-check.txt 2>&1; then
+            echo "Expected unknown command to be rejected"
+            exit 1
+          fi
+          grep -F 'unknown command' startup-check.txt
+      - name: Package Lightsail executable
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist/package
+          cp target/x86_64-unknown-linux-gnu/release/bastion-server dist/package/
+          cp Cargo.lock .env.example dist/package/
+          git rev-parse HEAD > dist/package/BUILD.txt
+          rustc --version >> dist/package/BUILD.txt
+          echo "Target: x86_64-unknown-linux-gnu; Ubuntu 24.04" >> dist/package/BUILD.txt
+          cd dist/package
+          sha256sum bastion-server > SHA256SUMS
+          cd ..
+          tar -czf bastion-server-linux-x86_64.tar.gz -C package .
+          sha256sum bastion-server-linux-x86_64.tar.gz > bastion-server-linux-x86_64.tar.gz.sha256
+      - name: Upload Lightsail package
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: bastion-server-linux-x86_64
+          path: |
+            dist/bastion-server-linux-x86_64.tar.gz
+            dist/bastion-server-linux-x86_64.tar.gz.sha256
+          if-no-files-found: error
+          retention-days: 30

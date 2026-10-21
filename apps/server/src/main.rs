@@ -1,7 +1,7 @@
 use std::{error::Error, net::SocketAddr};
 
 use bastion_api::router;
-use bastion_core::{AppConfig, CoreService, Database};
+use bastion_core::{AppConfig, CoreService, Database, DatabaseConfig};
 use tokio::net::TcpListener;
 use tracing_subscriber::EnvFilter;
 
@@ -9,38 +9,57 @@ use tracing_subscriber::EnvFilter;
 async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
     let _ = dotenvy::dotenv();
     tracing_subscriber::fmt()
-        .with_env_filter(EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info")))
-        .with_target(false).compact().init();
+        .with_env_filter(
+            EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info")),
+        )
+        .with_target(false)
+        .compact()
+        .init();
 
-    let config = AppConfig::from_env()?;
-    let command=std::env::args().nth(1).unwrap_or_else(||"serve".to_owned());
-    if command=="migrate"{
-        let migrator=Database::connect_lazy(&config.migrator_database);
+    let command = std::env::args()
+        .nth(1)
+        .unwrap_or_else(|| "serve".to_owned());
+    if command == "check-db" {
+        let database = Database::connect_lazy(&DatabaseConfig::from_env()?);
+        database.check_ready().await?;
+        tracing::info!("database connection verified with TLS VerifyIdentity (SELECT 1)");
+        return Ok(());
+    }
+    if command == "migrate" {
+        let migrator = Database::connect_lazy(&DatabaseConfig::migrator_from_env()?);
         migrator.migrate().await?;
         tracing::info!("database migrations completed");
         return Ok(());
     }
-    if command!="serve" { return Err(std::io::Error::other("unknown command").into()); }
+    if command != "serve" {
+        return Err(std::io::Error::other("unknown command").into());
+    }
+    let config = AppConfig::from_env()?;
     let database = Database::connect_lazy(&config.database);
-    let app_origin=config.cors_allowed_origin.clone();
-    let core = CoreService::new(database, config.bootstrap_secret, config.data_encryption_key)?.with_public_app_origin(app_origin.clone());
+    let app_origin = config.cors_allowed_origin.clone();
+    let core = CoreService::new(
+        database,
+        config.bootstrap_secret,
+        config.data_encryption_key,
+    )?
+    .with_public_app_origin(app_origin.clone());
     core.check_ready().await?;
-    let cleanup=core.admin();
+    let cleanup = core.admin();
     cleanup.cleanup_retention().await?;
     tokio::spawn(async move {
         loop {
-            tokio::time::sleep(std::time::Duration::from_secs(24*60*60)).await;
-            if let Err(error)=cleanup.cleanup_retention().await {
+            tokio::time::sleep(std::time::Duration::from_secs(24 * 60 * 60)).await;
+            if let Err(error) = cleanup.cleanup_retention().await {
                 let _ = error;
                 tracing::error!("retention cleanup failed");
             }
         }
     });
-    let mailer=core.clone();
+    let mailer = core.clone();
     tokio::spawn(async move {
         loop {
             match mailer.deliver_one_mail().await {
-                Ok(_) => {},
+                Ok(_) => {}
                 Err(_) => tracing::error!("mail outbox worker failed"),
             }
             tokio::time::sleep(std::time::Duration::from_secs(10)).await;
@@ -50,8 +69,12 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
     let listener = TcpListener::bind(config.listen_addr).await?;
     let local_addr: SocketAddr = listener.local_addr()?;
     tracing::info!(%local_addr, "Bastion Core server listening");
-    axum::serve(listener, app.into_make_service_with_connect_info::<SocketAddr>())
-        .with_graceful_shutdown(shutdown_signal()).await?;
+    axum::serve(
+        listener,
+        app.into_make_service_with_connect_info::<SocketAddr>(),
+    )
+    .with_graceful_shutdown(shutdown_signal())
+    .await?;
     Ok(())
 }
 
@@ -59,7 +82,9 @@ async fn shutdown_signal() {
     #[cfg(unix)]
     let terminate = async {
         tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())
-            .expect("could not register SIGTERM handler").recv().await;
+            .expect("could not register SIGTERM handler")
+            .recv()
+            .await;
     };
     #[cfg(not(unix))]
     let terminate = std::future::pending::<()>();

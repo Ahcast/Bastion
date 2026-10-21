@@ -1,9 +1,9 @@
 FROM rust:1.99.1-bookworm AS build
 WORKDIR /workspace
-COPY Cargo.toml rust-toolchain.toml ./
+COPY Cargo.toml Cargo.lock rust-toolchain.toml ./
 COPY apps ./apps
 COPY crates ./crates
-RUN cargo build --release --package bastion-server
+RUN cargo build --release --locked --package bastion-server
 
 FROM debian:bookworm-slim AS runtime
 RUN apt-get update \
