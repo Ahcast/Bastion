@@ -1340,7 +1340,13 @@ fn random_token() -> String {
 }
 
 async fn csrf_guard(State(guard): State<CsrfGuardState>, request: Request, next: Next) -> Response {
-    let client_ip = resolve_client_ip(&request, &guard.trusted_proxy_cidrs);
+    let Some(client_ip) = resolve_client_ip(&request, &guard.trusted_proxy_cidrs) else {
+        return problem(
+            StatusCode::BAD_REQUEST,
+            "Invalid Client Address",
+            "The client address could not be verified.",
+        );
+    };
     let mut request = request;
     request.extensions_mut().insert(ClientIp(client_ip));
     if matches!(
@@ -1404,26 +1410,46 @@ async fn csrf_guard(State(guard): State<CsrfGuardState>, request: Request, next:
     next.run(request).await
 }
 
-fn resolve_client_ip(request: &Request, proxies: &[IpNet]) -> String {
+fn resolve_client_ip(request: &Request, proxies: &[IpNet]) -> Option<String> {
     let peer = request
         .extensions()
         .get::<ConnectInfo<SocketAddr>>()
-        .map(|v| v.0.ip());
-    let Some(peer) = peer else {
-        return "127.0.0.1".to_owned();
-    };
-    if proxies.iter().any(|network| network.contains(&peer)) {
-        let values = request.headers().get_all("cf-connecting-ip");
-        let mut values = values.iter();
-        if let (Some(value), None) = (values.next(), values.next()) {
-            if let Ok(value) = value.to_str() {
-                if let Ok(ip) = value.parse::<IpAddr>() {
-                    return ip.to_string();
-                }
-            }
-        }
+        .map(|v| v.0.ip())?;
+    let trusted = |ip: &IpAddr| proxies.iter().any(|network| network.contains(ip));
+    if !trusted(&peer) {
+        return Some(peer.to_string());
     }
-    peer.to_string()
+
+    let mut values = request.headers().get_all("x-forwarded-for").iter();
+    let Some(value) = values.next() else {
+        return Some(peer.to_string());
+    };
+    // Require one bounded, unambiguous header from the trusted ingress. Reject
+    // malformed forwarding rather than recording the proxy as a shared client.
+    if values.next().is_some() || value.as_bytes().len() > 1024 {
+        return None;
+    }
+    let chain = value
+        .to_str()
+        .ok()?
+        .split(',')
+        .take(17)
+        .map(|part| part.trim().parse::<IpAddr>())
+        .collect::<Result<Vec<_>, _>>()
+        .ok()?;
+    if chain.len() > 16 {
+        return None;
+    }
+    // Only skip explicitly trusted hops, starting at the socket peer. A
+    // client-supplied prefix to the left of the first untrusted hop is ignored.
+    let mut client = peer;
+    for ip in chain.into_iter().rev() {
+        if !trusted(&client) {
+            break;
+        }
+        client = ip;
+    }
+    Some(client.to_string())
 }
 
 fn parse_cookie<'a>(cookies: &'a str, name: &str) -> Option<&'a str> {
@@ -1538,6 +1564,108 @@ impl IntoResponse for ApiError {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn client_request(peer: &str, forwarded: Option<&str>) -> Request {
+        let mut request = Request::new(axum::body::Body::empty());
+        request
+            .extensions_mut()
+            .insert(ConnectInfo(SocketAddr::new(peer.parse().unwrap(), 12345)));
+        if let Some(value) = forwarded {
+            request
+                .headers_mut()
+                .insert("x-forwarded-for", value.parse().unwrap());
+        }
+        request
+    }
+
+    fn ingress_proxies() -> Vec<IpNet> {
+        vec!["127.0.0.1/32".parse().unwrap(), "::1/128".parse().unwrap()]
+    }
+
+    #[test]
+    fn direct_clients_cannot_spoof_forwarding_headers() {
+        let mut request = client_request("198.51.100.25", Some("203.0.113.99"));
+        request
+            .headers_mut()
+            .insert("cf-connecting-ip", "203.0.113.98".parse().unwrap());
+        assert_eq!(
+            resolve_client_ip(&request, &ingress_proxies()).as_deref(),
+            Some("198.51.100.25")
+        );
+        let request = client_request("127.0.0.1", Some("203.0.113.99"));
+        assert_eq!(
+            resolve_client_ip(&request, &[]).as_deref(),
+            Some("127.0.0.1")
+        );
+    }
+
+    #[test]
+    fn trusted_ingress_resolves_ipv4_and_ipv6_and_ignores_cf_header() {
+        for (peer, client) in [("127.0.0.1", "198.51.100.25"), ("::1", "2001:db8::25")] {
+            let mut request = client_request(peer, Some(client));
+            request
+                .headers_mut()
+                .insert("cf-connecting-ip", "203.0.113.98".parse().unwrap());
+            assert_eq!(
+                resolve_client_ip(&request, &ingress_proxies()).as_deref(),
+                Some(client)
+            );
+        }
+    }
+
+    #[test]
+    fn forwarding_walk_stops_at_first_untrusted_hop() {
+        let request = client_request("127.0.0.1", Some("203.0.113.99, 198.51.100.25"));
+        assert_eq!(
+            resolve_client_ip(&request, &ingress_proxies()).as_deref(),
+            Some("198.51.100.25")
+        );
+        let mut proxies = ingress_proxies();
+        proxies.push("192.0.2.10/32".parse().unwrap());
+        let request = client_request("127.0.0.1", Some("203.0.113.99, 198.51.100.25, 192.0.2.10"));
+        assert_eq!(
+            resolve_client_ip(&request, &proxies).as_deref(),
+            Some("198.51.100.25")
+        );
+    }
+
+    #[test]
+    fn malformed_ambiguous_or_excessive_forwarding_is_rejected() {
+        let long_chain = std::iter::repeat_n("198.51.100.25", 17)
+            .collect::<Vec<_>>()
+            .join(",");
+        for value in [
+            "",
+            "unknown",
+            "198.51.100.25,",
+            "198.51.100.25:443",
+            &long_chain,
+            &" ".repeat(1025),
+        ] {
+            assert!(
+                resolve_client_ip(
+                    &client_request("127.0.0.1", Some(value)),
+                    &ingress_proxies()
+                )
+                .is_none()
+            );
+        }
+        let mut request = client_request("127.0.0.1", Some("198.51.100.25"));
+        request
+            .headers_mut()
+            .append("x-forwarded-for", "203.0.113.99".parse().unwrap());
+        assert!(resolve_client_ip(&request, &ingress_proxies()).is_none());
+    }
+
+    #[test]
+    fn missing_socket_peer_never_invents_localhost() {
+        let request = Request::new(axum::body::Body::empty());
+        assert!(resolve_client_ip(&request, &ingress_proxies()).is_none());
+        assert_eq!(
+            resolve_client_ip(&client_request("127.0.0.1", None), &ingress_proxies()).as_deref(),
+            Some("127.0.0.1")
+        );
+    }
 
     #[test]
     fn origin_validation_rejects_wildcards_paths_and_http() {

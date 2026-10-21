@@ -62,6 +62,8 @@ La cookie de dispositivo y la cookie de sesión son credenciales y requieren HTT
 
 La IP se obtiene del peer de conexión o de cabeceras de proxy únicamente cuando procedan de proxies confiables configurados; ignorar `X-Forwarded-For` arbitrario enviado directamente por el cliente. Debido a IP dinámicas, VPN y redes compartidas, comparar la dirección con criterio explícito, restringir su acceso y conservarla por 30 días.
 
+La implementación acepta únicamente `X-Forwarded-For` desde los CIDR de `BASTION_TRUSTED_PROXY_CIDRS`. Recorre la cadena de derecha a izquierda, omite solo proxies explícitamente confiables y usa el primer salto no confiable; ignora `CF-Connecting-IP` y otras cabeceras alternativas. Rechaza cabeceras duplicadas, valores no IP, más de 16 saltos o más de 1024 bytes y nunca inventa una IP si falta el peer de conexión. En el ingreso directo con Caddy, sobrescribir la cabecera con la IP de su conexión y mantener el backend en loopback, como en `deploy/Caddyfile.example`. Si se agrega otro proxy delante de Caddy, configurar y verificar primero su cadena de confianza; no confiar en rangos generales de clientes. La IP registrada es la salida pública observada (incluida una VPN o NAT), no la dirección privada del teléfono o computadora.
+
 ### TOTP y recuperación
 
 - El enrolamiento debe requerir autenticación reciente, mostrar el secreto de enrolamiento una sola vez y confirmarlo con un TOTP válido antes de activarlo. Para cambiar el factor desde Mi cuenta, exigir contraseña y TOTP vigente, verificar el nuevo enrolamiento, invalidar los códigos de recuperación anteriores y emitir nuevos. TOTP no se puede desactivar.
