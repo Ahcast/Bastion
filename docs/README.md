@@ -18,6 +18,8 @@ Este paquete convierte el análisis de la aplicación actual y las decisiones ac
 | `09-despliegue.md` | Bluehost, AWS, MySQL, ambientes y conectividad. |
 | `10-criterios-de-aceptacion.md` | Cómo revisar paridad y completar la implementación. |
 | `12-direccion-visual.md` | Referencia visual elegida y sistema de diseño a derivar de ella. |
+| `13-panel-inicio.md` | Inicio del Core, cinco áreas, navegación plegable y adaptación móvil. |
+| `adr/ADR-0002-frontend-react.md` | React + TypeScript + Vite y build estático para Bluehost. |
 | `adr/ADR-0001-stack-inicial.md` | Decisión técnica del primer corte del Core. |
 | `modulos/README.md` | Catálogo de módulos derivado del informe actual. |
 | `modulos/_plantilla-modulo.md` | Plantilla común de especificación por módulo. |
@@ -33,6 +35,13 @@ Cada módulo del catálogo tendrá una ficha individual dentro de `modulos/`.
 El informe se obtuvo de una copia de frontend Angular compilado y backend Laravel. No se validaron pantallas en una sesión activa ni se dispuso del esquema completo de producción. No interpretar los pendientes como ausencia de funcionalidad.
 
 ## Registro de decisiones
+
+- 2026-10-21: frontend y API instalados en el ambiente de pruebas con HTTPS y MySQL TLS verificado. Las notas de operación, IPs, cuentas y rutas reales se conservan localmente fuera del repositorio público.
+
+- 2026-10-21: el usuario confirma React + TypeScript estricto y Vite para el frontend del Core y módulos. Se compila como archivos estáticos para Bluehost, con Node únicamente en desarrollo/CI. Se mantiene Rust en AWS y MySQL en Bluehost. Se migra con paridad funcional y visual, carga por pantallas y cliente API/CSRF común; primero documentación, después GitHub validado y finalmente Bluehost. La decisión y sus límites se registran en `adr/ADR-0002-frontend-react.md`.
+
+- 2026-10-21: se corrige el enrolamiento TOTP del frontend para mostrar QR SVG generado localmente, además de la clave manual. Se incluye `qrcode-generator` 2.0.4 bajo MIT en `web/vendor/`; la URI y la clave no se envían a servicios QR externos. El mismo componente visual se reutiliza en el cambio de autenticador, cuyo endpoint sigue pendiente de implementación. Se verifica la decodificación exacta de tres URI de prueba con un lector independiente y la alternativa manual ante fallo del generador. La corrección de archivos estáticos se publica en Bluehost con respaldo previo.
+
 
 - 2026-10-21: se confirma por SSH de solo lectura que Lightsail usa Ubuntu 24.04.4, arquitectura x86_64 y glibc 2.39. El pipeline genera el ejecutable de release en Ubuntu 24.04 para `x86_64-unknown-linux-gnu`, después de formato y pruebas, con dependencias fijadas por `Cargo.lock`. Publica un artifact con procedencia y SHA-256; esta etapa prepara el paquete sin instalar ni iniciar servicios en Lightsail.
 
@@ -62,10 +71,6 @@ El informe se obtuvo de una copia de frontend Angular compilado y backend Larave
 - Bluehost usa MySQL 5.7; el Core inicial y sus migraciones deben ser compatibles con esta versión. Se puede usar el tipo nativo `JSON` para settings con validación de contenido en Rust. Confirmar la versión de mantenimiento exacta, TLS y acceso remoto del plan. MySQL 5.7 está en Sustaining Support de Oracle desde octubre de 2023; revisar con Bluehost la ruta de actualización antes de producción.
 - PDFs generados con Typst y adjuntos se guardan en almacenamiento privado de objetos en AWS; acceso público deshabilitado y autorización comprobada por el Core. No caducan mientras exista el registro asociado; al borrar el registro con permiso, confirmación y auditoría, se eliminan sus archivos. Servicio y respaldo quedan por definir técnicamente.
 - Protección perimetral propuesta: Cloudflare Free como DNS/proxy/WAF para `bastion.castilloit.net` y `api.bastion.castilloit.net`; MySQL sigue directo entre AWS y Bluehost y requiere su propio control de IP/TLS. Las limitaciones del plan se documentan en `09-despliegue.md`.
-- 2026-10-21: el usuario confirma frontend Bluehost en `bastion.castilloit.net` (`162.241.224.215`), API AWS Lightsail en `api.bastion.castilloit.net` (`52.204.2.154`) y MySQL en Bluehost. Lightsail resuelve ambos dominios a sus respectivos orígenes; en la verificación el backend aún no estaba desplegado ni escuchando.
-- 2026-10-21: el usuario actualiza la IP de Lightsail a `34.236.78.141` y confirma que es estática; sustituye a `52.204.2.154`. Verificar el registro A de `api.bastion.castilloit.net` y actualizar la lista de acceso MySQL en Bluehost antes de probar la conexión con la base nueva.
-- 2026-10-21: DNS de la API verificado desde Lightsail hacia `34.236.78.141`. Se separa la carga de credenciales de migración del servidor normal y se añade `check-db`, que exige TLS `VerifyIdentity` y ejecuta solo `SELECT 1` para probar una base vacía sin ejecutar migraciones ni mantenimiento. Las cuentas antiguas fueron eliminadas por el usuario; la nueva conexión debe usar exclusivamente la base y el usuario nuevos que confirme.
-- 2026-10-21: frontend de `web/` publicado por solicitud del usuario en Bluehost, `/home4/pzvswzmy/public_html/website_8a43abe8`, con respaldo privado del sitio anterior. Se verificaron integridad de archivos y pantalla de acceso con estilos en el navegador. El frontend apunta a `https://api.bastion.castilloit.net`; la API HTTPS sigue sin responder en la comprobación. Esta publicación no ejecutó migraciones ni cambió cuentas o permisos MySQL.
 - Salida SMTP: el Administrador configura un servidor global; el usuario no controla el host/puerto/TLS ni puede enviar overrides. El backend conecta únicamente al host global configurado, valida/pinea su IP pública y TLS, y bloquea redes internas y metadatos; AWS restringe el egreso SMTP a los puertos aprobados y a CIDR estables cuando existan. Esto elimina la selección de destino desde una cuenta de usuario y reduce el riesgo residual por error o compromiso administrativo.
 - Lineamientos de seguridad de prioridad alta acordados para el core: límites por operación y cuenta, límites perimetrales con Cloudflare Free más cuotas del backend, permisos por operación/objeto para UI/API/MCP, conexión AWS–MySQL restringida y verificada, y controles de sesión/CSRF. El detalle normativo está en `08-seguridad-y-permisos.md` y se refleja en arquitectura, contratos y criterios de aceptación.
 - Estrategia de lanzamiento: desplegar y probar el Core solo en servidores; después incorporar y validar un módulo por release. Se confirma un backend Rust común y habilitación de módulos por ambiente; el mismo artefacto se ejecuta con Core solo o con los módulos habilitados. Artefactos independientes o carga dinámica quedan fuera del primer release.

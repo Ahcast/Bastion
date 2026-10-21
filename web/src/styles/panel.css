@@ -48,3 +48,38 @@ button:focus-visible{outline-color:var(--ink)}
 .menu-toggle{display:inline-flex;align-items:center;justify-content:center;min-width:44px;min-height:44px;padding:6px;font-size:20px}
 .shell.sidebar-collapsed{grid-template-columns:minmax(0,1fr)}
 .shell.sidebar-collapsed>.sidebar{display:none}
+
+/* Shared React forms, touch targets and compact mobile records. */
+.form-fields{display:grid;gap:14px;border:0;padding:0;margin:0;min-width:0}
+button{min-height:44px}
+.text-button{border:0;background:transparent;padding:0;color:var(--rust);text-decoration:underline;font-weight:400;text-align:left}
+.text-button:hover{background:transparent}
+.auth-card{min-width:0;overflow-wrap:anywhere}
+.auth-links{gap:12px;align-items:center;flex-wrap:wrap}
+.auth-card>.ghost{margin-top:16px}
+.recovery-codes{font:14px/1.8 var(--mono);white-space:pre-wrap;overflow-wrap:anywhere}
+.section-tabs{margin-bottom:16px;align-items:stretch}
+.section-tabs button[aria-pressed=true]{background:var(--ink);color:var(--on-accent)}
+.section-heading{margin-top:28px}
+.core-table td{overflow-wrap:anywhere;max-width:420px}
+.modal-backdrop{z-index:40}
+.modal{min-width:0;max-height:calc(100dvh - 36px);overflow-wrap:anywhere}
+.modal-head>button{min-width:44px;flex:none}
+body:has(.modal-backdrop){overflow:hidden}
+hr{border:0;border-top:1px solid var(--line);margin:28px 0}
+@media(max-width:640px){
+ .auth-wrap{padding:16px;align-items:start;padding-top:32px}
+ .auth-card{padding:22px 18px;box-shadow:2px 2px 0 var(--ink)}
+ .card{padding:16px 12px}
+ .row{align-items:stretch}
+ .section-tabs button{flex:1 1 120px}
+ .core-table{display:block;min-width:0}
+ .core-table thead{position:absolute;clip-path:inset(50%);width:1px;height:1px;overflow:hidden}
+ .core-table tbody,.core-table tr{display:block;width:100%}
+ .core-table tr+tr{border-top:2px solid var(--ink)}
+ .core-table td{display:grid;grid-template-columns:minmax(74px,.35fr) minmax(0,1fr);gap:12px;max-width:none;font-size:14px;padding:10px 12px}
+ .core-table td::before{content:attr(data-label);font:500 10px/1.6 var(--mono);text-transform:uppercase;color:var(--muted)}
+ .core-table .actions{min-width:0}
+ .modal-backdrop{padding:12px}
+ .modal{padding:18px 14px;max-height:calc(100dvh - 24px)}
+}

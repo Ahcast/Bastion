@@ -52,7 +52,7 @@ La organización es conceptual, con estas decisiones para el primer corte del Co
 - `tower-http` para CORS exacto, límite de cuerpo, identificador de solicitud y cabeceras HTTP de seguridad.
 - El primer corte no registra módulos de negocio ni publica herramientas MCP. El crate MCP queda como punto de extensión; transporte, OAuth y registro de clientes se implementan después conforme a `06-mcp.md`.
 
-Esta selección fija las dependencias de infraestructura del arranque, pero no adelanta decisiones pendientes sobre almacenamiento de sesiones, frontend, almacenamiento de cuotas distribuido, CI/CD, Typst ni proveedor MCP.
+El frontend se fija mediante `adr/ADR-0002-frontend-react.md`: React y TypeScript estricto, compilados con Vite a archivos estáticos para Bluehost. Los componentes comparten cliente API, identidad, navegación y diseño del Core; las pantallas se cargan bajo demanda. Node.js se limita al desarrollo y CI. Rust conserva toda autorización y validación. Las decisiones sobre cuotas distribuidas, Typst y proveedor MCP se completan conforme a sus contratos.
 
 ## Conexión y despliegue progresivo de módulos
 
@@ -91,7 +91,7 @@ Los requisitos verificables están en `08-seguridad-y-permisos.md`; sus límites
 
 ## Decisiones técnicas pendientes
 
-Migraciones y esquema MySQL compatibles con 5.7, mecanismo concreto de sesión, frontend nuevo/reutilizado, almacenamiento compartido para cuotas si se ejecutan varias instancias, herramientas del pipeline y configuración técnica de activación por ambiente, integración de Typst y gestión de plantillas/fuentes, y librería/versión de transporte MCP. Confirmar la versión de mantenimiento de Bluehost, TLS remoto y la ruta de actualización antes de producción.
+Completar validación integral del esquema MySQL y las sesiones existentes, almacenamiento compartido para cuotas si se ejecutan varias instancias, configuración técnica de activación por ambiente, integración de Typst y gestión de plantillas/fuentes, y librería/versión de transporte MCP. El frontend React + TypeScript + Vite ya está decidido. Confirmar la ruta de actualización de MySQL antes de producción.
 
 ## Referencias de versión MySQL
 

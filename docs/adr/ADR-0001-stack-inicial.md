@@ -26,4 +26,6 @@ BastionV1 debe comenzar como backend Rust modular, desplegable primero sin módu
 
 ## Fuera de esta decisión
 
+Actualización del 2026-10-21: la selección del frontend se resuelve en `ADR-0002-frontend-react.md`; React + TypeScript + Vite, publicado como archivos estáticos en Bluehost.
+
 Selección del frontend, mecanismo de sesión, proveedor y diseño de OAuth/MCP, almacenamiento compartido para cuotas, pipeline de despliegue, Typst y almacenamiento de objetos. Siguen pendientes conforme a `03-arquitectura-rust.md` y `09-despliegue.md`.

@@ -1,6 +1,9 @@
 /target/
 /dist/
 /.tools/
+/web/node_modules/
+/web/dist/
+/web/.test-build/
 .env
 .env.*
 !.env.example

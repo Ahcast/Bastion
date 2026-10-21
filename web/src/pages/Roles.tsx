@@ -1,0 +1,13 @@
+import { useState } from 'react';
+import { message } from '../api.js';
+import { Dialog, Form, Heading, Loading, Notice, Table, useCore, useLoad } from '../ui.js';
+import type { Permission, Role } from '../types.js';
+export default function Roles() {
+  const { api, notify } = useCore(), [creating, setCreating] = useState(false), [editing, setEditing] = useState<number | null>(null);
+  const result = useLoad(signal => api.request<Role[]>('/api/v1/admin/roles', { signal }));
+  return <><Heading title="Roles y permisos" description="Los roles personalizados comienzan sin permisos." action={<button className="primary" onClick={() => setCreating(true)}>Nuevo rol</button>} /><Notice>{result.error}</Notice>{result.data ? <Table columns={['Rol', 'Descripción', 'Protegido', 'Acción']} rows={result.data.map(role => [role.name, role.description, role.protected ? 'Sí' : 'No', role.protected ? 'Integrado' : <div className="actions"><button onClick={() => setEditing(role.id)}>Permisos</button><button className="danger" onClick={async () => { if (!confirm('¿Eliminar rol?')) return; try { await api.request(`/api/v1/admin/roles/${role.id}`, { method: 'DELETE' }); result.reload(); } catch (error) { notify(message(error)); } }}>Eliminar</button></div>])} /> : !result.error && <Loading />}{creating && <Dialog title="Crear rol" close={() => setCreating(false)}><Form fields={[{ name: 'name', label: 'Nombre', maxLength: 100, required: true }, { name: 'description', label: 'Descripción', maxLength: 500 }]} onSubmit={async values => { await api.request('/api/v1/admin/roles', { method: 'POST', body: values }); setCreating(false); result.reload(); }} /></Dialog>}{editing !== null && <Permissions id={editing} close={() => setEditing(null)} />}</>;
+}
+function Permissions({ id, close }: { id: number; close: () => void }) {
+  const { api, notify } = useCore(), result = useLoad(signal => api.request<Permission[]>(`/api/v1/admin/roles/${id}/permissions`, { signal }), [id]);
+  return <Dialog title="Permisos" close={close}><p>Capacidades: ver, editar (incluye crear), eliminar.</p><Notice>{result.error}</Notice>{result.data ? <Form fields={[{ name: 'permissions', label: 'Permisos en JSON', multiline: true, required: true }]} initial={{ permissions: JSON.stringify(result.data, null, 2) }} onSubmit={async values => { let permissions: unknown; try { permissions = JSON.parse(values.permissions ?? ''); } catch { throw new Error('JSON no válido.'); } if (!Array.isArray(permissions)) throw new Error('Los permisos deben ser una lista.'); await api.request(`/api/v1/admin/roles/${id}`, { method: 'PATCH', body: { permissions } }); notify('Permisos guardados.'); close(); }} /> : !result.error && <Loading />}</Dialog>;
+}

@@ -1,4 +1,4 @@
-name: Rust checks
+name: Core checks
 
 on:
   push:
@@ -12,14 +12,48 @@ permissions:
 jobs:
   frontend-auth:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
     steps:
       - name: Check out source
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
-      - name: Check frontend syntax and CSRF recovery
+      - name: Set up Node.js
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '24.19.0'
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: Install pinned frontend dependencies
+        working-directory: web
+        run: npm ci --ignore-scripts
+      - name: Verify frontend types, security regressions and production build
+        working-directory: web
         run: |
-          node --check web/app.js
-          node --test web/tests/csrf-client.test.cjs
+          npm run typecheck
+          npm test
+          npm run build
+          npm audit --omit=dev --audit-level=high
+      - name: Package static frontend
+        shell: bash
+        run: |
+          set -euo pipefail
+          git rev-parse HEAD > web/dist/BUILD.txt
+          node --version >> web/dist/BUILD.txt
+          cd web/dist
+          find . -type f ! -name SHA256SUMS -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS
+          cd ../..
+          mkdir -p dist
+          tar -czf dist/bastion-web-static.tar.gz -C web/dist .
+          cd dist
+          sha256sum bastion-web-static.tar.gz > bastion-web-static.tar.gz.sha256
+      - name: Upload static frontend
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: bastion-web-static
+          path: |
+            dist/bastion-web-static.tar.gz
+            dist/bastion-web-static.tar.gz.sha256
+          if-no-files-found: error
+          retention-days: 30
 
   format:
     runs-on: ubuntu-latest

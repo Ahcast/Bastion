@@ -2,7 +2,7 @@
 
 ## Fuente revisada
 
-El usuario indicó que le gustan el diseño y los colores del panel de referencia. Se revisó como texto estático la exportación HTML local `C:\Users\Marco\Downloads\Bastion · Panel (1).html`. No se ejecutó el HTML ni su JavaScript.
+El usuario indicó que le gustan el diseño y los colores del panel de referencia. Se revisó como texto estático la exportación HTML local `Bastion · Panel (1).html`, proporcionada localmente. No se ejecutó el HTML ni su JavaScript.
 
 La hoja CSS declara el concepto **“Bastion · Concreto”**: una interfaz mate y sobria, con masas de carbón para texto y acciones, reglas oscuras para estructurar y óxido para alertas. Las superficies son cuadradas y planas. La exportación define tokens con valores precisos; se toman como dirección visual confirmada por el usuario, pero deben validarse en la implementación por contraste y legibilidad.
 
@@ -83,3 +83,5 @@ La exportación contiene datos de demostración, nombres, importes, etiquetas y 
 ## Aplicación en el frontend
 
 Implementar los valores como tokens centrales del tema y componentes reutilizables. Los ajustes visuales propios de cada módulo deben limitarse a configuración admitida por el core; no deben permitir que un módulo rompa la consistencia de la paleta, la tipografía o los estados accesibles. Documentar cualquier cambio respecto a esta referencia antes de aplicarlo a toda la interfaz.
+
+Los componentes se implementan en React con TypeScript según ADR-0002. Conservar los tokens CSS y las fuentes locales; la migración tecnológica no cambia la dirección Concreto. Formularios, tablas, estados vacíos, mensajes, modales y navegación son componentes compartidos con adaptación móvil y control de foco.

@@ -2,6 +2,8 @@
 
 ## Modelo
 
+El frontend usa React + TypeScript estricto y Vite conforme a ADR-0002, publicado como archivos estáticos. Renderizar datos como texto/atributos React y validar URLs según su uso; no usar HTML crudo ni ejecución dinámica. Un cliente API común conserva cookies y controles CSRF, sin credenciales en almacenamiento web. TypeScript no valida datos en ejecución ni concede permisos. Fijar dependencias por lockfile, revisar vulnerabilidades y no incluir secretos ni archivos fuente de configuración privada en el build.
+
 El core autentica usuarios y resuelve roles/permisos. Los módulos declaran permisos; todos los adaptadores (UI, API y MCP) consultan al mismo servicio de autorización. La autorización efectiva se aplica en servidor por operación y recurso.
 
 ## Controles requeridos

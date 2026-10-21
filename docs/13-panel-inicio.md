@@ -27,7 +27,7 @@ El usuario solicita también plegar el lateral para ampliar el área de trabajo.
 
 ## Integración
 
-`web/dashboard.js` contiene únicamente metadatos de presentación y el montaje de Inicio. `web/dashboard.css` contiene su distribución adaptable; `web/panel.css` mantiene los tokens compartidos y la navegación. El código de referencia se consulta para apariencia y comportamiento solicitado, sin incorporar sus scripts ni sus datos de demostración.
+`web/src/pages/Dashboard.tsx` contiene los metadatos de presentación y los componentes React de Inicio. `web/src/styles/dashboard.css` contiene su distribución adaptable; `web/src/styles/panel.css` mantiene los tokens compartidos y la navegación. El estado seleccionado se conserva en React. El código de referencia se consulta para apariencia y comportamiento solicitado, sin incorporar sus scripts ni sus datos de demostración. La compilación y publicación siguen ADR-0002.
 
 ## Validación del frontend
 

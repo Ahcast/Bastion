@@ -2,13 +2,13 @@
 
 ## Estado de esta entrega
 
-Copia inicial del código existente y de los lineamientos de `docs/`, publicada directamente en `main`, sin ramas de desarrollo. El workspace Rust está en la raíz; el frontend estático está en `web/`.
+Código y lineamientos publicados directamente en `main`, sin ramas de desarrollo. El workspace Rust está en la raíz; el frontend React + TypeScript estricto y Vite está en `web/` y se publica como build estático en Bluehost. La decisión se documenta en `docs/adr/ADR-0002-frontend-react.md`.
 
-Los dominios confirmados para las pruebas son `bastion.castilloit.net` para el frontend en Bluehost (`162.241.224.215`) y `api.bastion.castilloit.net` para la API en AWS Lightsail (IP estática `34.236.78.141`, confirmada por el usuario y DNS verificado desde Lightsail); MySQL permanece en Bluehost. Configurar `BASTION_CORS_ALLOWED_ORIGIN` con el origen exacto del frontend y `web/config.js` con el origen de la API.
+Los dominios confirmados para las pruebas son `bastion.castilloit.net` para el frontend en Bluehost y `api.bastion.castilloit.net` para la API en AWS Lightsail; MySQL permanece en Bluehost. Configurar `BASTION_CORS_ALLOWED_ORIGIN` con el origen exacto del frontend y `web/public/config.js` con el origen de la API.
 
-La implementación es parcial y no se declara lista para producción. GitHub Actions comprobó la compilación y las pruebas del código inicial; la conexión real con MySQL y la validación integral del despliegue siguen pendientes. Se comprobó la sintaxis de `web/app.js` con Node. Los flujos de cambio/restablecimiento administrativo de TOTP, cambio confirmado de correo, Empresa/SAR y OAuth/MCP siguen pendientes; hay controles y pantallas existentes que deben validarse antes de considerar completo el Core.
+La implementación es parcial y no se declara lista para producción. La API y la conexión TLS con MySQL se verificaron en el ambiente de pruebas. El frontend conserva las pantallas del Core y sus contratos API; las pruebas integrales con usuarios siguen siendo necesarias. Los flujos de cambio/restablecimiento administrativo de TOTP, cambio confirmado de correo, Empresa/SAR y OAuth/MCP siguen pendientes.
 
-El workflow `Rust checks` verifica formato, compilación y pruebas, y después genera un ejecutable de release para Lightsail: Linux x86_64 con Ubuntu 24.04. Usa `Cargo.lock` y `--locked` para conservar las versiones de dependencias. El paquete descargable `bastion-server-linux-x86_64` queda como artifact de la ejecución durante 30 días; incluye el ejecutable, una plantilla `.env.example`, el lockfile, el commit de origen y sumas SHA-256. Generar el paquete no instala ni inicia la API en el servidor.
+El workflow `Core checks` verifica Rust y el frontend. Usa `Cargo.lock`/`--locked` y `package-lock.json`/`npm ci`, comprueba tipos, pruebas y compilación, y publica los artifacts `bastion-server-linux-x86_64` y `bastion-web-static` durante 30 días. Ambos incluyen procedencia y SHA-256. El backend se compila para Linux x86_64/Ubuntu 24.04; el frontend contiene solo archivos publicables. Generar los paquetes no los instala en los servidores.
 
 Rust backend for the new CastilloIT application. The runtime is a modular monolith: Core owns authentication, authorization, settings, the module registry, audit history, and shared API controls. Business modules are added separately and remain disabled until they are included in a release, allowed by the environment, and enabled by an administrator.
 
@@ -23,6 +23,8 @@ Rust backend for the new CastilloIT application. The runtime is a modular monoli
 - MySQL 5.7-compatible schema and parameterized SQL. The runtime pool is bounded and MySQL TLS identity is verified.
 
 ## Build and run
+
+Frontend (Node.js 22.12+ para desarrollo/CI): ejecutar `npm ci`, `npm run typecheck`, `npm test` y `npm run build` dentro de `web/`. `npm run dev` sirve el desarrollo local; `web/dist/` es el único directorio publicable. Configurar el origen HTTPS público en `web/public/config.js`; nunca incluir secretos. Bluehost sirve los archivos y no ejecuta Node. Ver ADR-0002 para paridad, seguridad, rendimiento y publicación.
 
 Install the Rust toolchain from `rust-toolchain.toml`. Copy `.env.example` to `.env`, then set real database connection values, a TLS CA, a random bootstrap secret (at least 32 bytes), and a random 32-byte base64 data key. The normal server uses `MYSQL_USER`, which should have only the DML permissions needed by the app. Schema changes use the separate migrator credential, loaded only by `migrate`; omit it from the running server environment. `check-db` needs only the runtime MySQL configuration and CA, verifies TLS identity, and executes only `SELECT 1`, so it can test an empty database without creating tables or starting the server.
 

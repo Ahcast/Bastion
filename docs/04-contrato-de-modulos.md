@@ -1,5 +1,9 @@
 # Contrato de módulos
 
+## Integración del frontend
+
+El frontend usa React + TypeScript estricto y Vite (ADR-0002). Cada pantalla de módulo reutiliza cliente HTTP/CSRF, componentes, tokens visuales y navegación del Core; su código se carga bajo demanda. Registrar pantallas conforme al catálogo y permisos recibidos del API. Los permisos visibles no autorizan operaciones: Rust vuelve a verificarlos por recurso. Las vistas previas de Inicio no activan módulos ni llaman endpoints futuros.
+
 ## Objetivo
 
 Permitir que un módulo se conecte al core y contribuya capacidades sin duplicar identidad, permisos, navegación, API, MCP ni Ajustes.

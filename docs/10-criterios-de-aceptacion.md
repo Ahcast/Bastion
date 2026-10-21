@@ -1,5 +1,14 @@
 # Criterios de aceptación y cierre de paridad
 
+## Frontend React
+
+- React + TypeScript estricto + Vite, con lockfile y build estático reproducible para Bluehost; verificar tipos, pruebas y compilación en CI antes de publicar.
+- Preservar las pantallas y contratos existentes del Core, QR generado localmente, sesiones/CSRF y reautenticación, navegación y permisos. No declarar implementados endpoints pendientes.
+- No insertar HTML dinámico; datos del API presentados por React. Sin credenciales en almacenamiento web o build.
+- Comprobar 320, 390, 768 y 1440 px, teclado, foco de modales y menú, lateral plegable y cinco áreas de Inicio sin estadísticas ficticias. Sin scroll horizontal del documento.
+- Comprobar recuperación CSRF, un único reintento seguro, logout fallido visible, vencimiento/reautenticación y errores sin perder el control de la interfaz.
+- Publicar únicamente el build validado, respaldar la versión previa fuera del directorio público y verificar por HTTPS los hashes de los archivos publicados.
+
 ## Criterio por pantalla
 
 Una pantalla se considera documentada cuando especifica:
