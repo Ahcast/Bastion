@@ -43,3 +43,8 @@ button:focus-visible{outline-color:var(--ink)}
  .toast{left:16px;right:16px;max-width:none;overflow-wrap:anywhere}
 }
 .sidebar .muted{color:#abb3b5}
+
+/* One persistent menu button; the desktop sidebar can be fully folded away. */
+.menu-toggle{display:inline-flex;align-items:center;justify-content:center;min-width:44px;min-height:44px;padding:6px;font-size:20px}
+.shell.sidebar-collapsed{grid-template-columns:minmax(0,1fr)}
+.shell.sidebar-collapsed>.sidebar{display:none}

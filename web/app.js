@@ -2,7 +2,7 @@
 "use strict";
 const base=String(window.BASTION_API_BASE||"").replace(/\/$/,"");
 const app=document.getElementById("app"),toast=document.getElementById("toast");
-const s={csrf:"",user:null,access:null,page:"inicio",resumePage:"inicio"};
+const s={csrf:"",user:null,access:null,page:"inicio",resumePage:"inicio",sidebarCollapsed:false};
 const esc=x=>String(x??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const $=(x,r=document)=>r.querySelector(x);
 const fmt=(t,o)=>t.replace(/\{([a-z0-9_]+)\}/gi,(_,k)=>String(o[k]??""));
@@ -64,6 +64,18 @@ function resetPage(){
 const isAdmin=()=>Boolean(s.access&&s.access.is_system_administrator);
 const can=(m,scope,c)=>isAdmin()||Boolean(s.access&&s.access.permissions&&s.access.permissions.some(p=>p.module_id===m&&p.capability===c&&(p.scope_key===scope||p.scope_key==="*")));
 const nav=[["inicio","Inicio","PANEL",()=>true],["personas","Personas","CORE",()=>can("core","personas","ver")],["usuarios","Usuarios","CORE",isAdmin],["roles","Roles y permisos","CORE",isAdmin],["ajustes","Ajustes","SISTEMA",isAdmin],["cuenta","Mi cuenta","SISTEMA",()=>true]];
+function syncNavigation(){
+ const side=$("#side"),menu=$("#menu"),scrim=$("#nav-scrim"),shell=$(".shell");
+ if(!side||!menu||!shell)return;
+ const mobile=window.matchMedia("(max-width:800px)").matches;
+ if(!mobile){side.classList.remove("open");scrim.hidden=true;}
+ const expanded=mobile?side.classList.contains("open"):!s.sidebarCollapsed;
+ shell.classList.toggle("sidebar-collapsed",!mobile&&s.sidebarCollapsed);
+ side.inert=!expanded;side.setAttribute("aria-hidden",String(!expanded));
+ const label=expanded?"Ocultar menú lateral":"Mostrar menú lateral";
+ menu.setAttribute("aria-expanded",String(expanded));menu.setAttribute("aria-label",label);menu.title=label;
+ if((!expanded&&side.contains(document.activeElement))||(!mobile&&document.activeElement===$("#nav-close")))menu.focus();
+}
 function render(){
  if(!s.user){login();return;}
  const groups=[...new Set(nav.filter(n=>n[3]()).map(n=>n[2]))],cur=nav.find(n=>n[0]===s.page)||nav[0];
@@ -71,9 +83,10 @@ function render(){
   brand:brand(),nav:groups.map(g=>"<div class='navgroup'>"+esc(g)+"</div>"+nav.filter(n=>n[2]===g&&n[3]()).map(n=>fmt("<button class='navbtn {active}' data-nav='{id}'>{label}</button>",{active:s.page===n[0]?"active":"",id:n[0],label:esc(n[1])})).join("")).join(""),
   name:esc(s.user.name),role:esc(s.user.role),title:esc(cur[1].toUpperCase()),email:esc(s.user.email)});
  const menu=$("#menu"),side=$("#side"),scrim=$("#nav-scrim");
- const closeNavigation=()=>{side.classList.remove("open");scrim.hidden=true;menu.setAttribute("aria-expanded","false");menu.focus();};
- menu.onclick=()=>{if(side.classList.contains("open")){closeNavigation();return;}side.classList.add("open");scrim.hidden=false;menu.setAttribute("aria-expanded","true");$("#nav-close").focus();};
+ const closeNavigation=()=>{side.classList.remove("open");scrim.hidden=true;syncNavigation();menu.focus();};
+ menu.onclick=()=>{if(!window.matchMedia("(max-width:800px)").matches){s.sidebarCollapsed=!s.sidebarCollapsed;syncNavigation();return;}if(side.classList.contains("open")){closeNavigation();return;}side.classList.add("open");scrim.hidden=false;syncNavigation();$("#nav-close").focus();};
  $("#nav-close").onclick=closeNavigation;scrim.onclick=closeNavigation;$("#logout").onclick=logout;app.querySelectorAll("[data-nav]").forEach(b=>b.onclick=()=>{s.page=b.dataset.nav;render();});
+ syncNavigation();
  const pages={inicio:home,personas:people,usuarios:users,roles:roles,ajustes:settings,cuenta:account,reauth:reauth};(pages[s.page]||home)($("#view"));
 }
 function reauth(v){v.innerHTML=head("Verifica tu identidad","Se requiere TOTP para continuar con esta operación.")+"<section class='card'><form id='reauth' class='stack'><label>Código del autenticador<input name='code' inputmode='numeric' autocomplete='one-time-code' required></label><button class='primary'>Verificar</button></form></section>";$("#reauth").onsubmit=async e=>{e.preventDefault();try{await api("/api/v1/auth/reauth-totp",{method:"POST",body:{code:new FormData(e.currentTarget).get("code")}});s.page=s.resumePage;render();note("Identidad verificada. Repite la operación.");}catch(z){note(z.message);}};}
@@ -102,5 +115,6 @@ document.addEventListener("keydown",e=>{
  if(e.key==="Escape"){if(side)$("#nav-close").click();else closeModal();}
  if(e.key==="Tab"&&side){const controls=Array.from(side.querySelectorAll("button:not([disabled])"));const first=controls[0],last=controls.at(-1);if(e.shiftKey&&document.activeElement===first){e.preventDefault();last.focus();}else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus();}}
 });
+window.matchMedia?.("(max-width:800px)").addEventListener("change",syncNavigation);
 init();
 })();

@@ -23,6 +23,8 @@ En escritorio se muestran cinco tarjetas y una composición de varias columnas. 
 
 La selección usa el patrón accesible de pestañas: un foco de Tab, selección con flechas izquierda/derecha e Inicio/Fin, relación con el panel y anuncio del área seleccionada. No depende exclusivamente del color ni del hover.
 
+El usuario solicita también plegar el lateral para ampliar el área de trabajo. En escritorio un único botón de menú, siempre visible en la barra superior, oculta o muestra por completo el lateral. El área de trabajo ocupa el espacio liberado. El estado se conserva al navegar dentro de la sesión de la interfaz; no agrega ajustes de apariencia ni persiste valores de cuenta. En celular se mantiene el menú superpuesto, independiente del plegado de escritorio. Al ocultarse, el lateral sale del recorrido de teclado y del árbol accesible; el botón refleja el estado y conserva una etiqueta accesible.
+
 ## Integración
 
 `web/dashboard.js` contiene únicamente metadatos de presentación y el montaje de Inicio. `web/dashboard.css` contiene su distribución adaptable; `web/panel.css` mantiene los tokens compartidos y la navegación. El código de referencia se consulta para apariencia y comportamiento solicitado, sin incorporar sus scripts ni sus datos de demostración.
@@ -30,3 +32,5 @@ La selección usa el patrón accesible de pestañas: un foco de Tab, selección 
 ## Validación del frontend
 
 Con una sesión ficticia aislada se comprueba en navegador que las cinco tarjetas actualizan título, descripción, gráficos vacíos y encabezados de tabla. Se validan selección con Inicio/Fin, recorrido circular con flechas, apertura/cierre del menú, Escape y ciclo de foco del menú móvil. Se revisan anchos de 320, 390, 768 y 1440 píxeles sin desbordamiento horizontal del documento; solo las tarjetas móviles y las tablas tienen desplazamiento propio. El navegador no registra errores JavaScript. La comprobación de enrolamiento QR anterior también sigue pasando.
+
+Se comprueba además que el plegado de escritorio libera los 248 píxeles del lateral, conserva la selección del panel de inicio y puede revertirse con Enter sobre el mismo botón. El menú oculto queda inerte y fuera del árbol accesible. Se verifica el paso a celular con el menú superpuesto y el regreso a escritorio plegado, sin fondo de cierre residual ni foco en controles ocultos.
