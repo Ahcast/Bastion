@@ -1,0 +1,52 @@
+# Módulo: Órdenes de compra
+
+## Propósito
+
+Registrar y seguir órdenes, productos, gastos asociados, documentos, estados, entrega y conversión a factura.
+
+## Pantallas y campos
+
+| Pantalla | Campo | Nombre técnico | Requerido/validación conocida |
+|---|---|---|---|
+| Listado | Buscar orden, factura o cliente | `search` | Opcional. |
+| Listado | Cliente, estado | `id_client`, `id_estado` | Filtros opcionales. |
+| Listado | Valor mínimo/máximo | `min_total`, `max_total` | Filtros numéricos opcionales. |
+| Cabecera | Número de orden/factura | `n_orders`, `n_bill` | Número de orden; factura opcional/asociada. |
+| Cabecera | Fechas de orden y entrega | `order_date`, `received_date` | Orden requerida al crear; entrega opcional. |
+| Cabecera | Cliente o cliente manual | `id_client`, `client_name` | Uno requerido, confirmar reglas exactas. |
+| Cabecera | RTN, destino, estado, comentarios | `client_rtn`, `id_destination`, `id_estado`, `comments` | Destino/estado dependen de validación/catálogos. |
+| Producto | Descripción, cantidad, venta, costo | `description`, `cantidad`, `sale_price`, `purchase_price` | Cantidad/precios numéricos. |
+| Producto | Proveedor, tracking, ISV | `id_supplier`, `tracking`, `isv` | Opcionales según línea/flujo. |
+| Adjuntos | Archivo | Documento | Límites y tipos pendientes. |
+
+## Botones y efectos
+
+| Acción | Resultado |
+|---|---|
+| Nueva orden | Abre formulario de creación. |
+| Aplicar/Limpiar filtros | Actualiza/restaura búsqueda y filtros. |
+| Abrir/Editar | Navega al detalle y edición. |
+| Guardar | Crea/actualiza orden y productos; recarga estado. |
+| Agregar/Quitar producto | Añade/elimina línea y recalcula totales. |
+| Agregar/Quitar gasto | Actualiza gastos e inversión asociada. |
+| Adjuntar/Ver/Descargar/Eliminar documento | Administra documentos de la orden. |
+| Cambiar estado de línea/orden | Valida estado y actualiza la entidad. |
+| Marcar entregada | Solicita número de factura y cambia estado si está presente. |
+| Convertir a factura | Crea factura relacionada. |
+| Clonar | Crea copia de la orden. |
+| Eliminar | Confirma; extensión de detalle agrega confirmación escrita reforzada. |
+| Volver/paginación | Regresa al listado o cambia página. |
+
+Edición en línea presenta cálculos de venta, ISV, inversión de productos, otros gastos, inversión total y totales.
+
+## Settings bajo Ajustes
+
+Settings específicos no están identificados como tales en la aplicación actual. Sección del módulo bajo Ajustes: sí. Contenido (defaults de estados/destinos/proveedores/términos y numeración): `Pendiente de decisión`; no inferirlo sin revisar configuración existente.
+
+## Datos, API, permisos
+
+API actual: CRUD parcial, listado/detalle, documentos, estados, entrega, clonación y borrado. Datos principales: `orders`, `orders_detail`, estados, comentarios y gastos vinculados. Aplicar la matriz Core: `ver` para lectura/listados; `editar` para crear, modificar, adjuntar, cambiar estado, marcar entrega y clonar; `eliminar` para borrar órdenes/documentos. Cada operación verifica el registro y estado de dominio; las acciones destructivas requieren confirmación y auditoría.
+
+## Pendientes
+
+Campos completos, fórmulas/redondeo, transición de estados, tipos/tamaño de adjunto, alcance del borrado, relación exacta de gastos y comportamiento de conversión deben confirmarse con UI/esquema.

@@ -1,0 +1,25 @@
+[package]
+name = "bastion-core"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+aes-gcm.workspace = true
+argon2.workspace = true
+base64.workspace = true
+chrono.workspace = true
+data-encoding.workspace = true
+hex.workspace = true
+hmac.workspace = true
+ipnet.workspace = true
+lettre.workspace = true
+rand.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sha1.workspace = true
+sha2.workspace = true
+sqlx.workspace = true
+subtle.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+url.workspace = true
