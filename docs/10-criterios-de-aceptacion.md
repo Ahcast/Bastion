@@ -11,6 +11,8 @@
 
 ## Criterio por pantalla
 
+- Roles y permisos usa la matriz visual descrita en `14-permisos-por-rol.md`: selector de rol, Crear/Editar vinculados, dependencias con Ver, controles masivos, conservación de permisos fuera de matriz, confirmaciones y protección del borrador al salir o reautenticar. El backend rechaza cambios sin autoridad administrativa, cambios al rol integrado, duplicados y permisos nuevos de módulos no disponibles; conservar una entrada histórica exacta no le concede nuevas capacidades.
+
 Una pantalla se considera documentada cuando especifica:
 
 - ruta, módulo, rol y permiso;

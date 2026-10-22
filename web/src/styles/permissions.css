@@ -1,0 +1,43 @@
+.permission-role-selector{width:min(100%,280px);min-width:0;gap:7px}
+.permission-role-tools{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:20px}
+.permission-role-tools p{flex:1 1 240px;margin:0;color:var(--muted)}
+.permission-matrix-wrap{width:100%;min-width:0;border:1px solid var(--line);background:var(--panel)}
+.permission-matrix{width:100%;table-layout:fixed;border-collapse:collapse;text-align:left}
+.permission-matrix caption{caption-side:bottom;text-align:left;padding:14px 18px;color:var(--muted);font-size:13px;border-top:1px solid var(--line)}
+.permission-matrix th,.permission-matrix td{padding:14px 18px;border-bottom:1px solid var(--line);vertical-align:middle;overflow-wrap:anywhere}
+.permission-matrix thead th{background:#dfe3e3;width:21%}
+.permission-matrix thead th:first-child{width:37%;text-transform:uppercase;font:600 12px var(--mono)}
+.permission-column-title{display:block;font:600 12px var(--mono);text-transform:uppercase;margin-bottom:7px}
+.permission-matrix tbody th{font-family:var(--font);font-weight:400;text-transform:none;letter-spacing:normal;background:var(--panel)}
+.permission-matrix tbody th strong{font-size:15px;font-weight:600}
+.permission-matrix tbody th small{display:block;font-size:12px;font-weight:400;margin-top:4px;max-width:32ch}
+.permission-matrix tbody tr:last-child th,.permission-matrix tbody tr:last-child td{border-bottom:0}
+.permission-check{display:flex;gap:9px;align-items:center;min-height:44px;cursor:pointer;font-size:13px;font-weight:500;line-height:1.3;max-width:100%}
+.permission-check input{width:20px;height:20px;flex:0 0 20px;padding:0;margin:0;accent-color:var(--ink)}
+.permission-check:has(input:disabled){cursor:default;color:var(--muted)}
+.permission-check input:disabled{opacity:.6}
+.permission-matrix tbody th .permission-check{font-size:12px;margin-top:5px}
+.permission-additional{border:1px solid var(--line);padding:16px 18px;margin-top:18px;background:var(--panel);overflow-wrap:anywhere}
+.permission-additional summary{cursor:pointer;font-weight:600;min-height:28px}
+.permission-additional p,.permission-additional li{font-size:13px}
+.permission-additional li{margin:8px 0}
+.permission-footer{margin-top:20px;padding:16px 0;border-top:1px solid var(--line)}
+.permission-footer>p{font-size:13px;color:var(--muted);margin:0 0 12px}
+.permission-footer .actions{display:flex;flex-wrap:wrap;gap:10px}
+.permission-footer button{min-height:44px}
+.permission-success{border:1px solid var(--ok);background:#e6f0ea;color:var(--ok);padding:12px 16px}
+.permission-confirmation{white-space:pre-wrap;overflow-wrap:anywhere;font-size:14px}
+@media(max-width:640px){
+ .permission-role-selector{width:100%}
+ .permission-matrix th,.permission-matrix td{padding:10px 7px}
+ .permission-matrix thead th:first-child{width:40%}
+ .permission-matrix thead th{width:20%}
+ .permission-matrix thead .permission-check,.permission-matrix td .permission-check{flex-direction:column;justify-content:center;gap:6px;text-align:center;font-size:12px}
+ .permission-matrix thead th:not(:first-child){text-align:center}
+ .permission-matrix tbody th strong{font-size:14px}
+ .permission-matrix tbody th small{font-size:11px}
+ .permission-matrix tbody th .permission-check{gap:6px;font-size:11px}
+ .permission-matrix caption{padding:12px;font-size:12px}
+ .permission-additional{padding:14px 12px}
+ .permission-footer .actions{display:grid;grid-template-columns:1fr}
+}

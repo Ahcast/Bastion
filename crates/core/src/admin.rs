@@ -1,3 +1,5 @@
+use std::collections::BTreeSet;
+
 use chrono::{NaiveDateTime, Utc};
 use serde::Serialize;
 use sha2::{Digest, Sha256};
@@ -413,10 +415,12 @@ impl CoreAdmin {
         permissions: Option<Vec<RolePermissionInput>>,
     ) -> Result<RoleRecord, CoreError> {
         self.require_admin(actor).await?;
-        let protected: Option<bool> = sqlx::query_scalar("SELECT protected FROM roles WHERE id=?")
-            .bind(id)
-            .fetch_optional(&self.database.pool)
-            .await?;
+        let mut tx = self.database.pool.begin().await?;
+        let protected: Option<bool> =
+            sqlx::query_scalar("SELECT protected FROM roles WHERE id=? FOR UPDATE")
+                .bind(id)
+                .fetch_optional(&mut *tx)
+                .await?;
         let Some(protected) = protected else {
             return Err(CoreError::Invalid);
         };
@@ -429,7 +433,6 @@ impl CoreAdmin {
                 return Err(CoreError::Invalid);
             }
         }
-        let mut tx = self.database.pool.begin().await?;
         if let Some(name) = new_name {
             sqlx::query("UPDATE roles SET name=? WHERE id=?")
                 .bind(name)
@@ -446,7 +449,31 @@ impl CoreAdmin {
                 .await?;
         }
         if let Some(permissions) = permissions {
+            let existing = sqlx::query_as::<_, RolePermissionInput>(
+                "SELECT module_id,scope_key,capability FROM role_permissions WHERE role_id=?",
+            )
+            .bind(id)
+            .fetch_all(&mut *tx)
+            .await?;
+            let key = |permission: &RolePermissionInput| {
+                (
+                    permission.module_id.clone(),
+                    permission.scope_key.clone(),
+                    permission.capability.clone(),
+                )
+            };
+            let existing = existing.iter().map(key).collect::<BTreeSet<_>>();
+            let mut supplied = BTreeSet::new();
             for permission in &permissions {
+                let identity = key(permission);
+                if !supplied.insert(identity.clone()) {
+                    return Err(CoreError::Invalid);
+                }
+                // Preserve exact legacy entries, including temporarily unavailable
+                // modules. This exception cannot create or broaden a permission.
+                if existing.contains(&identity) {
+                    continue;
+                }
                 validate_permission(permission)?;
                 let usable:Option<String>=sqlx::query_scalar("SELECT module_id FROM module_registry WHERE module_id=? AND included_in_release=1 AND environment_allowed=1")
                     .bind(&permission.module_id).fetch_optional(&mut *tx).await?;
@@ -1036,4 +1063,148 @@ fn map_conflict(error: sqlx::Error) -> CoreError {
         }
     }
     CoreError::Internal(error)
+}
+
+#[cfg(test)]
+mod permission_tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn mysql57_role_permissions_preserve_legacy_without_allowing_new_unavailable_grants() {
+        let Ok(url) = std::env::var("BASTION_CORE_TEST_URL") else {
+            eprintln!(
+                "Role permission integration test requires isolated BASTION_CORE_TEST_URL; CI supplies it."
+            );
+            return;
+        };
+        let pool = sqlx::mysql::MySqlPoolOptions::new()
+            .max_connections(3)
+            .connect(&url)
+            .await
+            .unwrap();
+        let database = Database { pool: pool.clone() };
+        database.migrate().await.unwrap();
+        let administrator_role: u64 =
+            sqlx::query_scalar("SELECT id FROM roles WHERE system_key='system_administrator'")
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        let person =
+            sqlx::query("INSERT INTO persons (full_name) VALUES ('Permission administrator')")
+                .execute(&pool)
+                .await
+                .unwrap()
+                .last_insert_id();
+        let administrator = sqlx::query("INSERT INTO users (person_id,role_id,email,status) VALUES (?,?,'permissions-admin@example.test','active')").bind(person).bind(administrator_role).execute(&pool).await.unwrap().last_insert_id();
+        let admin = CoreAdmin::new(database, false);
+        let role = admin
+            .create_role(administrator, "Permission matrix fixture", None)
+            .await
+            .unwrap();
+        let person =
+            sqlx::query("INSERT INTO persons (full_name) VALUES ('Permission ordinary user')")
+                .execute(&pool)
+                .await
+                .unwrap()
+                .last_insert_id();
+        let ordinary = sqlx::query("INSERT INTO users (person_id,role_id,email,status) VALUES (?,?,'permissions-user@example.test','active')").bind(person).bind(role.id).execute(&pool).await.unwrap().last_insert_id();
+        let permission = |module: &str, scope: &str, capability: &str| RolePermissionInput {
+            module_id: module.into(),
+            scope_key: scope.into(),
+            capability: capability.into(),
+        };
+        let legacy = permission("legacy_unavailable", "archive", "download");
+        sqlx::query("INSERT INTO role_permissions (role_id,module_id,scope_hash,scope_key,capability) VALUES (?,?,?,?,?)").bind(role.id).bind(&legacy.module_id).bind(hash_key(&legacy.scope_key)).bind(&legacy.scope_key).bind(&legacy.capability).execute(&pool).await.unwrap();
+        let grants = vec![legacy.clone(), permission("core", "personas", "ver")];
+        admin
+            .update_role(administrator, role.id, None, None, Some(grants.clone()))
+            .await
+            .unwrap();
+        assert_eq!(
+            admin
+                .list_role_permissions(administrator, role.id)
+                .await
+                .unwrap()
+                .len(),
+            2
+        );
+        assert!(matches!(
+            admin.list_roles(ordinary).await,
+            Err(CoreError::Forbidden)
+        ));
+        assert!(matches!(
+            admin.list_role_permissions(ordinary, role.id).await,
+            Err(CoreError::Forbidden)
+        ));
+        assert!(matches!(
+            admin
+                .update_role(ordinary, role.id, None, None, Some(vec![]))
+                .await,
+            Err(CoreError::Forbidden)
+        ));
+        assert!(matches!(
+            admin
+                .update_role(administrator, administrator_role, None, None, Some(vec![]))
+                .await,
+            Err(CoreError::Forbidden)
+        ));
+        for invalid in [
+            vec![legacy.clone(), permission("legacy_unavailable", "*", "ver")],
+            vec![permission("core", "*", "crear")],
+            vec![legacy.clone(), legacy.clone()],
+        ] {
+            assert!(matches!(
+                admin
+                    .update_role(
+                        administrator,
+                        role.id,
+                        Some("Must roll back"),
+                        None,
+                        Some(invalid)
+                    )
+                    .await,
+                Err(CoreError::Invalid)
+            ));
+            assert_eq!(
+                admin
+                    .list_role_permissions(administrator, role.id)
+                    .await
+                    .unwrap()
+                    .len(),
+                2,
+                "Invalid replacement must not delete the saved permissions"
+            );
+        }
+        let name: String = sqlx::query_scalar("SELECT name FROM roles WHERE id=?")
+            .bind(role.id)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        assert_eq!(name, "Permission matrix fixture");
+        assert!(matches!(
+            admin
+                .authorize(ordinary, "legacy_unavailable", "archive", "download")
+                .await,
+            Err(CoreError::Forbidden)
+        ));
+        admin
+            .update_role(administrator, role.id, None, None, Some(vec![]))
+            .await
+            .unwrap();
+        assert!(
+            admin
+                .list_role_permissions(administrator, role.id)
+                .await
+                .unwrap()
+                .is_empty()
+        );
+        let audits: i64 = sqlx::query_scalar(
+            "SELECT COUNT(*) FROM audit_events WHERE action='role.update' AND target_id=?",
+        )
+        .bind(role.id.to_string())
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(audits, 2);
+    }
 }

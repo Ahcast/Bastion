@@ -19,6 +19,7 @@ Este paquete convierte el análisis de la aplicación actual y las decisiones ac
 | `10-criterios-de-aceptacion.md` | Cómo revisar paridad y completar la implementación. |
 | `12-direccion-visual.md` | Referencia visual elegida y sistema de diseño a derivar de ella. |
 | `13-panel-inicio.md` | Inicio del Core, cinco áreas, navegación plegable y adaptación móvil. |
+| `14-permisos-por-rol.md` | Matriz visual de permisos por rol, compatibilidad, conservación y autorización. |
 | `adr/ADR-0002-frontend-react.md` | React + TypeScript + Vite y build estático para Bluehost. |
 | `adr/ADR-0001-stack-inicial.md` | Decisión técnica del primer corte del Core. |
 | `modulos/README.md` | Catálogo de módulos derivado del informe actual. |
@@ -140,3 +141,5 @@ El informe se obtuvo de una copia de frontend Angular compilado y backend Larave
 - Credenciales: contraseñas con Argon2id; tokens aleatorios opacos guardados solo como hashes; semillas TOTP y contraseñas SMTP personales cifradas con cifrado autenticado y claves protegidas/rotables mediante AWS KMS. Códigos de recuperación se consumen una sola vez; refresh tokens OAuth rotan y detectan replay. Los parámetros completos están en `08-seguridad-y-permisos.md`.
 - Roles y Pantallas: el backend valida todas las entradas y relaciones, con nombres normalizados/únicos, límites explícitos y restricciones en MySQL para evitar duplicados concurrentes; no se confía en validación del frontend.
 - El catálogo de módulos de primera etapa se deriva de `01-aplicacion-actual-y-paridad.md`.
+
+- 2026-10-22: el usuario confirma sustituir el editor JSON de permisos por una matriz visual. Crear y Editar quedan vinculados al permiso existente editar; se conserva el contrato, los permisos adicionales y la administración exclusiva del Administrador del sistema. Ver 14-permisos-por-rol.md.

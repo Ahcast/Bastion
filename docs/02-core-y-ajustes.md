@@ -55,6 +55,8 @@ Para Roles y Pantallas, el contrato declara cada campo y regla antes de implemen
 
 ## Área Ajustes
 
+La edición visual de permisos por rol se especifica en `14-permisos-por-rol.md`. Reemplaza el editor JSON por casillas y mantiene el contrato `ver`/`editar`/`eliminar`: Crear y Editar son dos controles vinculados del permiso existente `editar`, según confirmación del usuario. Conserva permisos adicionales y la administración exclusiva del Administrador del sistema.
+
 La navegación muestra una entrada única `Ajustes`. Dentro de ella el core presenta:
 
 Decisión de navegación confirmada: **Personas, Usuarios, Roles y permisos y Mi cuenta van dentro de Ajustes**, sin accesos independientes en el menú principal. Ajustes está disponible para todo usuario autenticado porque contiene Mi cuenta. Personas conserva el permiso `core/personas/ver`; Usuarios, Roles y permisos y los ajustes globales del Core siguen siendo exclusivos del Administrador. Cambiar su ubicación no amplía permisos ni habilita consultas administrativas para otros usuarios.
