@@ -61,6 +61,10 @@ button{min-height:44px}
 .section-tabs{margin-bottom:16px;align-items:stretch}
 .section-tabs button[aria-pressed=true]{background:var(--ink);color:var(--on-accent)}
 .section-heading{margin-top:28px}
+.settings-location{display:flex;gap:8px;align-items:center;margin-bottom:12px;font:500 12px/1.6 var(--mono);color:var(--ink-subtle);flex-wrap:wrap}
+.settings-navigation{display:flex;flex-wrap:wrap;gap:8px;padding-bottom:20px;margin-bottom:24px;border-bottom:1px solid var(--line)}
+.settings-navigation button[aria-current=page]{background:var(--ink);color:var(--on-accent)}
+@media(max-width:640px){.settings-navigation{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}.settings-navigation button{min-width:0;padding:10px 8px;overflow-wrap:anywhere}.settings-location{font-size:11px}}
 .core-table td{overflow-wrap:anywhere;max-width:420px}
 .modal-backdrop{z-index:40}
 .modal{min-width:0;max-height:calc(100dvh - 36px);overflow-wrap:anywhere}

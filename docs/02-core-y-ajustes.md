@@ -57,6 +57,8 @@ Para Roles y Pantallas, el contrato declara cada campo y regla antes de implemen
 
 La navegación muestra una entrada única `Ajustes`. Dentro de ella el core presenta:
 
+Decisión de navegación confirmada: **Personas, Usuarios, Roles y permisos y Mi cuenta van dentro de Ajustes**, sin accesos independientes en el menú principal. Ajustes está disponible para todo usuario autenticado porque contiene Mi cuenta. Personas conserva el permiso `core/personas/ver`; Usuarios, Roles y permisos y los ajustes globales del Core siguen siendo exclusivos del Administrador. Cambiar su ubicación no amplía permisos ni habilita consultas administrativas para otros usuarios.
+
 1. **Ajustes del core:** opciones transversales, empresa/SAR, servidor de correo saliente, usuarios, roles, pantallas y permisos. Todos son exclusivos del Administrador del sistema.
 2. **Mi cuenta:** ajustes propios del usuario autenticado, incluidos seguridad de acceso, dispositivos confiables, sesiones y sus credenciales personales para autenticarse en el servidor SMTP global.
 3. **Ajustes de módulos:** una sección por cada módulo registrado que aporte configuración.
@@ -72,11 +74,12 @@ Ajustes
 │   ├── Sesiones
 │   ├── Aplicaciones conectadas
 │   └── Correo saliente (personal)
+├── Personas (según permisos)
+├── Usuarios (Administrador)
+├── Roles y permisos (Administrador)
 ├── Core
 │   ├── Empresa
 │   ├── Correo saliente (servidor SMTP)
-│   ├── Usuarios y acceso
-│   ├── Personas y roles
 │   ├── Módulos
 │   ├── Bitácora
 │   ├── Clientes IA y solicitudes

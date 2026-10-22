@@ -27,6 +27,8 @@ El usuario solicita también plegar el lateral para ampliar el área de trabajo.
 
 ## Integración
 
+El menú principal contiene Inicio, los módulos habilitados que correspondan y Ajustes. Personas, Usuarios, Roles y permisos y Mi cuenta se abren dentro de Ajustes. Mi cuenta permanece disponible para cualquier usuario autenticado; las demás secciones mantienen sus permisos y los ajustes globales están agrupados en Core. El menú lateral conserva su plegado y comportamiento móvil.
+
 `web/src/pages/Dashboard.tsx` contiene los metadatos de presentación y los componentes React de Inicio. `web/src/styles/dashboard.css` contiene su distribución adaptable; `web/src/styles/panel.css` mantiene los tokens compartidos y la navegación. El estado seleccionado se conserva en React. El código de referencia se consulta para apariencia y comportamiento solicitado, sin incorporar sus scripts ni sus datos de demostración. La compilación y publicación siguen ADR-0002.
 
 ## Validación del frontend

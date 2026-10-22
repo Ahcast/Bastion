@@ -1,8 +1,23 @@
-import { useState } from 'react';
+import { lazy, Suspense, useState } from 'react';
 import { message } from '../api.js';
 import { Form, Heading, Loading, Notice, Table, useCore, useLoad } from '../ui.js';
 import type { Audit, Mail, Module, PageResult, Setting } from '../types.js';
-export default function Settings() {
+import type { Access } from '../types.js';
+import { settingsSections } from '../navigation.js';
+import type { SettingsSection } from '../navigation.js';
+const Account = lazy(() => import('./Account.js'));
+const People = lazy(() => import('./People.js'));
+const Users = lazy(() => import('./Users.js'));
+const Roles = lazy(() => import('./Roles.js'));
+export function SettingsNavigation({ access, section, select }: { access: Access; section: SettingsSection; select: (section: SettingsSection) => void }) {
+  return <nav className="settings-navigation" aria-label="Secciones de Ajustes">{settingsSections(access).map(entry => <button key={entry.id} aria-current={section === entry.id ? 'page' : undefined} onClick={() => select(entry.id)}>{entry.label}</button>)}</nav>;
+}
+export default function Settings({ section, select }: { section: SettingsSection; select: (section: SettingsSection) => void }) {
+  const { access } = useCore();
+  const selected = settingsSections(access).find(entry => entry.id === section) ?? { id: 'cuenta', label: 'Mi cuenta' };
+  return <section aria-label="Ajustes"><div className="settings-location"><span>Ajustes</span><span aria-hidden="true"> / </span><strong>{selected.label}</strong></div><SettingsNavigation access={access} section={selected.id} select={select} /><div key={selected.id}><Suspense fallback={<Loading />}>{selected.id === 'personas' ? <People /> : selected.id === 'usuarios' ? <Users /> : selected.id === 'roles' ? <Roles /> : selected.id === 'core' ? <CoreSettings /> : <Account />}</Suspense></div></section>;
+}
+function CoreSettings() {
   const [tab, setTab] = useState('modules');
   const { api } = useCore(), registry = useLoad(signal => api.request<Module[]>('/api/v1/settings/modules', { signal }));
   return <><Heading title="Ajustes del Core" description="Módulos, correo global, bitácora y reintentos." /><div className="row section-tabs" aria-label="Ajustes del Core">{[['modules', 'Módulos'], ['smtp', 'SMTP global'], ['audit', 'Bitácora'], ['mail', 'Envíos'], ...(registry.data?.filter(mod => mod.module_id === 'procesos' && mod.included_in_release).map(mod => [mod.module_id, mod.display_name]) ?? [])].map(([id, title]) => <button key={id} aria-pressed={tab === id} onClick={() => setTab(id!)}>{title}</button>)}</div><section key={tab} className="card">{tab === 'procesos' ? <><h2>Procesos</h2><p>Entrada: maestro.csv de bastion-scout después del análisis IA.</p><p>Conservación: todos los procesos permanecen en el histórico. Las marcas y notas son compartidas. No hay eliminación automática ni ajustes editables en esta entrega; la depuración queda pendiente.</p></> : tab === 'modules' ? <Modules /> : tab === 'smtp' ? <Smtp /> : tab === 'audit' ? <AuditLog /> : <MailOutbox />}</section></>;

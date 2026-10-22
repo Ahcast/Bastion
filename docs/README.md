@@ -36,6 +36,8 @@ El informe se obtuvo de una copia de frontend Angular compilado y backend Larave
 
 ## Registro de decisiones
 
+- 2026-10-21: el usuario confirma que Personas, Usuarios, Roles y permisos y Mi cuenta pertenecen a Ajustes. El menú principal conserva Inicio, los módulos habilitados y un único acceso Ajustes. Mi cuenta está disponible para cada usuario autenticado; Personas conserva sus permisos y Usuarios/Roles/Core siguen reservados al Administrador. La ubicación no modifica la autorización del API.
+
 - 2026-10-21: el usuario confirma conservar todos los procesos y dejar la depuración pendiente. Ajustes > Procesos presenta la fuente Scout, la conservación total y el alcance compartido de marcas/notas como política informativa del primer corte; no se agregan controles editables ni borrado automático. Una política configurable o una acción de purga requiere definición posterior.
 
 - 2026-10-21: el usuario confirma marcas De interés y notas compartidas por todos los usuarios del módulo Procesos. Se persisten separadas del CSV de Scout, se conservan al importar y se editan con control de versión para evitar sobrescrituras entre usuarios.
