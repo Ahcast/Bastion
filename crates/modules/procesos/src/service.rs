@@ -210,7 +210,7 @@ impl ProcessService {
             return Err(CoreError::Invalid);
         }
         let mut tx = self.begin(actor, "consulta", "ver").await?;
-        let record = sqlx::query_as::<_, ProcessRecord>("SELECT r.proceso_id,r.entidad,r.expediente,r.fecha_recepcion,r.puntaje,r.rubro,r.resumen_corto,r.source_json AS source,COALESCE(m.marked,0) AS marked,COALESCE(m.note,'') AS note,COALESCE(m.version,0) AS version FROM procesos_rows r LEFT JOIN procesos_marks m ON m.proceso_id=r.proceso_id WHERE r.proceso_id=?")
+        let record = sqlx::query_as::<_, ProcessRecord>("SELECT r.proceso_id,r.entidad,r.expediente,r.fecha_recepcion,r.puntaje,r.rubro,r.resumen_corto,r.source_json AS source,COALESCE(m.marked,0) AS marked,COALESCE(m.note,'') AS note,CAST(COALESCE(m.version,0) AS UNSIGNED) AS version FROM procesos_rows r LEFT JOIN procesos_marks m ON m.proceso_id=r.proceso_id WHERE r.proceso_id=?")
             .bind(id).fetch_optional(&mut *tx).await?.ok_or(CoreError::NotFound)?;
         tx.commit().await?;
         Ok(record)
@@ -455,7 +455,7 @@ fn select_rows(
         "JSON_OBJECT()"
     };
     let mut query = QueryBuilder::<MySql>::new(format!(
-        "SELECT r.proceso_id,r.entidad,r.expediente,r.fecha_recepcion,r.puntaje,r.rubro,r.resumen_corto,{source} AS source,COALESCE(m.marked,0) AS marked,COALESCE(m.note,'') AS note,COALESCE(m.version,0) AS version FROM procesos_rows r LEFT JOIN procesos_marks m ON m.proceso_id=r.proceso_id WHERE 1=1"
+        "SELECT r.proceso_id,r.entidad,r.expediente,r.fecha_recepcion,r.puntaje,r.rubro,r.resumen_corto,{source} AS source,COALESCE(m.marked,0) AS marked,COALESCE(m.note,'') AS note,CAST(COALESCE(m.version,0) AS UNSIGNED) AS version FROM procesos_rows r LEFT JOIN procesos_marks m ON m.proceso_id=r.proceso_id WHERE 1=1"
     ));
     if let Some(marked) = filter.marked {
         query.push(" AND COALESCE(m.marked,0)=").push_bind(marked);
