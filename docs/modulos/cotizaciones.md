@@ -1,5 +1,9 @@
 # Módulo: Cotizaciones
 
+## Desarrollo iniciado
+
+El primer corte local integra registro, editor, cálculo Rust, numeración y persistencia; no cierra aún la paridad del módulo. Ver [alcance, límites y pendientes](cotizaciones-implementacion.md) y [contrato API](cotizaciones.openapi.yaml).
+
 ## Propósito
 
 Preparar cotizaciones, calcular líneas/impuestos/descuentos, generar PDF, adjuntar documentos, enviar o programar correo y convertir a orden o factura.
@@ -11,10 +15,10 @@ Preparar cotizaciones, calcular líneas/impuestos/descuentos, generar PDF, adjun
 | Buscar cotización, cliente o ítem | `search` | Filtra listado. |
 | Número de cotización / orden | `quote_number`, `order_number` | Número de cotización automático al guardar según informe/UI; referencia de orden. |
 | Cliente / manual | `id_client`, `client_name` | Cliente seleccionado o texto manual; confirmar validación exacta. |
-| Fecha, vigencia | `quote_date`, `valid_days`, `valid_until` | Vigencia inicial observada de 15 días. |
-| Estado | `status` | Borrador predeterminado; estados válidos por cerrar. |
+| Fecha, vigencia | `quote_date`, `valid_days`, `valid_until` | Alta de la compilación activa: 30 días; fallback del backend: 15. Vencimiento = fecha + días (0..3650). |
+| Estado | `status` | Borrador, Enviada, Aprobada, Rechazada y Convertido; no hay matriz de transiciones observada. |
 | Descuento | `discount_type`, `discount_value` | Descuento por monto o porcentaje. |
-| Contacto/preparador | `contact_email`, `prepared_by_name` | Datos de contacto y responsable. |
+| Contacto/preparador | `contact_email`, `prepared_by_name` | Instantánea del usuario creador; se conserva al editar y no es un campo editable. |
 | Ítems | `description`, `quantity`, `unit_price`, `discount_type`, `discount_value`, `tax_type` | Líneas, descuento e impuesto exento/ISV 15/18. |
 | Notas/términos | `notes`, `terms` | Notas privadas y términos. |
 | Adjunto | título y `file` | Documento asociado a cotización. |
@@ -40,4 +44,4 @@ API actual: CRUD, estado, clonación, conversión, adjuntos, correo inmediato/pr
 
 ## Pendientes
 
-Estados/transiciones, validación fiscal, destinatarios por defecto, horarios y límites de adjuntos requieren confirmación.
+Validación contable con ejemplos, verificación visual autenticada, permisos efectivos del Legacy y continuidad de numeración al migrar. Se cotejaron estados, fórmulas y defaults: ver [fuentes y diferencias](cotizaciones-paridad.md). Destinatarios por defecto, horarios y límites de adjuntos todavía requieren definición.

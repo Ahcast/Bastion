@@ -182,6 +182,7 @@ dependencies = [
  "axum",
  "base64 0.22.1",
  "bastion-core",
+ "bastion-cotizaciones",
  "bastion-procesos",
  "chrono",
  "ipnet",
@@ -222,6 +223,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "bastion-cotizaciones"
+version = "0.1.0"
+dependencies = [
+ "bastion-core",
+ "chrono",
+ "serde",
+ "serde_json",
+ "sha2 0.10.9",
+ "sqlx",
+ "tokio",
+]
+
+[[package]]
 name = "bastion-mcp"
 version = "0.1.0"
 
@@ -250,6 +264,7 @@ dependencies = [
  "axum",
  "bastion-api",
  "bastion-core",
+ "bastion-cotizaciones",
  "bastion-procesos",
  "dotenvy",
  "tokio",

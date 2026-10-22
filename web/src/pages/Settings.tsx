@@ -15,7 +15,7 @@ export function SettingsNavigation({ access, section, select }: { access: Access
 export default function Settings({ section, select }: { section: SettingsSection; select: (section: SettingsSection) => void }) {
   const { access } = useCore();
   const selected = settingsSections(access).find(entry => entry.id === section) ?? { id: 'cuenta', label: 'Mi cuenta' };
-  return <section aria-label="Ajustes"><div className="settings-location"><span>Ajustes</span><span aria-hidden="true"> / </span><strong>{selected.label}</strong></div><SettingsNavigation access={access} section={selected.id} select={select} /><div key={selected.id}><Suspense fallback={<Loading />}>{selected.id === 'personas' ? <People /> : selected.id === 'usuarios' ? <Users /> : selected.id === 'roles' ? <Roles /> : selected.id === 'core' ? <CoreSettings /> : <Account />}</Suspense></div></section>;
+  return <section aria-label="Ajustes"><div className="settings-location"><span>Ajustes</span><span aria-hidden="true"> / </span><strong>{selected.label}</strong></div><SettingsNavigation access={access} section={selected.id} select={select} /><div key={selected.id}><Suspense fallback={<Loading />}>{selected.id === 'personas' ? <People /> : selected.id === 'usuarios' ? <Users /> : selected.id === 'roles' ? <Roles /> : selected.id === 'core' ? <CoreSettings /> : selected.id === 'cotizaciones' ? <QuoteSettings /> : <Account />}</Suspense></div></section>;
 }
 function CoreSettings() {
   const [tab, setTab] = useState('modules');
@@ -39,3 +39,5 @@ function MailOutbox() {
   const { api, notify } = useCore(), result = useLoad(signal => api.request<PageResult<Mail>>('/api/v1/settings/mail-outbox?page=1&page_size=50', { signal }));
   return <><h2>Envíos</h2><Notice>{result.error}</Notice>{result.data ? <Table columns={['Fecha', 'Tipo', 'Destino', 'Estado', 'Intentos', 'Error', 'Acción']} rows={result.data.items.map(mail => [mail.created_at, mail.kind, mail.recipient_email, mail.delivery_status, mail.attempts, mail.last_error_code, mail.delivery_status === 'failed' ? <button onClick={async () => { try { await api.request(`/api/v1/settings/mail-outbox/${mail.id}/retry`, { method: 'POST' }); result.reload(); } catch (error) { notify(message(error)); } }}>Reintentar</button> : '—'])} /> : !result.error && <Loading />}</>;
 }
+
+function QuoteSettings() { return <section className="card"><h2>Cotizaciones</h2><p>Primera etapa: cotizaciones con cálculo, numeración y estados cotejados con CastilloIT. La validación contable, PDF, adjuntos, envío y conversiones siguen pendientes.</p><p>Los ajustes propios del módulo aún requieren definición. Empresa y servidor SMTP se administran en el Core; cada usuario configura sus credenciales de correo en Mi cuenta.</p></section>; }

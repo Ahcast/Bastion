@@ -29,6 +29,7 @@ use tower_http::{
 };
 use url::Url;
 
+mod cotizaciones;
 mod procesos;
 
 const GENERAL_REQUEST_BODY_LIMIT: usize = 1024 * 1024;
@@ -37,6 +38,7 @@ const GENERAL_REQUEST_BODY_LIMIT: usize = 1024 * 1024;
 struct ApiState {
     core: CoreService,
     procesos: bastion_procesos::ProcessService,
+    cotizaciones: bastion_cotizaciones::QuoteService,
     procesos_jobs: std::sync::Arc<tokio::sync::Semaphore>,
     scout_csv_path: std::path::PathBuf,
 }
@@ -258,6 +260,7 @@ pub fn router(
     let api_state = ApiState {
         core: core.clone(),
         procesos: bastion_procesos::ProcessService::new(core.database(), core.admin()),
+        cotizaciones: bastion_cotizaciones::QuoteService::new(core.database(), core.admin()),
         procesos_jobs: std::sync::Arc::new(tokio::sync::Semaphore::new(1)),
         scout_csv_path,
     };
@@ -350,6 +353,7 @@ pub fn router(
         )
         .layer(RequestBodyLimitLayer::new(GENERAL_REQUEST_BODY_LIMIT))
         .merge(procesos::routes(api_state.clone()))
+        .merge(cotizaciones::routes(api_state.clone()))
         .fallback(not_found)
         .with_state(api_state)
         .layer(middleware::from_fn(problem_details))

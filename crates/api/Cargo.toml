@@ -6,6 +6,7 @@ edition.workspace = true
 [dependencies]
 axum.workspace = true
 bastion-core = { path = "../core" }
+bastion-cotizaciones = { path = "../modules/cotizaciones" }
 bastion-procesos = { path = "../modules/procesos" }
 base64.workspace = true
 chrono.workspace = true

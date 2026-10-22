@@ -89,6 +89,7 @@ jobs:
     env:
       BASTION_CORE_TEST_URL: mysql://root:bastion_ci_only@127.0.0.1:3306/bastion_core_test?ssl-mode=disabled
       BASTION_PROCESOS_TEST_URL: mysql://root:bastion_ci_only@127.0.0.1:3306/bastion_test?ssl-mode=disabled
+      BASTION_COTIZACIONES_TEST_URL: mysql://root:bastion_ci_only@127.0.0.1:3306/bastion_cotizaciones_test?ssl-mode=disabled
     steps:
       - name: Check out source
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
@@ -99,6 +100,8 @@ jobs:
           components: rustfmt
       - name: Compile workspace
         run: cargo check --workspace --locked
+      - name: Prepare isolated Cotizaciones test database
+        run: docker exec ${{ job.services.mysql57.id }} mysql -uroot -pbastion_ci_only -e 'CREATE DATABASE bastion_cotizaciones_test CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci'
       - name: Prepare isolated invitation test database
         run: docker exec ${{ job.services.mysql57.id }} mysql -uroot -pbastion_ci_only -e 'CREATE DATABASE bastion_core_test CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci'
       - name: Run workspace tests

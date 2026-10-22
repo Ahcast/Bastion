@@ -125,6 +125,12 @@ pub struct RolePermissionInput {
 }
 
 impl CoreAdmin {
+    /// Authoritative contact snapshot for an authenticated domain actor.
+    pub async fn user_contact(&self, actor: u64) -> Result<(String, String), CoreError> {
+        sqlx::query_as("SELECT p.full_name,u.email FROM users u JOIN persons p ON p.id=u.person_id WHERE u.id=? AND u.status='active'")
+            .bind(actor).fetch_optional(self.database.pool()).await?.ok_or(CoreError::Unauthorized)
+    }
+
     pub async fn record_domain_event(
         tx: &mut sqlx::Transaction<'_, MySql>,
         actor: u64,

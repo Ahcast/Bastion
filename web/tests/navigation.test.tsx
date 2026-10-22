@@ -26,3 +26,13 @@ test('Personas keeps its read permission and enabled modules remain in main navi
   assert.deepEqual(settingsSections(access).map(entry => entry.id), ['cuenta', 'personas']);
   assert.deepEqual(settingsSections({ ...access, permissions: [{ module_id: 'core', scope_key: 'personas', capability: 'editar' }] }).map(entry => entry.id), ['cuenta']);
 });
+
+test('Cotizaciones requires its enabled catalog entry and document read permission', () => {
+  const access: Access = { ...ordinary, modules: [{ module_id: 'cotizaciones', display_name: 'Cotizaciones' }], permissions: [] };
+  assert.ok(!mainNavigation(access).some(entry => entry.id === 'cotizaciones'));
+  access.permissions = [{ module_id: 'cotizaciones', scope_key: 'documentos', capability: 'ver' }];
+  assert.deepEqual(mainNavigation(access).map(entry => entry.id), ['inicio', 'cotizaciones', 'ajustes']);
+  assert.deepEqual(settingsSections(access).map(entry => entry.id), ['cuenta', 'cotizaciones']);
+  assert.ok(!mainNavigation({ ...access, modules: [] }).some(entry => entry.id === 'cotizaciones'));
+  assert.ok(mainNavigation({ ...access, is_system_administrator: true, permissions: [] }).some(entry => entry.id === 'cotizaciones'));
+});

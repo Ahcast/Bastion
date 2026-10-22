@@ -35,6 +35,15 @@ test('parallel refresh requests share one token read', async () => {
   const { api, calls } = fixture([response(200, { csrf_token: 'shared' })]);
   await Promise.all([api.refreshCsrf(), api.refreshCsrf()]); assert.equal(calls.length, 1);
 });
+
+test('creating a quote preserves idempotency across CSRF retry and edits carry a version', async () => {
+  const { api, calls } = fixture([response(403, { title: 'CSRF Validation Failed' }), response(200, { csrf_token: 'fresh' }), response(201, { id: 1 }), response(200, { version: 2 })]);
+  await api.request('/api/v1/cotizaciones', { method: 'POST', body: { client_name: 'Prueba' }, idempotencyKey: 'quote-synthetic-key-0001' });
+  for (const index of [0, 2]) assert.equal(new Headers(calls[index]?.options.headers).get('Idempotency-Key'), 'quote-synthetic-key-0001');
+  assert.equal(calls[0]?.options.body, calls[2]?.options.body);
+  await api.request('/api/v1/cotizaciones/1', { method: 'PUT', body: {}, ifMatch: 1 });
+  assert.equal(new Headers(calls[3]?.options.headers).get('If-Match'), '"1"');
+});
 test('401 ends the UI session and 428 requests TOTP reauthentication', async () => {
   const { api } = fixture([response(401, {}), response(428, {})]); let expired = 0, reauth = 0;
   api.hooks = { unauthorized: () => { expired++; }, reauthenticate: () => { reauth++; } };

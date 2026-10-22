@@ -2,6 +2,8 @@
 
 ## Estado de esta entrega
 
+Cotizaciones está en desarrollo local: listado, editor, numeración, vigencia, estados y cálculo decimal en Rust cotejado con la copia Legacy, con vista previa y control de versión. Se integra al registro del Core y permanece desactivado por defecto. La validación contable, catálogo Clientes, PDF, adjuntos, correo y conversiones requieren las siguientes etapas; ver [alcance del corte](docs/modulos/cotizaciones-implementacion.md). No se presenta como módulo terminado ni se despliega durante esta etapa.
+
 El primer corte de Procesos recibe el `maestro.csv` analizado de bastion-scout, con Actualizar desde el maestro local verificado, consulta, detalle, marcas/notas compartidas y exportación. Permanece desactivado por defecto y conserva todos los registros. Ajustes muestra la política confirmada sin campos editables; la depuración queda aplazada por decisión del usuario. Ver [contrato y límites](docs/modulos/procesos-implementacion.md). Este desarrollo se publica primero en GitHub y no instala cambios en servidores.
 
 La [recepción local de Scout](docs/modulos/procesos-entrega-local.md) lee `/var/lib/bastion-scout/maestro.csv` y el manifiesto hermano cada 60 segundos. Se habilita en el backend con `BASTION_SCOUT_IMPORT_ENABLED=true`, junto con la activación normal de Procesos; está apagada por defecto. Requiere aplicar las migraciones y conceder al servicio lectura de ambos archivos durante el despliegue. No usa HTTP entre Scout y Bastion.

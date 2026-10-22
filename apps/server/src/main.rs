@@ -31,6 +31,7 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
         let migrator = Database::connect_lazy(&DatabaseConfig::migrator_from_env()?);
         migrator.migrate().await?;
         bastion_procesos::ProcessService::migrate(&migrator).await?;
+        bastion_cotizaciones::QuoteService::migrate(&migrator).await?;
         tracing::info!("database migrations completed");
         return Ok(());
     }
@@ -58,6 +59,9 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
     core.check_ready().await?;
     bastion_procesos::ProcessService::new(core.database(), core.admin())
         .synchronize_release(config.procesos_allowed)
+        .await?;
+    bastion_cotizaciones::QuoteService::new(core.database(), core.admin())
+        .synchronize_release(config.cotizaciones_allowed)
         .await?;
     if scout_config.enabled {
         tokio::spawn(scout_import::run(

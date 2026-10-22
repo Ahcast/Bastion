@@ -9,6 +9,7 @@ pub struct AppConfig {
     pub data_encryption_key: [u8; 32],
     pub trusted_proxy_cidrs: Vec<IpNet>,
     pub procesos_allowed: bool,
+    pub cotizaciones_allowed: bool,
 }
 
 #[derive(Clone)]
@@ -127,6 +128,15 @@ impl AppConfig {
             }
         };
 
+        let allowed_modules = match env::var("BASTION_ALLOWED_MODULES") {
+            Ok(value) => parse_allowed_modules(&value)?,
+            Err(env::VarError::NotPresent) => Vec::new(),
+            Err(_) => {
+                return Err(ConfigError {
+                    variable: "BASTION_ALLOWED_MODULES",
+                });
+            }
+        };
         Ok(Self {
             listen_addr,
             cors_allowed_origin,
@@ -134,17 +144,46 @@ impl AppConfig {
             bootstrap_secret,
             data_encryption_key,
             trusted_proxy_cidrs,
-            procesos_allowed: match env::var("BASTION_ALLOWED_MODULES") {
-                Ok(value) if value.trim().is_empty() => false,
-                Ok(value) if value.trim() == "procesos" => true,
-                Err(env::VarError::NotPresent) => false,
-                _ => {
-                    return Err(ConfigError {
-                        variable: "BASTION_ALLOWED_MODULES",
-                    });
-                }
-            },
+            procesos_allowed: allowed_modules.contains(&"procesos"),
+            cotizaciones_allowed: allowed_modules.contains(&"cotizaciones"),
         })
+    }
+}
+
+fn parse_allowed_modules(value: &str) -> Result<Vec<&str>, ConfigError> {
+    if value.trim().is_empty() {
+        return Ok(Vec::new());
+    }
+    let mut modules = Vec::new();
+    for module in value.split(',').map(str::trim) {
+        if !matches!(module, "procesos" | "cotizaciones") || modules.contains(&module) {
+            return Err(ConfigError {
+                variable: "BASTION_ALLOWED_MODULES",
+            });
+        }
+        modules.push(module);
+    }
+    Ok(modules)
+}
+
+#[cfg(test)]
+mod module_tests {
+    use super::parse_allowed_modules;
+
+    #[test]
+    fn allowlist_is_explicit_and_preserves_core_only() {
+        assert!(parse_allowed_modules("").unwrap().is_empty());
+        assert_eq!(
+            parse_allowed_modules(" procesos , cotizaciones ").unwrap(),
+            vec!["procesos", "cotizaciones"]
+        );
+        assert_eq!(
+            parse_allowed_modules("cotizaciones").unwrap(),
+            vec!["cotizaciones"]
+        );
+        for value in ["*", "clientes", "procesos,", "procesos,procesos"] {
+            assert!(parse_allowed_modules(value).is_err());
+        }
     }
 }
 
