@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { ProcessDetailContent, ProcessFilterBar, ProcessInsights, ProcessTable } from '../src/components/ProcessWorkspace.js';
-import { initialProcessFilters, processQuery } from '../src/processes.js';
+import { initialProcessFilters, nextProcessExpiry, processQuery } from '../src/processes.js';
 import type { ProcessRecord } from '../src/processes.js';
 
 const attack = '<img src=x onerror=alert(1)>';
@@ -21,7 +21,7 @@ test('process detail expands directly below its row without a dialog and escapes
   // UTC next-day 05:59 is still the previous Honduras day.
   assert.ok(expanded.includes('22 oct'));
 });
-test('compact filters share the same exact query for list, statistics and export', () => {
+test('compact filters share the same exact query for list and export', () => {
   const values = { ...initialProcessFilters, entidad: 'Salud & Bienestar', q: '  50%_equipo  ', marked: true, hide_municipalities: true, sort: 'puntaje_desc' as const };
   const query = new URLSearchParams(processQuery(values));
   assert.equal(query.get('entidad'), 'Salud & Bienestar');
@@ -42,4 +42,15 @@ test('statistics show explicit zero counts, calendar dates and the three deliver
   assert.ok(markup.includes('<strong>0</strong>'));
   assert.ok(!markup.includes('NaN'));
   assert.ok(!markup.includes('Infinity'));
+  assert.ok(markup.includes('Primera importación en Bastion'));
+  assert.ok(markup.includes('0 procesos importados'));
+  assert.ok(!markup.includes('Resultados filtrados'));
+});
+test('expiry uses the server instant, including equality, and accounts for request delay', () => {
+  const server_time = '2026-08-01T19:30:00Z'; // 13:30 Honduras.
+  assert.equal(nextProcessExpiry({ server_time, items: [{ ...row, fecha_recepcion: '2026-08-01T13:29:00-06:00' }] }, 0), 0);
+  assert.equal(nextProcessExpiry({ server_time, items: [{ ...row, fecha_recepcion: server_time }] }, 0), 0);
+  assert.equal(nextProcessExpiry({ server_time, items: [{ ...row, fecha_recepcion: '2026-08-01T13:31:00-06:00' }] }, 0), 60_000);
+  assert.equal(nextProcessExpiry({ server_time, items: [{ ...row, fecha_recepcion: '2026-08-01T13:31:00-06:00' }] }, 1000), 59_000);
+  assert.equal(nextProcessExpiry({ server_time, items: [] }, 0), null);
 });

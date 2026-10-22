@@ -3,7 +3,7 @@ import '../styles/procesos.css';
 import { message } from '../api.js';
 import { Form, Heading, Loading, Notice, useCore, useLoad } from '../ui.js';
 import { moduleCan } from '../types.js';
-import { initialProcessFilters, processDate, processQuery } from '../processes.js';
+import { initialProcessFilters, nextProcessExpiry, processDate, processQuery } from '../processes.js';
 import type { ProcessFilters, ProcessPage, ProcessRecord, ProcessStatus } from '../processes.js';
 import { ProcessDetailContent, ProcessFilterBar, ProcessInsights, ProcessTable } from '../components/ProcessWorkspace.js';
 
@@ -17,10 +17,23 @@ export default function Procesos() {
   const query = processQuery({ ...filters, q: search });
   const view = moduleCan(access, 'procesos', 'consulta', 'ver');
   const active = access.modules.some(module => module.module_id === 'procesos');
-  const result = useLoad(signal => view ? api.request<ProcessPage>(`/api/v1/procesos/rows?${query}&page=${page}&page_size=25`, { signal }) : Promise.resolve<ProcessPage>({ items: [], page, page_size: 25, has_more: false }), [view, query, page]);
-  const status = useLoad(signal => view ? api.request<ProcessStatus>(`/api/v1/procesos/status?${query}`, { signal }) : Promise.resolve(null), [view, query]);
+  const result = useLoad(async signal => {
+    const requestedAt = performance.now();
+    const data = view ? await api.request<ProcessPage>(`/api/v1/procesos/rows?${query}&page=${page}&page_size=25`, { signal }) : { items: [], total: 0, server_time: new Date().toISOString(), page, page_size: 25, has_more: false };
+    return { ...data, requestedAt };
+  }, [view, query, page]);
+  const status = useLoad(signal => view ? api.request<ProcessStatus>('/api/v1/procesos/status', { signal }) : Promise.resolve(null), [view]);
   const entities = useLoad(signal => view ? api.request<{ entities: string[] }>('/api/v1/procesos/entities', { signal }) : Promise.resolve({ entities: [] }), [view]);
-  const reload = () => { result.reload(); status.reload(); };
+  const reload = () => { result.reload(); };
+  useEffect(() => {
+    if (!result.data || !view) return;
+    const refresh = () => { setSelected(null); result.reload(); };
+    const delay = nextProcessExpiry(result.data, performance.now() - result.data.requestedAt);
+    const timer = delay === null ? undefined : setTimeout(refresh, delay);
+    const resume = () => { if (document.visibilityState === 'visible') refresh(); };
+    document.addEventListener('visibilitychange', resume);
+    return () => { clearTimeout(timer); document.removeEventListener('visibilitychange', resume); };
+  }, [result.data, view]);
   const changeFilters = (values: ProcessFilters) => { setFilters(values); setPage(1); setSelected(null); };
   if (!active) return <Notice>Procesos no está habilitado. Actualiza la sesión para consultar los módulos disponibles.</Notice>;
   return <div className="processes">
@@ -30,7 +43,7 @@ export default function Procesos() {
       try {
         const imported = await api.request<ImportResult>('/api/v1/procesos/refresh', { method: 'POST', body: {} });
         notify(imported.replayed ? 'Los resultados de Scout ya estaban cargados.' : `${imported.inserted} nuevos · ${imported.updated} actualizados · ${imported.unchanged} sin cambios · ${imported.stale} antiguos omitidos.`);
-        setPage(1); reload(); entities.reload();
+        setPage(1); reload(); status.reload(); entities.reload();
       } catch (error) { notify(message(error)); } finally { setBusy(false); setRefreshing(false); }
     }}>{refreshing ? 'Actualizando…' : 'Actualizar'}</button>{moduleCan(access, 'procesos', 'exportacion', 'ver') && <button disabled={busy} onClick={async () => {
       setBusy(true);
@@ -42,7 +55,7 @@ export default function Procesos() {
     }}>Exportar CSV</button>}</div>} />
     {view && <>
       <ProcessInsights status={status.data} /><Notice>{status.error}</Notice>
-      <section className="process-workspace" aria-label="Consulta de procesos"><div className="process-list-heading"><h2>Explorar procesos</h2><p>{status.data ? `${status.data.total} resultados` : 'Consultando…'}<span> · </span>Última importación: {status.data?.last_import_at ? processDate(status.data.last_import_at) : '—'}</p></div>
+      <section className="process-workspace" aria-label="Consulta de procesos"><div className="process-list-heading"><h2>Explorar procesos vigentes</h2><p>{result.data ? `${result.data.total} resultados` : 'Consultando…'}<span> · </span>Última importación: {status.data?.last_import_at ? processDate(status.data.last_import_at) : '—'}</p></div>
         <ProcessFilterBar values={filters} entities={entities.data?.entities ?? []} change={changeFilters} /><Notice>{entities.error}</Notice>
         <Notice>{result.error}</Notice>{result.data ? <><ProcessTable rows={result.data.items} selected={selected} select={setSelected} canMark={moduleCan(access, 'procesos', 'marcas', 'editar')} busy={busy} mark={async (row, marked) => {
           setBusy(true);

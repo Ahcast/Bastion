@@ -23,12 +23,12 @@ export function ProcessInsights({ status }: { status: ProcessStatus | null }) {
       {status ? <ol className="process-chart" aria-label="Procesos por semana, desde el lunes indicado">{status.weekly.map((week, index) => <li key={week.week_start} className={index === status.weekly.length - 1 ? 'is-current' : ''}>
         <span className="process-bar-count">{week.count}</span><div className="process-bar-track"><span style={{ height: `${week.count / max * 100}%` }} /></div><span className="process-bar-label">{processDay(week.week_start)}</span>
       </li>)}</ol> : <p className="process-stat-loading" role="status">Cargando estadísticas…</p>}
-      <p className="process-caption">Primera detección · semanas de lunes a domingo</p>
+      <p className="process-caption">Primera importación en Bastion · lunes a domingo</p>
     </div>
     <div className="process-deliveries"><div className="process-section-head"><h2>Próximas entregas</h2><span>Fecha de recepción</span></div><div className="process-due-grid">{['Hoy', 'Mañana', 'Pasado mañana'].map((label, index) => {
       const day = status?.due[index];
       return <div className="process-due" key={label}><span>{label}</span><strong>{day?.count ?? '—'}</strong><small>{day ? processDay(day.date) : '—'}</small></div>;
-    })}</div><p className="process-caption">Resultados filtrados · hora de Honduras</p></div>
+    })}</div><p className="process-caption">{status ? `${status.total} procesos importados` : 'Todos los procesos importados'} · hora de Honduras</p></div>
   </section>;
 }
 

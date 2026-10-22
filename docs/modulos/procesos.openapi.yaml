@@ -18,7 +18,7 @@ paths:
         - $ref: '#/components/parameters/Hasta'
       responses:
         '200':
-          description: Total filtrado, última importación global, seis semanas desde lunes según primera_deteccion y entregas de hoy, mañana y pasado mañana según fecha_recepcion. Calendario America/Tegucigalpa. No depende de la página visible.
+          description: Estadísticas globales de todo lo importado, incluidos vencidos y municipalidades. Los filtros se aceptan por compatibilidad pero se ignoran. Nuevos por semana suma inserted de recibos confirmados según created_at (primera incorporación en Bastion, sin repetir actualizaciones o reimportaciones). Entregas de tres días según fecha_recepcion, incluso horas ya vencidas de hoy. Calendario America/Tegucigalpa.
           content:
             application/json:
               schema: {$ref: '#/components/schemas/Status'}
@@ -63,7 +63,7 @@ paths:
           schema: {type: integer, minimum: 1, maximum: 100, default: 25}
       responses:
         '200':
-          description: items, page, page_size y has_more. Orden solicitado y proceso_id ASC como desempate estable. Campos de fecha en UTC RFC 3339.
+          description: Solo vigentes (fecha_recepcion estrictamente posterior al instante UTC del servidor). items, total filtrado de vigentes, page, page_size, has_more y server_time. Orden solicitado y proceso_id ASC como desempate estable. Fechas UTC RFC 3339; al vencer deja de aparecer sin borrar su histórico.
           content:
             application/json:
               schema: {$ref: '#/components/schemas/Page'}
@@ -80,7 +80,7 @@ paths:
           schema: {type: string, pattern: '^hc:[a-f0-9]{64}$'}
       responses:
         '200':
-          description: Registro con campos fuente completos, marked, note y version compartidos; ETag con versión. Resultado IA como texto/JSON; no descarga enlaces externos.
+          description: Registro vigente con campos fuente completos, marked, note y version compartidos; ETag con versión. Vencido devuelve 404. Resultado IA como texto/JSON; no descarga enlaces externos.
           content:
             application/json:
               schema: {$ref: '#/components/schemas/Process'}
@@ -174,7 +174,7 @@ paths:
         - $ref: '#/components/parameters/Sort'
       responses:
         '200':
-          description: JSON csv_text con CSV UTF-8 BOM, encabezados Scout seguidos de de_interes (0/1) y nota compartida; celdas potencialmente ejecutables en hojas de cálculo prefijadas con apóstrofo. Esta exportación es para consulta y no sustituye el maestro original de Scout.
+          description: Solo vigentes con filtros y orden solicitados. JSON csv_text con CSV UTF-8 BOM, encabezados Scout seguidos de de_interes (0/1) y nota compartida; celdas potencialmente ejecutables en hojas de cálculo prefijadas con apóstrofo. No sustituye el maestro original de Scout.
           content:
             application/json:
               schema:
@@ -242,7 +242,7 @@ components:
               additionalProperties: {type: string}
     Page:
       type: object
-      required: [items, page, page_size, has_more]
+      required: [items, total, server_time, page, page_size, has_more]
       properties:
         items:
           type: array
@@ -251,6 +251,8 @@ components:
         page: {type: integer, minimum: 1, maximum: 100000}
         page_size: {type: integer, minimum: 1, maximum: 100}
         has_more: {type: boolean}
+        total: {type: integer, minimum: 0, description: Total de vigentes que coinciden con filtros antes de paginar.}
+        server_time: {type: string, format: date-time, description: Instante UTC usado como corte de vigencia de la página.}
     ImportResult:
       type: object
       required: [import_id, inserted, updated, unchanged, stale, replayed]

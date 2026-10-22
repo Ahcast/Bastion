@@ -37,6 +37,8 @@ El informe se obtuvo de una copia de frontend Angular compilado y backend Larave
 
 ## Registro de decisiones
 
+- 2026-10-22: corrección de Procesos: mostrar solo recepción estrictamente futura por fecha y hora exactas; conservar vencidos en el histórico. Estadísticas globales de la importación independientes de filtros y vencimiento. Nuevos por semana usa la primera incorporación en Bastion mediante inserted/created_at de recibos confirmados, no primera detección de Scout. Ver `modulos/procesos-implementacion.md`.
+
 - 2026-10-22: Procesos adopta detalle expandido dentro de la fila según la referencia HTML del usuario, estadísticas de nuevos por semana y entregas de tres días en hora de Honduras, y filtros compactos con entidad no municipal, búsqueda de contenido fuente/expediente, orden de recepción/puntuación y checks. Las estadísticas usan todos los resultados filtrados; se deriva primera detección en UTC para agregación. No se añaden permisos ni settings. Ver `modulos/procesos-implementacion.md` y su OpenAPI.
 
 - 2026-10-22: el usuario confirma que el botón Actualizar de Procesos incorpora el maestro local de Scout y después recarga la consulta. Se elimina Importar CSV y la recepción de archivos por HTTP; Exportar CSV conserva su comportamiento. La nueva operación POST de actualización no recibe rutas ni CSV, requiere sesión, CSRF y `procesos/importacion/editar`, verifica el manifiesto y audita al usuario que la solicita. La recepción periódica opcional conserva su identidad técnica independiente.

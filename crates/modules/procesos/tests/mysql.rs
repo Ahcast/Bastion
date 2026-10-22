@@ -22,6 +22,8 @@ fn csv(id: char, observation: &str, hash: char) -> String {
     ] {
         values.insert(field, "2026-10-21T19:00:00-06:00".into());
     }
+    // Domain read tests must remain valid independently of the CI calendar.
+    values.insert("fecha_recepcion", "2099-10-21T19:00:00-06:00".into());
     values.insert("ultima_deteccion", observation.into());
     values.insert("proceso_id", format!("hc:{}", id.to_string().repeat(64)));
     values.insert("url", "https://example.test/detalle?id=1".into());
@@ -153,6 +155,15 @@ async fn mysql57_import_permissions_history_and_disable() {
         .await
         .unwrap();
     assert!(matches!(service.status(3).await, Err(CoreError::Forbidden)));
+    let empty = service.status(1).await.unwrap();
+    assert_eq!(empty["total"], 0);
+    assert!(
+        empty["weekly"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .all(|week| week["count"] == 0)
+    );
     let first = csv('a', "2026-10-21T20:00:00-06:00", 'b');
     assert_eq!(service.import(1, &first).await.unwrap().inserted, 1);
     let id = format!("hc:{}", "a".repeat(64));
@@ -225,8 +236,8 @@ async fn mysql57_import_permissions_history_and_disable() {
             .is_err()
     );
     let filter = ProcessFilter {
-        desde: Some("2026-10-21".parse().unwrap()),
-        hasta: Some("2026-10-21".parse().unwrap()),
+        desde: Some("2099-10-21".parse().unwrap()),
+        hasta: Some("2099-10-21".parse().unwrap()),
         ..Default::default()
     };
     assert_eq!(service.rows(1, &filter).await.unwrap().items.len(), 2);
@@ -352,7 +363,7 @@ async fn mysql57_import_permissions_history_and_disable() {
             .iter()
             .any(|event| event.actor_name.as_deref() == Some("bastion-scout (local)"))
     );
-    // Overview counts all matching rows, not just a page, and uses Honduras day boundaries.
+    // Import statistics never depend on display filters or expiry.
     let base = service.status(1).await.unwrap();
     let today: NaiveDate = base["as_of"].as_str().unwrap().parse().unwrap();
     let midnight = today.and_hms_opt(6, 0, 0).unwrap();
@@ -361,6 +372,15 @@ async fn mysql57_import_permissions_history_and_disable() {
         .unwrap()
         .and_hms_opt(6, 0, 0)
         .unwrap();
+    sqlx::query("UPDATE procesos_imports SET created_at=?")
+        .bind(monday - chrono::Duration::days(60))
+        .execute(&pool)
+        .await
+        .unwrap();
+    sqlx::query("UPDATE procesos_imports SET created_at=? WHERE CAST(JSON_UNQUOTE(JSON_EXTRACT(result_json,'$.inserted')) AS UNSIGNED)=600")
+        .bind(monday).execute(&pool).await.unwrap();
+    sqlx::query("UPDATE procesos_imports SET created_at=? WHERE CAST(JSON_UNQUOTE(JSON_EXTRACT(result_json,'$.inserted')) AS UNSIGNED)=1")
+        .bind(monday-chrono::Duration::seconds(1)).execute(&pool).await.unwrap();
     sqlx::query("UPDATE procesos_rows SET fecha_recepcion=?,primera_deteccion=?")
         .bind(midnight - chrono::Duration::days(60))
         .bind(monday - chrono::Duration::days(60))
@@ -411,16 +431,19 @@ async fn mysql57_import_permissions_history_and_disable() {
     assert_eq!(dashboard["due"][0]["count"], 1);
     assert_eq!(dashboard["due"][1]["count"], 1);
     assert_eq!(dashboard["due"][2]["count"], 1);
-    assert_eq!(dashboard["weekly"][5]["count"], 3);
-    assert_eq!(dashboard["weekly"][4]["count"], 1);
+    assert_eq!(dashboard["weekly"][5]["count"], 600);
+    assert_eq!(dashboard["weekly"][4]["count"], 2);
+    assert!(service.import(1, &bulk).await.unwrap().replayed);
+    assert_eq!(
+        service.status(1).await.unwrap()["weekly"],
+        dashboard["weekly"]
+    );
     let hidden = ProcessFilter {
         hide_municipalities: Some(true),
         ..Default::default()
     };
-    let dashboard = service.overview(1, &hidden).await.unwrap();
-    assert_eq!(dashboard["total"], 600);
-    assert_eq!(dashboard["due"][1]["count"], 0);
-    assert_eq!(dashboard["weekly"][5]["count"], 1);
+    let hidden_dashboard = service.overview(1, &hidden).await.unwrap();
+    assert_eq!(hidden_dashboard, dashboard);
     let entities = service.entities(1).await.unwrap();
     assert!(
         entities["entities"]
@@ -440,17 +463,20 @@ async fn mysql57_import_permissions_history_and_disable() {
         entidad: Some("Secretaría de Salud".into()),
         ..Default::default()
     };
-    assert_eq!(service.rows(1, &exact).await.unwrap().items.len(), 1);
+    assert!(service.rows(1, &exact).await.unwrap().items.is_empty());
+    assert_eq!(service.rows(1, &exact).await.unwrap().total, 0);
+    assert_eq!(service.overview(1, &exact).await.unwrap(), dashboard);
     let marked = ProcessFilter {
         marked: Some(true),
         ..Default::default()
     };
-    assert_eq!(service.overview(1, &marked).await.unwrap()["total"], 1);
+    assert_eq!(service.overview(1, &marked).await.unwrap(), dashboard);
     let search = ProcessFilter {
         q: Some("osciloscopio 50%_".into()),
         ..Default::default()
     };
-    assert_eq!(service.rows(1, &search).await.unwrap().items.len(), 4);
+    assert_eq!(service.rows(1, &search).await.unwrap().items.len(), 2);
+    assert_eq!(service.overview(1, &search).await.unwrap(), dashboard);
     assert!(
         service
             .rows(
@@ -466,7 +492,7 @@ async fn mysql57_import_permissions_history_and_disable() {
             .is_empty()
     );
     for (sort, first) in [
-        (ProcessSort::FechaAsc, &bulk_second),
+        (ProcessSort::FechaAsc, &municipality),
         (ProcessSort::FechaDesc, &bulk_first),
         (ProcessSort::PuntajeDesc, &bulk_first),
         (ProcessSort::PuntajeAsc, &municipality),
@@ -485,7 +511,58 @@ async fn mysql57_import_permissions_history_and_disable() {
             &reader.records().next().unwrap().unwrap()[1],
             first.as_str()
         );
+        assert_eq!(service.overview(1, &filter).await.unwrap(), dashboard);
     }
+    // Exact current-time cutoff: one minute ago is hidden, one minute ahead remains.
+    let now = chrono::Utc::now().naive_utc();
+    for (key, date) in [
+        (&id, now - chrono::Duration::minutes(1)),
+        (&municipality, now + chrono::Duration::minutes(1)),
+        (&bulk_first, now),
+    ] {
+        sqlx::query("UPDATE procesos_rows SET fecha_recepcion=? WHERE proceso_id=?")
+            .bind(date)
+            .bind(key)
+            .execute(&pool)
+            .await
+            .unwrap();
+    }
+    let current = service.rows(1, &search).await.unwrap();
+    assert_eq!(current.total, 1);
+    assert_eq!(current.items[0].proceso_id, municipality);
+    assert!(
+        current
+            .items
+            .iter()
+            .all(|row| row.fecha_recepcion > current.server_time)
+    );
+    assert!(matches!(
+        service.detail(1, &id).await,
+        Err(CoreError::NotFound)
+    ));
+    assert!(matches!(
+        service.detail(1, &bulk_first).await,
+        Err(CoreError::NotFound)
+    ));
+    assert!(service.detail(1, &municipality).await.is_ok());
+    assert!(matches!(
+        service.review(1, &id, 2, None, Some("Too late")).await,
+        Err(CoreError::NotFound)
+    ));
+    let export = service.export(1, &search).await.unwrap();
+    let mut reader = csv::Reader::from_reader(export.trim_start_matches('\u{feff}').as_bytes());
+    assert_eq!(reader.records().count(), 1);
+    // Expiration never deletes history, marks or notes; an extended deadline restores them.
+    sqlx::query("UPDATE procesos_rows SET fecha_recepcion=? WHERE proceso_id=?")
+        .bind(now + chrono::Duration::minutes(1))
+        .bind(&id)
+        .execute(&pool)
+        .await
+        .unwrap();
+    let retained = service.detail(1, &id).await.unwrap();
+    assert!(retained.marked);
+    assert_eq!(retained.note, "=1+1");
+    assert_eq!(service.status(1).await.unwrap()["total"], 602);
     assert!(matches!(
         service.overview(3, &hidden).await,
         Err(CoreError::Forbidden)

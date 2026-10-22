@@ -78,6 +78,9 @@ fn utc_date<S: serde::Serializer>(date: &NaiveDateTime, serializer: S) -> Result
 #[derive(Serialize)]
 pub struct ProcessPage {
     pub items: Vec<ProcessRecord>,
+    pub total: i64,
+    #[serde(serialize_with = "utc_date")]
+    pub server_time: NaiveDateTime,
     pub page: u32,
     pub page_size: u32,
     pub has_more: bool,
@@ -237,10 +240,7 @@ impl ProcessService {
             .date_naive();
         let (days, weeks) = calendar(today)?;
         let mut query = QueryBuilder::<MySql>::new("SELECT COUNT(*) AS total");
-        for (prefix, dates, field, width) in [
-            ("due", days.as_slice(), "r.fecha_recepcion", 1),
-            ("week", weeks.as_slice(), "r.primera_deteccion", 7),
-        ] {
+        for (prefix, dates, field, width) in [("due", days.as_slice(), "r.fecha_recepcion", 1)] {
             for (index, date) in dates.iter().enumerate() {
                 query
                     .push(format!(",CAST(COALESCE(SUM({field}>="))
@@ -257,16 +257,26 @@ impl ProcessService {
             }
         }
         query.push(PROCESS_FROM);
-        append_filters(&mut query, filter)?;
         let mut tx = self.begin(actor, "consulta", "ver").await?;
         let counts = query.build().fetch_one(&mut *tx).await?;
+        let mut imports = QueryBuilder::<MySql>::new("SELECT ");
+        for (index, date) in weeks.iter().enumerate() {
+            if index > 0 {
+                imports.push(",");
+            }
+            imports.push("CAST(COALESCE(SUM(CASE WHEN created_at>=").push_bind(day_start(*date)?.naive_utc())
+                .push(" AND created_at<").push_bind(day_start(date.checked_add_days(Days::new(7)).ok_or(CoreError::Invalid)?)?.naive_utc())
+                .push(format!(" THEN CAST(JSON_UNQUOTE(JSON_EXTRACT(result_json,'$.inserted')) AS UNSIGNED) ELSE 0 END),0) AS UNSIGNED) AS week_{index}"));
+        }
+        imports.push(" FROM procesos_imports");
+        let import_counts = imports.build().fetch_one(&mut *tx).await?;
         let last: Option<NaiveDateTime> =
             sqlx::query_scalar("SELECT MAX(created_at) FROM procesos_imports")
                 .fetch_one(&mut *tx)
                 .await?;
         tx.commit().await?;
         let due = days.iter().enumerate().map(|(i,date)| Ok(serde_json::json!({"date":date,"count":counts.try_get::<u64,_>(format!("due_{i}").as_str())?}))).collect::<Result<Vec<_>,sqlx::Error>>()?;
-        let weekly = weeks.iter().enumerate().map(|(i,date)| Ok(serde_json::json!({"week_start":date,"count":counts.try_get::<u64,_>(format!("week_{i}").as_str())?}))).collect::<Result<Vec<_>,sqlx::Error>>()?;
+        let weekly = weeks.iter().enumerate().map(|(i,date)| Ok(serde_json::json!({"week_start":date,"count":import_counts.try_get::<u64,_>(format!("week_{i}").as_str())?}))).collect::<Result<Vec<_>,sqlx::Error>>()?;
         Ok(
             serde_json::json!({"total":counts.try_get::<i64,_>("total")?,"last_import_at":last.map(|d| d.and_utc().to_rfc3339()),"as_of":today,"timezone":"America/Tegucigalpa","due":due,"weekly":weekly}),
         )
@@ -275,7 +285,13 @@ impl ProcessService {
     pub async fn rows(&self, actor: u64, filter: &ProcessFilter) -> Result<ProcessPage, CoreError> {
         let (page, size, offset) = filter.bounds()?;
         let mut tx = self.begin(actor, "consulta", "ver").await?;
-        let mut query = select_rows(filter, false)?;
+        let now = Utc::now().naive_utc();
+        let mut count = QueryBuilder::<MySql>::new("SELECT COUNT(*)");
+        count.push(PROCESS_FROM);
+        append_filters(&mut count, filter)?;
+        count.push(" AND r.fecha_recepcion>").push_bind(now);
+        let total: i64 = count.build_query_scalar().fetch_one(&mut *tx).await?;
+        let mut query = select_rows(filter, false, now)?;
         query
             .push(" ORDER BY ")
             .push(filter.sort.unwrap_or_default().sql())
@@ -292,6 +308,8 @@ impl ProcessService {
         tx.commit().await?;
         Ok(ProcessPage {
             items,
+            total,
+            server_time: now,
             page,
             page_size: size,
             has_more,
@@ -303,8 +321,8 @@ impl ProcessService {
             return Err(CoreError::Invalid);
         }
         let mut tx = self.begin(actor, "consulta", "ver").await?;
-        let record = sqlx::query_as::<_, ProcessRecord>("SELECT r.proceso_id,r.entidad,r.expediente,r.fecha_recepcion,r.puntaje,r.rubro,r.resumen_corto,r.source_json AS source,COALESCE(m.marked,0) AS marked,COALESCE(m.note,'') AS note,CAST(COALESCE(m.version,0) AS UNSIGNED) AS version FROM procesos_rows r LEFT JOIN procesos_marks m ON m.proceso_id=r.proceso_id WHERE r.proceso_id=?")
-            .bind(id).fetch_optional(&mut *tx).await?.ok_or(CoreError::NotFound)?;
+        let record = sqlx::query_as::<_, ProcessRecord>("SELECT r.proceso_id,r.entidad,r.expediente,r.fecha_recepcion,r.puntaje,r.rubro,r.resumen_corto,r.source_json AS source,COALESCE(m.marked,0) AS marked,COALESCE(m.note,'') AS note,CAST(COALESCE(m.version,0) AS UNSIGNED) AS version FROM procesos_rows r LEFT JOIN procesos_marks m ON m.proceso_id=r.proceso_id WHERE r.proceso_id=? AND r.fecha_recepcion>?")
+            .bind(id).bind(Utc::now().naive_utc()).fetch_optional(&mut *tx).await?.ok_or(CoreError::NotFound)?;
         tx.commit().await?;
         Ok(record)
     }
@@ -474,9 +492,10 @@ impl ProcessService {
                 .await?;
         }
         let exists: Option<String> = sqlx::query_scalar(
-            "SELECT proceso_id FROM procesos_rows WHERE proceso_id=? FOR UPDATE",
+            "SELECT proceso_id FROM procesos_rows WHERE proceso_id=? AND fecha_recepcion>? FOR UPDATE",
         )
         .bind(id)
+        .bind(Utc::now().naive_utc())
         .fetch_optional(&mut *tx)
         .await?;
         if exists.is_none() {
@@ -510,7 +529,7 @@ impl ProcessService {
 
     pub async fn export(&self, actor: u64, filter: &ProcessFilter) -> Result<String, CoreError> {
         let mut tx = self.begin(actor, "exportacion", "ver").await?;
-        let mut query = select_rows(filter, true)?;
+        let mut query = select_rows(filter, true, Utc::now().naive_utc())?;
         query
             .push(" ORDER BY ")
             .push(filter.sort.unwrap_or_default().sql())
@@ -676,6 +695,7 @@ fn calendar(today: NaiveDate) -> Result<([NaiveDate; 3], [NaiveDate; 6]), CoreEr
 fn select_rows(
     filter: &ProcessFilter,
     full_source: bool,
+    now: NaiveDateTime,
 ) -> Result<QueryBuilder<MySql>, CoreError> {
     filter.bounds()?;
     let source = if full_source {
@@ -687,6 +707,7 @@ fn select_rows(
         "SELECT r.proceso_id,r.entidad,r.expediente,r.fecha_recepcion,r.puntaje,r.rubro,r.resumen_corto,{source} AS source,COALESCE(m.marked,0) AS marked,COALESCE(m.note,'') AS note,CAST(COALESCE(m.version,0) AS UNSIGNED) AS version{PROCESS_FROM}"
     ));
     append_filters(&mut query, filter)?;
+    query.push(" AND r.fecha_recepcion>").push_bind(now);
     Ok(query)
 }
 
