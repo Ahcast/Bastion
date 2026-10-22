@@ -5,7 +5,7 @@ import type { ApiClient } from './api.js';
 import { message } from './api.js';
 import type { Access } from './types.js';
 
-export const CoreContext = createContext<{ api: ApiClient; access: Access; notify: (text: string) => void } | null>(null);
+export const CoreContext = createContext<{ api: ApiClient; access: Access; notify: (text: string) => void; refreshAccess?: () => Promise<void> } | null>(null);
 export function useCore() { const context = useContext(CoreContext); if (!context) throw new Error('Core context required'); return context; }
 export function Brand() { return <div className="brand">BASTION <b>/</b> CORE <span className="muted"> · v1</span></div>; }
 export function Notice({ children }: { children?: ReactNode }) { return children ? <div className="notice" role="alert">{children}</div> : null; }

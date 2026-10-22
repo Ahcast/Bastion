@@ -100,6 +100,19 @@ pub struct RolePermissionInput {
 }
 
 impl CoreAdmin {
+    pub async fn record_domain_event(
+        tx: &mut sqlx::Transaction<'_, MySql>,
+        actor: u64,
+        module: &str,
+        action: &str,
+        target: &str,
+        details: serde_json::Value,
+    ) -> Result<(), CoreError> {
+        sqlx::query("INSERT INTO audit_events (actor_id,module_id,action,target_type,target_id,result,details_json,created_at) VALUES (?,?,?,'domain_record',?,'success',?,UTC_TIMESTAMP(6))")
+            .bind(actor).bind(module).bind(action).bind(target).bind(details).execute(&mut **tx).await?;
+        Ok(())
+    }
+
     pub(crate) fn new(database: Database) -> Self {
         Self { database }
     }
@@ -765,7 +778,7 @@ impl CoreAdmin {
         }
     }
 
-    async fn authorize(
+    pub async fn authorize(
         &self,
         actor: u64,
         module: &str,

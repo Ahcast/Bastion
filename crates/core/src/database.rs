@@ -13,6 +13,16 @@ pub struct Database {
 }
 
 impl Database {
+    #[cfg(feature = "test-support")]
+    pub fn from_test_pool(pool: MySqlPool) -> Self {
+        Self { pool }
+    }
+
+    /// Shared pool for explicitly composed domain repositories.
+    pub fn pool(&self) -> &MySqlPool {
+        &self.pool
+    }
+
     pub fn connect_lazy(config: &DatabaseConfig) -> Self {
         let options = MySqlConnectOptions::new()
             .host(&config.host)

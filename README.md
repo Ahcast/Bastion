@@ -2,6 +2,8 @@
 
 ## Estado de esta entrega
 
+Procesos está en desarrollo como primer módulo de negocio: recibe el `maestro.csv` analizado de bastion-scout, con importación manual, consulta, detalle y exportación. Permanece desactivado por defecto. Ver [contrato y pendientes](docs/modulos/procesos-implementacion.md); marcas, notas, settings y purga no se dan por cerrados. Este desarrollo se publica primero en GitHub y no instala cambios en servidores.
+
 Código y lineamientos publicados directamente en `main`, sin ramas de desarrollo. El workspace Rust está en la raíz; el frontend React + TypeScript estricto y Vite está en `web/` y se publica como build estático en Bluehost. La decisión se documenta en `docs/adr/ADR-0002-frontend-react.md`.
 
 Los dominios confirmados para las pruebas son `bastion.castilloit.net` para el frontend en Bluehost y `api.bastion.castilloit.net` para la API en AWS Lightsail; MySQL permanece en Bluehost. Configurar `BASTION_CORS_ALLOWED_ORIGIN` con el origen exacto del frontend y `web/public/config.js` con el origen de la API.

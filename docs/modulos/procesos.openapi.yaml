@@ -1,0 +1,131 @@
+openapi: 3.1.0
+info:
+  title: Bastion Procesos (contrato del módulo habilitado)
+  version: 0.1.0
+security:
+  - session: []
+paths:
+  /api/v1/procesos/status:
+    get:
+      operationId: procesosStatus
+      x-permission: procesos/consulta/ver
+      responses:
+        '200':
+          description: Total de registros y última importación; no activa el módulo.
+        default:
+          $ref: '#/components/responses/Problem'
+  /api/v1/procesos/rows:
+    get:
+      operationId: procesosRows
+      x-permission: procesos/consulta/ver
+      parameters:
+        - $ref: '#/components/parameters/Q'
+        - $ref: '#/components/parameters/Entidad'
+        - $ref: '#/components/parameters/Desde'
+        - $ref: '#/components/parameters/Hasta'
+        - name: page
+          in: query
+          schema: {type: integer, minimum: 1, default: 1}
+        - name: page_size
+          in: query
+          schema: {type: integer, minimum: 1, maximum: 100, default: 25}
+      responses:
+        '200':
+          description: items, page, page_size y has_more. Orden fecha_recepcion DESC, proceso_id ASC. Campos de fecha en UTC RFC 3339.
+        default:
+          $ref: '#/components/responses/Problem'
+  /api/v1/procesos/rows/{id}:
+    get:
+      operationId: procesosDetail
+      x-permission: procesos/consulta/ver
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: {type: string, pattern: '^hc:[a-f0-9]{64}$'}
+      responses:
+        '200':
+          description: Registro con campos fuente completos y resultado IA como texto/JSON; no descarga enlaces externos.
+        default:
+          $ref: '#/components/responses/Problem'
+  /api/v1/procesos/import:
+    post:
+      operationId: procesosImport
+      x-permission: procesos/importacion/editar
+      x-limits: {csv_bytes: 8388608, request_bytes: 16777216, rows: 5000, timeout_seconds: 60, concurrency: 1}
+      description: Solo maestro.csv analizado de Scout. Idempotencia por SHA-256 exacto del CSV y actor, conservada en el registro de importaciones. Repetir devuelve el resultado previo. Archivo inválido revierte toda la operación. CSV antiguo no sobrescribe registros más recientes; ausencias no borran filas. Ver procesos-implementacion.md.
+      parameters:
+        - name: X-CSRF-Token
+          in: header
+          required: true
+          schema: {type: string}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [csv_text]
+              properties:
+                csv_text: {type: string, maxLength: 8388608}
+      responses:
+        '200':
+          description: import_id, inserted, updated, unchanged, stale y replayed. Confirmación transaccional con auditoría.
+        default:
+          $ref: '#/components/responses/Problem'
+  /api/v1/procesos/export:
+    get:
+      operationId: procesosExport
+      x-permission: procesos/exportacion/ver
+      x-limits: {rows: 5000, response_bytes: 16777216, timeout_seconds: 60, concurrency: 1}
+      parameters:
+        - $ref: '#/components/parameters/Q'
+        - $ref: '#/components/parameters/Entidad'
+        - $ref: '#/components/parameters/Desde'
+        - $ref: '#/components/parameters/Hasta'
+      responses:
+        '200':
+          description: JSON csv_text con CSV UTF-8 BOM, encabezados Scout; celdas potencialmente ejecutables en hojas de cálculo prefijadas con apóstrofo. Esta exportación es para consulta y no sustituye el maestro original de Scout.
+        '409':
+          description: Más de 5.000 filas o 16 MiB; acotar filtros. No se trunca el resultado.
+        default:
+          $ref: '#/components/responses/Problem'
+components:
+  securitySchemes:
+    session:
+      type: apiKey
+      in: cookie
+      name: __Host-bastion_session
+  parameters:
+    Q:
+      name: q
+      in: query
+      schema: {type: string, maxLength: 200}
+    Entidad:
+      name: entidad
+      in: query
+      schema: {type: string, maxLength: 200}
+    Desde:
+      name: desde
+      in: query
+      description: Primer día de recepción, inclusivo en America/Tegucigalpa.
+      schema: {type: string, format: date}
+    Hasta:
+      name: hasta
+      in: query
+      description: Último día de recepción, inclusivo en America/Tegucigalpa.
+      schema: {type: string, format: date}
+  responses:
+    Problem:
+      description: RFC 9457; 400 entrada inválida, 401 sin sesión, 403 sin permiso, 404 módulo inactivo o registro ausente, 409 conflicto o límite de exportación, 413 tamaño, 428 requiere TOTP, 429 cuota, 503 concurrencia/timeout. Reutiliza identidad, origen exacto y CSRF del Core.
+      content:
+        application/problem+json:
+          schema:
+            type: object
+            required: [type, title, status, detail]
+            properties:
+              type: {type: string}
+              title: {type: string}
+              status: {type: integer}
+              detail: {type: string}

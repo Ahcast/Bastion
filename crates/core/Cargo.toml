@@ -3,6 +3,9 @@ name = "bastion-core"
 version.workspace = true
 edition.workspace = true
 
+[features]
+test-support = []
+
 [dependencies]
 aes-gcm.workspace = true
 argon2.workspace = true

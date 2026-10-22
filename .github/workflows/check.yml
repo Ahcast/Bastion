@@ -73,6 +73,21 @@ jobs:
     runs-on: ubuntu-24.04
     needs: format
     timeout-minutes: 30
+    services:
+      mysql57:
+        image: mysql:5.7
+        env:
+          MYSQL_ROOT_PASSWORD: bastion_ci_only
+          MYSQL_DATABASE: bastion_test
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -pbastion_ci_only"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=12
+    env:
+      BASTION_PROCESOS_TEST_URL: mysql://root:bastion_ci_only@127.0.0.1:3306/bastion_test?ssl-mode=disabled
     steps:
       - name: Check out source
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262

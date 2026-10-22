@@ -36,6 +36,8 @@ El informe se obtuvo de una copia de frontend Angular compilado y backend Larave
 
 ## Registro de decisiones
 
+- 2026-10-21: primer corte de Procesos separado en `crates/modules/procesos`, con migraciones y ledger `_procesos_migrations` propios. `migrate` aplica primero Core y después Procesos; `serve` solo sincroniza disponibilidad y no crea tablas. La allowlist `BASTION_ALLOWED_MODULES` queda vacía por defecto; permite `procesos` después de sus migraciones, y el administrador controla su activación. Los endpoints vuelven a comprobar disponibilidad y permisos y se bloquean al desactivar sin borrar datos. La entrada manual usa el cliente CSRF común; MCP y recepción automática esperan sus contratos de identidad.
+
 - 2026-10-21: comienza Procesos como primer módulo de negocio, con publicación y validación primero en GitHub. El usuario confirma como entrada el CSV maestro de `bastion-scout` después de su análisis IA; el contrato se verifica en su repositorio y se documenta en `modulos/procesos-implementacion.md`. El CSV del crawler anterior no define el nuevo importador. Settings, alcance de marcas/notas y purga siguen pendientes de definición explícita.
 
 - 2026-10-21: frontend y API instalados en el ambiente de pruebas con HTTPS y MySQL TLS verificado. Las notas de operación, IPs, cuentas y rutas reales se conservan localmente fuera del repositorio público.

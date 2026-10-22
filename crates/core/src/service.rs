@@ -28,6 +28,7 @@ type HmacSha1 = Hmac<Sha1>;
 
 #[derive(Debug)]
 pub enum CoreError {
+    NotFound,
     Invalid,
     Unauthorized,
     Forbidden,
@@ -43,6 +44,7 @@ pub enum CoreError {
 impl fmt::Display for CoreError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            Self::NotFound => f.write_str("resource not found"),
             Self::Invalid => f.write_str("invalid request"),
             Self::Unauthorized => f.write_str("authentication required"),
             Self::Forbidden => f.write_str("operation not allowed"),
@@ -230,6 +232,10 @@ struct SessionRow {
 }
 
 impl CoreService {
+    pub fn database(&self) -> Database {
+        self.database.clone()
+    }
+
     pub fn admin(&self) -> CoreAdmin {
         CoreAdmin::new(self.database.clone())
     }

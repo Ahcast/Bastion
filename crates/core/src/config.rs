@@ -8,6 +8,7 @@ pub struct AppConfig {
     pub bootstrap_secret: String,
     pub data_encryption_key: [u8; 32],
     pub trusted_proxy_cidrs: Vec<IpNet>,
+    pub procesos_allowed: bool,
 }
 
 #[derive(Clone)]
@@ -133,6 +134,16 @@ impl AppConfig {
             bootstrap_secret,
             data_encryption_key,
             trusted_proxy_cidrs,
+            procesos_allowed: match env::var("BASTION_ALLOWED_MODULES") {
+                Ok(value) if value.trim().is_empty() => false,
+                Ok(value) if value.trim() == "procesos" => true,
+                Err(env::VarError::NotPresent) => false,
+                _ => {
+                    return Err(ConfigError {
+                        variable: "BASTION_ALLOWED_MODULES",
+                    });
+                }
+            },
         })
     }
 }

@@ -28,6 +28,7 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
     if command == "migrate" {
         let migrator = Database::connect_lazy(&DatabaseConfig::migrator_from_env()?);
         migrator.migrate().await?;
+        bastion_procesos::ProcessService::migrate(&migrator).await?;
         tracing::info!("database migrations completed");
         return Ok(());
     }
@@ -44,6 +45,9 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
     )?
     .with_public_app_origin(app_origin.clone());
     core.check_ready().await?;
+    bastion_procesos::ProcessService::new(core.database(), core.admin())
+        .synchronize_release(config.procesos_allowed)
+        .await?;
     let cleanup = core.admin();
     cleanup.cleanup_retention().await?;
     tokio::spawn(async move {
