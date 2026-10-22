@@ -1,7 +1,10 @@
 use std::collections::BTreeMap;
 
 use bastion_core::{CoreError, CoreService, Database, DomainActor};
-use bastion_procesos::{FIELDS, ProcessFilter, ProcessService, ReadyDelivery, SCOUT_FIELDS};
+use bastion_procesos::{
+    FIELDS, ProcessFilter, ProcessService, ProcessSort, ReadyDelivery, SCOUT_FIELDS,
+};
+use chrono::{Datelike, Days, NaiveDate, NaiveDateTime};
 use sha2::{Digest, Sha256};
 use sqlx::mysql::MySqlPoolOptions;
 
@@ -183,6 +186,27 @@ async fn mysql57_import_permissions_history_and_disable() {
     let second = csv('e', "2026-10-21T21:00:00-06:00", 'f');
     assert_eq!(service.import(2, &second).await.unwrap().inserted, 1);
     assert_eq!(service.status(1).await.unwrap()["total"], 2);
+    // Upgrade existing rows, including both offset and UTC source timestamps.
+    sqlx::query("UPDATE procesos_rows SET source_json=JSON_SET(source_json,'$.primera_deteccion','2026-10-22T01:00:00Z') WHERE proceso_id=?")
+        .bind(format!("hc:{}", "e".repeat(64))).execute(&pool).await.unwrap();
+    sqlx::query("ALTER TABLE procesos_rows DROP COLUMN primera_deteccion")
+        .execute(&pool)
+        .await
+        .unwrap();
+    sqlx::raw_sql(include_str!("../migrations/0004_first_detection.sql"))
+        .execute(&pool)
+        .await
+        .unwrap();
+    let recovered: Vec<NaiveDateTime> =
+        sqlx::query_scalar("SELECT primera_deteccion FROM procesos_rows")
+            .fetch_all(&pool)
+            .await
+            .unwrap();
+    assert!(
+        recovered
+            .iter()
+            .all(|date| date.to_string() == "2026-10-22 01:00:00")
+    );
     assert!(matches!(
         service
             .import(2, &csv('a', "2026-10-21T22:00:00-06:00", 'e'))
@@ -328,12 +352,162 @@ async fn mysql57_import_permissions_history_and_disable() {
             .iter()
             .any(|event| event.actor_name.as_deref() == Some("bastion-scout (local)"))
     );
+    // Overview counts all matching rows, not just a page, and uses Honduras day boundaries.
+    let base = service.status(1).await.unwrap();
+    let today: NaiveDate = base["as_of"].as_str().unwrap().parse().unwrap();
+    let midnight = today.and_hms_opt(6, 0, 0).unwrap();
+    let monday = today
+        .checked_sub_days(Days::new(u64::from(today.weekday().num_days_from_monday())))
+        .unwrap()
+        .and_hms_opt(6, 0, 0)
+        .unwrap();
+    sqlx::query("UPDATE procesos_rows SET fecha_recepcion=?,primera_deteccion=?")
+        .bind(midnight - chrono::Duration::days(60))
+        .bind(monday - chrono::Duration::days(60))
+        .execute(&pool)
+        .await
+        .unwrap();
+    let municipality = format!("hc:{}", "e".repeat(64));
+    let bulk_first = format!("hc:{:064x}", 0);
+    let bulk_second = format!("hc:{:064x}", 1);
+    for (key, entity, date, score, discovery) in [
+        (&id, "Secretaría de Salud", midnight, 80, monday),
+        (
+            &municipality,
+            "Alcaldía Municipal de Prueba",
+            midnight + chrono::Duration::days(1),
+            20,
+            monday,
+        ),
+        (
+            &bulk_first,
+            "Secretaría de Salud Especial",
+            midnight + chrono::Duration::days(2),
+            95,
+            monday - chrono::Duration::seconds(1),
+        ),
+        (
+            &bulk_second,
+            "Municipalidad de Otro Lugar",
+            midnight - chrono::Duration::seconds(1),
+            95,
+            monday,
+        ),
+    ] {
+        sqlx::query("UPDATE procesos_rows SET entidad=?,fecha_recepcion=?,puntaje=?,primera_deteccion=?,expediente='TEST-SEARCH',resumen_corto='SOLO_IA',source_json=JSON_SET(source_json,'$.descripcion','Una descripción','$.items_fuente','[{\"especificacion\":\"osciloscopio 50%_\"}]') WHERE proceso_id=?")
+            .bind(entity).bind(date).bind(score as u8).bind(discovery).bind(key).execute(&pool).await.unwrap();
+    }
+    let dashboard = service
+        .overview(
+            1,
+            &ProcessFilter {
+                page_size: Some(1),
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
+    assert_eq!(dashboard["total"], 602);
+    assert_eq!(dashboard["due"][0]["count"], 1);
+    assert_eq!(dashboard["due"][1]["count"], 1);
+    assert_eq!(dashboard["due"][2]["count"], 1);
+    assert_eq!(dashboard["weekly"][5]["count"], 3);
+    assert_eq!(dashboard["weekly"][4]["count"], 1);
+    let hidden = ProcessFilter {
+        hide_municipalities: Some(true),
+        ..Default::default()
+    };
+    let dashboard = service.overview(1, &hidden).await.unwrap();
+    assert_eq!(dashboard["total"], 600);
+    assert_eq!(dashboard["due"][1]["count"], 0);
+    assert_eq!(dashboard["weekly"][5]["count"], 1);
+    let entities = service.entities(1).await.unwrap();
+    assert!(
+        entities["entities"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .all(|v| !v.as_str().unwrap().contains("Municipal"))
+    );
+    assert!(
+        entities["entities"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|v| v == "Secretaría de Salud")
+    );
+    let exact = ProcessFilter {
+        entidad: Some("Secretaría de Salud".into()),
+        ..Default::default()
+    };
+    assert_eq!(service.rows(1, &exact).await.unwrap().items.len(), 1);
+    let marked = ProcessFilter {
+        marked: Some(true),
+        ..Default::default()
+    };
+    assert_eq!(service.overview(1, &marked).await.unwrap()["total"], 1);
+    let search = ProcessFilter {
+        q: Some("osciloscopio 50%_".into()),
+        ..Default::default()
+    };
+    assert_eq!(service.rows(1, &search).await.unwrap().items.len(), 4);
+    assert!(
+        service
+            .rows(
+                1,
+                &ProcessFilter {
+                    q: Some("SOLO_IA".into()),
+                    ..Default::default()
+                }
+            )
+            .await
+            .unwrap()
+            .items
+            .is_empty()
+    );
+    for (sort, first) in [
+        (ProcessSort::FechaAsc, &bulk_second),
+        (ProcessSort::FechaDesc, &bulk_first),
+        (ProcessSort::PuntajeDesc, &bulk_first),
+        (ProcessSort::PuntajeAsc, &municipality),
+    ] {
+        let filter = ProcessFilter {
+            sort: Some(sort),
+            q: Some("TEST-SEARCH".into()),
+            ..Default::default()
+        };
+        let rows = service.rows(1, &filter).await.unwrap().items;
+        assert_eq!(&rows[0].proceso_id, first);
+        let exported = service.export(1, &filter).await.unwrap();
+        let mut reader =
+            csv::Reader::from_reader(exported.trim_start_matches('\u{feff}').as_bytes());
+        assert_eq!(
+            &reader.records().next().unwrap().unwrap()[1],
+            first.as_str()
+        );
+    }
+    assert!(matches!(
+        service.overview(3, &hidden).await,
+        Err(CoreError::Forbidden)
+    ));
+    assert!(matches!(
+        service.entities(3).await,
+        Err(CoreError::Forbidden)
+    ));
     core.admin()
         .set_module_enabled(1, "procesos", false)
         .await
         .unwrap();
     assert!(matches!(
         service.rows(1, &filter).await,
+        Err(CoreError::NotFound)
+    ));
+    assert!(matches!(
+        service.entities(1).await,
+        Err(CoreError::NotFound)
+    ));
+    assert!(matches!(
+        service.overview(1, &hidden).await,
         Err(CoreError::NotFound)
     ));
     assert!(matches!(

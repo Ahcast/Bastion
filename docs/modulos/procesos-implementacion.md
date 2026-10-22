@@ -40,7 +40,19 @@ Para MySQL remoto, se consultan metadatos por lote y se insertan/actualizan hast
 
 ## Primer corte implementado
 
-Consulta de estado, listado paginado por expediente/resumen/descripción, entidad, fechas de recepción y marca; detalle de campos fuente y análisis; marcas/notas compartidas con control de versión; actualización desde Scout local y exportación. Contrato HTTP: [procesos.openapi.yaml](procesos.openapi.yaml). La pantalla carga bajo demanda y la sección Procesos en Ajustes explica su estado pendiente. La allowlist y el estado administrativo se comprueban también en cada operación del servidor. La compatibilidad de migraciones comprueba versiones y checksums de su ledger.
+Decisión de interfaz del 22 de octubre de 2026: detalle desplegado debajo de la fila, inspirado en `Bastion · Panel (1).html`. Muestra calificación, rubro, resumen, descripción/especificaciones disponibles e ítems, además de nota compartida y referencia original. Una segunda pulsación cierra el detalle; los controles de marca no abren ni cierran la fila. Se mantienen permisos y control de versión.
+
+La barra compacta presenta, en una línea de escritorio, entidad, palabras clave, orden y los checks Solo marcados/Ocultar municipalidades; se adapta a pantallas pequeñas. Entidad usa nombres distintos del histórico importado excluyendo nombres municipales, sin depender de la página ni de otros filtros. Coincidencia exacta del nombre seleccionado (hasta 500 caracteres). Palabras clave (hasta 200) busca literalmente en expediente, descripción e `items_fuente`, el contenido fuente disponible para especificaciones; no se inventa una columna ni se busca sobre resumen IA. Búsqueda tras 350 ms sin escribir; otros filtros al cambiar.
+
+La identificación municipal usa las palabras municipalidad(es), alcaldía(s), municipio(s) o municipal(es) en el nombre, sin distinguir mayúsculas ni el acento de alcaldía. No se infiere municipio por expediente ni se completa un catálogo geográfico. Nombres sin esas palabras no pueden reconocerse como municipalidades con esta fuente.
+
+Órdenes: recepción más reciente/más antigua y puntuación mayor/menor, con desempate estable por fecha descendente (para puntuación) y `proceso_id` ascendente. Listado y exportación comparten filtros y orden. Los filtros de fecha del API se conservan, aunque ya no ocupan espacio en la barra.
+
+Estadísticas: seis semanas de lunes a domingo según `primera_deteccion`, incluida la actual, y entregas de hoy, mañana y pasado mañana según `fecha_recepcion`; calendario `America/Tegucigalpa` (UTC−06). El servidor calcula todos los resultados filtrados, independientemente de página/tamaño. Ceros explícitos; última importación global. Migración 0004 deriva una columna UTC indexada de primera detección para registros existentes y nuevas importaciones mantienen esa proyección; el texto fuente permanece intacto. Las entregas indican recepción prevista, no una oferta enviada.
+
+`GET /status` aporta estadísticas y `GET /entities` el catálogo autorizado (máximo 5.000 entidades, rechaza el exceso sin truncar). Ambos requieren `procesos/consulta/ver` y módulo activo. No se agregan permisos ni ajustes.
+
+Consulta de estado/estadísticas, listado paginado por expediente/contenido fuente, entidad, fechas de recepción, municipalidad y marca; detalle expandido de campos fuente y análisis; marcas/notas compartidas con control de versión; actualización desde Scout local y exportación ordenada. Contrato HTTP: [procesos.openapi.yaml](procesos.openapi.yaml). La pantalla carga bajo demanda y la sección Procesos en Ajustes explica su estado pendiente. La allowlist y el estado administrativo se comprueban también en cada operación del servidor. La compatibilidad de migraciones comprueba versiones y checksums de su ledger.
 
 `migrate` aplica Core y el ledger independiente de Procesos con la credencial migradora. `serve` comprueba su migración antes de permitir activación; vacío en `BASTION_ALLOWED_MODULES` conserva Core solo. Deshabilitar conserva registros/importaciones. No ejecutar migraciones automáticamente al servir.
 

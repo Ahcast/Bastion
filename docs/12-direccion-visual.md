@@ -8,6 +8,8 @@ La hoja CSS declara el concepto **“Bastion · Concreto”**: una interfaz mate
 
 ## Decisiones visuales derivadas
 
+Para Procesos, la indicación explícita del 22 de octubre de 2026 sustituye el diálogo/drawer por el detalle debajo de su fila, tal como `WorkTable`/`ProcessInline` de la referencia. Usa los mismos tokens, dos columnas de contenido y adaptación móvil; véase `modulos/procesos-implementacion.md`.
+
 - Compartir un solo sistema visual entre el core y todos los módulos. Los módulos consumen los tokens centrales; no definen paletas propias.
 - Mantener una interfaz de escritorio densa y clara para operaciones, tablas y formularios, con adaptación a pantallas pequeñas.
 - Usar el color óxido solo para alertas, errores o acciones destructivas. El verde comunica estados positivos.

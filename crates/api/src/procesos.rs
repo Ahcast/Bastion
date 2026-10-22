@@ -15,6 +15,7 @@ struct ReviewRequest {
 pub(super) fn routes(state: ApiState) -> Router<ApiState> {
     Router::new()
         .route("/api/v1/procesos/status", get(status))
+        .route("/api/v1/procesos/entities", get(entities))
         .route("/api/v1/procesos/rows", get(rows))
         .route("/api/v1/procesos/rows/{id}", get(detail))
         .route(
@@ -79,11 +80,25 @@ async fn guarded_request(state: ApiState, request: Request, next: Next) -> Respo
 async fn status(
     State(state): State<ApiState>,
     headers: axum::http::HeaderMap,
+    Query(filter): Query<ProcessFilter>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     let actor = actor(&state, &headers).await?;
     state
         .procesos
-        .status(actor.id)
+        .overview(actor.id, &filter)
+        .await
+        .map(Json)
+        .map_err(ApiError)
+}
+
+async fn entities(
+    State(state): State<ApiState>,
+    headers: axum::http::HeaderMap,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    let actor = actor(&state, &headers).await?;
+    state
+        .procesos
+        .entities(actor.id)
         .await
         .map(Json)
         .map_err(ApiError)

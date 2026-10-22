@@ -1,9 +1,9 @@
 use bastion_core::{CoreAdmin, CoreError, Database, DomainActor};
-use chrono::{DateTime, FixedOffset, NaiveDate, NaiveDateTime, TimeZone};
+use chrono::{DateTime, Datelike, Days, FixedOffset, NaiveDate, NaiveDateTime, TimeZone, Utc};
 use futures_util::TryStreamExt;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-use sqlx::{FromRow, MySql, QueryBuilder, Transaction};
+use sqlx::{FromRow, MySql, QueryBuilder, Row, Transaction};
 use std::collections::BTreeMap;
 
 use crate::scout::{export_value, numbered_items};
@@ -21,11 +21,39 @@ pub struct ProcessFilter {
     pub marked: Option<bool>,
     pub q: Option<String>,
     pub entidad: Option<String>,
+    pub hide_municipalities: Option<bool>,
+    pub sort: Option<ProcessSort>,
     pub desde: Option<NaiveDate>,
     pub hasta: Option<NaiveDate>,
     pub page: Option<u32>,
     pub page_size: Option<u32>,
 }
+
+#[derive(Clone, Copy, Default, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ProcessSort {
+    #[default]
+    FechaDesc,
+    FechaAsc,
+    PuntajeDesc,
+    PuntajeAsc,
+}
+
+impl ProcessSort {
+    fn sql(self) -> &'static str {
+        match self {
+            Self::FechaDesc => "r.fecha_recepcion DESC,r.proceso_id ASC",
+            Self::FechaAsc => "r.fecha_recepcion ASC,r.proceso_id ASC",
+            Self::PuntajeDesc => "r.puntaje DESC,r.fecha_recepcion DESC,r.proceso_id ASC",
+            Self::PuntajeAsc => "r.puntaje ASC,r.fecha_recepcion DESC,r.proceso_id ASC",
+        }
+    }
+}
+
+// Explicit name-based rule; the CSV does not provide a municipal flag.
+const MUNICIPAL_ENTITY: &str = "REPLACE(LOWER(r.entidad),'í','i') REGEXP '(^|[^a-z])(municipalidad(es)?|alcaldia(s)?|municipio(s)?|municipal(es)?)([^a-z]|$)'";
+const PROCESS_FROM: &str =
+    " FROM procesos_rows r LEFT JOIN procesos_marks m ON m.proceso_id=r.proceso_id WHERE 1=1";
 
 #[derive(Serialize, FromRow)]
 pub struct ProcessRecord {
@@ -179,17 +207,63 @@ impl ProcessService {
     }
 
     pub async fn status(&self, actor: u64) -> Result<serde_json::Value, CoreError> {
+        self.overview(actor, &ProcessFilter::default()).await
+    }
+
+    pub async fn entities(&self, actor: u64) -> Result<serde_json::Value, CoreError> {
         let mut tx = self.begin(actor, "consulta", "ver").await?;
-        let total: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM procesos_rows")
-            .fetch_one(&mut *tx)
-            .await?;
+        let names = sqlx::query_scalar::<_, String>(&format!("SELECT DISTINCT r.entidad FROM procesos_rows r WHERE NOT ({MUNICIPAL_ENTITY}) ORDER BY r.entidad LIMIT 5001"))
+            .fetch_all(&mut *tx).await?;
+        if names.len() > 5000 {
+            return Err(CoreError::Conflict);
+        }
+        tx.commit().await?;
+        Ok(serde_json::json!({"entities":names}))
+    }
+
+    pub async fn overview(
+        &self,
+        actor: u64,
+        filter: &ProcessFilter,
+    ) -> Result<serde_json::Value, CoreError> {
+        filter.bounds()?;
+        let today = Utc::now()
+            .with_timezone(&FixedOffset::west_opt(6 * 3600).ok_or(CoreError::Invalid)?)
+            .date_naive();
+        let (days, weeks) = calendar(today)?;
+        let mut query = QueryBuilder::<MySql>::new("SELECT COUNT(*) AS total");
+        for (prefix, dates, field, width) in [
+            ("due", days.as_slice(), "r.fecha_recepcion", 1),
+            ("week", weeks.as_slice(), "r.primera_deteccion", 7),
+        ] {
+            for (index, date) in dates.iter().enumerate() {
+                query
+                    .push(format!(",CAST(COALESCE(SUM({field}>="))
+                    .push_bind(day_start(*date)?.naive_utc())
+                    .push(format!(" AND {field}<"))
+                    .push_bind(
+                        day_start(
+                            date.checked_add_days(Days::new(width))
+                                .ok_or(CoreError::Invalid)?,
+                        )?
+                        .naive_utc(),
+                    )
+                    .push(format!("),0) AS UNSIGNED) AS {prefix}_{index}"));
+            }
+        }
+        query.push(PROCESS_FROM);
+        append_filters(&mut query, filter)?;
+        let mut tx = self.begin(actor, "consulta", "ver").await?;
+        let counts = query.build().fetch_one(&mut *tx).await?;
         let last: Option<NaiveDateTime> =
             sqlx::query_scalar("SELECT MAX(created_at) FROM procesos_imports")
                 .fetch_one(&mut *tx)
                 .await?;
         tx.commit().await?;
+        let due = days.iter().enumerate().map(|(i,date)| Ok(serde_json::json!({"date":date,"count":counts.try_get::<u64,_>(format!("due_{i}").as_str())?}))).collect::<Result<Vec<_>,sqlx::Error>>()?;
+        let weekly = weeks.iter().enumerate().map(|(i,date)| Ok(serde_json::json!({"week_start":date,"count":counts.try_get::<u64,_>(format!("week_{i}").as_str())?}))).collect::<Result<Vec<_>,sqlx::Error>>()?;
         Ok(
-            serde_json::json!({"total":total,"last_import_at":last.map(|d| d.and_utc().to_rfc3339())}),
+            serde_json::json!({"total":counts.try_get::<i64,_>("total")?,"last_import_at":last.map(|d| d.and_utc().to_rfc3339()),"as_of":today,"timezone":"America/Tegucigalpa","due":due,"weekly":weekly}),
         )
     }
 
@@ -198,7 +272,9 @@ impl ProcessService {
         let mut tx = self.begin(actor, "consulta", "ver").await?;
         let mut query = select_rows(filter, false)?;
         query
-            .push(" ORDER BY r.fecha_recepcion DESC,r.proceso_id ASC LIMIT ")
+            .push(" ORDER BY ")
+            .push(filter.sort.unwrap_or_default().sql())
+            .push(" LIMIT ")
             .push_bind(size + 1)
             .push(" OFFSET ")
             .push_bind(offset);
@@ -431,7 +507,9 @@ impl ProcessService {
         let mut tx = self.begin(actor, "exportacion", "ver").await?;
         let mut query = select_rows(filter, true)?;
         query
-            .push(" ORDER BY r.fecha_recepcion DESC,r.proceso_id ASC LIMIT ")
+            .push(" ORDER BY ")
+            .push(filter.sort.unwrap_or_default().sql())
+            .push(" LIMIT ")
             .push_bind((MAX_ROWS + 1) as u32);
         let statement = query.build_query_as::<ProcessRecord>();
         let mut records = statement.fetch(&mut *tx);
@@ -512,7 +590,7 @@ async fn save_batch(
         }
     }
     let mut query = QueryBuilder::<MySql>::new(
-        "INSERT INTO procesos_rows (proceso_id,entidad,expediente,fecha_recepcion,ultima_deteccion,puntaje,rubro,resumen_corto,contenido_hash,source_json) ",
+        "INSERT INTO procesos_rows (proceso_id,entidad,expediente,fecha_recepcion,ultima_deteccion,primera_deteccion,puntaje,rubro,resumen_corto,contenido_hash,source_json) ",
     );
     query.push_values(rows, |mut fields, (row, source, _)| {
         fields
@@ -521,13 +599,14 @@ async fn save_batch(
             .push_bind(&row.expediente)
             .push_bind(row.fecha_recepcion.naive_utc())
             .push_bind(row.ultima_deteccion.naive_utc())
+            .push_bind(row.primera_deteccion.naive_utc())
             .push_bind(row.puntaje)
             .push_bind(&row.rubro)
             .push_bind(&row.resumen_corto)
             .push_bind(&row.contenido_hash)
             .push_bind(source);
     });
-    query.push(" ON DUPLICATE KEY UPDATE entidad=VALUES(entidad),expediente=VALUES(expediente),fecha_recepcion=VALUES(fecha_recepcion),ultima_deteccion=VALUES(ultima_deteccion),puntaje=VALUES(puntaje),rubro=VALUES(rubro),resumen_corto=VALUES(resumen_corto),contenido_hash=VALUES(contenido_hash),source_json=VALUES(source_json)");
+    query.push(" ON DUPLICATE KEY UPDATE entidad=VALUES(entidad),expediente=VALUES(expediente),fecha_recepcion=VALUES(fecha_recepcion),ultima_deteccion=VALUES(ultima_deteccion),primera_deteccion=VALUES(primera_deteccion),puntaje=VALUES(puntaje),rubro=VALUES(rubro),resumen_corto=VALUES(resumen_corto),contenido_hash=VALUES(contenido_hash),source_json=VALUES(source_json)");
     query.build().execute(&mut **tx).await?;
     Ok(())
 }
@@ -553,7 +632,7 @@ impl ProcessFilter {
             || self
                 .entidad
                 .as_ref()
-                .is_some_and(|s| s.chars().count() > 200)
+                .is_some_and(|s| s.chars().count() > 500)
             || matches!((self.desde,self.hasta), (Some(a),Some(b)) if a>b)
         {
             return Err(CoreError::Invalid);
@@ -570,6 +649,25 @@ fn day_start(date: NaiveDate) -> Result<DateTime<FixedOffset>, CoreError> {
         .ok_or(CoreError::Invalid)
 }
 
+fn calendar(today: NaiveDate) -> Result<([NaiveDate; 3], [NaiveDate; 6]), CoreError> {
+    let monday = today
+        .checked_sub_days(Days::new(u64::from(today.weekday().num_days_from_monday())))
+        .ok_or(CoreError::Invalid)?;
+    let mut days = [today; 3];
+    for (i, date) in days.iter_mut().enumerate() {
+        *date = today
+            .checked_add_days(Days::new(i as u64))
+            .ok_or(CoreError::Invalid)?;
+    }
+    let mut weeks = [monday; 6];
+    for (i, date) in weeks.iter_mut().enumerate() {
+        *date = monday
+            .checked_sub_days(Days::new((5 - i) as u64 * 7))
+            .ok_or(CoreError::Invalid)?;
+    }
+    Ok((days, weeks))
+}
+
 fn select_rows(
     filter: &ProcessFilter,
     full_source: bool,
@@ -581,8 +679,16 @@ fn select_rows(
         "JSON_OBJECT()"
     };
     let mut query = QueryBuilder::<MySql>::new(format!(
-        "SELECT r.proceso_id,r.entidad,r.expediente,r.fecha_recepcion,r.puntaje,r.rubro,r.resumen_corto,{source} AS source,COALESCE(m.marked,0) AS marked,COALESCE(m.note,'') AS note,CAST(COALESCE(m.version,0) AS UNSIGNED) AS version FROM procesos_rows r LEFT JOIN procesos_marks m ON m.proceso_id=r.proceso_id WHERE 1=1"
+        "SELECT r.proceso_id,r.entidad,r.expediente,r.fecha_recepcion,r.puntaje,r.rubro,r.resumen_corto,{source} AS source,COALESCE(m.marked,0) AS marked,COALESCE(m.note,'') AS note,CAST(COALESCE(m.version,0) AS UNSIGNED) AS version{PROCESS_FROM}"
     ));
+    append_filters(&mut query, filter)?;
+    Ok(query)
+}
+
+fn append_filters(
+    query: &mut QueryBuilder<MySql>,
+    filter: &ProcessFilter,
+) -> Result<(), CoreError> {
     if let Some(marked) = filter.marked {
         query.push(" AND COALESCE(m.marked,0)=").push_bind(marked);
     }
@@ -591,7 +697,7 @@ fn select_rows(
         query
             .push(" AND (r.expediente LIKE ")
             .push_bind(value.clone())
-            .push(" OR r.resumen_corto LIKE ")
+            .push(" OR JSON_UNQUOTE(JSON_EXTRACT(r.source_json,'$.items_fuente')) LIKE ")
             .push_bind(value.clone())
             .push(" OR JSON_UNQUOTE(JSON_EXTRACT(r.source_json,'$.descripcion')) LIKE ")
             .push_bind(value)
@@ -599,8 +705,11 @@ fn select_rows(
     }
     if let Some(entidad) = filter.entidad.as_deref().filter(|s| !s.trim().is_empty()) {
         query
-            .push(" AND r.entidad LIKE ")
-            .push_bind(format!("%{}%", escape_like(entidad.trim())));
+            .push(" AND r.entidad = ")
+            .push_bind(entidad.trim().to_owned());
+    }
+    if filter.hide_municipalities == Some(true) {
+        query.push(format!(" AND NOT ({MUNICIPAL_ENTITY})"));
     }
     if let Some(date) = filter.desde {
         query
@@ -612,7 +721,7 @@ fn select_rows(
             .push(" AND r.fecha_recepcion<")
             .push_bind(day_start(date.succ_opt().ok_or(CoreError::Invalid)?)?.naive_utc());
     }
-    Ok(query)
+    Ok(())
 }
 
 fn escape_like(value: &str) -> String {
@@ -636,6 +745,10 @@ mod tests {
     use super::*;
     #[test]
     fn honduras_date_bounds_do_not_shift_the_local_day() {
+        let (days, weeks) = calendar(NaiveDate::from_ymd_opt(2027, 1, 3).unwrap()).unwrap();
+        assert_eq!(days[2].to_string(), "2027-01-05");
+        assert_eq!(weeks[5].to_string(), "2026-12-28");
+        assert_eq!(weeks[0].to_string(), "2026-11-23");
         assert_eq!(
             day_start(NaiveDate::from_ymd_opt(2026, 10, 21).unwrap())
                 .unwrap()
