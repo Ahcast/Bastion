@@ -1137,8 +1137,27 @@ impl CoreService {
         let setup_token = random_token();
         let expires_at = now + chrono::Duration::minutes(10);
         let mut tx = self.database.pool.begin().await?;
+        let invitation_hash = token_hash(invitation_token).to_vec();
         let row=sqlx::query_as::<_,(u64,String)>("SELECT t.id,u.email FROM account_tokens t JOIN users u ON u.id=t.user_id WHERE t.token_hash=? AND t.token_type='invitation' AND t.mailed_at IS NOT NULL AND t.expires_at>? AND t.consumed_at IS NULL AND u.status='invitation_pending' FOR UPDATE")
-            .bind(token_hash(invitation_token).to_vec()).bind(now).fetch_optional(&mut *tx).await?.ok_or(CoreError::Unauthorized)?;
+            .bind(&invitation_hash).bind(now).fetch_optional(&mut *tx).await?;
+        let Some(row) = row else {
+            // Restricted diagnostics only: never log the link, token/hash, password,
+            // email, or account identifier. Keep the public failure indistinguishable.
+            let reason: Option<String> = sqlx::query_scalar("SELECT CASE WHEN t.consumed_at IS NOT NULL THEN 'consumed_or_replaced' WHEN t.mailed_at IS NULL THEN 'not_mailed' WHEN t.expires_at IS NULL OR t.expires_at<=? THEN 'expired' WHEN u.status<>'invitation_pending' THEN 'account_not_pending' ELSE 'eligibility_query_mismatch' END FROM account_tokens t JOIN users u ON u.id=t.user_id WHERE t.token_hash=? AND t.token_type='invitation'")
+                .bind(now).bind(&invitation_hash).fetch_optional(&mut *tx).await?;
+            tracing::warn!(
+                action = "account.invitation.accept",
+                reason = reason.as_deref().unwrap_or("unrecognized_token"),
+                token_length = invitation_token.len(),
+                token_format_valid = base64::Engine::decode(
+                    &base64::engine::general_purpose::URL_SAFE_NO_PAD,
+                    invitation_token
+                )
+                .is_ok_and(|bytes| bytes.len() == 32),
+                "invitation activation rejected"
+            );
+            return Err(CoreError::Unauthorized);
+        };
         let user_id: u64 = sqlx::query_scalar("SELECT user_id FROM account_tokens WHERE id=?")
             .bind(row.0)
             .fetch_one(&mut *tx)
@@ -2053,6 +2072,167 @@ fn verify_totp(secret: &str, code: &str, last_counter: i64) -> Option<u64> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[tokio::test]
+    async fn mysql57_invitation_link_password_and_totp_lifecycle() {
+        let Ok(url) = std::env::var("BASTION_CORE_TEST_URL") else {
+            eprintln!(
+                "Invitation integration test requires isolated BASTION_CORE_TEST_URL; CI supplies it."
+            );
+            return;
+        };
+        // This URL is exclusively for the disposable CI database, never MYSQL_*.
+        let pool = sqlx::mysql::MySqlPoolOptions::new()
+            .max_connections(3)
+            .connect(&url)
+            .await
+            .unwrap();
+        let database = Database { pool: pool.clone() };
+        database.migrate().await.unwrap();
+        let role_id: u64 =
+            sqlx::query_scalar("SELECT id FROM roles WHERE system_key='system_administrator'")
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        let administrator =
+            sqlx::query("INSERT INTO persons (full_name) VALUES ('Invitation test administrator')")
+                .execute(&pool)
+                .await
+                .unwrap()
+                .last_insert_id();
+        let administrator = sqlx::query("INSERT INTO users (person_id,role_id,email,status) VALUES (?,?,'inviter@example.test','active')")
+            .bind(administrator).bind(role_id).execute(&pool).await.unwrap().last_insert_id();
+        let person =
+            sqlx::query("INSERT INTO persons (full_name) VALUES ('Invitation test recipient')")
+                .execute(&pool)
+                .await
+                .unwrap()
+                .last_insert_id();
+        let core = CoreService::new(database, "test-bootstrap-secret".repeat(2), [7; 32])
+            .unwrap()
+            .with_public_app_origin("https://app.example.test".into());
+        let dispatch = core
+            .create_user_with_invitation(administrator, person, role_id, "invited@example.test")
+            .await
+            .unwrap();
+        let password = "synthetic invitation passphrase";
+
+        async fn queued_token(
+            core: &CoreService,
+            pool: &sqlx::MySqlPool,
+            user_id: u64,
+        ) -> (u64, String) {
+            let (id, body): (u64, Vec<u8>) = sqlx::query_as("SELECT m.account_token_id,m.body_ciphertext FROM mail_outbox m JOIN account_tokens t ON t.id=m.account_token_id WHERE t.user_id=? ORDER BY m.id DESC LIMIT 1")
+                .bind(user_id).fetch_one(pool).await.unwrap();
+            let body = core.decrypt(&body).unwrap();
+            let link = url::Url::parse(body.lines().last().unwrap()).unwrap();
+            assert_eq!(link.path(), "/activate");
+            let token = link
+                .query_pairs()
+                .find(|(key, _)| key == "token")
+                .unwrap()
+                .1
+                .into_owned();
+            (id, token)
+        }
+        async fn mark_mailed(pool: &sqlx::MySqlPool, id: u64, expires: NaiveDateTime) {
+            sqlx::query("UPDATE account_tokens SET mailed_at=?,expires_at=? WHERE id=?")
+                .bind(Utc::now().naive_utc())
+                .bind(expires)
+                .bind(id)
+                .execute(pool)
+                .await
+                .unwrap();
+        }
+        let (old_id, old_token) = queued_token(&core, &pool, dispatch.user.id).await;
+        assert!(
+            matches!(
+                core.begin_invitation_activation(&old_token, password).await,
+                Err(CoreError::Unauthorized)
+            ),
+            "Unsent links must fail"
+        );
+        mark_mailed(
+            &pool,
+            old_id,
+            Utc::now().naive_utc() + chrono::Duration::hours(24),
+        )
+        .await;
+        core.dispatch_invitation(administrator, dispatch.user.id)
+            .await
+            .unwrap();
+        assert!(
+            matches!(
+                core.begin_invitation_activation(&old_token, password).await,
+                Err(CoreError::Unauthorized)
+            ),
+            "Resending must invalidate the old link"
+        );
+        let (id, token) = queued_token(&core, &pool, dispatch.user.id).await;
+        mark_mailed(
+            &pool,
+            id,
+            Utc::now().naive_utc() - chrono::Duration::seconds(1),
+        )
+        .await;
+        assert!(
+            matches!(
+                core.begin_invitation_activation(&token, password).await,
+                Err(CoreError::Unauthorized)
+            ),
+            "Expired links must fail"
+        );
+        mark_mailed(
+            &pool,
+            id,
+            Utc::now().naive_utc() + chrono::Duration::hours(24),
+        )
+        .await;
+        assert!(matches!(
+            core.begin_invitation_activation("truncated", password)
+                .await,
+            Err(CoreError::Unauthorized)
+        ));
+        let setup = core
+            .begin_invitation_activation(&token, password)
+            .await
+            .expect(
+                "A delivered, current link must accept the new password and return TOTP enrollment",
+            );
+        assert!(
+            matches!(
+                core.begin_invitation_activation(&token, password).await,
+                Err(CoreError::Unauthorized)
+            ),
+            "An accepted link cannot be reused"
+        );
+        let (status, hash): (String, String) =
+            sqlx::query_as("SELECT status,password_hash FROM users WHERE id=?")
+                .bind(dispatch.user.id)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(status, "totp_setup_pending");
+        assert!(verify_password(password, &hash));
+        let counter = Utc::now().timestamp().max(0) as u64 / 30;
+        let completed = core
+            .complete_invitation_activation(
+                &setup.setup_token,
+                &totp_for_counter(&setup.totp_secret, counter),
+            )
+            .await
+            .unwrap();
+        assert_eq!(completed.status, "active");
+        assert_eq!(completed.recovery_codes.len(), 10);
+        assert!(matches!(
+            core.complete_invitation_activation(
+                &setup.setup_token,
+                &totp_for_counter(&setup.totp_secret, counter)
+            )
+            .await,
+            Err(CoreError::Unauthorized)
+        ));
+    }
 
     #[test]
     fn rejects_passwords_below_eight_characters_and_accepts_passphrases() {

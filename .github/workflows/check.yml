@@ -87,6 +87,7 @@ jobs:
           --health-timeout=5s
           --health-retries=12
     env:
+      BASTION_CORE_TEST_URL: mysql://root:bastion_ci_only@127.0.0.1:3306/bastion_core_test?ssl-mode=disabled
       BASTION_PROCESOS_TEST_URL: mysql://root:bastion_ci_only@127.0.0.1:3306/bastion_test?ssl-mode=disabled
     steps:
       - name: Check out source
@@ -98,6 +99,8 @@ jobs:
           components: rustfmt
       - name: Compile workspace
         run: cargo check --workspace --locked
+      - name: Prepare isolated invitation test database
+        run: docker exec ${{ job.services.mysql57.id }} mysql -uroot -pbastion_ci_only -e 'CREATE DATABASE bastion_core_test CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci'
       - name: Run workspace tests
         run: cargo test --workspace --locked
       - name: Build Lightsail executable
