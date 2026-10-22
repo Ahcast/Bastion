@@ -634,7 +634,7 @@ impl CoreAdmin {
     ) -> Result<UserRecord, CoreError> {
         self.require_admin(actor).await?;
         let mut tx = self.database.pool.begin().await?;
-        let current=sqlx::query_as::<_,(u64,String,String)>("SELECT u.role_id,u.status,r.system_key FROM users u JOIN roles r ON r.id=u.role_id WHERE u.id=? FOR UPDATE").bind(id).fetch_optional(&mut *tx).await?.ok_or(CoreError::Invalid)?;
+        let current=sqlx::query_as::<_,(u64,String,Option<String>)>("SELECT u.role_id,u.status,r.system_key FROM users u JOIN roles r ON r.id=u.role_id WHERE u.id=? FOR UPDATE").bind(id).fetch_optional(&mut *tx).await?.ok_or(CoreError::Invalid)?;
         let mut new_role = current.0;
         if let Some(role) = role_id {
             if sqlx::query_scalar::<_, u64>("SELECT id FROM roles WHERE id=?")
@@ -648,8 +648,8 @@ impl CoreAdmin {
             new_role = role;
         }
         let disabling = enabled == Some(false);
-        let removing_admin =
-            current.2 == "system_administrator" && (disabling || new_role != current.0);
+        let removing_admin = current.2.as_deref() == Some("system_administrator")
+            && (disabling || new_role != current.0);
         if removing_admin {
             let remaining:i64=sqlx::query_scalar("SELECT COUNT(*) FROM users u JOIN roles r ON r.id=u.role_id WHERE u.status='active' AND r.system_key='system_administrator' AND u.id<>?").bind(id).fetch_one(&mut *tx).await?;
             if remaining < 1 {

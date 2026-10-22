@@ -810,8 +810,8 @@ impl CoreService {
 
     pub async fn access_catalog(&self, session_token: &str) -> Result<AccessCatalog, CoreError> {
         let user = self.authenticate(session_token).await?;
-        let system_key:Option<String>=sqlx::query_scalar("SELECT r.system_key FROM users u JOIN roles r ON r.id=u.role_id WHERE u.id=? AND u.status='active'")
-            .bind(user.id).fetch_optional(&self.database.pool).await?;
+        let system_key=sqlx::query_scalar::<_,Option<String>>("SELECT r.system_key FROM users u JOIN roles r ON r.id=u.role_id WHERE u.id=? AND u.status='active'")
+            .bind(user.id).fetch_optional(&self.database.pool).await?.ok_or(CoreError::Unauthorized)?;
         let is_admin = system_key.as_deref() == Some("system_administrator");
         let modules = if is_admin {
             sqlx::query_as::<_,ModuleAccess>("SELECT m.module_id,m.display_name FROM module_registry m WHERE m.included_in_release=1 AND m.environment_allowed=1 AND m.enabled=1 ORDER BY m.display_name,m.module_id")
@@ -2332,6 +2332,132 @@ mod tests {
                 &totp_for_counter(&setup.totp_secret, counter)
             )
             .await,
+            Err(CoreError::Unauthorized)
+        ));
+
+        // Exercise the actual login/catalog sequence for both integrated and custom roles.
+        let ip = "192.0.2.50";
+        let challenge = match core
+            .start_login(
+                "invited@example.test",
+                password,
+                ip,
+                "Login regression",
+                false,
+                None,
+            )
+            .await
+            .expect("An activated account must accept its password")
+        {
+            LoginStart::TotpRequired { challenge_token } => challenge_token,
+            LoginStart::Authenticated(_) => panic!("A new device must require TOTP"),
+        };
+        let cookies = core
+            .verify_login_totp(
+                &challenge,
+                &totp_for_counter(&setup.totp_secret, counter + 1),
+                None,
+            )
+            .await
+            .expect("Valid TOTP must complete login");
+        assert_eq!(
+            core.current_user(&cookies.session_token).await.unwrap().id,
+            dispatch.user.id
+        );
+        assert!(
+            core.access_catalog(&cookies.session_token)
+                .await
+                .unwrap()
+                .is_system_administrator
+        );
+
+        let admin = core.admin();
+        let custom_role = admin
+            .create_role(administrator, "Login regression sales", None)
+            .await
+            .unwrap();
+        admin
+            .update_user(
+                administrator,
+                dispatch.user.id,
+                None,
+                Some(custom_role.id),
+                None,
+            )
+            .await
+            .unwrap();
+        let access = core
+            .access_catalog(&cookies.session_token)
+            .await
+            .expect("A custom role with SQL NULL system_key must load its access catalog");
+        assert!(!access.is_system_administrator);
+        assert!(access.modules.is_empty());
+        assert!(access.permissions.is_empty());
+        assert!(matches!(
+            admin.list_roles(dispatch.user.id).await,
+            Err(CoreError::Forbidden)
+        ));
+
+        let returning = match core
+            .start_login(
+                "invited@example.test",
+                password,
+                ip,
+                "Login regression",
+                true,
+                Some(&cookies.device_token),
+            )
+            .await
+            .unwrap()
+        {
+            LoginStart::Authenticated(cookies) => cookies,
+            LoginStart::TotpRequired { .. } => {
+                panic!("The same recently trusted device/IP must be recognized")
+            }
+        };
+        assert_eq!(
+            core.current_user(&returning.session_token)
+                .await
+                .unwrap()
+                .id,
+            dispatch.user.id
+        );
+        assert!(
+            !core
+                .access_catalog(&returning.session_token)
+                .await
+                .unwrap()
+                .is_system_administrator
+        );
+        assert!(matches!(
+            core.authenticate(&cookies.session_token).await,
+            Err(CoreError::SessionReplaced)
+        ));
+        admin
+            .update_role(
+                administrator,
+                custom_role.id,
+                None,
+                None,
+                Some(vec![crate::RolePermissionInput {
+                    module_id: "core".into(),
+                    scope_key: "personas".into(),
+                    capability: "ver".into(),
+                }]),
+            )
+            .await
+            .unwrap();
+        let access = core.access_catalog(&returning.session_token).await.unwrap();
+        assert!(!access.is_system_administrator);
+        assert_eq!(access.permissions.len(), 1);
+        assert_eq!(access.permissions[0].capability, "ver");
+        assert_eq!(access.permissions[0].scope_key, "personas");
+        admin
+            .update_user(administrator, dispatch.user.id, None, None, Some(false))
+            .await
+            .expect("An administrator must be able to disable a custom-role account");
+        assert!(matches!(
+            core.authenticate(&returning.session_token).await,
             Err(CoreError::Unauthorized)
         ));
     }

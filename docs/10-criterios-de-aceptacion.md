@@ -102,6 +102,7 @@ Una pantalla se considera documentada cuando especifica:
 - Desactivar una cuenta con invitación pendiente invalida inmediatamente el enlace; reactivarla requiere enviar una nueva invitación de un solo uso.
 - El backend impide eliminar, desactivar o quitar el rol al último Administrador del sistema activo; el rol integrado tampoco puede eliminarse, renombrarse ni perder permisos completos desde la interfaz.
 - Administrador del sistema tiene `ver`, `editar` y `eliminar` en Core y todos los módulos habilitados.
+- Una cuenta activa con rol personalizado (`roles.system_key` nulo) completa contraseña/TOTP y carga su catálogo de acceso aunque no tenga permisos asignados. No recibe privilegios administrativos implícitos. El administrador puede editar o desactivar esa cuenta con los controles existentes.
 - La primera cuenta se crea solo mientras no exista Administrador del sistema, mediante asistente web protegido por código temporal de alta entropía; el asistente queda desactivado tras crearla y obliga al primer administrador a completar TOTP antes de entrar al Core.
 - Un Administrador del sistema puede liberar manualmente una pausa de inicio antes de su vencimiento; la acción queda auditada.
 - Un desafío preautenticado no puede leer ni modificar recursos de usuario antes de verificar el OTP.
