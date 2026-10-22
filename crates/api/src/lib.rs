@@ -1569,6 +1569,11 @@ impl IntoResponse for ApiError {
                 "Invalid Request",
                 "The request could not be processed.",
             ),
+            CoreError::InvalidInvitationLink => (
+                StatusCode::BAD_REQUEST,
+                "Invalid Invitation Link",
+                "El enlace de invitación está incompleto o alterado. Solicita reenviar la invitación y abre el enlace del correo más reciente.",
+            ),
             CoreError::Unauthorized => (
                 StatusCode::UNAUTHORIZED,
                 "Authentication Failed",
@@ -1620,6 +1625,25 @@ impl IntoResponse for ApiError {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[tokio::test]
+    async fn malformed_invitation_returns_actionable_error_without_secret_details() {
+        let response = ApiError(CoreError::InvalidInvitationLink).into_response();
+        assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+        let body = axum::body::to_bytes(response.into_body(), 4096)
+            .await
+            .unwrap();
+        let body: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(body["title"], "Invalid Invitation Link");
+        assert!(
+            body["detail"]
+                .as_str()
+                .unwrap()
+                .contains("reenviar la invitación")
+        );
+        assert!(body.get("token").is_none());
+        assert!(body.get("password").is_none());
+    }
 
     #[tokio::test]
     async fn csrf_refresh_preserves_session_token_across_reloads_and_tabs() {

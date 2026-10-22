@@ -11,7 +11,11 @@ use chrono::{NaiveDateTime, Utc};
 use data_encoding::BASE32_NOPAD;
 use hmac::{Hmac, Mac};
 use lettre::{
-    AsyncSmtpTransport, AsyncTransport, Message, Tokio1Executor, message::Mailbox,
+    AsyncSmtpTransport, AsyncTransport, Message, Tokio1Executor,
+    message::{
+        Mailbox, SinglePart,
+        header::{ContentTransferEncoding, ContentType},
+    },
     transport::smtp::authentication::Credentials,
 };
 use rand::{RngCore, rngs::OsRng};
@@ -31,6 +35,7 @@ pub enum CoreError {
     NotFound,
     PreconditionFailed,
     Invalid,
+    InvalidInvitationLink,
     Unauthorized,
     Forbidden,
     Conflict,
@@ -48,6 +53,7 @@ impl fmt::Display for CoreError {
             Self::NotFound => f.write_str("resource not found"),
             Self::PreconditionFailed => f.write_str("resource version changed"),
             Self::Invalid => f.write_str("invalid request"),
+            Self::InvalidInvitationLink => f.write_str("invalid invitation link"),
             Self::Unauthorized => f.write_str("authentication required"),
             Self::Forbidden => f.write_str("operation not allowed"),
             Self::Conflict => f.write_str("resource conflict"),
@@ -1124,6 +1130,21 @@ impl CoreService {
         invitation_token: &str,
         password: &str,
     ) -> Result<BootstrapBegin, CoreError> {
+        if invitation_token.len() != 43
+            || !base64::Engine::decode(
+                &base64::engine::general_purpose::URL_SAFE_NO_PAD,
+                invitation_token,
+            )
+            .is_ok_and(|bytes| bytes.len() == 32)
+        {
+            tracing::warn!(
+                action = "account.invitation.accept",
+                reason = "malformed_token",
+                token_length = invitation_token.len(),
+                "invitation activation rejected"
+            );
+            return Err(CoreError::InvalidInvitationLink);
+        }
         validate_password(password)?;
         let _permit = self
             .password_kdf_semaphore
@@ -1373,24 +1394,24 @@ impl CoreService {
                 return Ok(true);
             }
         };
-        let message = match Message::builder()
-            .from(match smtp_email.parse::<Mailbox>() {
+        let message = match build_account_message(
+            match smtp_email.parse::<Mailbox>() {
                 Ok(m) => m,
                 Err(_) => {
                     self.fail_mail(mail.id, "sender_address_invalid").await?;
                     return Ok(true);
                 }
-            })
-            .to(match mail.recipient_email.parse::<Mailbox>() {
+            },
+            match mail.recipient_email.parse::<Mailbox>() {
                 Ok(m) => m,
                 Err(_) => {
                     self.fail_mail(mail.id, "recipient_address_invalid").await?;
                     return Ok(true);
                 }
-            })
-            .subject(mail.subject)
-            .body(body)
-        {
+            },
+            mail.subject,
+            body,
+        ) {
             Ok(message) => message,
             Err(_) => {
                 self.fail_mail(mail.id, "message_invalid").await?;
@@ -2036,6 +2057,26 @@ fn is_public_ipv4(ip: Ipv4Addr) -> bool {
         || (a == 203 && b == 0 && c == 113)
         || a >= 224)
 }
+fn build_account_message(
+    sender: Mailbox,
+    recipient: Mailbox,
+    subject: String,
+    body: String,
+) -> Result<Message, lettre::error::Error> {
+    // singlepart adds MIME-Version; declaring UTF-8 and the transfer encoding
+    // prevents clients from displaying transport escapes as part of the link.
+    Message::builder()
+        .from(sender)
+        .to(recipient)
+        .subject(subject)
+        .singlepart(
+            SinglePart::builder()
+                .header(ContentType::TEXT_PLAIN)
+                .header(ContentTransferEncoding::Base64)
+                .body(body),
+        )
+}
+
 fn recovery_code() -> String {
     hex::encode(random_bytes::<8>()).to_uppercase()
 }
@@ -2072,6 +2113,67 @@ fn verify_totp(secret: &str, code: &str, last_counter: i64) -> Option<u64> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[tokio::test]
+    async fn malformed_invitation_links_fail_before_password_or_database_work() {
+        let pool = sqlx::mysql::MySqlPoolOptions::new()
+            .connect_lazy("mysql://unused:unused@127.0.0.1/unused")
+            .unwrap();
+        let core = CoreService::new(
+            Database { pool },
+            "synthetic-bootstrap-secret".repeat(2),
+            [9; 32],
+        )
+        .unwrap();
+        let token = random_token();
+        for malformed in [
+            String::new(),
+            "truncated".into(),
+            format!("3D{token}="),
+            format!("{token}%3D"),
+            format!("{token} "),
+            format!("{token}="),
+        ] {
+            // Even an invalid password must not conceal the actionable link error.
+            assert!(matches!(
+                core.begin_invitation_activation(&malformed, "short").await,
+                Err(CoreError::InvalidInvitationLink)
+            ));
+        }
+    }
+
+    #[test]
+    fn account_mail_declares_mime_utf8_and_preserves_the_exact_link() {
+        let token = random_token();
+        let link = format!("https://app.example.test/activate?token={token}");
+        let body = format!("Activa tu cuenta y configura tu autenticación.\n\n{link}");
+        let message = build_account_message(
+            "sender@example.test".parse().unwrap(),
+            "recipient@example.test".parse().unwrap(),
+            "Activación de cuenta".into(),
+            body.clone(),
+        )
+        .unwrap();
+        let wire = String::from_utf8(message.formatted()).unwrap();
+        let (headers, encoded) = wire.split_once("\r\n\r\n").unwrap();
+        assert!(headers.contains("MIME-Version: 1.0\r\n"));
+        assert!(headers.contains("Content-Type: text/plain; charset=utf-8\r\n"));
+        assert!(headers.contains("Content-Transfer-Encoding: base64"));
+        let encoded = encoded.lines().collect::<String>();
+        let decoded =
+            base64::Engine::decode(&base64::engine::general_purpose::STANDARD, encoded).unwrap();
+        let decoded = String::from_utf8(decoded).unwrap();
+        assert_eq!(decoded.replace("\r\n", "\n"), body);
+        let url = url::Url::parse(decoded.lines().last().unwrap()).unwrap();
+        let delivered_token = url
+            .query_pairs()
+            .find(|(key, _)| key == "token")
+            .unwrap()
+            .1
+            .into_owned();
+        assert_eq!(delivered_token, token);
+        assert_eq!(token_hash(&delivered_token), token_hash(&token));
+    }
 
     #[tokio::test]
     async fn mysql57_invitation_link_password_and_totp_lifecycle() {
@@ -2191,7 +2293,7 @@ mod tests {
         assert!(matches!(
             core.begin_invitation_activation("truncated", password)
                 .await,
-            Err(CoreError::Unauthorized)
+            Err(CoreError::InvalidInvitationLink)
         ));
         let setup = core
             .begin_invitation_activation(&token, password)
