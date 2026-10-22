@@ -11,10 +11,10 @@ El usuario confirmó el 21 de octubre de 2026 que la entrada es `maestro.csv` de
 UTF-8 con BOM opcional, separador coma, comillas CSV y saltos de línea escapados. Encabezados exactos de Scout:
 
 ```text
-run_id,proceso_id,url,entidad,expediente,fecha_recepcion,fecha_recepcion_original,descripcion,items_fuente,extraido_en,extraccion_estado,contenido_hash,primera_deteccion,ultima_deteccion,ultima_modificacion,puntaje,rubro,resumen_corto,items,hash_analizado,analisis_estado,analizado_en,analisis_modelo,analisis_error
+run_id,proceso_id,url,entidad,expediente,fecha_recepcion,fecha_recepcion_original,descripcion,items_fuente,extraido_en,extraccion_estado,contenido_hash,primera_deteccion,ultima_deteccion,ultima_modificacion,puntaje,rubro,resumen,items,hash_analizado,analisis_estado,analizado_en,analisis_modelo,analisis_error
 ```
 
-`items` es JSON de textos; `items_fuente` conserva el JSON del extractor. `puntaje` es entero 0–100. Solo se admiten filas con extracción `completo`, análisis `analizado` y `hash_analizado=contenido_hash`; el archivo entero se rechaza si contiene filas pendientes/incongruentes. Fechas normalizadas RFC 3339 con zona explícita. El contenido de IA se muestra como texto, nunca como HTML ni instrucciones ejecutables.
+`items` es texto numerado consecutivamente, un ítem por línea; `items_fuente` conserva el JSON del extractor. Se admite también el formato anterior completo con `resumen_corto` e `items` JSON de textos. `puntaje` es entero 0–100. Solo se admiten filas con extracción `completo`, análisis `analizado` y `hash_analizado=contenido_hash`; el archivo entero se rechaza si contiene filas pendientes/incongruentes. Fechas normalizadas RFC 3339 con zona explícita. El contenido de IA se muestra como texto, nunca como HTML ni instrucciones ejecutables.
 
 `proceso_id` identifica el registro, y `contenido_hash` identifica la versión analizada. Se conservan ambos valores de Scout; Bastion no sustituye su algoritmo. Un ID ausente del CSV conserva su histórico. Una versión anterior no sobrescribe una observación más reciente. Reimportar no duplica filas ni borra marcas/notas. La incorporación y su auditoría deben confirmarse en una transacción.
 
@@ -25,6 +25,8 @@ El usuario confirmó el 21 de octubre de 2026 que **marcas y notas son compartid
 Dominio en `crates/modules/procesos`, adaptador HTTP común y pantalla React bajo demanda. Core controla acceso, permisos, activación y auditoría. Módulo inicialmente desactivado y excluido del ambiente por defecto. `BASTION_ALLOWED_MODULES=procesos` permite ofrecerlo al administrador, que decide su activación en Ajustes. Una migración identificada de Procesos crea sus tablas sin alterar registros Legacy. API y navegación bloquean el módulo desactivado incluso para administradores.
 
 Consulta/detalle/exportación requieren `ver`; importación y marcas/notas requieren `editar`, con alcances separados. No se asignan permisos a roles nuevos. MCP sigue pendiente del transporte e identidad delegada del Core.
+
+La [recepción local de Scout](procesos-entrega-local.md), acordada el 22 de octubre, lee `/var/lib/bastion-scout/maestro.csv` y su `main.json` al iniciar y cada 60 segundos. Requiere habilitación explícita del ambiente y del módulo. Usa una identidad interna limitada a importar, validación del manifiesto y recibos persistentes por origen/SHA-256; comparte la transacción de importación manual. No agrega rutas HTTP ni acepta rutas de archivos desde API/MCP. La exportación usa las columnas actuales `resumen` e `items` numerados; el DTO mantiene `resumen_corto` por compatibilidad.
 
 ## Límites técnicos del primer corte
 
@@ -46,5 +48,5 @@ La validación de GitHub incluye una instancia desechable de MySQL 5.7, migracio
 
 - Políticas editables y depuración quedan aplazadas por decisión del usuario. La política vigente es conservación total; no habilitar operaciones destructivas hasta acordar criterio y protección de filas con marcas/notas.
 - El maestro de Scout no contiene columnas separadas de municipio, dirección ni especificaciones. No inventarlas ni deducirlas de IA como datos fuente. Su paridad requiere definir origen/mapeo.
-- Recepción automática, autenticación de Scout y manifiesto `main.json`: fuera del primer importador manual. No aceptar rutas de archivos ni URLs arbitrarias en la API.
+- Otros productores y entregas por red requieren definir su identidad y contrato; la recepción implementada se limita a Scout local. No aceptar rutas de archivos ni URLs arbitrarias en la API.
 - Verificación de paridad visual con una sesión Legacy y validación de volumen real.

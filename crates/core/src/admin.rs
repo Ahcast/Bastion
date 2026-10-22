@@ -8,6 +8,29 @@ use crate::{CoreError, Database};
 #[derive(Clone)]
 pub struct CoreAdmin {
     database: Database,
+    local_scout_enabled: bool,
+}
+
+/// Internal identity, never deserialized from API or MCP input.
+#[derive(Clone, Copy, Debug)]
+pub enum DomainActor {
+    User(u64),
+    LocalScout,
+}
+
+impl DomainActor {
+    pub fn user_id(self) -> Option<u64> {
+        match self {
+            Self::User(id) => Some(id),
+            Self::LocalScout => None,
+        }
+    }
+    pub fn source_key(self) -> Option<&'static str> {
+        match self {
+            Self::User(_) => None,
+            Self::LocalScout => Some("bastion-scout"),
+        }
+    }
 }
 
 #[derive(Debug, Serialize, FromRow)]
@@ -108,13 +131,62 @@ impl CoreAdmin {
         target: &str,
         details: serde_json::Value,
     ) -> Result<(), CoreError> {
+        Self::record_actor_event(
+            tx,
+            DomainActor::User(actor),
+            module,
+            action,
+            target,
+            details,
+        )
+        .await
+    }
+
+    pub async fn record_actor_event(
+        tx: &mut sqlx::Transaction<'_, MySql>,
+        actor: DomainActor,
+        module: &str,
+        action: &str,
+        target: &str,
+        mut details: serde_json::Value,
+    ) -> Result<(), CoreError> {
+        if matches!(actor, DomainActor::LocalScout) {
+            if module != "procesos" || action != "import" {
+                return Err(CoreError::Forbidden);
+            }
+            details["actor"] = serde_json::json!("bastion-scout");
+        }
         sqlx::query("INSERT INTO audit_events (actor_id,module_id,action,target_type,target_id,result,details_json,created_at) VALUES (?,?,?,'domain_record',?,'success',?,UTC_TIMESTAMP(6))")
-            .bind(actor).bind(module).bind(action).bind(target).bind(details).execute(&mut **tx).await?;
+            .bind(actor.user_id()).bind(module).bind(action).bind(target).bind(details).execute(&mut **tx).await?;
         Ok(())
     }
 
-    pub(crate) fn new(database: Database) -> Self {
-        Self { database }
+    pub(crate) fn new(database: Database, local_scout_enabled: bool) -> Self {
+        Self {
+            database,
+            local_scout_enabled,
+        }
+    }
+
+    pub async fn authorize_actor(
+        &self,
+        actor: DomainActor,
+        module: &str,
+        scope: &str,
+        capability: &str,
+    ) -> Result<(), CoreError> {
+        match actor {
+            DomainActor::User(id) => self.authorize(id, module, scope, capability).await,
+            DomainActor::LocalScout
+                if self.local_scout_enabled
+                    && module == "procesos"
+                    && scope == "importacion"
+                    && capability == "editar" =>
+            {
+                Ok(())
+            }
+            DomainActor::LocalScout => Err(CoreError::Forbidden),
+        }
     }
 
     pub async fn cleanup_retention(&self) -> Result<(), CoreError> {
@@ -704,7 +776,7 @@ impl CoreAdmin {
             return Err(CoreError::Invalid);
         }
         let mut q = QueryBuilder::<MySql>::new(
-            "SELECT a.id,a.created_at,a.actor_id,p.full_name AS actor_name,a.module_id,a.action,a.target_type,a.target_id,a.result FROM audit_events a LEFT JOIN users u ON u.id=a.actor_id LEFT JOIN persons p ON p.id=u.person_id WHERE a.created_at>=UTC_TIMESTAMP(6)-INTERVAL 1 YEAR",
+            "SELECT a.id,a.created_at,a.actor_id,COALESCE(p.full_name,CASE WHEN a.actor_id IS NULL AND a.module_id='procesos' AND JSON_UNQUOTE(JSON_EXTRACT(a.details_json,'$.actor'))='bastion-scout' THEN 'bastion-scout (local)' ELSE NULL END) AS actor_name,a.module_id,a.action,a.target_type,a.target_id,a.result FROM audit_events a LEFT JOIN users u ON u.id=a.actor_id LEFT JOIN persons p ON p.id=u.person_id WHERE a.created_at>=UTC_TIMESTAMP(6)-INTERVAL 1 YEAR",
         );
         if let Some(v) = from {
             q.push(" AND a.created_at>=").push_bind(v);

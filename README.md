@@ -4,6 +4,8 @@
 
 El primer corte de Procesos recibe el `maestro.csv` analizado de bastion-scout, con importación manual, consulta, detalle, marcas/notas compartidas y exportación. Permanece desactivado por defecto y conserva todos los registros. Ajustes muestra la política confirmada sin campos editables; la depuración queda aplazada por decisión del usuario. Ver [contrato y límites](docs/modulos/procesos-implementacion.md). Este desarrollo se publica primero en GitHub y no instala cambios en servidores.
 
+La [recepción local de Scout](docs/modulos/procesos-entrega-local.md) lee `/var/lib/bastion-scout/maestro.csv` y el manifiesto hermano cada 60 segundos. Se habilita en el backend con `BASTION_SCOUT_IMPORT_ENABLED=true`, junto con la activación normal de Procesos; está apagada por defecto. Requiere aplicar las migraciones y conceder al servicio lectura de ambos archivos durante el despliegue. No usa HTTP entre Scout y Bastion.
+
 Código y lineamientos publicados directamente en `main`, sin ramas de desarrollo. El workspace Rust está en la raíz; el frontend React + TypeScript estricto y Vite está en `web/` y se publica como build estático en Bluehost. La decisión se documenta en `docs/adr/ADR-0002-frontend-react.md`.
 
 Los dominios confirmados para las pruebas son `bastion.castilloit.net` para el frontend en Bluehost y `api.bastion.castilloit.net` para la API en AWS Lightsail; MySQL permanece en Bluehost. Configurar `BASTION_CORS_ALLOWED_ORIGIN` con el origen exacto del frontend y `web/public/config.js` con el origen de la API.

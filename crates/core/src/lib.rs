@@ -6,7 +6,7 @@ mod database;
 mod service;
 
 pub use admin::{
-    AuditRecord, CoreAdmin, MailOutboxRecord, ModuleRecord, PersonInput, PersonRecord,
+    AuditRecord, CoreAdmin, DomainActor, MailOutboxRecord, ModuleRecord, PersonInput, PersonRecord,
     RolePermissionInput, RoleRecord, SettingRecord, UserRecord,
 };
 pub use config::{AppConfig, ConfigError, DatabaseConfig};

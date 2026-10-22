@@ -36,6 +36,8 @@ El informe se obtuvo de una copia de frontend Angular compilado y backend Larave
 
 ## Registro de decisiones
 
+- 2026-10-22: se confirma entrega local de Scout y Bastion en el mismo servidor, desde `/var/lib/bastion-scout/maestro.csv` y su `main.json`. Un trabajador del backend verifica finalización, SHA-256 y cantidad de filas, y reutiliza el importador transaccional con identidad interna del Core limitada a `procesos/importacion/editar`. No se expone un endpoint nuevo ni se usan cuentas humanas o credenciales de red. Se admite el formato actual `resumen`/ítems numerados conservando compatibilidad con la entrega anterior. Ver `modulos/procesos-entrega-local.md`.
+
 - 2026-10-21: el usuario confirma que Personas, Usuarios, Roles y permisos y Mi cuenta pertenecen a Ajustes. El menú principal conserva Inicio, los módulos habilitados y un único acceso Ajustes. Mi cuenta está disponible para cada usuario autenticado; Personas conserva sus permisos y Usuarios/Roles/Core siguen reservados al Administrador. La ubicación no modifica la autorización del API.
 
 - 2026-10-21: el usuario confirma conservar todos los procesos y dejar la depuración pendiente. Ajustes > Procesos presenta la fuente Scout, la conservación total y el alcance compartido de marcas/notas como política informativa del primer corte; no se agregan controles editables ni borrado automático. Una política configurable o una acción de purga requiere definición posterior.

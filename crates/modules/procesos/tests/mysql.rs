@@ -1,7 +1,8 @@
 use std::collections::BTreeMap;
 
-use bastion_core::{CoreError, CoreService, Database};
-use bastion_procesos::{FIELDS, ProcessFilter, ProcessService};
+use bastion_core::{CoreError, CoreService, Database, DomainActor};
+use bastion_procesos::{FIELDS, ProcessFilter, ProcessService, ReadyDelivery, SCOUT_FIELDS};
+use sha2::{Digest, Sha256};
 use sqlx::mysql::MySqlPoolOptions;
 
 fn csv(id: char, observation: &str, hash: char) -> String {
@@ -58,6 +59,55 @@ fn batch_csv(count: u64, start: u64, last: Option<&str>) -> String {
         }
     }
     String::from_utf8(writer.into_inner().unwrap()).unwrap()
+}
+
+struct DeliveryFiles(std::path::PathBuf);
+impl DeliveryFiles {
+    fn new(legacy: &str) -> Self {
+        let path = std::env::temp_dir().join(format!(
+            "bastion-scout-db-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        std::fs::create_dir(&path).unwrap();
+        let mut reader = csv::Reader::from_reader(legacy.trim_start_matches('\u{feff}').as_bytes());
+        let mut writer = csv::Writer::from_writer(Vec::new());
+        writer.write_record(SCOUT_FIELDS).unwrap();
+        for record in reader.records() {
+            let mut fields = record
+                .unwrap()
+                .iter()
+                .map(str::to_owned)
+                .collect::<Vec<_>>();
+            let items: Vec<String> = serde_json::from_str(&fields[18]).unwrap();
+            fields[18] = items
+                .iter()
+                .enumerate()
+                .map(|(n, item)| format!("{}. {}", n + 1, item))
+                .collect::<Vec<_>>()
+                .join("\n");
+            writer.write_record(fields).unwrap();
+        }
+        let csv = format!(
+            "\u{feff}{}",
+            String::from_utf8(writer.into_inner().unwrap()).unwrap()
+        );
+        let manifest = serde_json::json!({"status":"exitoso","output_ready":true,"run_id":"2026-10-22","maestro_sha256":hex::encode(Sha256::digest(csv.as_bytes())),"total":1,"stages":{"scout":"exitoso","combiner":"exitoso","clasificador":"exitoso"}});
+        std::fs::write(path.join("maestro.csv"), csv).unwrap();
+        std::fs::write(path.join("main.json"), manifest.to_string()).unwrap();
+        Self(path)
+    }
+    fn read(&self) -> ReadyDelivery {
+        ReadyDelivery::read(&self.0.join("maestro.csv")).unwrap()
+    }
+}
+impl Drop for DeliveryFiles {
+    fn drop(&mut self) {
+        let _ = std::fs::remove_dir_all(&self.0);
+    }
 }
 
 #[tokio::test]
@@ -199,6 +249,70 @@ async fn mysql57_import_permissions_history_and_disable() {
     ));
     assert_eq!(service.status(1).await.unwrap()["total"], 602);
     assert!(service.detail(2, &id).await.unwrap().marked);
+    // Current Scout format can replace an equivalent legacy row without changing its identity or review.
+    let files = DeliveryFiles::new(&next);
+    let delivery = files.read();
+    assert!(matches!(
+        service.import_local_scout(&delivery).await,
+        Err(CoreError::Forbidden)
+    ));
+    let local_core = core.clone().with_local_scout_import(true);
+    let local = ProcessService::new(local_core.database(), local_core.admin());
+    assert!(
+        local_core
+            .admin()
+            .authorize_actor(DomainActor::LocalScout, "procesos", "importacion", "editar")
+            .await
+            .is_ok()
+    );
+    assert!(matches!(
+        local_core
+            .admin()
+            .authorize_actor(DomainActor::LocalScout, "procesos", "marcas", "editar")
+            .await,
+        Err(CoreError::Forbidden)
+    ));
+    assert!(matches!(
+        local_core
+            .admin()
+            .authorize_actor(DomainActor::LocalScout, "core", "usuarios", "editar")
+            .await,
+        Err(CoreError::Forbidden)
+    ));
+    let receipt = local.import_local_scout(&delivery).await.unwrap();
+    assert_eq!(receipt.unchanged, 1);
+    let restarted = ProcessService::new(local_core.database(), local_core.admin());
+    assert!(
+        restarted
+            .import_local_scout(&files.read())
+            .await
+            .unwrap()
+            .replayed
+    );
+    let record = service.detail(2, &id).await.unwrap();
+    assert!(record.marked);
+    assert_eq!(record.note, "=1+1");
+    assert_eq!(record.source["items"], "1. Dos equipos");
+    assert!(record.source.get("resumen").is_some());
+    let audit = core
+        .admin()
+        .list_audit(
+            1,
+            None,
+            None,
+            Some("procesos"),
+            Some("import"),
+            None,
+            1,
+            100,
+        )
+        .await
+        .unwrap();
+    assert!(
+        audit
+            .iter()
+            .any(|event| event.actor_name.as_deref() == Some("bastion-scout (local)"))
+    );
     core.admin()
         .set_module_enabled(1, "procesos", false)
         .await
@@ -213,6 +327,10 @@ async fn mysql57_import_permissions_history_and_disable() {
     ));
     assert!(matches!(
         service.import(1, &first).await,
+        Err(CoreError::NotFound)
+    ));
+    assert!(matches!(
+        local.import_local_scout(&delivery).await,
         Err(CoreError::NotFound)
     ));
     assert!(matches!(
@@ -243,6 +361,6 @@ async fn mysql57_import_permissions_history_and_disable() {
         .fetch_one(&pool)
         .await
         .unwrap(),
-        6
+        7
     );
 }

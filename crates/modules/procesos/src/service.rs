@@ -1,4 +1,4 @@
-use bastion_core::{CoreAdmin, CoreError, Database};
+use bastion_core::{CoreAdmin, CoreError, Database, DomainActor};
 use chrono::{DateTime, FixedOffset, NaiveDate, NaiveDateTime, TimeZone};
 use futures_util::TryStreamExt;
 use serde::{Deserialize, Serialize};
@@ -6,7 +6,8 @@ use sha2::{Digest, Sha256};
 use sqlx::{FromRow, MySql, QueryBuilder, Transaction};
 use std::collections::BTreeMap;
 
-use crate::{FIELDS, MAX_ROWS, ScoutRow, parse_csv};
+use crate::scout::{export_value, numbered_items};
+use crate::{MAX_ROWS, SCOUT_FIELDS, ScoutRow, parse_csv};
 
 #[derive(Clone)]
 pub struct ProcessService {
@@ -154,8 +155,18 @@ impl ProcessService {
         scope: &str,
         capability: &str,
     ) -> Result<Transaction<'_, MySql>, CoreError> {
+        self.begin_as(DomainActor::User(actor), scope, capability)
+            .await
+    }
+
+    async fn begin_as(
+        &self,
+        actor: DomainActor,
+        scope: &str,
+        capability: &str,
+    ) -> Result<Transaction<'_, MySql>, CoreError> {
         self.admin
-            .authorize(actor, "procesos", scope, capability)
+            .authorize_actor(actor, "procesos", scope, capability)
             .await?;
         let mut tx = self.database.pool().begin().await?;
         // Serialize with administrative disable and with other domain operations.
@@ -218,13 +229,35 @@ impl ProcessService {
     }
 
     pub async fn import(&self, actor: u64, csv: &str) -> Result<ImportResult, CoreError> {
-        let mut tx = self.begin(actor, "importacion", "editar").await?;
+        self.import_as(DomainActor::User(actor), csv, None).await
+    }
+
+    pub async fn import_local_scout(
+        &self,
+        delivery: &crate::ReadyDelivery,
+    ) -> Result<ImportResult, CoreError> {
+        self.import_as(
+            DomainActor::LocalScout,
+            &delivery.csv,
+            Some((&delivery.run_id, delivery.total)),
+        )
+        .await
+    }
+
+    async fn import_as(
+        &self,
+        actor: DomainActor,
+        csv: &str,
+        delivery: Option<(&str, usize)>,
+    ) -> Result<ImportResult, CoreError> {
+        let mut tx = self.begin_as(actor, "importacion", "editar").await?;
         // Database-backed quota survives restarts and applies across instances.
         let hash = Sha256::digest(csv.as_bytes()).to_vec();
         if let Some(previous) = sqlx::query_scalar::<_, serde_json::Value>(
-            "SELECT result_json FROM procesos_imports WHERE actor_id=? AND file_hash=?",
+            "SELECT result_json FROM procesos_imports WHERE actor_id <=> ? AND source_key <=> ? AND file_hash=?",
         )
-        .bind(actor)
+        .bind(actor.user_id())
+        .bind(actor.source_key())
         .bind(&hash)
         .fetch_optional(&mut *tx)
         .await?
@@ -234,12 +267,15 @@ impl ProcessService {
             result.replayed = true;
             return Ok(result);
         }
-        let recent: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM procesos_imports WHERE actor_id=? AND created_at>UTC_TIMESTAMP(6)-INTERVAL 1 MINUTE")
-            .bind(actor).fetch_one(&mut *tx).await?;
+        let recent: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM procesos_imports WHERE actor_id <=> ? AND source_key <=> ? AND created_at>UTC_TIMESTAMP(6)-INTERVAL 1 MINUTE")
+            .bind(actor.user_id()).bind(actor.source_key()).fetch_one(&mut *tx).await?;
         if recent >= 2 {
             return Err(CoreError::Locked);
         }
         let rows = parse_csv(csv)?;
+        if delivery.is_some_and(|(_, total)| rows.len() != total) {
+            return Err(CoreError::Invalid);
+        }
         let mut result = ImportResult::default();
         let mut existing = BTreeMap::new();
         if !rows.is_empty() {
@@ -296,20 +332,26 @@ impl ProcessService {
             save_batch(&mut tx, &pending[start..end]).await?;
             start = end;
         }
-        result.import_id = sqlx::query("INSERT INTO procesos_imports (actor_id,file_hash,result_json,created_at) VALUES (?,?,'{}',UTC_TIMESTAMP(6))")
-            .bind(actor).bind(hash).execute(&mut *tx).await?.last_insert_id();
+        result.import_id = sqlx::query("INSERT INTO procesos_imports (actor_id,source_key,file_hash,result_json,created_at) VALUES (?,?,?,'{}',UTC_TIMESTAMP(6))")
+            .bind(actor.user_id()).bind(actor.source_key()).bind(&hash).execute(&mut *tx).await?.last_insert_id();
         let value = serde_json::to_value(&result).map_err(|_| CoreError::Invalid)?;
         sqlx::query("UPDATE procesos_imports SET result_json=? WHERE id=?")
             .bind(&value)
             .bind(result.import_id)
             .execute(&mut *tx)
             .await?;
-        audit(
+        let mut details = value;
+        if let Some((run_id, _)) = delivery {
+            details["run_id"] = serde_json::json!(run_id);
+            details["file_sha256"] = serde_json::json!(hex::encode(hash));
+        }
+        CoreAdmin::record_actor_event(
             &mut tx,
             actor,
+            "procesos",
             "import",
             &result.import_id.to_string(),
-            value,
+            details,
         )
         .await?;
         tx.commit().await?;
@@ -383,14 +425,14 @@ impl ProcessService {
         let mut row_count = 0;
         let mut writer = csv::Writer::from_writer(Vec::new());
         writer
-            .write_record(FIELDS.into_iter().chain(["de_interes", "nota"]))
+            .write_record(SCOUT_FIELDS.into_iter().chain(["de_interes", "nota"]))
             .map_err(|_| CoreError::Invalid)?;
         while let Some(record) = records.try_next().await? {
             row_count += 1;
             if row_count > MAX_ROWS {
                 return Err(CoreError::Conflict);
             }
-            let values = FIELDS.map(|field| safe_cell(record.source[field].as_str().unwrap_or("")));
+            let values = SCOUT_FIELDS.map(|field| safe_cell(&export_value(&record.source, field)));
             writer
                 .write_record(values.into_iter().chain([
                     if record.marked {
@@ -430,19 +472,24 @@ async fn save_batch(
 ) -> Result<(), CoreError> {
     let mut compare = QueryBuilder::<MySql>::new("SELECT COUNT(*) FROM procesos_rows WHERE ");
     let mut comparisons = 0;
-    for (row, source, same_observation) in rows {
+    for (row, _source, same_observation) in rows {
         if !same_observation {
             continue;
         }
         if comparisons > 0 {
             compare.push(" OR ");
         }
-        compare
-            .push("(proceso_id=")
-            .push_bind(&row.proceso_id)
-            .push(" AND source_json<>CAST(")
-            .push_bind(source)
-            .push(" AS JSON))");
+        let mut other = row.source.clone();
+        other.remove("resumen_corto");
+        other.remove("resumen");
+        other.remove("items");
+        let other = serde_json::to_string(&other).map_err(|_| CoreError::Invalid)?;
+        let items = serde_json::to_string(&row.items).map_err(|_| CoreError::Invalid)?;
+        compare.push("(proceso_id=").push_bind(&row.proceso_id)
+            .push(" AND (JSON_REMOVE(source_json,'$.resumen_corto','$.resumen','$.items')<>CAST(").push_bind(other).push(" AS JSON)")
+            .push(" OR BINARY COALESCE(JSON_UNQUOTE(JSON_EXTRACT(source_json,'$.resumen')),JSON_UNQUOTE(JSON_EXTRACT(source_json,'$.resumen_corto')))<>BINARY ").push_bind(&row.resumen_corto)
+            .push(" OR IF(JSON_CONTAINS_PATH(source_json,'one','$.resumen_corto'),CAST(JSON_UNQUOTE(JSON_EXTRACT(source_json,'$.items')) AS JSON)<>CAST(").push_bind(items)
+            .push(" AS JSON),BINARY JSON_UNQUOTE(JSON_EXTRACT(source_json,'$.items'))<>BINARY ").push_bind(numbered_items(&row.items)).push(")))");
         comparisons += 1;
     }
     if comparisons > 0 {

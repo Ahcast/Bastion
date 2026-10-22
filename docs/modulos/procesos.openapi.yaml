@@ -182,7 +182,7 @@ components:
             resumen_corto: {type: string, maxLength: 16384}
             source:
               type: object
-              description: Vacío en listados; las 24 columnas de Scout con sus textos exactos en el detalle. items e items_fuente son JSON serializado como texto.
+              description: Vacío en listados; las 24 columnas de Scout con sus textos exactos en el detalle. Scout actual usa resumen e items numerados; el formato anterior usa resumen_corto e items JSON. items_fuente conserva JSON serializado como texto.
               additionalProperties: {type: string}
     Page:
       type: object

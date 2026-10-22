@@ -71,6 +71,7 @@ impl From<sqlx::Error> for CoreError {
 
 #[derive(Clone)]
 pub struct CoreService {
+    local_scout_enabled: bool,
     database: Database,
     bootstrap_secret: String,
     public_app_origin: String,
@@ -239,7 +240,7 @@ impl CoreService {
     }
 
     pub fn admin(&self) -> CoreAdmin {
-        CoreAdmin::new(self.database.clone())
+        CoreAdmin::new(self.database.clone(), self.local_scout_enabled)
     }
 
     pub fn new(
@@ -255,6 +256,7 @@ impl CoreService {
         let cipher =
             Aes256Gcm::new_from_slice(&data_encryption_key).map_err(|_| CoreError::Invalid)?;
         Ok(Self {
+            local_scout_enabled: false,
             database,
             bootstrap_secret,
             public_app_origin: "https://app.castilloit.net".to_owned(),
@@ -266,6 +268,12 @@ impl CoreService {
 
     pub fn with_public_app_origin(mut self, origin: String) -> Self {
         self.public_app_origin = origin;
+        self
+    }
+
+    /// Deployment-only switch for the local Scout worker; grants no network identity.
+    pub fn with_local_scout_import(mut self, enabled: bool) -> Self {
+        self.local_scout_enabled = enabled;
         self
     }
 

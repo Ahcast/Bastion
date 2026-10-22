@@ -5,6 +5,8 @@ use bastion_core::{AppConfig, CoreService, Database, DatabaseConfig};
 use tokio::net::TcpListener;
 use tracing_subscriber::EnvFilter;
 
+mod scout_import;
+
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
     let _ = dotenvy::dotenv();
@@ -36,6 +38,13 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
         return Err(std::io::Error::other("unknown command").into());
     }
     let config = AppConfig::from_env()?;
+    let scout_config = scout_import::ScoutImportConfig::from_env()?;
+    if scout_config.enabled && !config.procesos_allowed {
+        return Err(std::io::Error::other(
+            "Local Scout import requires procesos in BASTION_ALLOWED_MODULES",
+        )
+        .into());
+    }
     let database = Database::connect_lazy(&config.database);
     let app_origin = config.cors_allowed_origin.clone();
     let core = CoreService::new(
@@ -43,11 +52,18 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
         config.bootstrap_secret,
         config.data_encryption_key,
     )?
-    .with_public_app_origin(app_origin.clone());
+    .with_public_app_origin(app_origin.clone())
+    .with_local_scout_import(scout_config.enabled);
     core.check_ready().await?;
     bastion_procesos::ProcessService::new(core.database(), core.admin())
         .synchronize_release(config.procesos_allowed)
         .await?;
+    if scout_config.enabled {
+        tokio::spawn(scout_import::run(
+            bastion_procesos::ProcessService::new(core.database(), core.admin()),
+            scout_config,
+        ));
+    }
     let cleanup = core.admin();
     cleanup.cleanup_retention().await?;
     tokio::spawn(async move {

@@ -169,6 +169,8 @@ La IA interactiva usa OAuth Authorization Code + PKCE y actúa en nombre del usu
 
 ## Revisión pendiente
 
+La recepción local de Scout usa una identidad interna del Core, no deserializable desde API/MCP, habilitada explícitamente en el ambiente y limitada a `procesos/importacion/editar`. No es una conexión interactiva ni una credencial de servicio por red. Se audita como `bastion-scout (local)` y vuelve a comprobar la activación del módulo dentro de la transacción. Solo lee el CSV y manifiesto configurados en el servidor, con límites y permisos de lectura; véase [contrato local](modulos/procesos-entrega-local.md).
+
 La auditoría del informe fue estática. Hacer revisión de amenazas y verificación dinámica antes de producción; confirmar soporte TLS de MySQL Bluehost, conexiones remotas, IPs y políticas de hosting.
 
 ## Referencias para SMTP y SSRF

@@ -16,5 +16,8 @@ sqlx.workspace = true
 tokio.workspace = true
 url.workspace = true
 
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
+
 [dev-dependencies]
 bastion-core = { path = "../../core", features = ["test-support"] }
