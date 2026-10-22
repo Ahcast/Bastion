@@ -756,308 +756,1073 @@ async fn request_password_reset(
     State(state): State<ApiState>,
     Extension(client_ip): Extension<ClientIp>,
     Json(body): Json<PasswordResetRequest>,
-) -> Result<(StatusCode, Json<s…40027 tokens truncated…&str) -> Result<Vec<u8>, CoreError> {
-        let nonce = random_bytes::<12>();
-        let ciphertext = self
-            .cipher
-            .encrypt(Nonce::from_slice(&nonce), value.as_bytes())
-            .map_err(|_| CoreError::Invalid)?;
-        let mut packed = nonce.to_vec();
-        packed.extend(ciphertext);
-        Ok(packed)
-    }
+) -> Result<(StatusCode, Json<serde_json::Value>), ApiError> {
+    state
+        .core
+        .request_password_reset(&body.email, &client_ip.0)
+        .await
+        .map_err(ApiError)?;
+    Ok((
+        StatusCode::ACCEPTED,
+        Json(serde_json::json!({"status":"if_account_exists_email_will_be_sent"})),
+    ))
+}
 
-    fn decrypt(&self, packed: &[u8]) -> Result<String, CoreError> {
-        if packed.len() < 12 {
-            return Err(CoreError::Invalid);
-        }
-        let (nonce, ciphertext) = packed.split_at(12);
-        let plain = self
-            .cipher
-            .decrypt(Nonce::from_slice(nonce), ciphertext)
-            .map_err(|_| CoreError::Invalid)?;
-        String::from_utf8(plain).map_err(|_| CoreError::Invalid)
-    }
+async fn complete_password_reset(
+    State(state): State<ApiState>,
+    Extension(client_ip): Extension<ClientIp>,
+    Json(body): Json<PasswordResetCompleteRequest>,
+) -> Result<Response, ApiError> {
+    state
+        .core
+        .complete_password_reset(&body.token, &body.new_password, &client_ip.0)
+        .await
+        .map_err(ApiError)?;
+    Ok(StatusCode::NO_CONTENT.into_response())
+}
 
-    async fn log_security(
-        &self,
-        user_id: Option<u64>,
-        kind: &str,
-        result: &str,
-        ip: &str,
-        agent: String,
-    ) -> Result<(), CoreError> {
-        sqlx::query("INSERT INTO security_events (user_id,event_type,result,ip_address,device_label,created_at) VALUES (?,?,?,?,?,?)")
-            .bind(user_id).bind(kind).bind(result).bind(ip).bind(agent).bind(Utc::now().naive_utc()).execute(&self.database.pool).await?;
-        Ok(())
-    }
+async fn reauth_totp(
+    State(state): State<ApiState>,
+    headers: axum::http::HeaderMap,
+    Extension(client_ip): Extension<ClientIp>,
+    Json(body): Json<TotpRequest>,
+) -> Result<StatusCode, ApiError> {
+    let session = cookie_value(&headers, "__Host-bastion_session")
+        .ok_or(ApiError(CoreError::Unauthorized))?;
+    let agent = headers
+        .get("user-agent")
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("");
+    state
+        .core
+        .verify_session_totp(&session, &body.code, &client_ip.0, agent)
+        .await
+        .map_err(ApiError)?;
+    Ok(StatusCode::NO_CONTENT)
+}
 
-    async fn audit(
-        &self,
-        actor: Option<u64>,
-        module: &str,
-        action: &str,
-        target_type: &str,
-        target_id: String,
-        result: &str,
-    ) -> Result<(), CoreError> {
-        sqlx::query("INSERT INTO audit_events (actor_id,module_id,action,target_type,target_id,result,created_at) VALUES (?,?,?,?,?,?,?)")
-            .bind(actor).bind(module).bind(action).bind(target_type).bind(target_id).bind(result).bind(Utc::now().naive_utc()).execute(&self.database.pool).await?;
-        Ok(())
+async fn logout(
+    State(state): State<ApiState>,
+    headers: axum::http::HeaderMap,
+) -> Result<Response, ApiError> {
+    let session = cookie_value(&headers, "__Host-bastion_session").unwrap_or_default();
+    state.core.logout(&session).await.map_err(ApiError)?;
+    let mut response = StatusCode::NO_CONTENT.into_response();
+    for name in ["__Host-bastion_session", "__Host-bastion_challenge"] {
+        set_cookie(
+            &mut response,
+            name,
+            "",
+            "Path=/; Secure; HttpOnly; SameSite=Lax",
+            Some(0),
+        );
+    }
+    Ok(response)
+}
+
+async fn actor(
+    state: &ApiState,
+    headers: &axum::http::HeaderMap,
+) -> Result<bastion_core::AuthenticatedUser, ApiError> {
+    let token =
+        cookie_value(headers, "__Host-bastion_session").ok_or(ApiError(CoreError::Unauthorized))?;
+    state.core.current_user(&token).await.map_err(ApiError)
+}
+
+fn page(query: &ListQuery) -> (u32, u32) {
+    (query.page.unwrap_or(1), query.page_size.unwrap_or(25))
+}
+fn person_input(body: PersonRequest) -> bastion_core::PersonInput {
+    bastion_core::PersonInput {
+        full_name: body.full_name,
+        dni: body.dni,
+        country_code: body.country_code,
+        gender: body.gender,
     }
 }
 
-async fn revoke_user_access(
-    tx: &mut Transaction<'_, MySql>,
-    user_id: u64,
-    now: NaiveDateTime,
-    reason: &str,
-) -> Result<(), CoreError> {
-    sqlx::query("UPDATE sessions SET revoked_at=?,revocation_reason=? WHERE user_id=? AND revoked_at IS NULL").bind(now).bind(reason).bind(user_id).execute(&mut **tx).await?;
-    sqlx::query("UPDATE trusted_devices SET revoked_at=? WHERE user_id=? AND revoked_at IS NULL")
-        .bind(now)
-        .bind(user_id)
-        .execute(&mut **tx)
-        .await?;
-    sqlx::query("UPDATE otp_challenges SET consumed_at=? WHERE user_id=? AND consumed_at IS NULL")
-        .bind(now)
-        .bind(user_id)
-        .execute(&mut **tx)
-        .await?;
-    Ok(())
+async fn list_persons(
+    State(state): State<ApiState>,
+    headers: axum::http::HeaderMap,
+    Query(query): Query<ListQuery>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    let actor = actor(&state, &headers).await?;
+    let (page, size) = page(&query);
+    let items = state
+        .core
+        .admin()
+        .list_persons(actor.id, query.q.as_deref(), page, size)
+        .await
+        .map_err(ApiError)?;
+    Ok(Json(
+        serde_json::json!({"items":items,"page":page.max(1),"page_size":size.clamp(1,100)}),
+    ))
 }
 
-async fn insert_audit(
-    tx: &mut Transaction<'_, MySql>,
-    actor: Option<u64>,
-    module: &str,
-    action: &str,
-    target_type: &str,
-    target_id: Option<String>,
-    result: &str,
-) -> Result<(), CoreError> {
-    sqlx::query("INSERT INTO audit_events (actor_id,module_id,action,target_type,target_id,result,created_at) VALUES (?,?,?,?,?,?,?)")
-        .bind(actor).bind(module).bind(action).bind(target_type).bind(target_id).bind(result).bind(Utc::now().naive_utc()).execute(&mut **tx).await?;
-    Ok(())
+async fn create_person(
+    State(state): State<ApiState>,
+    headers: axum::http::HeaderMap,
+    Json(body): Json<PersonRequest>,
+) -> Result<Response, ApiError> {
+    let actor = actor(&state, &headers).await?;
+    let item = state
+        .core
+        .admin()
+        .create_person(actor.id, person_input(body))
+        .await
+        .map_err(ApiError)?;
+    let mut response = Json(item).into_response();
+    *response.status_mut() = StatusCode::CREATED;
+    Ok(response)
 }
 
-fn random_bytes<const N: usize>() -> [u8; N] {
-    let mut bytes = [0u8; N];
-    OsRng.fill_bytes(&mut bytes);
-    bytes
+async fn update_person(
+    State(state): State<ApiState>,
+    headers: axum::http::HeaderMap,
+    Path(id): Path<u64>,
+    Json(body): Json<PersonRequest>,
+) -> Result<Json<bastion_core::PersonRecord>, ApiError> {
+    let actor = actor(&state, &headers).await?;
+    state
+        .core
+        .admin()
+        .update_person(actor.id, id, person_input(body))
+        .await
+        .map(Json)
+        .map_err(ApiError)
 }
-fn random_token() -> String {
-    base64::Engine::encode(
-        &base64::engine::general_purpose::URL_SAFE_NO_PAD,
-        random_bytes::<32>(),
+
+async fn delete_person(
+    State(state): State<ApiState>,
+    headers: axum::http::HeaderMap,
+    Path(id): Path<u64>,
+) -> Result<StatusCode, ApiError> {
+    let actor = actor(&state, &headers).await?;
+    state
+        .core
+        .admin()
+        .delete_person(actor.id, id)
+        .await
+        .map_err(ApiError)?;
+    Ok(StatusCode::NO_CONTENT)
+}
+
+async fn list_users(
+    State(state): State<ApiState>,
+    headers: axum::http::HeaderMap,
+    Query(query): Query<ListQuery>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    let actor = actor(&state, &headers).await?;
+    let (page, size) = page(&query);
+    let items = state
+        .core
+        .admin()
+        .list_users(actor.id, query.q.as_deref(), page, size)
+        .await
+        .map_err(ApiError)?;
+    Ok(Json(
+        serde_json::json!({"items":items,"page":page.max(1),"page_size":size.clamp(1,100)}),
+    ))
+}
+
+async fn create_user(
+    State(state): State<ApiState>,
+    headers: axum::http::HeaderMap,
+    Json(body): Json<CreateUserRequest>,
+) -> Result<Response, ApiError> {
+    let actor = actor(&state, &headers).await?;
+    let item = state
+        .core
+        .create_user_with_invitation(actor.id, body.person_id, body.role_id, &body.email)
+        .await
+        .map_err(ApiError)?;
+    let mut response = Json(item).into_response();
+    *response.status_mut() = StatusCode::CREATED;
+    Ok(response)
+}
+
+async fn resend_invitation(
+    State(state): State<ApiState>,
+    headers: axum::http::HeaderMap,
+    Path(id): Path<u64>,
+) -> Result<StatusCode, ApiError> {
+    let actor = actor(&state, &headers).await?;
+    state
+        .core
+        .dispatch_invitation(actor.id, id)
+        .await
+        .map_err(ApiError)?;
+    Ok(StatusCode::ACCEPTED)
+}
+
+async fn update_user(
+    State(state): State<ApiState>,
+    headers: axum::http::HeaderMap,
+    Path(id): Path<u64>,
+    Json(body): Json<UpdateUserRequest>,
+) -> Result<Json<bastion_core::UserRecord>, ApiError> {
+    let actor = actor(&state, &headers).await?;
+    state
+        .core
+        .admin()
+        .update_user(actor.id, id, body.person_id, body.role_id, body.enabled)
+        .await
+        .map(Json)
+        .map_err(ApiError)
+}
+
+async fn list_roles(
+    State(state): State<ApiState>,
+    headers: axum::http::HeaderMap,
+) -> Result<Json<Vec<bastion_core::RoleRecord>>, ApiError> {
+    let actor = actor(&state, &headers).await?;
+    state
+        .core
+        .admin()
+        .list_roles(actor.id)
+        .await
+        .map(Json)
+        .map_err(ApiError)
+}
+
+async fn list_role_permissions(
+    State(state): State<ApiState>,
+    headers: axum::http::HeaderMap,
+    Path(id): Path<u64>,
+) -> Result<Json<Vec<bastion_core::RolePermissionInput>>, ApiError> {
+    let actor = actor(&state, &headers).await?;
+    state
+        .core
+        .admin()
+        .list_role_permissions(actor.id, id)
+        .await
+        .map(Json)
+        .map_err(ApiError)
+}
+
+async fn create_role(
+    State(state): State<ApiState>,
+    headers: axum::http::HeaderMap,
+    Json(body): Json<CreateRoleRequest>,
+) -> Result<Response, ApiError> {
+    let actor = actor(&state, &headers).await?;
+    let role = state
+        .core
+        .admin()
+        .create_role(actor.id, &body.name, body.description.as_deref())
+        .await
+        .map_err(ApiError)?;
+    let mut response = Json(role).into_response();
+    *response.status_mut() = StatusCode::CREATED;
+    Ok(response)
+}
+
+async fn update_role(
+    State(state): State<ApiState>,
+    headers: axum::http::HeaderMap,
+    Path(id): Path<u64>,
+    Json(body): Json<UpdateRoleRequest>,
+) -> Result<Json<bastion_core::RoleRecord>, ApiError> {
+    let actor = actor(&state, &headers).await?;
+    let permissions = body.permissions.map(|items| {
+        items
+            .into_iter()
+            .map(|p| bastion_core::RolePermissionInput {
+                module_id: p.module_id,
+                scope_key: p.scope_key,
+                capability: p.capability,
+            })
+            .collect()
+    });
+    state
+        .core
+        .admin()
+        .update_role(
+            actor.id,
+            id,
+            body.name.as_deref(),
+            body.description.as_deref().map(Some),
+            permissions,
+        )
+        .await
+        .map(Json)
+        .map_err(ApiError)
+}
+
+async fn delete_role(
+    State(state): State<ApiState>,
+    headers: axum::http::HeaderMap,
+    Path(id): Path<u64>,
+) -> Result<StatusCode, ApiError> {
+    let actor = actor(&state, &headers).await?;
+    state
+        .core
+        .admin()
+        .delete_role(actor.id, id)
+        .await
+        .map_err(ApiError)?;
+    Ok(StatusCode::NO_CONTENT)
+}
+
+async fn list_modules(
+    State(state): State<ApiState>,
+    headers: axum::http::HeaderMap,
+) -> Result<Json<Vec<bastion_core::ModuleRecord>>, ApiError> {
+    let actor = actor(&state, &headers).await?;
+    state
+        .core
+        .admin()
+        .list_modules(actor.id)
+        .await
+        .map(Json)
+        .map_err(ApiError)
+}
+
+async fn toggle_module(
+    State(state): State<ApiState>,
+    headers: axum::http::HeaderMap,
+    Path(module_id): Path<String>,
+    Json(body): Json<ModuleToggleRequest>,
+) -> Result<StatusCode, ApiError> {
+    let actor = actor(&state, &headers).await?;
+    state
+        .core
+        .admin()
+        .set_module_enabled(actor.id, &module_id, body.enabled)
+        .await
+        .map_err(ApiError)?;
+    Ok(StatusCode::NO_CONTENT)
+}
+
+async fn get_core_settings(
+    State(state): State<ApiState>,
+    headers: axum::http::HeaderMap,
+) -> Result<Json<Vec<bastion_core::SettingRecord>>, ApiError> {
+    let actor = actor(&state, &headers).await?;
+    state
+        .core
+        .admin()
+        .get_core_settings(actor.id)
+        .await
+        .map(Json)
+        .map_err(ApiError)
+}
+
+async fn set_core_setting(
+    State(state): State<ApiState>,
+    headers: axum::http::HeaderMap,
+    Path(key): Path<String>,
+    Json(body): Json<CoreSettingRequest>,
+) -> Result<StatusCode, ApiError> {
+    let actor = actor(&state, &headers).await?;
+    state
+        .core
+        .admin()
+        .set_core_setting(actor.id, &key, body.value)
+        .await
+        .map_err(ApiError)?;
+    Ok(StatusCode::NO_CONTENT)
+}
+
+async fn list_audit(
+    State(state): State<ApiState>,
+    headers: axum::http::HeaderMap,
+    Query(query): Query<AuditQuery>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    let actor = actor(&state, &headers).await?;
+    let from = query
+        .from
+        .map(parse_datetime)
+        .transpose()
+        .map_err(|_| ApiError(CoreError::Invalid))?;
+    let to = query
+        .to
+        .map(parse_datetime)
+        .transpose()
+        .map_err(|_| ApiError(CoreError::Invalid))?;
+    let page = query.page.unwrap_or(1);
+    let size = query.page_size.unwrap_or(25);
+    let items = state
+        .core
+        .admin()
+        .list_audit(
+            actor.id,
+            from,
+            to,
+            query.module.as_deref(),
+            query.action.as_deref(),
+            query.result.as_deref(),
+            page,
+            size,
+        )
+        .await
+        .map_err(ApiError)?;
+    Ok(Json(
+        serde_json::json!({"items":items,"page":page.max(1),"page_size":size.clamp(1,100)}),
+    ))
+}
+
+async fn list_mail_outbox(
+    State(state): State<ApiState>,
+    headers: axum::http::HeaderMap,
+    Query(query): Query<ListQuery>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    let actor = actor(&state, &headers).await?;
+    let (page, size) = page(&query);
+    let items = state
+        .core
+        .admin()
+        .list_mail_outbox(actor.id, page, size)
+        .await
+        .map_err(ApiError)?;
+    Ok(Json(
+        serde_json::json!({"items":items,"page":page.max(1),"page_size":size.clamp(1,100)}),
+    ))
+}
+
+async fn retry_mail(
+    State(state): State<ApiState>,
+    headers: axum::http::HeaderMap,
+    Path(id): Path<u64>,
+) -> Result<StatusCode, ApiError> {
+    let actor = actor(&state, &headers).await?;
+    state
+        .core
+        .admin()
+        .retry_mail(actor.id, id)
+        .await
+        .map_err(ApiError)?;
+    Ok(StatusCode::ACCEPTED)
+}
+
+async fn list_sessions(
+    State(state): State<ApiState>,
+    headers: axum::http::HeaderMap,
+) -> Result<Json<Vec<bastion_core::SessionInfo>>, ApiError> {
+    let user = actor(&state, &headers).await?;
+    let token = cookie_value(&headers, "__Host-bastion_session")
+        .ok_or(ApiError(CoreError::Unauthorized))?;
+    state
+        .core
+        .list_sessions(user.id, &token)
+        .await
+        .map(Json)
+        .map_err(ApiError)
+}
+
+async fn revoke_session(
+    State(state): State<ApiState>,
+    headers: axum::http::HeaderMap,
+    Path(id): Path<u64>,
+) -> Result<StatusCode, ApiError> {
+    let user = actor(&state, &headers).await?;
+    let token = cookie_value(&headers, "__Host-bastion_session")
+        .ok_or(ApiError(CoreError::Unauthorized))?;
+    state
+        .core
+        .revoke_session(&token, id, user.id)
+        .await
+        .map_err(ApiError)?;
+    Ok(StatusCode::NO_CONTENT)
+}
+
+async fn revoke_other_sessions(
+    State(state): State<ApiState>,
+    headers: axum::http::HeaderMap,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    let user = actor(&state, &headers).await?;
+    let token = cookie_value(&headers, "__Host-bastion_session")
+        .ok_or(ApiError(CoreError::Unauthorized))?;
+    let count = state
+        .core
+        .revoke_other_sessions(user.id, &token)
+        .await
+        .map_err(ApiError)?;
+    Ok(Json(serde_json::json!({"revoked":count})))
+}
+
+async fn list_devices(
+    State(state): State<ApiState>,
+    headers: axum::http::HeaderMap,
+) -> Result<Json<Vec<bastion_core::TrustedDeviceInfo>>, ApiError> {
+    let user = actor(&state, &headers).await?;
+    state
+        .core
+        .list_trusted_devices(user.id)
+        .await
+        .map(Json)
+        .map_err(ApiError)
+}
+
+async fn revoke_device(
+    State(state): State<ApiState>,
+    headers: axum::http::HeaderMap,
+    Path(id): Path<u64>,
+) -> Result<StatusCode, ApiError> {
+    let user = actor(&state, &headers).await?;
+    state
+        .core
+        .revoke_trusted_device(user.id, id)
+        .await
+        .map_err(ApiError)?;
+    Ok(StatusCode::NO_CONTENT)
+}
+
+async fn list_security_history(
+    State(state): State<ApiState>,
+    headers: axum::http::HeaderMap,
+    Query(query): Query<ListQuery>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    let user = actor(&state, &headers).await?;
+    let (page, size) = page(&query);
+    let items = state
+        .core
+        .security_history(user.id, page, size)
+        .await
+        .map_err(ApiError)?;
+    Ok(Json(
+        serde_json::json!({"items":items,"page":page.max(1),"page_size":size.clamp(1,100)}),
+    ))
+}
+
+fn parse_datetime(value: String) -> Result<chrono::NaiveDateTime, ()> {
+    chrono::DateTime::parse_from_rfc3339(&value)
+        .map(|v| v.with_timezone(&chrono::Utc).naive_utc())
+        .map_err(|_| ())
+}
+
+async fn authenticated_response(
+    core: &CoreService,
+    cookies: AuthCookies,
+) -> Result<Response, ApiError> {
+    let user = core
+        .current_user(&cookies.session_token)
+        .await
+        .map_err(ApiError)?;
+    let mut response = Json(
+        serde_json::json!({"status":"authenticated","csrf_token":cookies.csrf_token,"user":user}),
     )
+    .into_response();
+    set_cookie(
+        &mut response,
+        "__Host-bastion_session",
+        &cookies.session_token,
+        "Path=/; Secure; HttpOnly; SameSite=Lax",
+        if cookies.keep_logged_in {
+            Some(315_360_000)
+        } else {
+            None
+        },
+    );
+    set_cookie(
+        &mut response,
+        "__Host-bastion_csrf",
+        &cookies.csrf_token,
+        "Path=/; Secure; SameSite=Lax",
+        if cookies.keep_logged_in {
+            Some(315_360_000)
+        } else {
+            None
+        },
+    );
+    set_cookie(
+        &mut response,
+        "__Host-bastion_device",
+        &cookies.device_token,
+        "Path=/; Secure; HttpOnly; SameSite=Lax",
+        Some(1_296_000),
+    );
+    set_cookie(
+        &mut response,
+        "__Host-bastion_challenge",
+        "",
+        "Path=/; Secure; HttpOnly; SameSite=Lax",
+        Some(0),
+    );
+    Ok(response)
 }
-fn token_hash(value: &str) -> [u8; 32] {
-    Sha256::digest(value.as_bytes()).into()
-}
-fn constant_time_text_eq(left: &str, right: &str) -> bool {
-    left.as_bytes().ct_eq(right.as_bytes()).into()
-}
-fn hash_password(password: &str) -> Result<String, CoreError> {
-    let salt = SaltString::generate(&mut OsRng);
-    Argon2::default()
-        .hash_password(password.as_bytes(), &salt)
-        .map(|hash| hash.to_string())
-        .map_err(|_| CoreError::Invalid)
-}
-fn verify_password(password: &str, encoded: &str) -> bool {
-    PasswordHash::new(encoded).ok().is_some_and(|parsed| {
-        Argon2::default()
-            .verify_password(password.as_bytes(), &parsed)
-            .is_ok()
-    })
-}
-fn map_unique_conflict(error: sqlx::Error) -> CoreError {
-    if let sqlx::Error::Database(db) = &error {
-        if db.code().as_deref() == Some("23000") {
-            return CoreError::Conflict;
-        }
+
+fn set_cookie(
+    response: &mut Response,
+    name: &str,
+    value: &str,
+    attributes: &str,
+    max_age: Option<i64>,
+) {
+    let age = max_age
+        .map(|seconds| format!("; Max-Age={seconds}"))
+        .unwrap_or_default();
+    if let Ok(cookie) = HeaderValue::from_str(&format!("{name}={value}; {attributes}{age}")) {
+        response
+            .headers_mut()
+            .append(axum::http::header::SET_COOKIE, cookie);
     }
-    CoreError::Internal(error)
 }
-fn validate_password(password: &str) -> Result<(), CoreError> {
-    if password.chars().count() < 8 || password.len() > 1024 {
-        return Err(CoreError::Invalid);
-    }
-    Ok(())
-}
-fn validate_password_input(password: &str) -> Result<(), CoreError> {
-    if password.len() > 1024 {
-        Err(CoreError::Invalid)
-    } else {
-        Ok(())
-    }
-}
-fn normalize_email(email: &str) -> Result<String, CoreError> {
-    let normalized = email.trim().to_lowercase();
-    if normalized.is_empty()
-        || normalized.len() > 254
-        || !normalized.is_ascii()
-        || !normalized.contains('@')
-        || normalized.chars().any(char::is_control)
-    {
-        return Err(CoreError::Invalid);
-    }
-    Ok(normalized)
-}
-fn safe_agent(agent: &str) -> String {
-    agent
-        .chars()
-        .filter(|c| !c.is_control())
-        .take(180)
-        .collect()
-}
-async fn smtp_host_resolves_publicly(host: &str, port: u16) -> bool {
-    if host.is_empty()
-        || host.len() > 253
-        || host.parse::<IpAddr>().is_ok()
-        || host
-            .chars()
-            .any(|c| c.is_control() || c.is_whitespace() || matches!(c, '/' | '\\' | '@' | ':'))
-    {
-        return false;
-    }
-    let resolved = tokio::time::timeout(
-        Duration::from_secs(5),
-        tokio::net::lookup_host((host, port)),
-    )
-    .await;
-    let Ok(Ok(addresses)) = resolved else {
-        return false;
-    };
-    let addresses = addresses.collect::<Vec<_>>();
-    !addresses.is_empty() && addresses.iter().all(|address| is_public_ip(address.ip()))
-}
-fn is_public_ip(address: IpAddr) -> bool {
-    match address {
-        IpAddr::V4(ip) => is_public_ipv4(ip),
-        IpAddr::V6(ip) => {
-            if let Some(mapped) = ip.to_ipv4_mapped() {
-                return is_public_ipv4(mapped);
+
+fn cookie_value(headers: &axum::http::HeaderMap, name: &str) -> Option<String> {
+    let cookies = headers.get(COOKIE)?.to_str().ok()?;
+    let mut found = None;
+    for part in cookies.split(';') {
+        let (key, value) = part.trim().split_once('=')?;
+        if key == name {
+            if found.is_some() {
+                return None;
             }
-            let octets = ip.octets();
-            let global_unicast = octets[0] & 0xe0 == 0x20;
-            let special_2001 = octets[0] == 0x20 && octets[1] == 0x01 && octets[2] < 0x02;
-            let six_to_four = octets[0] == 0x20 && octets[1] == 0x02;
-            let documentation = octets[0] == 0x3f && octets[1] == 0xff;
-            global_unicast && !special_2001 && !six_to_four && !documentation
+            found = Some(value.to_owned());
         }
     }
+    found
 }
-fn is_public_ipv4(ip: Ipv4Addr) -> bool {
-    let [a, b, c, _] = ip.octets();
-    !(a == 0
-        || a == 10
-        || a == 127
-        || (a == 169 && b == 254)
-        || (a == 172 && (16..=31).contains(&b))
-        || (a == 192 && b == 168)
-        || (a == 100 && (64..=127).contains(&b))
-        || (a == 192 && b == 0)
-        || (a == 192 && b == 0 && c == 2)
-        || (a == 198 && (b == 18 || b == 19))
-        || (a == 198 && b == 51 && c == 100)
-        || (a == 203 && b == 0 && c == 113)
-        || a >= 224)
+
+fn random_token() -> String {
+    let mut bytes = [0u8; 32];
+    rand::RngCore::fill_bytes(&mut rand::rngs::OsRng, &mut bytes);
+    base64::Engine::encode(&base64::engine::general_purpose::URL_SAFE_NO_PAD, bytes)
 }
-fn recovery_code() -> String {
-    hex::encode(random_bytes::<8>()).to_uppercase()
+
+async fn csrf_guard(State(guard): State<CsrfGuardState>, request: Request, next: Next) -> Response {
+    let Some(client_ip) = resolve_client_ip(&request, &guard.trusted_proxy_cidrs) else {
+        return problem(
+            StatusCode::BAD_REQUEST,
+            "Invalid Client Address",
+            "The client address could not be verified.",
+        );
+    };
+    let mut request = request;
+    request.extensions_mut().insert(ClientIp(client_ip));
+    if matches!(
+        *request.method(),
+        Method::GET | Method::HEAD | Method::OPTIONS
+    ) {
+        return next.run(request).await;
+    }
+    let request_origin = request.headers().get(ORIGIN).and_then(|v| v.to_str().ok());
+    if request_origin != Some(guard.origin.as_str()) {
+        return problem(
+            StatusCode::FORBIDDEN,
+            "Origin Rejected",
+            "The request origin is not allowed.",
+        );
+    }
+    let cookie = request
+        .headers()
+        .get(COOKIE)
+        .and_then(|v| v.to_str().ok())
+        .and_then(|s| parse_cookie(s, "__Host-bastion_csrf"));
+    let header = request
+        .headers()
+        .get("x-csrf-token")
+        .and_then(|v| v.to_str().ok());
+    let valid = cookie
+        .zip(header)
+        .is_some_and(|(a, b)| a.as_bytes().ct_eq(b.as_bytes()).into());
+    if !valid {
+        return problem(
+            StatusCode::FORBIDDEN,
+            "CSRF Validation Failed",
+            "The request could not be verified.",
+        );
+    }
+    let session = request
+        .headers()
+        .get(COOKIE)
+        .and_then(|v| v.to_str().ok())
+        .and_then(|s| parse_cookie(s, "__Host-bastion_session"));
+    if let Some(session) =
+        session.filter(|_| requires_session_csrf_binding(request.method(), request.uri().path()))
+    {
+        let token = header.unwrap_or_default();
+        match guard.core.csrf_matches(session, token).await {
+            Ok(true) => {}
+            Ok(false) => {
+                return problem(
+                    StatusCode::FORBIDDEN,
+                    "CSRF Validation Failed",
+                    "The request could not be verified.",
+                );
+            }
+            Err(_) => {
+                return problem(
+                    StatusCode::SERVICE_UNAVAILABLE,
+                    "Temporarily Unavailable",
+                    "The request could not be verified.",
+                );
+            }
+        }
+    }
+    next.run(request).await
 }
-fn verify_totp(secret: &str, code: &str, last_counter: i64) -> Option<u64> {
-    if code.len() != 6 || !code.bytes().all(|b| b.is_ascii_digit()) {
+
+fn resolve_client_ip(request: &Request, proxies: &[IpNet]) -> Option<String> {
+    let peer = request
+        .extensions()
+        .get::<ConnectInfo<SocketAddr>>()
+        .map(|v| v.0.ip())?;
+    let trusted = |ip: &IpAddr| proxies.iter().any(|network| network.contains(ip));
+    if !trusted(&peer) {
+        return Some(peer.to_string());
+    }
+
+    let mut values = request.headers().get_all("x-forwarded-for").iter();
+    let Some(value) = values.next() else {
+        return Some(peer.to_string());
+    };
+    // Require one bounded, unambiguous header from the trusted ingress. Reject
+    // malformed forwarding rather than recording the proxy as a shared client.
+    if values.next().is_some() || value.as_bytes().len() > 1024 {
         return None;
     }
-    let secret = BASE32_NOPAD.decode(secret.as_bytes()).ok()?;
-    let current = (Utc::now().timestamp().max(0) as u64) / 30;
-    for counter in [
-        current.saturating_sub(1),
-        current,
-        current.saturating_add(1),
-    ] {
-        if counter as i64 <= last_counter {
-            continue;
+    let chain = value
+        .to_str()
+        .ok()?
+        .split(',')
+        .take(17)
+        .map(|part| part.trim().parse::<IpAddr>())
+        .collect::<Result<Vec<_>, _>>()
+        .ok()?;
+    if chain.len() > 16 {
+        return None;
+    }
+    // Only skip explicitly trusted hops, starting at the socket peer. A
+    // client-supplied prefix to the left of the first untrusted hop is ignored.
+    let mut client = peer;
+    for ip in chain.into_iter().rev() {
+        if !trusted(&client) {
+            break;
         }
-        let mut mac = <HmacSha1 as Mac>::new_from_slice(&secret).ok()?;
-        mac.update(&counter.to_be_bytes());
-        let digest = mac.finalize().into_bytes();
-        let offset = (digest[19] & 0x0f) as usize;
-        let binary = (u32::from(digest[offset] & 0x7f) << 24)
-            | (u32::from(digest[offset + 1]) << 16)
-            | (u32::from(digest[offset + 2]) << 8)
-            | u32::from(digest[offset + 3]);
-        let expected = format!("{:06}", binary % 1_000_000);
-        if bool::from(expected.as_bytes().ct_eq(code.as_bytes())) {
-            return Some(counter);
+        client = ip;
+    }
+    Some(client.to_string())
+}
+
+fn parse_cookie<'a>(cookies: &'a str, name: &str) -> Option<&'a str> {
+    let mut found = None;
+    for item in cookies.split(';') {
+        let (key, value) = item.trim().split_once('=')?;
+        if key == name {
+            if found.is_some() {
+                return None;
+            }
+            found = Some(value);
         }
     }
-    None
+    found
+}
+
+async fn problem_details(request: Request, next: Next) -> Response {
+    let response = next.run(request).await;
+    let status = response.status();
+    let (title, detail) = match status {
+        StatusCode::NOT_FOUND => ("Not Found", "The requested resource was not found."),
+        StatusCode::PAYLOAD_TOO_LARGE => (
+            "Payload Too Large",
+            "The request body exceeds the configured limit.",
+        ),
+        StatusCode::METHOD_NOT_ALLOWED => ("Method Not Allowed", "The HTTP method is not allowed."),
+        _ => return response,
+    };
+    problem(status, title, detail)
+}
+
+fn problem(status: StatusCode, title: &'static str, detail: &'static str) -> Response {
+    let body = ProblemDetails {
+        problem_type: "about:blank",
+        title,
+        status: status.as_u16(),
+        detail,
+    };
+    let mut response = Json(body).into_response();
+    *response.status_mut() = status;
+    response.headers_mut().insert(
+        "content-type",
+        HeaderValue::from_static("application/problem+json"),
+    );
+    response
+}
+
+async fn strip_untrusted_request_id(mut request: Request, next: Next) -> Response {
+    request
+        .headers_mut()
+        .remove(HeaderName::from_static("x-request-id"));
+    next.run(request).await
+}
+
+struct ApiError(CoreError);
+impl IntoResponse for ApiError {
+    fn into_response(self) -> Response {
+        let (status, title, detail) = match self.0 {
+            CoreError::NotFound => (
+                StatusCode::NOT_FOUND,
+                "Not Found",
+                "The resource is unavailable.",
+            ),
+            CoreError::Invalid => (
+                StatusCode::BAD_REQUEST,
+                "Invalid Request",
+                "The request could not be processed.",
+            ),
+            CoreError::Unauthorized => (
+                StatusCode::UNAUTHORIZED,
+                "Authentication Failed",
+                "Authentication could not be completed.",
+            ),
+            CoreError::Forbidden => (
+                StatusCode::FORBIDDEN,
+                "Forbidden",
+                "The operation is not allowed.",
+            ),
+            CoreError::Conflict => (
+                StatusCode::CONFLICT,
+                "Conflict",
+                "The request conflicts with current state.",
+            ),
+            CoreError::Locked => (
+                StatusCode::TOO_MANY_REQUESTS,
+                "Temporarily Unavailable",
+                "Try again later.",
+            ),
+            CoreError::ReauthenticationRequired => (
+                StatusCode::PRECONDITION_REQUIRED,
+                "Additional Authentication Required",
+                "Verify your authenticator to continue.",
+            ),
+            CoreError::SessionReplaced => (
+                StatusCode::UNAUTHORIZED,
+                "Session Replaced",
+                "This account signed in from another session.",
+            ),
+            CoreError::Overloaded => (
+                StatusCode::SERVICE_UNAVAILABLE,
+                "Temporarily Unavailable",
+                "Try again shortly.",
+            ),
+            CoreError::Internal(_) | CoreError::Migration(_) => {
+                tracing::error!("core request failed");
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "Internal Server Error",
+                    "The request failed. Use the request ID when contacting support.",
+                )
+            }
+        };
+        problem(status, title, detail)
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    #[test]
-    fn rejects_passwords_below_eight_characters_and_accepts_passphrases() {
-        assert!(validate_password("short7").is_err());
-        assert!(validate_password("a long passphrase with unicode ñ").is_ok());
-        assert!(validate_password(&"x".repeat(1025)).is_err());
+    #[tokio::test]
+    async fn csrf_refresh_preserves_session_token_across_reloads_and_tabs() {
+        let token = random_token();
+        for session in ["", "; __Host-bastion_session=stale-or-revoked-session"] {
+            let mut headers = axum::http::HeaderMap::new();
+            headers.insert(
+                COOKIE,
+                format!("__Host-bastion_csrf={token}{session}")
+                    .parse()
+                    .unwrap(),
+            );
+            for _ in 0..2 {
+                let response = issue_csrf(headers.clone()).await;
+                // In particular, do not remove Max-Age from persistent cookies.
+                assert!(
+                    !response
+                        .headers()
+                        .contains_key(axum::http::header::SET_COOKIE)
+                );
+                let body = axum::body::to_bytes(response.into_body(), 1024)
+                    .await
+                    .unwrap();
+                let payload: serde_json::Value = serde_json::from_slice(&body).unwrap();
+                assert_eq!(payload["csrf_token"], token);
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn csrf_initialization_replaces_missing_invalid_or_duplicate_cookie() {
+        for cookie in [
+            "",
+            "__Host-bastion_csrf=invalid",
+            "__Host-bastion_csrf=a; __Host-bastion_csrf=b",
+        ] {
+            let mut headers = axum::http::HeaderMap::new();
+            headers.insert(COOKIE, cookie.parse().unwrap());
+            let response = issue_csrf(headers).await;
+            let set_cookie = response.headers()[axum::http::header::SET_COOKIE]
+                .to_str()
+                .unwrap()
+                .to_owned();
+            assert!(set_cookie.contains("; Path=/; Secure; SameSite=Lax"));
+            assert!(!set_cookie.contains("Domain="));
+            let body = axum::body::to_bytes(response.into_body(), 1024)
+                .await
+                .unwrap();
+            let payload: serde_json::Value = serde_json::from_slice(&body).unwrap();
+            let token = payload["csrf_token"].as_str().unwrap();
+            let mut issued = axum::http::HeaderMap::new();
+            issued.insert(
+                COOKIE,
+                format!("__Host-bastion_csrf={token}").parse().unwrap(),
+            );
+            assert_eq!(reusable_csrf_token(&issued).as_deref(), Some(token));
+            assert!(set_cookie.starts_with(&format!("__Host-bastion_csrf={token};")));
+        }
     }
 
     #[test]
-    fn hashes_are_one_way_and_verification_uses_argon2() {
-        let hash = hash_password("correct horse battery staple").expect("hash password");
-        assert!(verify_password("correct horse battery staple", &hash));
-        assert!(!verify_password("wrong password", &hash));
-        assert!(!hash.contains("correct horse"));
+    fn stale_sessions_do_not_bind_preauth_flows_but_protected_changes_stay_bound() {
+        for path in [
+            "/api/v1/auth/login",
+            "/api/v1/auth/totp",
+            "/api/v1/auth/recovery-code",
+            "/api/v1/auth/activate",
+            "/api/v1/auth/activate/complete",
+            "/api/v1/auth/password-reset",
+            "/api/v1/auth/password-reset/complete",
+            "/api/v1/bootstrap",
+            "/api/v1/bootstrap/complete",
+        ] {
+            assert!(!requires_session_csrf_binding(&Method::POST, path));
+            assert!(requires_session_csrf_binding(&Method::PUT, path));
+        }
+        for path in [
+            "/api/v1/auth/logout",
+            "/api/v1/auth/reauth-totp",
+            "/api/v1/account/password",
+            "/api/v1/account/sessions/revoke-others",
+            "/api/v1/account/profile",
+            "/api/v1/settings/core/smtp",
+            "/api/v1/auth/login/extra",
+        ] {
+            assert!(requires_session_csrf_binding(&Method::POST, path));
+        }
+    }
+
+    fn client_request(peer: &str, forwarded: Option<&str>) -> Request {
+        let mut request = Request::new(axum::body::Body::empty());
+        request
+            .extensions_mut()
+            .insert(ConnectInfo(SocketAddr::new(peer.parse().unwrap(), 12345)));
+        if let Some(value) = forwarded {
+            request
+                .headers_mut()
+                .insert("x-forwarded-for", value.parse().unwrap());
+        }
+        request
+    }
+
+    fn ingress_proxies() -> Vec<IpNet> {
+        vec!["127.0.0.1/32".parse().unwrap(), "::1/128".parse().unwrap()]
     }
 
     #[test]
-    fn recovery_and_session_tokens_are_unpredictable_and_hashed() {
-        let a = random_token();
-        let b = random_token();
-        assert_ne!(a, b);
-        assert_eq!(a.len(), 43);
-        assert_ne!(token_hash(&a), token_hash(&b));
-        assert_eq!(recovery_code().len(), 16);
+    fn direct_clients_cannot_spoof_forwarding_headers() {
+        let mut request = client_request("198.51.100.25", Some("203.0.113.99"));
+        request
+            .headers_mut()
+            .insert("cf-connecting-ip", "203.0.113.98".parse().unwrap());
+        assert_eq!(
+            resolve_client_ip(&request, &ingress_proxies()).as_deref(),
+            Some("198.51.100.25")
+        );
+        let request = client_request("127.0.0.1", Some("203.0.113.99"));
+        assert_eq!(
+            resolve_client_ip(&request, &[]).as_deref(),
+            Some("127.0.0.1")
+        );
     }
 
     #[test]
-    fn totp_is_single_use_by_counter() {
-        let secret = BASE32_NOPAD.encode(b"12345678901234567890");
-        let counter = (Utc::now().timestamp().max(0) as u64 / 30) + 1;
-        let code = totp_for_counter(&secret, counter);
-        assert_eq!(verify_totp(&secret, &code, -1), Some(counter));
-        assert_eq!(verify_totp(&secret, &code, counter as i64), None);
+    fn trusted_ingress_resolves_ipv4_and_ipv6_and_ignores_cf_header() {
+        for (peer, client) in [("127.0.0.1", "198.51.100.25"), ("::1", "2001:db8::25")] {
+            let mut request = client_request(peer, Some(client));
+            request
+                .headers_mut()
+                .insert("cf-connecting-ip", "203.0.113.98".parse().unwrap());
+            assert_eq!(
+                resolve_client_ip(&request, &ingress_proxies()).as_deref(),
+                Some(client)
+            );
+        }
     }
 
     #[test]
-    fn smtp_ip_filter_rejects_local_and_documentation_ranges() {
-        assert!(!is_public_ip("127.0.0.1".parse().unwrap()));
-        assert!(!is_public_ip("10.1.2.3".parse().unwrap()));
-        assert!(!is_public_ip("192.0.2.10".parse().unwrap()));
-        assert!(!is_public_ip("::1".parse().unwrap()));
-        assert!(is_public_ip("8.8.8.8".parse().unwrap()));
+    fn forwarding_walk_stops_at_first_untrusted_hop() {
+        let request = client_request("127.0.0.1", Some("203.0.113.99, 198.51.100.25"));
+        assert_eq!(
+            resolve_client_ip(&request, &ingress_proxies()).as_deref(),
+            Some("198.51.100.25")
+        );
+        let mut proxies = ingress_proxies();
+        proxies.push("192.0.2.10/32".parse().unwrap());
+        let request = client_request("127.0.0.1", Some("203.0.113.99, 198.51.100.25, 192.0.2.10"));
+        assert_eq!(
+            resolve_client_ip(&request, &proxies).as_deref(),
+            Some("198.51.100.25")
+        );
     }
-}
 
-#[cfg(test)]
-fn totp_for_counter(secret: &str, counter: u64) -> String {
-    let secret = BASE32_NOPAD
-        .decode(secret.as_bytes())
-        .expect("base32 secret");
-    let mut mac = <HmacSha1 as Mac>::new_from_slice(&secret).expect("hmac key");
-    mac.update(&counter.to_be_bytes());
-    let digest = mac.finalize().into_bytes();
-    let offset = (digest[19] & 0x0f) as usize;
-    let binary = (u32::from(digest[offset] & 0x7f) << 24)
-        | (u32::from(digest[offset + 1]) << 16)
-        | (u32::from(digest[offset + 2]) << 8)
-        | u32::from(digest[offset + 3]);
-    format!("{:06}", binary % 1_000_000)
+    #[test]
+    fn malformed_ambiguous_or_excessive_forwarding_is_rejected() {
+        let long_chain = std::iter::repeat_n("198.51.100.25", 17)
+            .collect::<Vec<_>>()
+            .join(",");
+        for value in [
+            "",
+            "unknown",
+            "198.51.100.25,",
+            "198.51.100.25:443",
+            &long_chain,
+            &" ".repeat(1025),
+        ] {
+            assert!(
+                resolve_client_ip(
+                    &client_request("127.0.0.1", Some(value)),
+                    &ingress_proxies()
+                )
+                .is_none()
+            );
+        }
+        let mut request = client_request("127.0.0.1", Some("198.51.100.25"));
+        request
+            .headers_mut()
+            .append("x-forwarded-for", "203.0.113.99".parse().unwrap());
+        assert!(resolve_client_ip(&request, &ingress_proxies()).is_none());
+    }
+
+    #[test]
+    fn missing_socket_peer_never_invents_localhost() {
+        let request = Request::new(axum::body::Body::empty());
+        assert!(resolve_client_ip(&request, &ingress_proxies()).is_none());
+        assert_eq!(
+            resolve_client_ip(&client_request("127.0.0.1", None), &ingress_proxies()).as_deref(),
+            Some("127.0.0.1")
+        );
+    }
+
+    #[test]
+    fn origin_validation_rejects_wildcards_paths_and_http() {
+        assert!(validate_origin("https://app.castilloit.net").is_ok());
+        assert!(validate_origin("*").is_err());
+        assert!(validate_origin("https://app.castilloit.net/path").is_err());
+        assert!(validate_origin("http://app.castilloit.net").is_err());
+    }
+
+    #[test]
+    fn cookie_parser_rejects_ambiguous_duplicate() {
+        assert_eq!(
+            parse_cookie("a=1; __Host-bastion_csrf=token", "__Host-bastion_csrf"),
+            Some("token")
+        );
+        assert_eq!(
+            parse_cookie(
+                "__Host-bastion_csrf=a; __Host-bastion_csrf=b",
+                "__Host-bastion_csrf"
+            ),
+            None
+        );
+    }
 }
