@@ -625,13 +625,14 @@ impl CoreAdmin {
         enabled: bool,
     ) -> Result<(), CoreError> {
         self.require_admin(actor).await?;
-        let allowed: Option<(bool, bool)> = sqlx::query_as(
-            "SELECT included_in_release,environment_allowed FROM module_registry WHERE module_id=?",
+        let mut tx = self.database.pool.begin().await?;
+        let allowed: Option<(bool, bool, bool)> = sqlx::query_as(
+            "SELECT included_in_release,environment_allowed,enabled FROM module_registry WHERE module_id=? FOR UPDATE",
         )
         .bind(module_id)
-        .fetch_optional(&self.database.pool)
+        .fetch_optional(&mut *tx)
         .await?;
-        let Some((included, environment_allowed)) = allowed else {
+        let Some((included, environment_allowed, previous)) = allowed else {
             return Err(CoreError::Invalid);
         };
         if module_id == "core" && !enabled {
@@ -644,10 +645,12 @@ impl CoreAdmin {
             .bind(enabled)
             .bind(actor)
             .bind(module_id)
-            .execute(&self.database.pool)
+            .execute(&mut *tx)
             .await?;
-        self.audit(Some(actor), "module.toggle", "module", module_id)
-            .await
+        Self::record_domain_event(&mut tx, actor, "core", "module.toggle", module_id,
+            serde_json::json!({"previous": previous, "enabled": enabled, "environment_allowed":environment_allowed})).await?;
+        tx.commit().await?;
+        Ok(())
     }
 
     pub async fn get_core_settings(&self, actor: u64) -> Result<Vec<SettingRecord>, CoreError> {

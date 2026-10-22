@@ -232,6 +232,7 @@ dependencies = [
  "bastion-core",
  "chrono",
  "csv",
+ "futures-util",
  "hex",
  "serde",
  "serde_json",

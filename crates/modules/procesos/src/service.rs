@@ -1,5 +1,6 @@
 use bastion_core::{CoreAdmin, CoreError, Database};
-use chrono::{DateTime, FixedOffset, NaiveDate, NaiveDateTime, TimeZone, Utc};
+use chrono::{DateTime, FixedOffset, NaiveDate, NaiveDateTime, TimeZone};
+use futures_util::TryStreamExt;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use sqlx::{FromRow, MySql, QueryBuilder, Transaction};
@@ -265,18 +266,18 @@ impl ProcessService {
         query
             .push(" ORDER BY fecha_recepcion DESC,proceso_id ASC LIMIT ")
             .push_bind((MAX_ROWS + 1) as u32);
-        let records = query
-            .build_query_as::<ProcessRecord>()
-            .fetch_all(&mut *tx)
-            .await?;
-        if records.len() > MAX_ROWS {
-            return Err(CoreError::Conflict);
-        }
+        let statement = query.build_query_as::<ProcessRecord>();
+        let mut records = statement.fetch(&mut *tx);
+        let mut row_count = 0;
         let mut writer = csv::Writer::from_writer(Vec::new());
         writer
             .write_record(FIELDS)
             .map_err(|_| CoreError::Invalid)?;
-        for record in &records {
+        while let Some(record) = records.try_next().await? {
+            row_count += 1;
+            if row_count > MAX_ROWS {
+                return Err(CoreError::Conflict);
+            }
             writer
                 .write_record(
                     FIELDS.map(|field| safe_cell(record.source[field].as_str().unwrap_or(""))),
@@ -286,6 +287,7 @@ impl ProcessService {
                 return Err(CoreError::Conflict);
             }
         }
+        drop(records);
         let csv = String::from_utf8(writer.into_inner().map_err(|_| CoreError::Invalid)?)
             .map_err(|_| CoreError::Invalid)?;
         if csv.len() > 16 * 1024 * 1024 {
@@ -296,7 +298,7 @@ impl ProcessService {
             actor,
             "export",
             "csv",
-            serde_json::json!({"rows": records.len()}),
+            serde_json::json!({"rows": row_count}),
         )
         .await?;
         tx.commit().await?;
@@ -354,7 +356,7 @@ fn day_start(date: NaiveDate) -> Result<DateTime<FixedOffset>, CoreError> {
 fn select_rows(
     filter: &ProcessFilter,
     full_source: bool,
-) -> Result<QueryBuilder<'static, MySql>, CoreError> {
+) -> Result<QueryBuilder<MySql>, CoreError> {
     filter.bounds()?;
     let source = if full_source {
         "source_json"
