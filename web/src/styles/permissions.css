@@ -5,7 +5,7 @@
 .permission-matrix{width:100%;min-width:0;table-layout:fixed;border-collapse:collapse;text-align:left}
 .permission-matrix caption{caption-side:bottom;text-align:left;padding:14px 18px;color:var(--muted);font-size:13px;border-top:1px solid var(--line)}
 .permission-matrix th,.permission-matrix td{padding:14px 18px;border-bottom:1px solid var(--line);vertical-align:middle;overflow-wrap:anywhere}
-.permission-matrix thead th{background:#dfe3e3;width:21%}
+.permission-matrix thead th{background:#dfe3e3;width:21%;letter-spacing:normal}
 .permission-matrix thead th:first-child{width:37%;text-transform:uppercase;font:600 12px var(--mono)}
 .permission-column-title{display:block;font:600 12px var(--mono);text-transform:uppercase;margin-bottom:7px}
 .permission-matrix tbody th{font-family:var(--font);font-weight:400;text-transform:none;letter-spacing:normal;background:var(--panel)}
@@ -32,6 +32,7 @@
  .permission-matrix th,.permission-matrix td{padding:10px 5px}
  .permission-matrix thead th:first-child{width:36%}
  .permission-matrix thead th{width:21.333%}
+ .permission-column-title{font-size:10px;overflow-wrap:normal}
  .permission-matrix thead .permission-check,.permission-matrix td .permission-check{flex-direction:column;justify-content:center;gap:6px;text-align:center;font-size:12px}
  .permission-matrix thead th:not(:first-child){text-align:center}
  .permission-matrix tbody th strong{font-size:14px}
