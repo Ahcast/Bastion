@@ -2,6 +2,8 @@
 
 Estado: desarrollo del primer módulo; seguimiento en [GitHub #1](https://github.com/Ahcast/Bastion/issues/1). Publicación primero en GitHub/main y validación de CI antes de instalar en servidores.
 
+Alcance confirmado del primer corte: importar el maestro analizado, consultar/filtrar, marcar, anotar y exportar. El usuario confirmó **conservar todos los registros y dejar la depuración pendiente**. No se elimina por ausencia, vencimiento ni antigüedad. La sección de Ajustes presenta esta política y la fuente de datos; no ofrece campos editables en esta entrega.
+
 ## Fuente confirmada
 
 El usuario confirmó el 21 de octubre de 2026 que la entrada es `maestro.csv` de **bastion-scout una vez analizado por IA**, no el CSV del crawler anterior. Contrato contrastado con [common.py](https://github.com/Ahcast/bastion-scout/blob/main/common.py) y [README](https://github.com/Ahcast/bastion-scout/blob/main/README.md). No ejecutar análisis IA ni extracción desde Bastion.
@@ -40,8 +42,7 @@ La validación de GitHub incluye una instancia desechable de MySQL 5.7, migracio
 
 ## Pendientes que no deben resolverse por inferencia
 
-- Settings: no hay valores editables confirmados; mostrar la sección pendiente en Ajustes, sin afirmar que el módulo está terminado.
-- Edad/fecha de purga y protección de filas con marcas/notas. No habilitar una operación destructiva hasta acordar el criterio.
+- Políticas editables y depuración quedan aplazadas por decisión del usuario. La política vigente es conservación total; no habilitar operaciones destructivas hasta acordar criterio y protección de filas con marcas/notas.
 - El maestro de Scout no contiene columnas separadas de municipio, dirección ni especificaciones. No inventarlas ni deducirlas de IA como datos fuente. Su paridad requiere definir origen/mapeo.
 - Recepción automática, autenticación de Scout y manifiesto `main.json`: fuera del primer importador manual. No aceptar rutas de archivos ni URLs arbitrarias en la API.
 - Verificación de paridad visual con una sesión Legacy y validación de volumen real.

@@ -27,6 +27,8 @@ Actualizar (consulta estado/datos); Importar CSV (ingiere y actualiza filas); Ex
 
 ## Settings bajo Ajustes
 
+Primer corte confirmado el 21 de octubre de 2026: CSV analizado de bastion-scout, marcas y notas compartidas, conservación total de registros. Se presenta esta política en la sección del módulo, sin campos editables. La depuración queda pendiente por decisión del usuario y no se habilita ni se ejecuta automáticamente.
+
 No se confirman settings específicos en el módulo actual; se registra la sección central. Configuración de importación, retención, filtros por defecto y calendario son `Pendientes de decisión`.
 
 ## API y datos

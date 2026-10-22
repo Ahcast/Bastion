@@ -2,7 +2,7 @@
 
 ## Estado de esta entrega
 
-Procesos está en desarrollo como primer módulo de negocio: recibe el `maestro.csv` analizado de bastion-scout, con importación manual, consulta, detalle, marcas/notas compartidas y exportación. Permanece desactivado por defecto. Ver [contrato y pendientes](docs/modulos/procesos-implementacion.md); settings y purga no se dan por cerrados. Este desarrollo se publica primero en GitHub y no instala cambios en servidores.
+El primer corte de Procesos recibe el `maestro.csv` analizado de bastion-scout, con importación manual, consulta, detalle, marcas/notas compartidas y exportación. Permanece desactivado por defecto y conserva todos los registros. Ajustes muestra la política confirmada sin campos editables; la depuración queda aplazada por decisión del usuario. Ver [contrato y límites](docs/modulos/procesos-implementacion.md). Este desarrollo se publica primero en GitHub y no instala cambios en servidores.
 
 Código y lineamientos publicados directamente en `main`, sin ramas de desarrollo. El workspace Rust está en la raíz; el frontend React + TypeScript estricto y Vite está en `web/` y se publica como build estático en Bluehost. La decisión se documenta en `docs/adr/ADR-0002-frontend-react.md`.
 

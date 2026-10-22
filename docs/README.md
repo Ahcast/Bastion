@@ -36,6 +36,8 @@ El informe se obtuvo de una copia de frontend Angular compilado y backend Larave
 
 ## Registro de decisiones
 
+- 2026-10-21: el usuario confirma conservar todos los procesos y dejar la depuración pendiente. Ajustes > Procesos presenta la fuente Scout, la conservación total y el alcance compartido de marcas/notas como política informativa del primer corte; no se agregan controles editables ni borrado automático. Una política configurable o una acción de purga requiere definición posterior.
+
 - 2026-10-21: el usuario confirma marcas De interés y notas compartidas por todos los usuarios del módulo Procesos. Se persisten separadas del CSV de Scout, se conservan al importar y se editan con control de versión para evitar sobrescrituras entre usuarios.
 
 - 2026-10-21: primer corte de Procesos separado en `crates/modules/procesos`, con migraciones y ledger `_procesos_migrations` propios. `migrate` aplica primero Core y después Procesos; `serve` solo sincroniza disponibilidad y no crea tablas. La allowlist `BASTION_ALLOWED_MODULES` queda vacía por defecto; permite `procesos` después de sus migraciones, y el administrador controla su activación. Los endpoints vuelven a comprobar disponibilidad y permisos y se bloquean al desactivar sin borrar datos. La entrada manual usa el cliente CSRF común; MCP y recepción automática esperan sus contratos de identidad.
