@@ -22,7 +22,7 @@ export function NavigationGuardProvider({ children }: { children: ReactNode }) {
   }, []);
   const value = useMemo(() => ({ register, navigate }), [register, navigate]);
   const cancel = () => { pending?.resolve(false); setPending(null); };
-  return <GuardContext.Provider value={value}>{children}{pending && <Dialog title="Cambios sin guardar" close={cancel}><p>Hay cambios sin guardar en los permisos. Si continúas, se descartarán.</p><div className="actions"><button onClick={cancel}>Seguir editando</button><button className="danger" onClick={() => { pending.action(); pending.resolve(true); setPending(null); }}>Descartar y continuar</button></div></Dialog>}</GuardContext.Provider>;
+  return <GuardContext.Provider value={value}>{children}{pending && <Dialog title="Cambios sin guardar" close={cancel}><p>Hay cambios sin guardar. Si continúas, se descartarán.</p><div className="actions"><button onClick={cancel}>Seguir editando</button><button className="danger" onClick={() => { pending.action(); pending.resolve(true); setPending(null); }}>Descartar y continuar</button></div></Dialog>}</GuardContext.Provider>;
 }
 
 export function useNavigationGuard() {

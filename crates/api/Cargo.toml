@@ -6,6 +6,7 @@ edition.workspace = true
 [dependencies]
 axum.workspace = true
 bastion-core = { path = "../core" }
+bastion-clientes = { path = "../modules/clientes" }
 bastion-cotizaciones = { path = "../modules/cotizaciones" }
 bastion-procesos = { path = "../modules/procesos" }
 base64.workspace = true
@@ -23,3 +24,5 @@ url.workspace = true
 
 [dev-dependencies]
 tokio.workspace = true
+bastion-core = { path = "../core", features = ["test-support"] }
+tower = { version = "0.5", features = ["util"] }

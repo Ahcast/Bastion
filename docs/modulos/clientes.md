@@ -31,7 +31,7 @@ Lista: cliente, contacto, correo, móvil/teléfono y acciones; búsqueda y pagin
 
 ## Settings bajo Ajustes
 
-El informe no identifica settings propios del módulo. Mantener su sección de Ajustes dentro del espacio central; contenido y necesidad de campos: `Pendiente de decisión`.
+El usuario confirmó el 2026-10-22 publicar esta primera versión con una sección en Ajustes que indica que los ajustes propios siguen pendientes, sin campos editables. Esto autoriza el corte inicial, no da por definidos futuros settings.
 
 ## API, datos y permisos
 
@@ -39,4 +39,6 @@ API actual: listar/buscar/paginar clientes, catálogo para selectores, crear y e
 
 ## Pendientes
 
-Confirmar todos los campos del formulario, unicidad/merge de clientes, permisos por rol y política de borrado/archivo.
+El formulario activo y el controlador se cotejaron estáticamente el 2026-10-22. Límites comprobados: nombre/contacto 255, correo 50, RTN 30, teléfono/móvil 20 y dirección 1500 caracteres. El nombre es obligatorio. Alta completa coincidencias por nombre y luego RTN; editar reemplaza campos sin combinar registros. Ver [implementación y límites](clientes-implementacion.md) y [OpenAPI](clientes.openapi.yaml).
+
+Pendientes: sesión visual Legacy, esquema SQL y eventual migración de clientes, equivalencia de transliteración fuera de nombres latinos, settings propios y política de borrado/archivo. No se ofrece eliminación ni MCP hasta completar identidad delegada del Core.

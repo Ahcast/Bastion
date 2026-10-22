@@ -165,3 +165,12 @@ Screenshots de cada pantalla/estado, ejemplos de datos anonimizados, esquema MyS
 ## Pendientes actuales
 
 Esquema SQL completo y límites MySQL para los campos; versión de mantenimiento exacta y capacidades TLS del plan Bluehost; validación de migraciones sobre esa versión; ruta de actualización de MySQL antes de producción; asignaciones de roles personalizados por módulo/área; contratos completos; cálculo fiscal verificado; criterios de aceptación detallados por módulo.
+
+## Clientes: corte inicial
+
+- Buscar/paginar, crear/completar coincidencia por nombre y después RTN, editar siete campos y catálogo paginado autorizado.
+- No sustituir RTN existente durante merge; edición explícita admite corregirlo.
+- Permisos ver/editar, activación/allowlist/migración, CSRF, idempotencia, versiones y auditoría transaccional verificados.
+- Ajustes propios sin campos editables por confirmación del usuario del 2026-10-22; pendiente de futura definición.
+- No afirmar migración Legacy, borrado, MCP ni paridad visual sin sus validaciones.
+

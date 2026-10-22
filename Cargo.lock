@@ -181,6 +181,7 @@ version = "0.1.0"
 dependencies = [
  "axum",
  "base64 0.22.1",
+ "bastion-clientes",
  "bastion-core",
  "bastion-cotizaciones",
  "bastion-procesos",
@@ -192,9 +193,24 @@ dependencies = [
  "sqlx",
  "subtle",
  "tokio",
+ "tower",
  "tower-http",
  "tracing",
  "url",
+]
+
+[[package]]
+name = "bastion-clientes"
+version = "0.1.0"
+dependencies = [
+ "bastion-core",
+ "lettre",
+ "serde",
+ "serde_json",
+ "sha2 0.10.9",
+ "sqlx",
+ "tokio",
+ "unicode-normalization",
 ]
 
 [[package]]
@@ -263,6 +279,7 @@ version = "0.1.0"
 dependencies = [
  "axum",
  "bastion-api",
+ "bastion-clientes",
  "bastion-core",
  "bastion-cotizaciones",
  "bastion-procesos",

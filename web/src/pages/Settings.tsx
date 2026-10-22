@@ -15,7 +15,7 @@ export function SettingsNavigation({ access, section, select }: { access: Access
 export default function Settings({ section, select }: { section: SettingsSection; select: (section: SettingsSection) => void }) {
   const { access } = useCore();
   const selected = settingsSections(access).find(entry => entry.id === section) ?? { id: 'cuenta', label: 'Mi cuenta' };
-  return <section aria-label="Ajustes"><div className="settings-location"><span>Ajustes</span><span aria-hidden="true"> / </span><strong>{selected.label}</strong></div><SettingsNavigation access={access} section={selected.id} select={select} /><div key={selected.id}><Suspense fallback={<Loading />}>{selected.id === 'personas' ? <People /> : selected.id === 'usuarios' ? <Users /> : selected.id === 'roles' ? <Roles /> : selected.id === 'core' ? <CoreSettings /> : selected.id === 'cotizaciones' ? <QuoteSettings /> : <Account />}</Suspense></div></section>;
+  return <section aria-label="Ajustes"><div className="settings-location"><span>Ajustes</span><span aria-hidden="true"> / </span><strong>{selected.label}</strong></div><SettingsNavigation access={access} section={selected.id} select={select} /><div key={selected.id}><Suspense fallback={<Loading />}>{selected.id === 'personas' ? <People /> : selected.id === 'usuarios' ? <Users /> : selected.id === 'roles' ? <Roles /> : selected.id === 'core' ? <CoreSettings /> : selected.id === 'clientes' ? <ClientSettings /> : selected.id === 'cotizaciones' ? <QuoteSettings /> : <Account />}</Suspense></div></section>;
 }
 function CoreSettings() {
   const [tab, setTab] = useState('modules');
@@ -41,3 +41,5 @@ function MailOutbox() {
 }
 
 function QuoteSettings() { return <section className="card"><h2>Cotizaciones</h2><p>Primera etapa: cotizaciones con cálculo, numeración y estados cotejados con CastilloIT. La validación contable, PDF, adjuntos, envío y conversiones siguen pendientes.</p><p>Los ajustes propios del módulo aún requieren definición. Empresa y servidor SMTP se administran en el Core; cada usuario configura sus credenciales de correo en Mi cuenta.</p></section>; }
+
+function ClientSettings() { return <section className="card"><h2>Clientes</h2><p>Catálogo de clientes y contactos con búsqueda, alta y edición.</p><p>Esta versión no tiene ajustes editables. Los ajustes propios del módulo siguen pendientes de definición.</p></section>; }

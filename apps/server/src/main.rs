@@ -32,6 +32,7 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
         migrator.migrate().await?;
         bastion_procesos::ProcessService::migrate(&migrator).await?;
         bastion_cotizaciones::QuoteService::migrate(&migrator).await?;
+        bastion_clientes::ClientService::migrate(&migrator).await?;
         tracing::info!("database migrations completed");
         return Ok(());
     }
@@ -69,6 +70,9 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
             scout_config,
         ));
     }
+    bastion_clientes::ClientService::new(core.database(), core.admin())
+        .synchronize_release(config.clientes_allowed)
+        .await?;
     let cleanup = core.admin();
     cleanup.cleanup_retention().await?;
     tokio::spawn(async move {

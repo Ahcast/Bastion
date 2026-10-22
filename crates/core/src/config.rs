@@ -10,6 +10,7 @@ pub struct AppConfig {
     pub trusted_proxy_cidrs: Vec<IpNet>,
     pub procesos_allowed: bool,
     pub cotizaciones_allowed: bool,
+    pub clientes_allowed: bool,
 }
 
 #[derive(Clone)]
@@ -146,6 +147,7 @@ impl AppConfig {
             trusted_proxy_cidrs,
             procesos_allowed: allowed_modules.contains(&"procesos"),
             cotizaciones_allowed: allowed_modules.contains(&"cotizaciones"),
+            clientes_allowed: allowed_modules.contains(&"clientes"),
         })
     }
 }
@@ -159,6 +161,7 @@ fn parse_allowed_modules(value: &str) -> Result<Vec<&'static str>, ConfigError> 
         let module = match module {
             "procesos" => "procesos",
             "cotizaciones" => "cotizaciones",
+            "clientes" => "clientes",
             _ => {
                 return Err(ConfigError {
                     variable: "BASTION_ALLOWED_MODULES",
@@ -190,7 +193,8 @@ mod module_tests {
             parse_allowed_modules("cotizaciones").unwrap(),
             vec!["cotizaciones"]
         );
-        for value in ["*", "clientes", "procesos,", "procesos,procesos"] {
+        assert_eq!(parse_allowed_modules("clientes").unwrap(), vec!["clientes"]);
+        for value in ["*", "unknown", "procesos,", "procesos,procesos"] {
             assert!(parse_allowed_modules(value).is_err());
         }
     }

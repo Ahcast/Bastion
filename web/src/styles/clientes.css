@@ -1,0 +1,11 @@
+.client-search{margin-bottom:24px;align-items:end}
+.client-search label{flex:1 1 260px;max-width:580px}
+.client-editor{margin-bottom:24px}
+.client-editor h2{overflow-wrap:anywhere}
+.client-editor p{color:var(--muted);max-width:900px}
+.client-fields{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px}
+.client-address{grid-column:1/-1}
+.client-editor fieldset{margin-bottom:12px}
+.client-pagination{margin-top:20px;justify-content:flex-end}
+@media(max-width:1000px){.client-fields{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:600px){.client-fields{grid-template-columns:minmax(0,1fr)}.client-pagination{justify-content:space-between}.client-search button{width:100%}}

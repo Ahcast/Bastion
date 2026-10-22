@@ -1,0 +1,201 @@
+openapi: 3.1.0
+info:
+  title: Bastion Clientes
+  version: 0.1.0
+servers:
+  - url: https://api.bastion.castilloit.net
+security:
+  - session: []
+paths:
+  /api/v1/clientes:
+    get:
+      operationId: listClientes
+      summary: Buscar y paginar clientes; permiso clientes/catalogo/ver
+      description: Orden por nombre normalizado e ID. Representante por nombre con correo, RTN y menor ID, después de filtrar. 120 solicitudes/minuto por actor, timeout 30 segundos.
+      parameters:
+        - $ref: '#/components/parameters/search'
+        - $ref: '#/components/parameters/page'
+        - $ref: '#/components/parameters/pageSize'
+      responses:
+        '200':
+          description: Página de clientes
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ClientPage' }
+        default: { $ref: '#/components/responses/Error' }
+    post:
+      operationId: createCliente
+      summary: Crear o completar coincidencia; permiso clientes/catalogo/editar
+      description: Cuerpo máximo 16 KiB. Coincidencia por nombre normalizado y luego dígitos RTN, menor ID. Solo completa campos vacíos y actualiza nombre. No sustituye RTN existente. Recibos de idempotencia por actor persistentes hasta definir retiro. Auditoría transaccional sin datos de contacto. Origen exacto y CSRF del Core.
+      parameters:
+        - in: header
+          name: Idempotency-Key
+          required: true
+          schema: { type: string, pattern: '^[A-Za-z0-9_-]{16,128}$' }
+        - $ref: '#/components/parameters/csrf'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ClientInput' }
+      responses:
+        '201':
+          description: Creado; Location y ETag de versión
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ClientWrite' }
+        '200':
+          description: Coincidencia completada; ETag de versión
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ClientWrite' }
+        default: { $ref: '#/components/responses/Error' }
+  /api/v1/clientes/catalogo:
+    get:
+      operationId: clientCatalog
+      summary: Catálogo paginado para selectores; permiso clientes/catalogo/ver
+      description: Mismo filtro, deduplicación, orden y límites del listado; solo ID, nombre, RTN y correo. Nunca devuelve el catálogo ilimitado.
+      parameters:
+        - $ref: '#/components/parameters/search'
+        - $ref: '#/components/parameters/page'
+        - $ref: '#/components/parameters/pageSize'
+      responses:
+        '200':
+          description: Página del catálogo
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, page, page_size, has_more]
+                properties:
+                  items:
+                    type: array
+                    maxItems: 100
+                    items: { $ref: '#/components/schemas/CatalogClient' }
+                  page: { type: integer }
+                  page_size: { type: integer }
+                  has_more: { type: boolean }
+        default: { $ref: '#/components/responses/Error' }
+  /api/v1/clientes/{id}:
+    parameters:
+      - in: path
+        name: id
+        required: true
+        schema: { type: integer, minimum: 1 }
+    get:
+      operationId: getCliente
+      summary: Obtener cliente y versión; permiso clientes/catalogo/ver
+      responses:
+        '200':
+          description: Cliente; ETag de versión
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Client' }
+        default: { $ref: '#/components/responses/Error' }
+    put:
+      operationId: replaceCliente
+      summary: Editar los siete campos; permiso clientes/catalogo/editar
+      description: Reemplazo completo; vacíos borran opcionales. Sin merge ni borrado de registros. If-Match fuerte obligatorio; versión obsoleta devuelve 412. Cuerpo máximo 16 KiB, auditoría transaccional, origen y CSRF del Core.
+      parameters:
+        - in: header
+          name: If-Match
+          required: true
+          schema: { type: string, pattern: '^"[1-9][0-9]*"$' }
+        - $ref: '#/components/parameters/csrf'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ClientInput' }
+      responses:
+        '200':
+          description: Cliente actualizado; ETag de versión
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Client' }
+        default: { $ref: '#/components/responses/Error' }
+components:
+  securitySchemes:
+    session: { type: apiKey, in: cookie, name: __Host-bastion_session }
+  parameters:
+    csrf:
+      in: header
+      name: X-CSRF-Token
+      required: true
+      schema: { type: string }
+    search:
+      in: query
+      name: search
+      schema: { type: string, maxLength: 200 }
+      description: Nombre, correo o RTN; caracteres SQL comodín tratados literalmente. Vacío, null y undefined sin filtro como Legacy.
+    page:
+      in: query
+      name: page
+      schema: { type: integer, minimum: 1, maximum: 10000, default: 1 }
+    pageSize:
+      in: query
+      name: page_size
+      schema: { type: integer, minimum: 1, maximum: 100, default: 25 }
+  schemas:
+    ClientInput:
+      type: object
+      additionalProperties: false
+      required: [cliente_name]
+      properties:
+        cliente_name: { type: string, minLength: 1, maxLength: 255 }
+        user_contact: { type: [string, 'null'], maxLength: 255, default: '' }
+        email: { type: [string, 'null'], maxLength: 50, default: '' }
+        rtn: { type: [string, 'null'], maxLength: 30, default: '' }
+        phone_number: { type: [string, 'null'], maxLength: 20, default: '' }
+        mobile_number: { type: [string, 'null'], maxLength: 20, default: '' }
+        direction: { type: [string, 'null'], maxLength: 1500, default: '' }
+    Client:
+      type: object
+      additionalProperties: false
+      required: [id, version, cliente_name, user_contact, email, rtn, phone_number, mobile_number, direction]
+      properties:
+        id: { type: integer }
+        version: { type: integer }
+        cliente_name: { type: string, maxLength: 255 }
+        user_contact: { type: string, maxLength: 255 }
+        email: { type: string, maxLength: 50 }
+        rtn: { type: string, maxLength: 30 }
+        phone_number: { type: string, maxLength: 20 }
+        mobile_number: { type: string, maxLength: 20 }
+        direction: { type: string, maxLength: 1500 }
+    CatalogClient:
+      type: object
+      required: [id, cliente_name, rtn, email]
+      properties:
+        id: { type: integer }
+        cliente_name: { type: string }
+        rtn: { type: string }
+        email: { type: string }
+    ClientWrite:
+      type: object
+      required: [client, merged]
+      properties:
+        client: { $ref: '#/components/schemas/Client' }
+        merged: { type: boolean }
+    ClientPage:
+      type: object
+      required: [items, page, page_size, has_more]
+      properties:
+        items: { type: array, maxItems: 100, items: { $ref: '#/components/schemas/Client' } }
+        page: { type: integer }
+        page_size: { type: integer }
+        has_more: { type: boolean }
+    Problem:
+      type: object
+      required: [type, title, status, detail]
+      properties:
+        type: { type: string }
+        title: { type: string }
+        status: { type: integer }
+        detail: { type: string }
+  responses:
+    Error:
+      description: 400 parámetros/cabeceras inválidos; 401 sesión; 403 permiso/origen/CSRF; 404 módulo inactivo/recurso; 409 clave idempotente reutilizada; 412 versión; 413 cuerpo; 415 tipo; 422 validación; 429 cuota; 503 timeout/dependencia. Fallos del extractor pueden usar formato estándar de Axum, pendiente de unificación en Core.
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
