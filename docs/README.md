@@ -155,3 +155,5 @@ El informe se obtuvo de una copia de frontend Angular compilado y backend Larave
 
 - 2026-10-22: primera versión de Clientes cotejada con formulario/controlador Legacy: siete campos, búsqueda, catálogo paginado, alta con merge y edición con versión. Permisos y auditoría del Core. El usuario autoriza publicar sin ajustes editables y con su sección en Ajustes indicando el pendiente. Ver modulos/clientes-implementacion.md. No se migra el catálogo Legacy ni se habilita borrado/MCP.
 
+- 2026-10-22: Clientes publicado en GitHub y desplegado en AWS/Bluehost desde `c86e8142763bea59adcad7dfb442daa4e96a3526`, tras CI exitoso (46 pruebas Rust y 42 frontend), artifacts verificados y respaldos privados. Migración propia aplicada; datos y módulos existentes conservados. Clientes queda disponible, desactivado hasta su activación administrativa. Salud HTTPS y hashes públicos comprobados; ver evidencia y límites en `modulos/clientes-implementacion.md`.
+
