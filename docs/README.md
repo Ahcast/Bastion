@@ -36,6 +36,8 @@ El informe se obtuvo de una copia de frontend Angular compilado y backend Larave
 
 ## Registro de decisiones
 
+- 2026-10-21: comienza Procesos como primer módulo de negocio, con publicación y validación primero en GitHub. El usuario confirma como entrada el CSV maestro de `bastion-scout` después de su análisis IA; el contrato se verifica en su repositorio y se documenta en `modulos/procesos-implementacion.md`. El CSV del crawler anterior no define el nuevo importador. Settings, alcance de marcas/notas y purga siguen pendientes de definición explícita.
+
 - 2026-10-21: frontend y API instalados en el ambiente de pruebas con HTTPS y MySQL TLS verificado. Las notas de operación, IPs, cuentas y rutas reales se conservan localmente fuera del repositorio público.
 
 - 2026-10-21: el usuario confirma React + TypeScript estricto y Vite para el frontend del Core y módulos. Se compila como archivos estáticos para Bluehost, con Node únicamente en desarrollo/CI. Se mantiene Rust en AWS y MySQL en Bluehost. Se migra con paridad funcional y visual, carga por pantallas y cliente API/CSRF común; primero documentación, después GitHub validado y finalmente Bluehost. La decisión y sus límites se registran en `adr/ADR-0002-frontend-react.md`.

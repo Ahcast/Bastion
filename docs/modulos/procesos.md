@@ -2,6 +2,8 @@
 
 ## Propósito
 
+La entrada confirmada el 21 de octubre de 2026 es el `maestro.csv` de **bastion-scout después del análisis IA**. El contrato y los pendientes del desarrollo se describen en [procesos-implementacion.md](procesos-implementacion.md). El inventario Legacy siguiente se conserva como referencia de paridad; no define los encabezados del nuevo importador.
+
 Importar registros desde CSV, revisar información, marcar oportunidades de interés, añadir notas y exportar o depurar históricos.
 
 ## Campos y filtros
