@@ -254,7 +254,7 @@ impl ClientService {
     }
 }
 
-fn search<'a>(query: &mut QueryBuilder<'a, MySql>, alias: &str, term: Option<&'a str>) {
+fn search(query: &mut QueryBuilder<MySql>, alias: &str, term: Option<&str>) {
     if let Some(term) = term {
         query
             .push(" AND (LOCATE(")
@@ -267,10 +267,7 @@ fn search<'a>(query: &mut QueryBuilder<'a, MySql>, alias: &str, term: Option<&'a
     }
 }
 
-fn list_query<'a>(
-    fields: &str,
-    filter: &'a ClientFilter,
-) -> Result<QueryBuilder<'a, MySql>, CoreError> {
+fn list_query(fields: &str, filter: &ClientFilter) -> Result<QueryBuilder<MySql>, CoreError> {
     let (page, size) = filter.bounds()?;
     let mut query = QueryBuilder::new(format!("SELECT {fields} FROM clientes_records c WHERE 1=1"));
     search(&mut query, "c", filter.search());
@@ -298,9 +295,7 @@ fn client_from_row(row: &MySqlRow) -> Result<Client, sqlx::Error> {
 }
 
 async fn load(tx: &mut Transaction<'_, MySql>, id: u64) -> Result<Client, CoreError> {
-    let row = sqlx::query(&format!(
-        "SELECT {FIELDS} FROM clientes_records c WHERE c.id=?"
-    ))
+    let row = sqlx::query("SELECT c.id,c.version,c.cliente_name,c.user_contact,c.email,c.rtn,c.phone_number,c.mobile_number,c.direction FROM clientes_records c WHERE c.id=?")
     .bind(id)
     .fetch_optional(&mut **tx)
     .await?
