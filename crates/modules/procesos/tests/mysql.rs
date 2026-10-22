@@ -290,6 +290,21 @@ async fn mysql57_import_permissions_history_and_disable() {
             .replayed
     );
     let record = service.detail(2, &id).await.unwrap();
+    // A user-triggered refresh works without enabling the internal Scout actor.
+    assert!(matches!(
+        service.import_scout_for_user(3, &delivery).await,
+        Err(CoreError::Forbidden)
+    ));
+    let refreshed = service.import_scout_for_user(1, &delivery).await.unwrap();
+    assert!(!refreshed.replayed);
+    assert_eq!(refreshed.unchanged, 1);
+    assert!(
+        service
+            .import_scout_for_user(1, &delivery)
+            .await
+            .unwrap()
+            .replayed
+    );
     assert!(record.marked);
     assert_eq!(record.note, "=1+1");
     assert_eq!(record.source["items"], "1. Dos equipos");
@@ -334,6 +349,10 @@ async fn mysql57_import_permissions_history_and_disable() {
         Err(CoreError::NotFound)
     ));
     assert!(matches!(
+        service.import_scout_for_user(1, &delivery).await,
+        Err(CoreError::NotFound)
+    ));
+    assert!(matches!(
         service.review(1, &id, 2, Some(false), None).await,
         Err(CoreError::NotFound)
     ));
@@ -361,6 +380,6 @@ async fn mysql57_import_permissions_history_and_disable() {
         .fetch_one(&pool)
         .await
         .unwrap(),
-        7
+        8
     );
 }

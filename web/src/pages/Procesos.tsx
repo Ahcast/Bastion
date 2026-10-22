@@ -17,7 +17,7 @@ const date = (value: string) => new Intl.DateTimeFormat('es-HN', { timeZone: 'Am
 
 export default function Procesos() {
   const { api, access, notify } = useCore();
-  const [filters, setFilters] = useState(''), [page, setPage] = useState(1), [importing, setImporting] = useState(false), [busy, setBusy] = useState(false), [selected, setSelected] = useState<string | null>(null);
+  const [filters, setFilters] = useState(''), [page, setPage] = useState(1), [refreshing, setRefreshing] = useState(false), [busy, setBusy] = useState(false), [selected, setSelected] = useState<string | null>(null);
   const view = moduleCan(access, 'procesos', 'consulta', 'ver');
   const active = access.modules.some(module => module.module_id === 'procesos');
   const result = useLoad(signal => view ? api.request<ProcessPage>(`/api/v1/procesos/rows?${filters}&page=${page}&page_size=25`, { signal }) : Promise.resolve<ProcessPage>({ items: [], page, page_size: 25, has_more: false }), [view, filters, page]);
@@ -25,7 +25,15 @@ export default function Procesos() {
   const reload = () => { result.reload(); status.reload(); };
   if (!active) return <Notice>Procesos no está habilitado. Actualiza la sesión para consultar los módulos disponibles.</Notice>;
   return <>
-    <Heading title="Procesos" description="Oportunidades analizadas por bastion-scout." action={<div className="actions"><button onClick={reload}>Actualizar</button>{moduleCan(access, 'procesos', 'importacion', 'editar') && <button className="primary" onClick={() => setImporting(true)}>Importar CSV</button>}{moduleCan(access, 'procesos', 'exportacion', 'ver') && <button disabled={busy} onClick={async () => {
+    <Heading title="Procesos" description="Oportunidades analizadas por bastion-scout." action={<div className="actions"><button disabled={busy || !moduleCan(access, 'procesos', 'importacion', 'editar')} onClick={async () => {
+      if (busy) return;
+      setBusy(true); setRefreshing(true);
+      try {
+        const imported = await api.request<ImportResult>('/api/v1/procesos/refresh', { method: 'POST', body: {} });
+        notify(imported.replayed ? 'Los resultados de Scout ya estaban cargados.' : `${imported.inserted} nuevos · ${imported.updated} actualizados · ${imported.unchanged} sin cambios · ${imported.stale} antiguos omitidos.`);
+        setPage(1); reload();
+      } catch (error) { notify(message(error)); } finally { setBusy(false); setRefreshing(false); }
+    }}>{refreshing ? 'Actualizando…' : 'Actualizar'}</button>{moduleCan(access, 'procesos', 'exportacion', 'ver') && <button disabled={busy} onClick={async () => {
       setBusy(true);
       try {
         const data = await api.request<{ csv_text: string }>(`/api/v1/procesos/export?${filters}`);
@@ -35,18 +43,6 @@ export default function Procesos() {
     }}>Exportar CSV</button>}</div>} />
     {view && <><section className="card"><p>{status.data ? `${status.data.total} procesos · Última importación: ${status.data.last_import_at ? date(status.data.last_import_at) : 'Sin importaciones'}` : 'Consultando estado…'}</p><Notice>{status.error}</Notice><Form fields={[{ name: 'q', label: 'Buscar expediente, resumen o descripción', maxLength: 200 }, { name: 'entidad', label: 'Entidad', maxLength: 200 }, { name: 'desde', label: 'Recepción desde', type: 'date' }, { name: 'hasta', label: 'Recepción hasta', type: 'date' }, { name: 'marked', label: 'De interés', options: [{value:'',label:'Todos'},{value:'true',label:'Solo marcados'},{value:'false',label:'Sin marcar'}] }]} submit="Buscar" onSubmit={async values => { const query = new URLSearchParams(); for (const [key, value] of Object.entries(values)) if (value) query.set(key, value); setFilters(query.toString()); setPage(1); }} /></section>
     <Notice>{result.error}</Notice>{result.data ? <><Table columns={['Expediente', 'Entidad', 'Recepción de ofertas', 'Puntaje IA', 'Rubro', 'Resumen', 'De interés', 'Nota compartida', 'Acciones']} rows={result.data.items.map(row => [row.expediente, row.entidad, date(row.fecha_recepcion), `${row.puntaje}/100`, row.rubro, row.resumen_corto, <input type="checkbox" aria-label={'De interés: '+row.expediente} checked={row.marked} disabled={busy || !moduleCan(access,'procesos','marcas','editar')} onChange={async event => { const marked=event.currentTarget.checked; setBusy(true); try { await api.request('/api/v1/procesos/rows/'+encodeURIComponent(row.proceso_id)+'/review', {method:'PATCH',body:{marked},ifMatch:row.version}); } catch(error) {notify(message(error));} finally {setBusy(false);result.reload();} }} />, row.note || '—', <button onClick={() => setSelected(row.proceso_id)}>Ver todo el proceso</button>])} /><div className="row"><button disabled={page === 1} onClick={() => setPage(page - 1)}>Anterior</button><span>Página {page}</span><button disabled={!result.data.has_more} onClick={() => setPage(page + 1)}>Siguiente</button></div></> : !result.error && <Loading />}</>}
-    {importing && <Dialog title="Importar CSV de bastion-scout" close={() => { if (!busy) setImporting(false); }}><p>Selecciona el maestro.csv ya analizado por IA. Hasta 8 MiB y 5.000 filas. Las filas ausentes conservan su histórico.</p><form className="stack" onSubmit={async event => {
-      event.preventDefault(); if (busy) return;
-      const file = new FormData(event.currentTarget).get('csv');
-      if (!(file instanceof File) || !file.size || file.size > 8 * 1024 * 1024) { notify('Selecciona un CSV de hasta 8 MiB.'); return; }
-      setBusy(true);
-      try {
-        const text = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(await file.arrayBuffer());
-        const imported = await api.request<ImportResult>('/api/v1/procesos/import', { method: 'POST', body: { csv_text: text } });
-        notify(`${imported.replayed ? 'Archivo ya importado. ' : ''}${imported.inserted} nuevos · ${imported.updated} actualizados · ${imported.unchanged} sin cambios · ${imported.stale} antiguos omitidos.`);
-        setImporting(false); reload();
-      } catch (error) { notify(message(error)); } finally { setBusy(false); }
-    }}><label>Archivo CSV<input type="file" name="csv" accept=".csv,text/csv" required disabled={busy} /></label><button className="primary" disabled={busy}>{busy ? 'Importando…' : 'Importar CSV'}</button></form></Dialog>}
     {selected && <Detail id={selected} close={() => setSelected(null)} saved={reload} />}
   </>;
 }

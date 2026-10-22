@@ -39,6 +39,7 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
     }
     let config = AppConfig::from_env()?;
     let scout_config = scout_import::ScoutImportConfig::from_env()?;
+    let scout_csv_path = scout_config.csv_path.clone();
     if scout_config.enabled && !config.procesos_allowed {
         return Err(std::io::Error::other(
             "Local Scout import requires procesos in BASTION_ALLOWED_MODULES",
@@ -85,7 +86,7 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
             tokio::time::sleep(std::time::Duration::from_secs(10)).await;
         }
     });
-    let app = router(core, app_origin, config.trusted_proxy_cidrs)?;
+    let app = router(core, app_origin, config.trusted_proxy_cidrs, scout_csv_path)?;
     let listener = TcpListener::bind(config.listen_addr).await?;
     let local_addr: SocketAddr = listener.local_addr()?;
     tracing::info!(%local_addr, "Bastion Core server listening");

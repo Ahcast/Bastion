@@ -10,6 +10,8 @@ El manifiesto no puede seleccionar otra ruta ni una URL. El backend solo abre lo
 
 ## Ejecución
 
+El botón **Actualizar** solicita `POST /api/v1/procesos/refresh` con un objeto vacío. El backend lee exclusivamente el maestro configurado y su manifiesto, valida la entrega y la incorpora antes de responder con los contadores de importación. Requiere sesión, CSRF, módulo activo y `procesos/importacion/editar`; la auditoría identifica al usuario conectado. Repetir el archivo recupera su recibo sin duplicar registros. Esta actualización bajo demanda funciona aunque el trabajador periódico esté deshabilitado. No se aceptan rutas ni archivos desde el navegador. Se elimina Importar CSV y su endpoint; Exportar CSV no cambia.
+
 El receptor se habilita explícitamente con `BASTION_SCOUT_IMPORT_ENABLED=true`, junto con la allowlist y activación normal de Procesos. `BASTION_SCOUT_CSV_PATH` permite definir el archivo local en el despliegue; su valor predeterminado es la ruta confirmada. No es un ajuste web ni un argumento API/MCP. El proceso revisa al iniciar y después cada 60 segundos, fuera del horario del crawler también, para recuperar entregas pendientes sin volver a ejecutar IA.
 
 Se usa una identidad interna del Core `bastion-scout`, sin cuenta humana, contraseña ni token de red. El Core le concede exclusivamente `procesos/importacion/editar` cuando la integración está habilitada en el ambiente. No participa en login, API ni MCP. Cada incorporación vuelve a comprobar esta autorización y la activación del módulo. La auditoría la identifica como `bastion-scout (local)`.

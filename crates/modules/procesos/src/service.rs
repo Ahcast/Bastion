@@ -232,6 +232,19 @@ impl ProcessService {
         self.import_as(DomainActor::User(actor), csv, None).await
     }
 
+    pub async fn import_scout_for_user(
+        &self,
+        actor: u64,
+        delivery: &crate::ReadyDelivery,
+    ) -> Result<ImportResult, CoreError> {
+        self.import_as(
+            DomainActor::User(actor),
+            &delivery.csv,
+            Some((&delivery.run_id, delivery.total)),
+        )
+        .await
+    }
+
     pub async fn import_local_scout(
         &self,
         delivery: &crate::ReadyDelivery,

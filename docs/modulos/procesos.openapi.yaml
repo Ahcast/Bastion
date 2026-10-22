@@ -98,12 +98,12 @@ paths:
           description: Otro usuario cambió la revisión; recargar. No sobrescribe.
         default:
           $ref: '#/components/responses/Problem'
-  /api/v1/procesos/import:
+  /api/v1/procesos/refresh:
     post:
-      operationId: procesosImport
+      operationId: procesosRefresh
       x-permission: procesos/importacion/editar
-      x-limits: {csv_bytes: 8388608, request_bytes: 16777216, rows: 5000, timeout_seconds: 60, concurrency: 1}
-      description: Solo maestro.csv analizado de Scout. Idempotencia por SHA-256 exacto del CSV y actor, conservada en el registro de importaciones. Repetir devuelve el resultado previo. Archivo inválido revierte toda la operación. CSV antiguo no sobrescribe registros más recientes; ausencias no borran filas. Ver procesos-implementacion.md.
+      x-limits: {csv_bytes: 8388608, request_bytes: 1048576, rows: 5000, timeout_seconds: 60, concurrency: 1}
+      description: Actualizar incorpora el maestro local configurado en el servidor tras verificar main.json, finalización, SHA-256 y cantidad de filas. No acepta rutas ni CSV. Auditoría e idempotencia por usuario y SHA-256. Repetir devuelve el recibo previo; ausencias no borran filas ni marcas/notas. Funciona sin el trabajador periódico. Sustituye el endpoint de carga de archivos.
       parameters:
         - name: X-CSRF-Token
           in: header
@@ -116,15 +116,19 @@ paths:
             schema:
               type: object
               additionalProperties: false
-              required: [csv_text]
-              properties:
-                csv_text: {type: string, maxLength: 8388608}
+              maxProperties: 0
       responses:
         '200':
           description: import_id, inserted, updated, unchanged, stale y replayed. Confirmación transaccional con auditoría.
           content:
             application/json:
               schema: {$ref: '#/components/schemas/ImportResult'}
+        '409':
+          description: Scout todavía no terminó o la entrega cambió durante la lectura; reintentar después.
+        '422':
+          description: El maestro o manifiesto no cumple el contrato; no se importó ninguna fila.
+        '503':
+          description: La fuente local no está disponible o no tiene permisos de lectura.
         default:
           $ref: '#/components/responses/Problem'
   /api/v1/procesos/export:

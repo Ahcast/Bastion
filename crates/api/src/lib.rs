@@ -38,6 +38,7 @@ struct ApiState {
     core: CoreService,
     procesos: bastion_procesos::ProcessService,
     procesos_jobs: std::sync::Arc<tokio::sync::Semaphore>,
+    scout_csv_path: std::path::PathBuf,
 }
 #[derive(Clone)]
 struct CsrfGuardState {
@@ -221,6 +222,7 @@ pub fn router(
     core: CoreService,
     allowed_origin: String,
     trusted_proxy_cidrs: Vec<IpNet>,
+    scout_csv_path: std::path::PathBuf,
 ) -> io::Result<Router> {
     let allowed_origin = validate_origin(&allowed_origin)?;
     let origin_for_guard = allowed_origin
@@ -257,6 +259,7 @@ pub fn router(
         core: core.clone(),
         procesos: bastion_procesos::ProcessService::new(core.database(), core.admin()),
         procesos_jobs: std::sync::Arc::new(tokio::sync::Semaphore::new(1)),
+        scout_csv_path,
     };
     Ok(Router::new()
         .route("/health/live", get(liveness))

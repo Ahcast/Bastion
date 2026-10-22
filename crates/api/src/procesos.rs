@@ -3,9 +3,7 @@ use bastion_procesos::ProcessFilter;
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
-struct ImportRequest {
-    csv_text: String,
-}
+struct RefreshRequest {}
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -24,17 +22,12 @@ pub(super) fn routes(state: ApiState) -> Router<ApiState> {
             axum::routing::patch(review),
         )
         .route("/api/v1/procesos/export", get(export))
+        .route("/api/v1/procesos/refresh", post(refresh))
         .layer(RequestBodyLimitLayer::new(GENERAL_REQUEST_BODY_LIMIT))
-        .merge(
-            Router::new()
-                .route("/api/v1/procesos/import", post(import))
-                .layer(axum::extract::DefaultBodyLimit::max(16 * 1024 * 1024))
-                .layer(RequestBodyLimitLayer::new(16 * 1024 * 1024)),
-        )
         .route_layer(middleware::from_fn_with_state(state, guard))
 }
 
-// Identity, module status and permission are checked before buffering uploaded CSV.
+// Check identity, module status and import permission before opening local files.
 async fn guard(State(state): State<ApiState>, request: Request, next: Next) -> Response {
     match tokio::time::timeout(
         Duration::from_secs(60),
@@ -54,7 +47,7 @@ async fn guarded_request(state: ApiState, request: Request, next: Next) -> Respo
     };
     let path = request.uri().path();
     let (scope, capability, expensive) = match path {
-        "/api/v1/procesos/import" => ("importacion", "editar", true),
+        "/api/v1/procesos/refresh" => ("importacion", "editar", true),
         "/api/v1/procesos/export" => ("exportacion", "ver", true),
         _ => ("consulta", "ver", false),
     };
@@ -158,18 +151,76 @@ async fn review(
     Ok(with_version(Json(review).into_response(), version))
 }
 
-async fn import(
+async fn refresh(
     State(state): State<ApiState>,
     headers: axum::http::HeaderMap,
-    Json(body): Json<ImportRequest>,
-) -> Result<Json<bastion_procesos::ImportResult>, ApiError> {
-    let actor = actor(&state, &headers).await?;
+    Json(_body): Json<RefreshRequest>,
+) -> Result<Json<bastion_procesos::ImportResult>, Response> {
+    let actor = actor(&state, &headers)
+        .await
+        .map_err(IntoResponse::into_response)?;
+    let path = state.scout_csv_path.clone();
+    let delivery =
+        tokio::task::spawn_blocking(move || bastion_procesos::ReadyDelivery::read(&path))
+            .await
+            .map_err(|_| local_delivery_problem(bastion_procesos::LocalDeliveryError::Io))?
+            .map_err(local_delivery_problem)?;
     state
         .procesos
-        .import(actor.id, &body.csv_text)
+        .import_scout_for_user(actor.id, &delivery)
         .await
         .map(Json)
-        .map_err(ApiError)
+        .map_err(|error| ApiError(error).into_response())
+}
+
+fn local_delivery_problem(error: bastion_procesos::LocalDeliveryError) -> Response {
+    use bastion_procesos::LocalDeliveryError;
+    let (status, detail) = match error {
+        LocalDeliveryError::Pending | LocalDeliveryError::Changed => (
+            StatusCode::CONFLICT,
+            "Scout todavía no terminó o está publicando sus resultados. Intenta actualizar más tarde.",
+        ),
+        LocalDeliveryError::Invalid => (
+            StatusCode::UNPROCESSABLE_ENTITY,
+            "Los resultados de Scout no cumplen el contrato de entrega. No se importaron registros.",
+        ),
+        LocalDeliveryError::Missing | LocalDeliveryError::Io => (
+            StatusCode::SERVICE_UNAVAILABLE,
+            "Los resultados de Scout no están disponibles. Revisa la publicación y los permisos del servicio.",
+        ),
+    };
+    problem(status, "Scout Delivery Unavailable", detail)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn refresh_cannot_select_a_file_or_upload_csv() {
+        assert!(serde_json::from_str::<RefreshRequest>("{}").is_ok());
+        for payload in [
+            r#"{"path":"/etc/passwd"}"#,
+            r#"{"csv_text":"untrusted"}"#,
+            r#"{"url":"https://example.test/maestro.csv"}"#,
+        ] {
+            assert!(serde_json::from_str::<RefreshRequest>(payload).is_err());
+        }
+    }
+
+    #[test]
+    fn unavailable_or_partial_delivery_is_not_reported_as_success() {
+        use bastion_procesos::LocalDeliveryError::*;
+        for (error, expected) in [
+            (Pending, StatusCode::CONFLICT),
+            (Changed, StatusCode::CONFLICT),
+            (Invalid, StatusCode::UNPROCESSABLE_ENTITY),
+            (Missing, StatusCode::SERVICE_UNAVAILABLE),
+            (Io, StatusCode::SERVICE_UNAVAILABLE),
+        ] {
+            assert_eq!(local_delivery_problem(error).status(), expected);
+        }
+    }
 }
 
 async fn export(
