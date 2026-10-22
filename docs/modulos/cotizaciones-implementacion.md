@@ -1,6 +1,6 @@
 # Cotizaciones: primer corte funcional en desarrollo
 
-Fecha: 2026-10-22. Estado: desarrollo local; módulo incompleto y desactivado por defecto.
+Fecha: 2026-10-22. Estado: primer corte publicado en el ambiente de pruebas; módulo incompleto y desactivado por defecto.
 
 ## Alcance implementado
 
@@ -38,10 +38,18 @@ El contador nuevo empieza en cero y no implica continuidad con producción. Ante
 
 Pendientes: catálogo Clientes, PDF/Typst y plantilla, adjuntos privados, correo inmediato/programado, clonación, eliminación confirmada, conversiones, acciones masivas y MCP. No se exponen botones de esas operaciones antes de implementarlas. Los settings propios siguen pendientes y Ajustes lo indica.
 
-No se despliega ni se aplican migraciones remotas en esta etapa. No activar este corte como módulo terminado.
+El usuario autorizó la publicación en GitHub y AWS. El corte técnico se desplegó con respaldo previo; esto no lo convierte en módulo terminado ni en aprobación de producción.
 
 ## Verificación
 
-Tipos TypeScript, 28 pruebas del frontend y build Vite verificados; rustfmt y metadatos Cargo verificados. Se añaden pruebas Rust para fórmulas mixtas, descuento unitario, redondeo agrupado, prorrateo sin redistribución, normalización, exoneración y límites. La prueba de integración MySQL contempla permisos, idempotencia concurrente, numeración estable, contacto del Core, edición concurrente, auditoría, búsqueda literal y desactivación, en una base CI aislada.
+Tipos TypeScript, 35 pruebas del frontend y build Vite verificados; rustfmt y metadatos Cargo verificados. Se añaden pruebas Rust para fórmulas mixtas, descuento unitario, redondeo agrupado, prorrateo sin redistribución, normalización, exoneración y límites. La prueba de integración MySQL contempla permisos, idempotencia concurrente, numeración estable, contacto del Core, edición concurrente, auditoría, búsqueda literal y desactivación, en una base CI aislada.
 
-Rust/MySQL siguen pendientes de ejecución: el compilador portátil local carece de la biblioteca estándar de su target. El navegador disponible tampoco pudo acceder al servidor local de pruebas, por lo que la verificación visual sigue pendiente. La presencia de pruebas no equivale a una ejecución satisfactoria del backend.
+Rust, pruebas unitarias e integración con MySQL 5.7 pasaron en GitHub Actions. El compilador portátil local sigue sin biblioteca estándar; la validación ejecutada en CI cierra esa comprobación del release. La verificación autenticada del editor y la reconciliación contable siguen pendientes.
+
+## Publicación técnica verificada — 2026-10-22
+
+Código ejecutado: `78743be826c4d57ea9e46f6459fa912566c50241`; [CI aprobado](https://github.com/Ahcast/Bastion/actions/runs/39824576638). Se corrigieron durante CI la vida útil de los identificadores de la allowlist y la lectura con tipo firmado del resultado `SELECT 1` de autorización.
+
+Backend instalado en AWS Lightsail y frontend en Bluehost desde artifacts del mismo commit, con procedencia y hashes SHA-256 comprobados. Se crearon respaldos privados de la base y del frontend. Las dos migraciones de Cotizaciones se aplicaron; los 835 procesos y los conteos de datos existentes se conservaron. API HTTPS: health live/ready 200; consulta anónima de Cotizaciones/Procesos 401. Se verificaron por HTTPS los hashes de HTML/assets y la carga de la pantalla de acceso sin errores de consola.
+
+Cotizaciones quedó incluido y permitido por el ambiente, **sin activación administrativa**. El Administrador puede activarlo en Ajustes > Core > Módulos. Se conservó la activación de Procesos y la recepción automática de Scout siguió desactivada. Rutas internas y respaldos reales permanecen en los registros privados de despliegue.

@@ -2,7 +2,7 @@
 
 ## Estado de esta entrega
 
-Cotizaciones está en desarrollo local: listado, editor, numeración, vigencia, estados y cálculo decimal en Rust cotejado con la copia Legacy, con vista previa y control de versión. Se integra al registro del Core y permanece desactivado por defecto. La validación contable, catálogo Clientes, PDF, adjuntos, correo y conversiones requieren las siguientes etapas; ver [alcance del corte](docs/modulos/cotizaciones-implementacion.md). No se presenta como módulo terminado ni se despliega durante esta etapa.
+Cotizaciones está en desarrollo local: listado, editor, numeración, vigencia, estados y cálculo decimal en Rust cotejado con la copia Legacy, con vista previa y control de versión. Se integra al registro del Core y permanece desactivado por defecto. La validación contable, catálogo Clientes, PDF, adjuntos, correo y conversiones requieren las siguientes etapas; ver [alcance del corte](docs/modulos/cotizaciones-implementacion.md). El corte técnico se publicó en el ambiente de pruebas; Cotizaciones queda disponible en Ajustes > Core > Módulos y sin activar. No se presenta como módulo terminado ni aprobado para producción.
 
 El primer corte de Procesos recibe el `maestro.csv` analizado de bastion-scout, con Actualizar desde el maestro local verificado, consulta, detalle, marcas/notas compartidas y exportación. Permanece desactivado por defecto y conserva todos los registros. Ajustes muestra la política confirmada sin campos editables; la depuración queda aplazada por decisión del usuario. Ver [contrato y límites](docs/modulos/procesos-implementacion.md). Este desarrollo se publica primero en GitHub y no instala cambios en servidores.
 
