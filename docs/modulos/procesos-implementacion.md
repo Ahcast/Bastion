@@ -18,6 +18,8 @@ run_id,proceso_id,url,entidad,expediente,fecha_recepcion,fecha_recepcion_origina
 
 ## Integración
 
+El usuario confirmó el 21 de octubre de 2026 que **marcas y notas son compartidas por todos los usuarios**. Se guardan separadas del contenido de Scout; una reimportación no las reemplaza. Lectura con `consulta/ver`; cambios de marca con `marcas/editar` y de nota con `notas/editar`. Edición con versión obligatoria para detectar cambios de otro usuario (`412` exige recargar), nota hasta 10.000 caracteres y auditoría sin copiar su contenido. La exportación agrega `de_interes` (0/1) y `nota` después de las columnas fuente.
+
 Dominio en `crates/modules/procesos`, adaptador HTTP común y pantalla React bajo demanda. Core controla acceso, permisos, activación y auditoría. Módulo inicialmente desactivado y excluido del ambiente por defecto. `BASTION_ALLOWED_MODULES=procesos` permite ofrecerlo al administrador, que decide su activación en Ajustes. Una migración identificada de Procesos crea sus tablas sin alterar registros Legacy. API y navegación bloquean el módulo desactivado incluso para administradores.
 
 Consulta/detalle/exportación requieren `ver`; importación y marcas/notas requieren `editar`, con alcances separados. No se asignan permisos a roles nuevos. MCP sigue pendiente del transporte e identidad delegada del Core.
@@ -30,7 +32,7 @@ Entidades/rubros hasta 500 caracteres, expediente hasta 255 y resumen IA hasta 1
 
 ## Primer corte implementado
 
-Consulta de estado, listado paginado por expediente/resumen/descripción, entidad y fechas de recepción; detalle de campos fuente y análisis; importación manual y exportación. Contrato HTTP: [procesos.openapi.yaml](procesos.openapi.yaml). La pantalla carga bajo demanda y la sección Procesos en Ajustes explica su estado pendiente. La allowlist y el estado administrativo se comprueban también en cada operación del servidor.
+Consulta de estado, listado paginado por expediente/resumen/descripción, entidad, fechas de recepción y marca; detalle de campos fuente y análisis; marcas/notas compartidas con control de versión; importación manual y exportación. Contrato HTTP: [procesos.openapi.yaml](procesos.openapi.yaml). La pantalla carga bajo demanda y la sección Procesos en Ajustes explica su estado pendiente. La allowlist y el estado administrativo se comprueban también en cada operación del servidor. La compatibilidad de migraciones comprueba versiones y checksums de su ledger.
 
 `migrate` aplica Core y el ledger independiente de Procesos con la credencial migradora. `serve` comprueba su migración antes de permitir activación; vacío en `BASTION_ALLOWED_MODULES` conserva Core solo. Deshabilitar conserva registros/importaciones. No ejecutar migraciones automáticamente al servir.
 
@@ -38,7 +40,6 @@ La validación de GitHub incluye una instancia desechable de MySQL 5.7, migracio
 
 ## Pendientes que no deben resolverse por inferencia
 
-- Alcance personal o compartido de las marcas/notas y concurrencia de edición.
 - Settings: no hay valores editables confirmados; mostrar la sección pendiente en Ajustes, sin afirmar que el módulo está terminado.
 - Edad/fecha de purga y protección de filas con marcas/notas. No habilitar una operación destructiva hasta acordar el criterio.
 - El maestro de Scout no contiene columnas separadas de municipio, dirección ni especificaciones. No inventarlas ni deducirlas de IA como datos fuente. Su paridad requiere definir origen/mapeo.

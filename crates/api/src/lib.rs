@@ -1551,6 +1551,11 @@ struct ApiError(CoreError);
 impl IntoResponse for ApiError {
     fn into_response(self) -> Response {
         let (status, title, detail) = match self.0 {
+            CoreError::PreconditionFailed => (
+                StatusCode::PRECONDITION_FAILED,
+                "Precondition Failed",
+                "El proceso cambió. Recarga sus datos antes de guardar.",
+            ),
             CoreError::NotFound => (
                 StatusCode::NOT_FOUND,
                 "Not Found",

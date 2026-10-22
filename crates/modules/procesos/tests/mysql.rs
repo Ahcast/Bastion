@@ -82,6 +82,25 @@ async fn mysql57_import_permissions_history_and_disable() {
     assert!(matches!(service.status(3).await, Err(CoreError::Forbidden)));
     let first = csv('a', "2026-10-21T20:00:00-06:00", 'b');
     assert_eq!(service.import(1, &first).await.unwrap().inserted, 1);
+    let id = format!("hc:{}", "a".repeat(64));
+    assert_eq!(
+        service
+            .review(1, &id, 0, Some(true), None)
+            .await
+            .unwrap()
+            .version,
+        1
+    );
+    let shared = service.review(2, &id, 1, None, Some("=1+1")).await.unwrap();
+    assert_eq!(shared.version, 2);
+    assert!(matches!(
+        service.review(1, &id, 1, Some(false), None).await,
+        Err(CoreError::PreconditionFailed)
+    ));
+    assert!(matches!(
+        service.review(3, &id, 2, None, Some("No permitido")).await,
+        Err(CoreError::Forbidden)
+    ));
     assert!(service.import(1, &first).await.unwrap().replayed);
     let next = csv('a', "2026-10-21T21:00:00-06:00", 'c');
     assert_eq!(service.import(1, &next).await.unwrap().updated, 1);
@@ -100,9 +119,11 @@ async fn mysql57_import_permissions_history_and_disable() {
             .await,
         Err(CoreError::Locked)
     ));
-    let id = format!("hc:{}", "a".repeat(64));
     let detail = service.detail(1, &id).await.unwrap();
     assert_eq!(detail.source["contenido_hash"], "c".repeat(64));
+    assert!(detail.marked);
+    assert_eq!(detail.note, "=1+1");
+    assert_eq!(detail.version, 2);
     assert!(
         service
             .import(1, &first.replace("analizado,", "pendiente,"))
@@ -115,6 +136,17 @@ async fn mysql57_import_permissions_history_and_disable() {
         ..Default::default()
     };
     assert_eq!(service.rows(1, &filter).await.unwrap().items.len(), 2);
+    let marked_filter = ProcessFilter {
+        marked: Some(true),
+        ..Default::default()
+    };
+    assert_eq!(
+        service.rows(2, &marked_filter).await.unwrap().items.len(),
+        1
+    );
+    let exported = service.export(1, &filter).await.unwrap();
+    assert!(exported.contains("de_interes,nota"));
+    assert!(exported.contains("'=1+1"));
     assert!(
         service
             .export(1, &filter)
@@ -141,6 +173,20 @@ async fn mysql57_import_permissions_history_and_disable() {
     assert!(matches!(
         service.import(1, &first).await,
         Err(CoreError::NotFound)
+    ));
+    assert!(matches!(
+        service.review(1, &id, 2, Some(false), None).await,
+        Err(CoreError::NotFound)
+    ));
+    // An incompatible migration ledger must also block reactivation.
+    sqlx::query("UPDATE _procesos_migrations SET checksum=REPEAT('x',48) WHERE version=2")
+        .execute(&pool)
+        .await
+        .unwrap();
+    service.synchronize_release(true).await.unwrap();
+    assert!(matches!(
+        core.admin().set_module_enabled(1, "procesos", true).await,
+        Err(CoreError::Forbidden)
     ));
     assert_eq!(
         sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM procesos_rows")

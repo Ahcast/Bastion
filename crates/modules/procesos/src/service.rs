@@ -16,6 +16,7 @@ pub struct ProcessService {
 #[derive(Clone, Default, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ProcessFilter {
+    pub marked: Option<bool>,
     pub q: Option<String>,
     pub entidad: Option<String>,
     pub desde: Option<NaiveDate>,
@@ -26,6 +27,9 @@ pub struct ProcessFilter {
 
 #[derive(Serialize, FromRow)]
 pub struct ProcessRecord {
+    pub marked: bool,
+    pub note: String,
+    pub version: u64,
     pub proceso_id: String,
     pub entidad: String,
     pub expediente: String,
@@ -59,7 +63,24 @@ pub struct ImportResult {
     pub replayed: bool,
 }
 
+#[derive(Serialize, FromRow)]
+pub struct ReviewRecord {
+    pub marked: bool,
+    pub note: String,
+    pub version: u64,
+}
+
 impl ProcessService {
+    pub async fn check_enabled(&self) -> Result<(), CoreError> {
+        let active: Option<bool> = sqlx::query_scalar("SELECT (included_in_release AND environment_allowed AND enabled) FROM module_registry WHERE module_id='procesos'")
+            .fetch_optional(self.database.pool()).await?;
+        if active == Some(true) {
+            Ok(())
+        } else {
+            Err(CoreError::NotFound)
+        }
+    }
+
     pub async fn check_access(
         &self,
         actor: u64,
@@ -104,17 +125,25 @@ impl ProcessService {
         let exists: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema=DATABASE() AND table_name='_procesos_migrations'")
             .fetch_one(self.database.pool()).await?;
         let ready = if exists > 0 {
-            sqlx::query_scalar::<_, bool>(
-                "SELECT success FROM _procesos_migrations WHERE version=1",
+            let applied = sqlx::query_as::<_, (i64, bool, Vec<u8>)>(
+                "SELECT version,success,checksum FROM _procesos_migrations",
             )
-            .fetch_optional(self.database.pool())
-            .await?
-            .unwrap_or(false)
+            .fetch_all(self.database.pool())
+            .await?;
+            let expected = sqlx::migrate!("./migrations");
+            applied.len() == expected.iter().count()
+                && expected.iter().all(|migration| {
+                    applied.iter().any(|(version, success, checksum)| {
+                        *version == migration.version
+                            && *success
+                            && checksum.as_slice() == migration.checksum.as_ref()
+                    })
+                })
         } else {
             false
         };
         sqlx::query("INSERT INTO module_registry (module_id,display_name,included_in_release,environment_allowed,enabled) VALUES ('procesos','Procesos',?, ?,0) ON DUPLICATE KEY UPDATE included_in_release=VALUES(included_in_release),environment_allowed=VALUES(environment_allowed)")
-            .bind(ready).bind(allowed && ready).execute(self.database.pool()).await?;
+            .bind(true).bind(allowed && ready).execute(self.database.pool()).await?;
         Ok(())
     }
 
@@ -157,7 +186,7 @@ impl ProcessService {
         let mut tx = self.begin(actor, "consulta", "ver").await?;
         let mut query = select_rows(filter, false)?;
         query
-            .push(" ORDER BY fecha_recepcion DESC,proceso_id ASC LIMIT ")
+            .push(" ORDER BY r.fecha_recepcion DESC,r.proceso_id ASC LIMIT ")
             .push_bind(size + 1)
             .push(" OFFSET ")
             .push_bind(offset);
@@ -181,7 +210,7 @@ impl ProcessService {
             return Err(CoreError::Invalid);
         }
         let mut tx = self.begin(actor, "consulta", "ver").await?;
-        let record = sqlx::query_as::<_, ProcessRecord>("SELECT proceso_id,entidad,expediente,fecha_recepcion,puntaje,rubro,resumen_corto,source_json AS source FROM procesos_rows WHERE proceso_id=?")
+        let record = sqlx::query_as::<_, ProcessRecord>("SELECT r.proceso_id,r.entidad,r.expediente,r.fecha_recepcion,r.puntaje,r.rubro,r.resumen_corto,r.source_json AS source,COALESCE(m.marked,0) AS marked,COALESCE(m.note,'') AS note,COALESCE(m.version,0) AS version FROM procesos_rows r LEFT JOIN procesos_marks m ON m.proceso_id=r.proceso_id WHERE r.proceso_id=?")
             .bind(id).fetch_optional(&mut *tx).await?.ok_or(CoreError::NotFound)?;
         tx.commit().await?;
         Ok(record)
@@ -260,28 +289,90 @@ impl ProcessService {
         Ok(result)
     }
 
+    pub async fn review(
+        &self,
+        actor: u64,
+        id: &str,
+        expected: u64,
+        marked: Option<bool>,
+        note: Option<&str>,
+    ) -> Result<ReviewRecord, CoreError> {
+        if id.len() != 67
+            || (marked.is_none() && note.is_none())
+            || note.is_some_and(|n| n.chars().count() > 10_000 || n.contains('\0'))
+        {
+            return Err(CoreError::Invalid);
+        }
+        let scope = if marked.is_some() { "marcas" } else { "notas" };
+        let mut tx = self.begin(actor, scope, "editar").await?;
+        if marked.is_some() && note.is_some() {
+            self.admin
+                .authorize(actor, "procesos", "notas", "editar")
+                .await?;
+        }
+        let exists: Option<String> = sqlx::query_scalar(
+            "SELECT proceso_id FROM procesos_rows WHERE proceso_id=? FOR UPDATE",
+        )
+        .bind(id)
+        .fetch_optional(&mut *tx)
+        .await?;
+        if exists.is_none() {
+            return Err(CoreError::NotFound);
+        }
+        let previous = sqlx::query_as::<_, ReviewRecord>(
+            "SELECT marked,note,version FROM procesos_marks WHERE proceso_id=? FOR UPDATE",
+        )
+        .bind(id)
+        .fetch_optional(&mut *tx)
+        .await?
+        .unwrap_or(ReviewRecord {
+            marked: false,
+            note: String::new(),
+            version: 0,
+        });
+        if previous.version != expected {
+            return Err(CoreError::PreconditionFailed);
+        }
+        let result = ReviewRecord {
+            marked: marked.unwrap_or(previous.marked),
+            note: note.map(str::to_owned).unwrap_or(previous.note),
+            version: expected.checked_add(1).ok_or(CoreError::Conflict)?,
+        };
+        sqlx::query("INSERT INTO procesos_marks (proceso_id,marked,note,version,updated_by,updated_at) VALUES (?,?,?,?,?,UTC_TIMESTAMP(6)) ON DUPLICATE KEY UPDATE marked=VALUES(marked),note=VALUES(note),version=VALUES(version),updated_by=VALUES(updated_by),updated_at=VALUES(updated_at)")
+            .bind(id).bind(result.marked).bind(&result.note).bind(result.version).bind(actor).execute(&mut *tx).await?;
+        audit(&mut tx,actor,"review.update",id,serde_json::json!({"marked":result.marked,"note_changed":note.is_some(),"version":result.version})).await?;
+        tx.commit().await?;
+        Ok(result)
+    }
+
     pub async fn export(&self, actor: u64, filter: &ProcessFilter) -> Result<String, CoreError> {
         let mut tx = self.begin(actor, "exportacion", "ver").await?;
         let mut query = select_rows(filter, true)?;
         query
-            .push(" ORDER BY fecha_recepcion DESC,proceso_id ASC LIMIT ")
+            .push(" ORDER BY r.fecha_recepcion DESC,r.proceso_id ASC LIMIT ")
             .push_bind((MAX_ROWS + 1) as u32);
         let statement = query.build_query_as::<ProcessRecord>();
         let mut records = statement.fetch(&mut *tx);
         let mut row_count = 0;
         let mut writer = csv::Writer::from_writer(Vec::new());
         writer
-            .write_record(FIELDS)
+            .write_record(FIELDS.into_iter().chain(["de_interes", "nota"]))
             .map_err(|_| CoreError::Invalid)?;
         while let Some(record) = records.try_next().await? {
             row_count += 1;
             if row_count > MAX_ROWS {
                 return Err(CoreError::Conflict);
             }
+            let values = FIELDS.map(|field| safe_cell(record.source[field].as_str().unwrap_or("")));
             writer
-                .write_record(
-                    FIELDS.map(|field| safe_cell(record.source[field].as_str().unwrap_or(""))),
-                )
+                .write_record(values.into_iter().chain([
+                    if record.marked {
+                        "1".into()
+                    } else {
+                        "0".into()
+                    },
+                    safe_cell(&record.note),
+                ]))
                 .map_err(|_| CoreError::Invalid)?;
             if writer.get_ref().len() > 16 * 1024 * 1024 {
                 return Err(CoreError::Conflict);
@@ -359,37 +450,40 @@ fn select_rows(
 ) -> Result<QueryBuilder<MySql>, CoreError> {
     filter.bounds()?;
     let source = if full_source {
-        "source_json"
+        "r.source_json"
     } else {
         "JSON_OBJECT()"
     };
     let mut query = QueryBuilder::<MySql>::new(format!(
-        "SELECT proceso_id,entidad,expediente,fecha_recepcion,puntaje,rubro,resumen_corto,{source} AS source FROM procesos_rows WHERE 1=1"
+        "SELECT r.proceso_id,r.entidad,r.expediente,r.fecha_recepcion,r.puntaje,r.rubro,r.resumen_corto,{source} AS source,COALESCE(m.marked,0) AS marked,COALESCE(m.note,'') AS note,COALESCE(m.version,0) AS version FROM procesos_rows r LEFT JOIN procesos_marks m ON m.proceso_id=r.proceso_id WHERE 1=1"
     ));
+    if let Some(marked) = filter.marked {
+        query.push(" AND COALESCE(m.marked,0)=").push_bind(marked);
+    }
     if let Some(q) = filter.q.as_deref().filter(|s| !s.trim().is_empty()) {
         let value = format!("%{}%", escape_like(q.trim()));
         query
-            .push(" AND (expediente LIKE ")
+            .push(" AND (r.expediente LIKE ")
             .push_bind(value.clone())
-            .push(" OR resumen_corto LIKE ")
+            .push(" OR r.resumen_corto LIKE ")
             .push_bind(value.clone())
-            .push(" OR JSON_UNQUOTE(JSON_EXTRACT(source_json,'$.descripcion')) LIKE ")
+            .push(" OR JSON_UNQUOTE(JSON_EXTRACT(r.source_json,'$.descripcion')) LIKE ")
             .push_bind(value)
             .push(")");
     }
     if let Some(entidad) = filter.entidad.as_deref().filter(|s| !s.trim().is_empty()) {
         query
-            .push(" AND entidad LIKE ")
+            .push(" AND r.entidad LIKE ")
             .push_bind(format!("%{}%", escape_like(entidad.trim())));
     }
     if let Some(date) = filter.desde {
         query
-            .push(" AND fecha_recepcion>=")
+            .push(" AND r.fecha_recepcion>=")
             .push_bind(day_start(date)?.naive_utc());
     }
     if let Some(date) = filter.hasta {
         query
-            .push(" AND fecha_recepcion<")
+            .push(" AND r.fecha_recepcion<")
             .push_bind(day_start(date.succ_opt().ok_or(CoreError::Invalid)?)?.naive_utc());
     }
     Ok(query)

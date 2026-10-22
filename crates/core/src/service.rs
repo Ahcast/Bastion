@@ -29,6 +29,7 @@ type HmacSha1 = Hmac<Sha1>;
 #[derive(Debug)]
 pub enum CoreError {
     NotFound,
+    PreconditionFailed,
     Invalid,
     Unauthorized,
     Forbidden,
@@ -45,6 +46,7 @@ impl fmt::Display for CoreError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::NotFound => f.write_str("resource not found"),
+            Self::PreconditionFailed => f.write_str("resource version changed"),
             Self::Invalid => f.write_str("invalid request"),
             Self::Unauthorized => f.write_str("authentication required"),
             Self::Forbidden => f.write_str("operation not allowed"),

@@ -12,6 +12,9 @@ paths:
       responses:
         '200':
           description: Total de registros y última importación; no activa el módulo.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Status'}
         default:
           $ref: '#/components/responses/Problem'
   /api/v1/procesos/rows:
@@ -23,6 +26,7 @@ paths:
         - $ref: '#/components/parameters/Entidad'
         - $ref: '#/components/parameters/Desde'
         - $ref: '#/components/parameters/Hasta'
+        - $ref: '#/components/parameters/Marked'
         - name: page
           in: query
           schema: {type: integer, minimum: 1, default: 1}
@@ -32,6 +36,9 @@ paths:
       responses:
         '200':
           description: items, page, page_size y has_more. Orden fecha_recepcion DESC, proceso_id ASC. Campos de fecha en UTC RFC 3339.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Page'}
         default:
           $ref: '#/components/responses/Problem'
   /api/v1/procesos/rows/{id}:
@@ -45,7 +52,50 @@ paths:
           schema: {type: string, pattern: '^hc:[a-f0-9]{64}$'}
       responses:
         '200':
-          description: Registro con campos fuente completos y resultado IA como texto/JSON; no descarga enlaces externos.
+          description: Registro con campos fuente completos, marked, note y version compartidos; ETag con versión. Resultado IA como texto/JSON; no descarga enlaces externos.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Process'}
+        default:
+          $ref: '#/components/responses/Problem'
+  /api/v1/procesos/rows/{id}/review:
+    patch:
+      operationId: procesosReview
+      x-permission: procesos/marcas/editar para marked; procesos/notas/editar para note
+      description: Marca y nota compartidas. Conservadas al importar Scout. Al menos un campo requerido; no permite campos fuente ni actor. Auditoría sin texto de nota.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: {type: string, pattern: '^hc:[a-f0-9]{64}$'}
+        - name: If-Match
+          in: header
+          required: true
+          description: Versión del registro entre comillas, recibida en ETag/version del detalle/listado.
+          schema: {type: string}
+        - name: X-CSRF-Token
+          in: header
+          required: true
+          schema: {type: string}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              minProperties: 1
+              properties:
+                marked: {type: boolean}
+                note: {type: string, maxLength: 10000}
+      responses:
+        '200':
+          description: marked, note y version actualizados; ETag nuevo.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Review'}
+        '412':
+          description: Otro usuario cambió la revisión; recargar. No sobrescribe.
         default:
           $ref: '#/components/responses/Problem'
   /api/v1/procesos/import:
@@ -72,6 +122,9 @@ paths:
       responses:
         '200':
           description: import_id, inserted, updated, unchanged, stale y replayed. Confirmación transaccional con auditoría.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ImportResult'}
         default:
           $ref: '#/components/responses/Problem'
   /api/v1/procesos/export:
@@ -84,20 +137,84 @@ paths:
         - $ref: '#/components/parameters/Entidad'
         - $ref: '#/components/parameters/Desde'
         - $ref: '#/components/parameters/Hasta'
+        - $ref: '#/components/parameters/Marked'
       responses:
         '200':
-          description: JSON csv_text con CSV UTF-8 BOM, encabezados Scout; celdas potencialmente ejecutables en hojas de cálculo prefijadas con apóstrofo. Esta exportación es para consulta y no sustituye el maestro original de Scout.
+          description: JSON csv_text con CSV UTF-8 BOM, encabezados Scout seguidos de de_interes (0/1) y nota compartida; celdas potencialmente ejecutables en hojas de cálculo prefijadas con apóstrofo. Esta exportación es para consulta y no sustituye el maestro original de Scout.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [csv_text]
+                properties:
+                  csv_text: {type: string}
         '409':
           description: Más de 5.000 filas o 16 MiB; acotar filtros. No se trunca el resultado.
         default:
           $ref: '#/components/responses/Problem'
 components:
+  schemas:
+    Status:
+      type: object
+      required: [total, last_import_at]
+      properties:
+        total: {type: integer, minimum: 0}
+        last_import_at: {type: [string, 'null'], format: date-time}
+    Review:
+      type: object
+      required: [marked, note, version]
+      properties:
+        marked: {type: boolean}
+        note: {type: string, maxLength: 10000}
+        version: {type: integer, minimum: 0}
+    Process:
+      allOf:
+        - $ref: '#/components/schemas/Review'
+        - type: object
+          required: [proceso_id, entidad, expediente, fecha_recepcion, puntaje, rubro, resumen_corto, source]
+          properties:
+            proceso_id: {type: string, pattern: '^hc:[a-f0-9]{64}$'}
+            entidad: {type: string, maxLength: 500}
+            expediente: {type: string, maxLength: 255}
+            fecha_recepcion: {type: string, format: date-time}
+            puntaje: {type: integer, minimum: 0, maximum: 100}
+            rubro: {type: string, maxLength: 500}
+            resumen_corto: {type: string, maxLength: 16384}
+            source:
+              type: object
+              description: Vacío en listados; las 24 columnas de Scout con sus textos exactos en el detalle. items e items_fuente son JSON serializado como texto.
+              additionalProperties: {type: string}
+    Page:
+      type: object
+      required: [items, page, page_size, has_more]
+      properties:
+        items:
+          type: array
+          maxItems: 100
+          items: {$ref: '#/components/schemas/Process'}
+        page: {type: integer, minimum: 1, maximum: 100000}
+        page_size: {type: integer, minimum: 1, maximum: 100}
+        has_more: {type: boolean}
+    ImportResult:
+      type: object
+      required: [import_id, inserted, updated, unchanged, stale, replayed]
+      properties:
+        import_id: {type: integer, minimum: 1}
+        inserted: {type: integer, minimum: 0}
+        updated: {type: integer, minimum: 0}
+        unchanged: {type: integer, minimum: 0}
+        stale: {type: integer, minimum: 0}
+        replayed: {type: boolean}
   securitySchemes:
     session:
       type: apiKey
       in: cookie
       name: __Host-bastion_session
   parameters:
+    Marked:
+      name: marked
+      in: query
+      schema: {type: boolean}
     Q:
       name: q
       in: query

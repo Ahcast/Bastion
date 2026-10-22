@@ -3,7 +3,7 @@ export class ApiError extends Error {
   readonly title: string;
   constructor(status: number, title: string, detail: string) { super(detail); this.status = status; this.title = title; }
 }
-type Options = { method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'; body?: unknown; signal?: AbortSignal };
+type Options = { method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'; body?: unknown; signal?: AbortSignal; ifMatch?: number };
 type Hooks = { unauthorized?: () => void; reauthenticate?: () => void };
 const record = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null;
 export class ApiClient {
@@ -20,6 +20,7 @@ export class ApiClient {
   async request<T = void>(path: string, options: Options = {}, retried = false): Promise<T> {
     const method = options.method ?? 'GET';
     const headers = new Headers();
+    if (options.ifMatch !== undefined) headers.set('If-Match', `"${options.ifMatch}"`);
     if (options.body !== undefined) headers.set('Content-Type', 'application/json');
     if (method !== 'GET') headers.set('X-CSRF-Token', this.csrf);
     let response: Response;
