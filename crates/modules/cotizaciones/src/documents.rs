@@ -66,22 +66,24 @@ impl QuoteService {
         let mut identity = serde_json::to_vec(&payload).map_err(|_| CoreError::Invalid)?;
         identity.extend_from_slice(TEMPLATE.as_bytes());
         let hash = Sha256::digest(identity);
-        let key = format!(
-            "cotizaciones/{id}/{expected}/pdf-v1-{}.pdf",
-            hex::encode(hash)
-        );
+        let prefix = format!("cotizaciones/{id}/{expected}/pdf-v1-{}-", hex::encode(hash));
+        // A renderer owns its key, so failed/concurrent renders cannot remove or
+        // overwrite another renderer's confirmed document during cleanup.
+        let mut key = format!("{prefix}{}.pdf", DocumentService::object_suffix());
         let filename = format!(
             "{}.pdf",
             current.quote_number.as_deref().unwrap_or("cotizacion")
         );
-        let previous: Option<Vec<u8>> = sqlx::query_scalar(
-            "SELECT sha256 FROM cotizaciones_documents WHERE quote_id=? AND object_key=?",
+        let previous: Option<(String,Vec<u8>)> = sqlx::query_as(
+            "SELECT object_key,sha256 FROM cotizaciones_documents WHERE quote_id=? AND quote_version=? AND kind='pdf' AND object_key LIKE ? ORDER BY object_key LIMIT 1",
         )
         .bind(id)
-        .bind(&key)
+        .bind(expected)
+        .bind(format!("{prefix}%"))
         .fetch_optional(self.database.pool())
         .await?;
-        let bytes = if let Some(hash) = previous {
+        let bytes = if let Some((stored_key, hash)) = previous {
+            key = stored_key;
             let bytes = storage.get(key.clone()).await?;
             if Sha256::digest(&bytes).as_slice() != hash.as_slice() {
                 return Err(CoreError::Overloaded);
@@ -94,14 +96,14 @@ impl QuoteService {
                 let mut tx=self.begin(actor,"ver").await?;
                 let latest=load(&mut tx,id).await?;
                 if latest.version!=expected {return Err(CoreError::PreconditionFailed);}
-                sqlx::query("INSERT IGNORE INTO cotizaciones_documents (object_key,quote_id,quote_version,kind,filename,mime,sha256,byte_size,created_at) VALUES (?,?,?,'pdf',?,'application/pdf',?,?,UTC_TIMESTAMP(6))")
+                sqlx::query("INSERT INTO cotizaciones_documents (object_key,quote_id,quote_version,kind,filename,mime,sha256,byte_size,created_at) VALUES (?,?,?,'pdf',?,'application/pdf',?,?,UTC_TIMESTAMP(6))")
                     .bind(&key).bind(id).bind(expected).bind(&filename).bind(Sha256::digest(&bytes).to_vec()).bind(bytes.len() as u32).execute(&mut *tx).await?;
                 CoreAdmin::record_domain_event(&mut tx,actor,"cotizaciones","quote.pdf",&id.to_string(),serde_json::json!({"version":expected,"template":"cotizacion-v1"})).await?;
                 tx.commit().await?;
                 Ok::<(),CoreError>(())
             }.await;
             if let Err(error) = persist {
-                sqlx::query("INSERT IGNORE INTO cotizaciones_document_deletions (object_key,available_at) VALUES (?,UTC_TIMESTAMP(6))").bind(&key).execute(self.database.pool()).await?;
+                sqlx::query("INSERT IGNORE INTO cotizaciones_document_deletions (object_key,available_at) VALUES (?,UTC_TIMESTAMP(6)+INTERVAL 5 MINUTE)").bind(&key).execute(self.database.pool()).await?;
                 return Err(error);
             }
             bytes

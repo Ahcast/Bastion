@@ -53,6 +53,11 @@ pub struct DocumentService {
     region: String,
 }
 impl DocumentService {
+    pub fn object_suffix() -> String {
+        let mut random = [0u8; 24];
+        rand::rngs::OsRng.fill_bytes(&mut random);
+        hex::encode(random)
+    }
     pub fn from_environment() -> Self {
         Self {
             enabled: std::env::var("BASTION_DOCUMENTS_ENABLED").as_deref() == Ok("true"),
