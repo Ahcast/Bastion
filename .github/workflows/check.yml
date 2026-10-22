@@ -106,7 +106,18 @@ jobs:
         run: docker exec ${{ job.services.mysql57.id }} mysql -uroot -pbastion_ci_only -e 'CREATE DATABASE bastion_cotizaciones_test CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci'
       - name: Prepare isolated invitation test database
         run: docker exec ${{ job.services.mysql57.id }} mysql -uroot -pbastion_ci_only -e 'CREATE DATABASE bastion_core_test CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci'
+      - name: Install pinned PDF compiler
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/bastion-typst"
+          curl -fsSL https://github.com/typst/typst/releases/download/v0.15.1/typst-x86_64-unknown-linux-musl.tar.xz -o "$RUNNER_TEMP/typst.tar.xz"
+          echo "a6d077d0a95eed5a2eba715b2dae06be954f624ccbf85758a03f389ded33118c  $RUNNER_TEMP/typst.tar.xz" | sha256sum -c -
+          tar -xJf "$RUNNER_TEMP/typst.tar.xz" --strip-components=1 -C "$RUNNER_TEMP/bastion-typst"
+          echo "BASTION_TYPST_BIN=$RUNNER_TEMP/bastion-typst/typst" >> "$GITHUB_ENV"
+          echo "BASTION_DOCUMENTS_WORK_DIR=$RUNNER_TEMP/bastion-documents" >> "$GITHUB_ENV"
       - name: Run workspace tests
+        # Shared PDF template runs with synthetic data and no S3 or SMTP credentials.
         # Each module uses an isolated disposable MySQL 5.7 database.
         run: |
           docker exec ${{ job.services.mysql57.id }} mysql -uroot -pbastion_ci_only -e 'CREATE DATABASE bastion_clientes_test CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci'

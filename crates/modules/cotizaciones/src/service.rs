@@ -2,8 +2,16 @@ use bastion_core::{CoreAdmin, CoreError, Database};
 use sha2::{Digest, Sha256};
 use sqlx::{MySql, QueryBuilder, Transaction};
 
+#[path = "documents.rs"]
+mod documents;
+pub use documents::{QuoteDocument, QuoteDocumentReadiness};
+#[path = "mail.rs"]
+mod mail;
+pub use mail::{QuoteEmailInput, QuoteEmailJob, QuoteMailService};
+
 use crate::{
-    QuoteCalculation, QuoteDraft, QuoteFilter, QuoteInput, QuotePage, QuoteSummary, calculate,
+    QuoteCalculation, QuoteDraft, QuoteFilter, QuoteInput, QuotePage, QuoteStatus, QuoteSummary,
+    calculate,
 };
 
 #[derive(Clone)]
@@ -258,6 +266,131 @@ impl QuoteService {
             quote_number: Some(number),
             calculation,
         })
+    }
+
+    pub async fn change_status(
+        &self,
+        actor: u64,
+        id: u64,
+        expected: u64,
+        status: QuoteStatus,
+    ) -> Result<QuoteDraft, CoreError> {
+        let mut tx = self.begin(actor, "editar").await?;
+        let current = load(&mut tx, id).await?;
+        if current.version != expected {
+            return Err(CoreError::PreconditionFailed);
+        }
+        let version = expected.checked_add(1).ok_or(CoreError::Invalid)?;
+        let mut result = current;
+        let previous = result.status.clone();
+        result.version = version;
+        result.status = status.as_str().into();
+        result.data.status = status;
+        result.calculation.data.status = status;
+        sqlx::query("UPDATE cotizaciones_drafts SET data_json=?,calculation_json=?,updated_by=?,updated_at=UTC_TIMESTAMP(6),version=? WHERE id=? AND version=?")
+            .bind(serde_json::to_value(&result.data).map_err(|_| CoreError::Invalid)?)
+            .bind(serde_json::to_value(&result.calculation).map_err(|_| CoreError::Invalid)?)
+            .bind(actor).bind(version).bind(id).bind(expected).execute(&mut *tx).await?;
+        CoreAdmin::record_domain_event(&mut tx,actor,"cotizaciones","quote.status",&id.to_string(),
+            serde_json::json!({"version":version,"previous_status":previous,"status":result.status})).await?;
+        tx.commit().await?;
+        Ok(result)
+    }
+
+    pub async fn clone_quote(
+        &self,
+        actor: u64,
+        id: u64,
+        expected: u64,
+        key: &str,
+    ) -> Result<QuoteDraft, CoreError> {
+        if !(16..=128).contains(&key.len())
+            || !key
+                .bytes()
+                .all(|c| c.is_ascii_alphanumeric() || c == b'-' || c == b'_')
+        {
+            return Err(CoreError::Invalid);
+        }
+        let key_hash = Sha256::digest(key.as_bytes()).to_vec();
+        let request_hash =
+            Sha256::digest(format!("quote.clone:{id}:{expected}").as_bytes()).to_vec();
+        let (name, email) = self.admin.user_contact(actor).await?;
+        let mut tx = self.begin(actor, "editar").await?;
+        let previous: Option<(Vec<u8>, serde_json::Value)> = sqlx::query_as("SELECT request_hash,response_json FROM cotizaciones_create_receipts WHERE actor_id=? AND key_hash=?")
+            .bind(actor).bind(&key_hash).fetch_optional(&mut *tx).await?;
+        if let Some((hash, response)) = previous {
+            if hash != request_hash {
+                return Err(CoreError::Conflict);
+            }
+            let result = serde_json::from_value(response).map_err(|_| CoreError::Invalid)?;
+            tx.commit().await?;
+            return Ok(result);
+        }
+        let original = load(&mut tx, id).await?;
+        if original.version != expected {
+            return Err(CoreError::PreconditionFailed);
+        }
+        let mut input = original.data;
+        input.client_name.clear();
+        input.prepared_by_name = name;
+        input.contact_email = email;
+        input.status = QuoteStatus::Borrador;
+        input.quote_date = chrono::Utc::now()
+            .with_timezone(&chrono::FixedOffset::west_opt(6 * 3600).ok_or(CoreError::Invalid)?)
+            .date_naive();
+        let calculation = calculate(&input)?;
+        let input = calculation.data.clone();
+        let number = next_number(&mut tx).await?;
+        let id_new = sqlx::query("INSERT INTO cotizaciones_drafts (client_name,order_number,data_json,calculation_json,quote_number,created_by,updated_by,created_at,updated_at) VALUES (?,?,?,?,?,?,?,UTC_TIMESTAMP(6),UTC_TIMESTAMP(6))")
+            .bind(&input.client_name).bind(&input.order_number)
+            .bind(serde_json::to_value(&input).map_err(|_| CoreError::Invalid)?)
+            .bind(serde_json::to_value(&calculation).map_err(|_| CoreError::Invalid)?)
+            .bind(&number).bind(actor).bind(actor).execute(&mut *tx).await?.last_insert_id();
+        let result = QuoteDraft {
+            id: id_new,
+            version: 1,
+            status: input.status.as_str().into(),
+            currency: "HNL".into(),
+            data: input,
+            quote_number: Some(number),
+            calculation,
+        };
+        sqlx::query("INSERT INTO cotizaciones_create_receipts (actor_id,key_hash,request_hash,response_json) VALUES (?,?,?,?)")
+            .bind(actor).bind(key_hash).bind(request_hash).bind(serde_json::to_value(&result).map_err(|_| CoreError::Invalid)?).execute(&mut *tx).await?;
+        CoreAdmin::record_domain_event(&mut tx,actor,"cotizaciones","quote.clone",&id_new.to_string(),
+            serde_json::json!({"source_id":id,"source_version":expected,"quote_number":result.quote_number})).await?;
+        tx.commit().await?;
+        Ok(result)
+    }
+
+    pub async fn delete(&self, actor: u64, id: u64, expected: u64) -> Result<(), CoreError> {
+        let mut tx = self.begin(actor, "eliminar").await?;
+        let current = load(&mut tx, id).await?;
+        if current.version != expected {
+            return Err(CoreError::PreconditionFailed);
+        }
+        sqlx::query("INSERT INTO cotizaciones_document_deletions (object_key,available_at) SELECT object_key,UTC_TIMESTAMP(6) FROM cotizaciones_documents WHERE quote_id=? ON DUPLICATE KEY UPDATE available_at=VALUES(available_at)").bind(id).execute(&mut *tx).await?;
+        sqlx::query("UPDATE cotizaciones_email_jobs SET delivery_status='cancelled',payload_ciphertext='',completed_at=UTC_TIMESTAMP(6) WHERE quote_id=? AND delivery_status IN ('pending','failed')").bind(id).execute(&mut *tx).await?;
+        let delivering:i64=sqlx::query_scalar("SELECT COUNT(*) FROM cotizaciones_email_jobs WHERE quote_id=? AND delivery_status='delivering'").bind(id).fetch_one(&mut *tx).await?;
+        if delivering > 0 {
+            return Err(CoreError::Conflict);
+        }
+        sqlx::query("DELETE FROM cotizaciones_drafts WHERE id=? AND version=?")
+            .bind(id)
+            .bind(expected)
+            .execute(&mut *tx)
+            .await?;
+        CoreAdmin::record_domain_event(
+            &mut tx,
+            actor,
+            "cotizaciones",
+            "quote.delete",
+            &id.to_string(),
+            serde_json::json!({"version":expected,"quote_number":current.quote_number}),
+        )
+        .await?;
+        tx.commit().await?;
+        Ok(())
     }
 }
 

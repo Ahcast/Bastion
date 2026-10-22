@@ -94,6 +94,22 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
             tokio::time::sleep(std::time::Duration::from_secs(10)).await;
         }
     });
+    if config.cotizaciones_allowed {
+        let quote_mailer = bastion_cotizaciones::QuoteMailService::new(core.clone());
+        let quote_documents =
+            bastion_cotizaciones::QuoteService::new(core.database(), core.admin());
+        tokio::spawn(async move {
+            loop {
+                if quote_mailer.deliver_one().await.is_err() {
+                    tracing::error!("quote email worker failed");
+                }
+                if quote_documents.clean_one_document().await.is_err() {
+                    tracing::error!("private document cleanup failed");
+                }
+                tokio::time::sleep(std::time::Duration::from_secs(10)).await;
+            }
+        });
+    }
     let app = router(core, app_origin, config.trusted_proxy_cidrs, scout_csv_path)?;
     let listener = TcpListener::bind(config.listen_addr).await?;
     let local_addr: SocketAddr = listener.local_addr()?;

@@ -125,6 +125,16 @@ pub struct RolePermissionInput {
 }
 
 impl CoreAdmin {
+    /// Shared business identity; callers authorize their document operation first.
+    pub async fn document_company(&self) -> Result<crate::DocumentCompany, CoreError> {
+        let value: Option<serde_json::Value> = sqlx::query_scalar("SELECT value_json FROM settings WHERE module_id='core' AND scope_key='global' AND setting_key='company.profile'")
+            .fetch_optional(self.database.pool()).await?;
+        let company: crate::DocumentCompany =
+            serde_json::from_value(value.ok_or(CoreError::Invalid)?)
+                .map_err(|_| CoreError::Invalid)?;
+        company.validate()?;
+        Ok(company)
+    }
     /// Authoritative contact snapshot for an authenticated domain actor.
     pub async fn user_contact(&self, actor: u64) -> Result<(String, String), CoreError> {
         sqlx::query_as("SELECT p.full_name,u.email FROM users u JOIN persons p ON p.id=u.person_id WHERE u.id=? AND u.status='active'")
@@ -1028,6 +1038,11 @@ fn validate_permission(p: &RolePermissionInput) -> Result<(), CoreError> {
 }
 fn validate_core_setting(key: &str, value: &serde_json::Value) -> Result<(), CoreError> {
     match key {
+        "company.profile" => {
+            let profile: crate::DocumentCompany =
+                serde_json::from_value(value.clone()).map_err(|_| CoreError::Invalid)?;
+            profile.validate()?;
+        }
         "smtp.host" => {
             let s = value.as_str().ok_or(CoreError::Invalid)?;
             if s.is_empty()

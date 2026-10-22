@@ -2,6 +2,10 @@
 
 Fecha: 2026-10-22. Estado: primer corte publicado en el ambiente de pruebas; módulo incompleto y desactivado por defecto.
 
+## Ampliación de acciones en curso
+
+Se incorpora el menú solicitado y sus comandos, PDF Typst y correo en cola/programado. Ver [contrato, límites y pendientes](cotizaciones-acciones.md). Las conversiones permanecen visibles y deshabilitadas por decisión del usuario. La verificación y publicación de esta ampliación siguen pendientes; la sección de publicación al final describe el corte anterior.
+
 ## Alcance implementado
 
 Registro `cotizaciones`, migraciones propias y almacenamiento transaccional. Listado resumido con búsqueda por número, cliente, referencia, estado y descripción; consulta y edición con control de versión. Numeración automática `COT-000001`, vencimiento, estados visibles y cálculo de descuentos e impuestos. El contacto procede del usuario creador mediante el Core y se conserva al editar. La pantalla React carga bajo demanda y aporta una sección informativa propia en Ajustes.
@@ -10,7 +14,7 @@ La copia Legacy indicada por el usuario ya se cotejó. Ver [fuentes, fórmulas y
 
 ## Contrato y límites del corte
 
-Ver `cotizaciones.openapi.yaml` (0.2.0). Permisos `cotizaciones/documentos/ver` y `cotizaciones/documentos/editar`, dentro de la matriz acordada. La copia del servidor no filtra por creador: los documentos del módulo son compartidos entre actores con permisos. La comprobación de paridad de permisos en sesión real sigue pendiente. No se presume multitenancy.
+Ver `cotizaciones.openapi.yaml` (0.3.0). Permisos `cotizaciones/documentos/ver` y `cotizaciones/documentos/editar`, dentro de la matriz acordada. La copia del servidor no filtra por creador: los documentos del módulo son compartidos entre actores con permisos. La comprobación de paridad de permisos en sesión real sigue pendiente. No se presume multitenancy.
 
 - Alta web: 30 días, término `Tiempo de entrega: `, estado Borrador y un ítem con cantidad 1, precio 0 e ISV 15%, conforme al editor activo. Los códigos `amount`/`percent` y `none`/`isv15`/`isv18` están confirmados. Se acepta `exempt` como alias de compatibilidad del prototipo, pero siempre se serializa `none`.
 - Fecha más días para `valid_until`; vigencia 0..3650. Rango técnico de fechas: 1000-01-01..9999-12-31, sin vencimientos fuera de ese rango.
@@ -36,7 +40,7 @@ Queda pendiente reconciliar los casos límite de redondeo con ejemplos contables
 
 El contador nuevo empieza en cero y no implica continuidad con producción. Antes de migrar cotizaciones del Legacy se deben reconciliar números, referencias, importes, contactos y archivos. Este corte no migra datos.
 
-Pendientes: catálogo Clientes, PDF/Typst y plantilla, adjuntos privados, correo inmediato/programado, clonación, eliminación confirmada, conversiones, acciones masivas y MCP. No se exponen botones de esas operaciones antes de implementarlas. Los settings propios siguen pendientes y Ajustes lo indica.
+Pendientes: catálogo Clientes, PDF/Typst y plantilla, adjuntos privados, correo inmediato/programado, clonación, eliminación confirmada, conversiones, acciones masivas y MCP. La ampliación de acciones actualiza este alcance: conversiones visibles y deshabilitadas por acuerdo; PDF y correo requieren su configuración efectiva. Los demás pendientes se detallan en cotizaciones-acciones.md. Los settings propios siguen pendientes y Ajustes lo indica.
 
 El usuario autorizó la publicación en GitHub y AWS. El corte técnico se desplegó con respaldo previo; esto no lo convierte en módulo terminado ni en aprobación de producción.
 

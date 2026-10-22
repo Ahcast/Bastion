@@ -3,6 +3,7 @@
 mod admin;
 mod config;
 mod database;
+mod documents;
 mod service;
 
 pub use admin::{
@@ -11,8 +12,9 @@ pub use admin::{
 };
 pub use config::{AppConfig, ConfigError, DatabaseConfig};
 pub use database::Database;
+pub use documents::{DocumentCompany, DocumentService};
 pub use service::{
-    AccessCatalog, AuthCookies, AuthenticatedUser, BootstrapBegin, BootstrapComplete, CoreError,
-    CoreService, InvitationDispatch, LoginStart, ModuleAccess, ProfileInfo, SecurityEventInfo,
-    SessionInfo, SmtpCredentialInfo, TrustedDeviceInfo,
+    AccessCatalog, AuthCookies, AuthenticatedUser, BootstrapBegin, BootstrapComplete, BusinessMail,
+    BusinessMailAttachment, CoreError, CoreService, InvitationDispatch, LoginStart, ModuleAccess,
+    ProfileInfo, SecurityEventInfo, SessionInfo, SmtpCredentialInfo, TrustedDeviceInfo,
 };

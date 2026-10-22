@@ -37,6 +37,8 @@ El informe se obtuvo de una copia de frontend Angular compilado y backend Larave
 
 ## Registro de decisiones
 
+- 2026-10-22: el usuario confirma menú por cotización con Ver, Editar, Marcar como enviado, conversiones, Aprobar, Clonar, PDF, correo y Eliminar. Ambas conversiones quedan visibles y deshabilitadas hasta desarrollar sus módulos. PDF usa el diseño Legacy como referencia para Typst y correo conserva destinatarios/copias/mensaje y programación. Empresa, compilación PDF, almacenamiento privado y SMTP siguen como servicios del Core. Implementación y condiciones de habilitación: `modulos/cotizaciones-acciones.md`.
+
 - 2026-10-22: por autorización del usuario se publica el primer corte técnico de Cotizaciones en GitHub y luego AWS/Bluehost. El código `78743be` pasó CI con MySQL 5.7, se respaldaron base/frontend y se aplicaron dos migraciones. Cotizaciones queda disponible pero sin activar; Procesos y sus 835 registros se conservaron. Ver la evidencia y pendientes en `modulos/cotizaciones-implementacion.md`.
 
 - 2026-10-22: corrección de Procesos: mostrar solo recepción estrictamente futura por fecha y hora exactas; conservar vencidos en el histórico. Estadísticas globales de la importación independientes de filtros y vencimiento. Nuevos por semana usa la primera incorporación en Bastion mediante inserted/created_at de recibos confirmados, no primera detección de Scout. Ver `modulos/procesos-implementacion.md`.

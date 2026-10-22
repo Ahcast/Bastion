@@ -1,6 +1,7 @@
 use bastion_core::{CoreError, CoreService, Database};
 use bastion_cotizaciones::{
-    DiscountType, QuoteFilter, QuoteInput, QuoteItem, QuoteService, QuoteStatus, TaxType,
+    DiscountType, QuoteFilter, QuoteInput, QuoteItem, QuoteMailService, QuoteService, QuoteStatus,
+    TaxType,
 };
 use sqlx::mysql::MySqlPoolOptions;
 
@@ -152,6 +153,166 @@ async fn mysql57_drafts_permissions_idempotency_versions_and_disable() {
             .await
             .unwrap();
     assert_eq!(events, 2);
+    assert!(matches!(
+        service
+            .change_status(2, one.id, 2, QuoteStatus::Enviada)
+            .await,
+        Err(CoreError::Forbidden)
+    ));
+    assert!(matches!(
+        service
+            .clone_quote(2, one.id, 2, "synthetic-clone-key-0001")
+            .await,
+        Err(CoreError::Forbidden)
+    ));
+    assert!(matches!(
+        service.delete(2, one.id, 2).await,
+        Err(CoreError::Forbidden)
+    ));
+    let sent = service
+        .change_status(1, one.id, 2, QuoteStatus::Enviada)
+        .await
+        .unwrap();
+    assert_eq!(sent.version, 3);
+    assert_eq!(sent.data.status.as_str(), "Enviada");
+    assert_eq!(sent.calculation.data.status.as_str(), "Enviada");
+    assert_eq!(
+        sent.calculation.totals.total,
+        edited.calculation.totals.total
+    );
+    assert!(matches!(
+        service
+            .change_status(1, one.id, 2, QuoteStatus::Aprobada)
+            .await,
+        Err(CoreError::PreconditionFailed)
+    ));
+    let approved = service
+        .change_status(1, one.id, 3, QuoteStatus::Aprobada)
+        .await
+        .unwrap();
+    sqlx::query("INSERT INTO role_permissions (role_id,module_id,scope_hash,scope_key,capability) VALUES (2,'cotizaciones',UNHEX(SHA2('documentos',256)),'documentos','editar')").execute(&pool).await.unwrap();
+    assert!(matches!(
+        service
+            .clone_quote(2, one.id, 3, "synthetic-clone-key-0001")
+            .await,
+        Err(CoreError::PreconditionFailed)
+    ));
+    let (cloned, replay) = tokio::join!(
+        service.clone_quote(2, one.id, approved.version, "synthetic-clone-key-0001"),
+        service.clone_quote(2, one.id, approved.version, "synthetic-clone-key-0001")
+    );
+    let cloned = cloned.unwrap();
+    assert_eq!(cloned.id, replay.unwrap().id);
+    assert_eq!(cloned.quote_number.as_deref(), Some("COT-000002"));
+    assert_eq!(cloned.data.client_name, "");
+    assert_eq!(cloned.data.prepared_by_name, "Viewer test");
+    assert_eq!(cloned.data.contact_email, "viewer@example.test");
+    assert_eq!(cloned.status, "Borrador");
+    assert_eq!(
+        cloned.data.quote_date,
+        chrono::Utc::now()
+            .with_timezone(&chrono::FixedOffset::west_opt(21600).unwrap())
+            .date_naive()
+    );
+    assert_eq!(
+        cloned.data.items[0].description,
+        approved.data.items[0].description
+    );
+    assert_eq!(cloned.data.notes, approved.data.notes);
+    assert_eq!(
+        cloned.calculation.totals.total,
+        approved.calculation.totals.total
+    );
+    assert_eq!(
+        service.detail(1, one.id).await.unwrap().version,
+        approved.version
+    );
+    assert!(matches!(
+        service
+            .clone_quote(2, one.id, 3, "synthetic-clone-key-0001")
+            .await,
+        Err(CoreError::Conflict)
+    ));
+    assert!(matches!(
+        service
+            .clone_quote(2, one.id, approved.version, "bad")
+            .await,
+        Err(CoreError::Invalid)
+    ));
+    assert!(matches!(
+        service.delete(2, cloned.id, 1).await,
+        Err(CoreError::Forbidden)
+    ));
+    assert!(matches!(
+        service.delete(1, cloned.id, 2).await,
+        Err(CoreError::PreconditionFailed)
+    ));
+    let document_key = format!("cotizaciones/{}/synthetic.pdf", cloned.id);
+    sqlx::query("INSERT INTO cotizaciones_documents (object_key,quote_id,quote_version,kind,filename,mime,sha256,byte_size,created_at) VALUES (?,?,1,'pdf','synthetic.pdf','application/pdf',UNHEX(SHA2('synthetic',256)),10,UTC_TIMESTAMP(6))").bind(&document_key).bind(cloned.id).execute(&pool).await.unwrap();
+    let pending=sqlx::query("INSERT INTO cotizaciones_email_jobs (quote_id,quote_version,actor_id,key_hash,request_hash,payload_ciphertext,delivery_status,scheduled_at,created_at) VALUES (?,1,2,UNHEX(SHA2('synthetic-job',256)),UNHEX(SHA2('payload',256)),X'01','delivering',UTC_TIMESTAMP(6),UTC_TIMESTAMP(6))").bind(cloned.id).execute(&pool).await.unwrap().last_insert_id();
+    assert!(matches!(
+        service.delete(1, cloned.id, 1).await,
+        Err(CoreError::Conflict)
+    ));
+    sqlx::query("UPDATE cotizaciones_email_jobs SET delivery_status='pending' WHERE id=?")
+        .bind(pending)
+        .execute(&pool)
+        .await
+        .unwrap();
+    service.delete(1, cloned.id, 1).await.unwrap();
+    let cancelled: (String, Vec<u8>) = sqlx::query_as(
+        "SELECT delivery_status,payload_ciphertext FROM cotizaciones_email_jobs WHERE id=?",
+    )
+    .bind(pending)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(cancelled.0, "cancelled");
+    assert!(cancelled.1.is_empty());
+    let cleanup: String =
+        sqlx::query_scalar("SELECT object_key FROM cotizaciones_document_deletions")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!(cleanup, document_key);
+    assert!(matches!(
+        service.detail(1, cloned.id).await,
+        Err(CoreError::NotFound)
+    ));
+    let audit: Vec<String> = sqlx::query_scalar(
+        "SELECT action FROM audit_events WHERE module_id='cotizaciones' ORDER BY id",
+    )
+    .fetch_all(&pool)
+    .await
+    .unwrap();
+    assert_eq!(
+        audit,
+        [
+            "quote.create",
+            "quote.update",
+            "quote.status",
+            "quote.status",
+            "quote.clone",
+            "quote.delete"
+        ]
+    );
+    sqlx::query("DELETE FROM role_permissions WHERE role_id=2 AND module_id='cotizaciones' AND capability='editar'").execute(&pool).await.unwrap();
+    let revoked=sqlx::query("INSERT INTO cotizaciones_email_jobs (quote_id,quote_version,actor_id,key_hash,request_hash,payload_ciphertext,scheduled_at,created_at) VALUES (?,?,2,UNHEX(SHA2('revoked-job',256)),UNHEX(SHA2('payload',256)),X'01',UTC_TIMESTAMP(6),UTC_TIMESTAMP(6))").bind(one.id).bind(approved.version).execute(&pool).await.unwrap().last_insert_id();
+    assert!(
+        QuoteMailService::new(core.clone())
+            .deliver_one()
+            .await
+            .unwrap()
+    );
+    let failed: (String, Option<String>) = sqlx::query_as(
+        "SELECT delivery_status,last_error_code FROM cotizaciones_email_jobs WHERE id=?",
+    )
+    .bind(revoked)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(failed.0, "failed");
+    assert_eq!(failed.1.as_deref(), Some("authorization_changed"));
     core.admin()
         .set_module_enabled(1, "cotizaciones", false)
         .await

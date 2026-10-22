@@ -3,7 +3,10 @@
 mod calculation;
 mod service;
 pub use calculation::{CalculatedItem, QuoteCalculation, QuoteTotals, calculate};
-pub use service::QuoteService;
+pub use service::{
+    QuoteDocument, QuoteDocumentReadiness, QuoteEmailInput, QuoteEmailJob, QuoteMailService,
+    QuoteService,
+};
 
 use bastion_core::CoreError;
 use chrono::{Datelike, NaiveDate};

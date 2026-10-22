@@ -37,3 +37,7 @@ La vista previa Angular calcula sin los redondeos intermedios del backend y suma
 El prorrateo legado puede distribuir más o menos centavos que el descuento general solicitado; se conserva y se prueba, sin introducir reparto de residuos. El total bruto sin redondear y el redondeo de descuentos por línea también pueden producir resultados límite no intuitivos con cantidades fraccionarias. Deben reconciliarse con ejemplos anonimizados antes de producción; no afirmar equivalencia contable por esta revisión estática.
 
 Pendientes de implementación/paridad: catálogo Clientes, PDF/Typst, adjuntos privados, correo/programación, clonación, eliminación confirmada, conversiones y acciones masivas. Pendientes de validación: sesión real, esquema SQL Legacy, ejemplos contables y continuidad del contador al migrar. Los settings propios siguen sin definirse.
+
+## Cotejo de acciones por fila
+
+El menú activo diferencia Ver/Editar y ofrece las diez acciones indicadas por el usuario. Marcar como enviado y Aprobar llaman a updateStatus. Clonar limpia cliente, asigna fecha actual de Honduras/nuevo número/contacto y vuelve a Borrador. Eliminar solicita confirmación. Convertir a orden abre un formulario con quote_id; convertir a factura crea o reutiliza una factura relacionada. PDF y correo adoptan el diseño/flujo Legacy por acuerdo. Ver el alcance actual y diferencias explícitas en [cotizaciones-acciones.md](cotizaciones-acciones.md).

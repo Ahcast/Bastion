@@ -1,9 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
 import { ApiError, message } from '../api.js';
-import { Heading, Loading, Notice, Table, useCore, useLoad } from '../ui.js';
+import { Dialog, Heading, Loading, Notice, Table, useCore, useLoad } from '../ui.js';
+import { QuoteActions } from '../components/QuoteActions.js';
+import { QuoteEmailComposer } from '../components/QuoteEmailComposer.js';
+import { downloadPdf } from '../quoteDocuments.js';
+import type { DocumentReadiness, QuotePdf } from '../quoteDocuments.js';
 import { moduleCan } from '../types.js';
 import { newQuote, newQuoteItem, quoteStatuses } from '../quotes.js';
-import type { DiscountType, QuoteDraft, QuoteInput, QuoteItem, QuotePage, QuoteCalculation, QuoteStatus } from '../quotes.js';
+import type { DiscountType, QuoteDraft, QuoteInput, QuoteItem, QuotePage, QuoteCalculation, QuoteStatus, QuoteSummary } from '../quotes.js';
 
 export default function Cotizaciones() {
   const { access } = useCore();
@@ -12,21 +16,68 @@ export default function Cotizaciones() {
 }
 
 function Workspace() {
-  const { api, access } = useCore();
+  const { api, access, notify } = useCore();
   const [selected, setSelected] = useState<QuoteDraft | 'new' | null>(null);
   const [search, setSearch] = useState(''), [query, setQuery] = useState(''), [page, setPage] = useState(1), [error, setError] = useState(''), [opening, setOpening] = useState(false);
+  const [mode, setMode] = useState<'view' | 'edit'>('view'), [deleting, setDeleting] = useState<QuoteSummary | null>(null);
+  const [email, setEmail] = useState<QuoteSummary | null>(null);
+  const cloneAttempt = useRef<{ id: number; version: number; key: string } | null>(null);
   const editable = moduleCan(access, 'cotizaciones', 'documentos', 'editar');
-  const result = useLoad(signal => api.request<QuotePage>(`/api/v1/cotizaciones?q=${encodeURIComponent(query)}&page=${page}&page_size=25`, { signal }), [query, page]);
-  if (selected) return <Editor key={selected === 'new' ? 'new' : selected.id} initial={selected === 'new' ? null : selected} editable={editable} close={() => { setSelected(null); result.reload(); }} />;
-  return <><Heading title="Cotizaciones" description="Prepara cotizaciones con descuentos, impuestos y totales calculados por el servidor." action={editable && <button className="primary" onClick={() => setSelected('new')}>Nueva cotización</button>} />
-    <p className="quote-stage">Desarrollo local · Cálculo y numeración cotejados con CastilloIT. PDF, adjuntos, correo y conversiones siguen pendientes.</p>
+  const removable = moduleCan(access, 'cotizaciones', 'documentos', 'eliminar');
+  const documents = useLoad(signal => api.request<DocumentReadiness>('/api/v1/cotizaciones/document-readiness', { signal }));
+  const result = useLoad(signal => api.request<QuotePage>(`/api/v1/cotizaciones?q=${encodeURIComponent(query)}&page=${page}&page_size=25`, { signal }), [query, page], true);
+  const open = async (draft: QuoteSummary, nextMode: 'view' | 'edit') => {
+    setError(''); setOpening(true);
+    try { setSelected(await api.request<QuoteDraft>(`/api/v1/cotizaciones/${draft.id}`)); setMode(nextMode); }
+    catch (reason) { setError(message(reason)); } finally { setOpening(false); }
+  };
+  const status = async (draft: QuoteSummary, value: QuoteStatus) => {
+    setError(''); setOpening(true);
+    try {
+      const updated = await api.request<QuoteDraft>(`/api/v1/cotizaciones/${draft.id}/status`, { method: 'PATCH', body: { status: value }, ifMatch: draft.version });
+      result.setData(current => current ? { ...current, items: current.items.map(row => row.id === draft.id ? { ...row, status: updated.status, version: updated.version } : row) } : current);
+      notify(`Cotización marcada como ${value}.`);
+    } catch (reason) { setError(message(reason)); if (reason instanceof ApiError && reason.status === 412) result.reload(); }
+    finally { setOpening(false); }
+  };
+  const clone = async (draft: QuoteSummary) => {
+    setError(''); setOpening(true);
+    if (!cloneAttempt.current || cloneAttempt.current.id !== draft.id || cloneAttempt.current.version !== draft.version) cloneAttempt.current = { id: draft.id, version: draft.version, key: crypto.randomUUID() };
+    try {
+      setSelected(await api.request<QuoteDraft>(`/api/v1/cotizaciones/${draft.id}/clone`, { method: 'POST', ifMatch: draft.version, idempotencyKey: cloneAttempt.current.key }));
+      setMode('edit'); cloneAttempt.current = null; notify('Cotización clonada. Completa el cliente de la copia.');
+    } catch (reason) { setError(message(reason)); if (reason instanceof ApiError && reason.status === 412) result.reload(); }
+    finally { setOpening(false); }
+  };
+  if (selected) return <Editor key={selected === 'new' ? 'new' : selected.id} initial={selected === 'new' ? null : selected} editable={editable && mode === 'edit'} edit={editable && mode === 'view' ? () => setMode('edit') : undefined} close={() => { setSelected(null); result.reload(); }} />;
+  return <><Heading title="Cotizaciones" description="Prepara cotizaciones con descuentos, impuestos y totales calculados por el servidor." action={editable && <button className="primary" onClick={() => { setMode('edit'); setSelected('new'); }}>Nueva cotización</button>} />
+    {!documents.data?.pdf && <p className="quote-stage">PDF requiere la configuración de Empresa en Ajustes del Core y el servicio de documentos del servidor.</p>}
+    <Notice>{documents.error}</Notice>
     <form className="row quote-search" onSubmit={event => { event.preventDefault(); setQuery(search); setPage(1); }}><label>Buscar cliente, referencia o ítem<input value={search} maxLength={200} onChange={event => setSearch(event.target.value)} /></label><button type="submit">Buscar</button></form>
     <Notice>{error || result.error}</Notice>
-    {result.data ? <><Table columns={['Número', 'Cliente', 'Fecha', 'Vence', 'Total (HNL)', 'Estado', 'Ítems', 'Acción']} rows={result.data.items.map(draft => [draft.quote_number ?? 'Sin numerar', draft.client_name || 'Sin cliente', draft.quote_date, draft.valid_until, draft.total, draft.status, draft.item_count, <button disabled={opening} onClick={async () => { setError(''); setOpening(true); try { setSelected(await api.request<QuoteDraft>(`/api/v1/cotizaciones/${draft.id}`)); } catch (reason) { setError(message(reason)); } finally { setOpening(false); } }}>Abrir</button>])} /><div className="row"><button disabled={page === 1 || opening} onClick={() => setPage(p => p - 1)}>Anterior</button><span>Página {page}</span><button disabled={!result.data.has_more || opening} onClick={() => setPage(p => p + 1)}>Siguiente</button></div></> : !result.error && <Loading />}
+    {result.data ? <><Table columns={['Número', 'Cliente', 'Fecha', 'Vence', 'Total (HNL)', 'Estado', 'Ítems', 'Acción']} rows={result.data.items.map(draft => [draft.quote_number ?? 'Sin numerar', draft.client_name || 'Sin cliente', draft.quote_date, draft.valid_until, draft.total, draft.status, draft.item_count, <QuoteActions number={draft.quote_number ?? String(draft.id)} busy={opening} actions={[
+      { label: 'Ver', run: () => void open(draft, 'view') },
+      { label: 'Editar', disabled: !editable, reason: !editable ? 'Sin permiso de edición' : undefined, run: () => void open(draft, 'edit') },
+      { label: 'Marcar como enviado', disabled: !editable, run: () => void status(draft, 'Enviada') },
+      { label: 'Convertir a orden de compra', disabled: true, reason: 'Disponible al incorporar Órdenes de compra' },
+      { label: 'Convertir a factura', disabled: true, reason: 'Disponible al incorporar Facturas' },
+      { label: 'Aprobar', disabled: !editable, run: () => void status(draft, 'Aprobada') },
+      { label: 'Clonar', disabled: !editable, run: () => void clone(draft) },
+      { label: 'PDF', disabled: !documents.data?.pdf, reason: !documents.data?.pdf ? 'Configura Empresa y el servicio de documentos' : undefined, run: () => { setError(''); setOpening(true); void api.request<QuotePdf>(`/api/v1/cotizaciones/${draft.id}/pdf`, { ifMatch: draft.version }).then(downloadPdf).catch(reason => setError(message(reason))).finally(() => setOpening(false)); } },
+      { label: 'Enviar por correo', disabled: !editable || !documents.data?.pdf || !documents.data?.email, reason: !editable ? 'Sin permiso de edición' : !documents.data?.pdf ? 'Configura Empresa y documentos' : !documents.data?.email ? 'Configura SMTP global y tus credenciales en Mi cuenta' : undefined, run: () => setEmail(draft) },
+      { label: 'Eliminar', disabled: !removable, danger: true, run: () => setDeleting(draft) },
+    ]} />])} /><div className="row"><button disabled={page === 1 || opening} onClick={() => setPage(p => p - 1)}>Anterior</button><span>Página {page}</span><button disabled={!result.data.has_more || opening} onClick={() => setPage(p => p + 1)}>Siguiente</button></div></> : !result.error && <Loading />}
+    {email && <QuoteEmailComposer summary={email} close={() => setEmail(null)} sent={result.reload} />}
+    {deleting && <Dialog title={`Eliminar ${deleting.quote_number ?? 'cotización'}`} close={() => { if (!opening) setDeleting(null); }}><p>Esta acción elimina la cotización y no se puede deshacer.</p><Notice>{error}</Notice><div className="actions"><button disabled={opening} onClick={() => setDeleting(null)}>Cancelar</button><button disabled={opening} className="danger" onClick={async () => {
+      setError(''); setOpening(true);
+      try { await api.request(`/api/v1/cotizaciones/${deleting.id}`, { method: 'DELETE', ifMatch: deleting.version }); setDeleting(null); setPage(1); result.reload(); notify('Cotización eliminada.'); }
+      catch (reason) { setError(message(reason)); if (reason instanceof ApiError && reason.status === 412) { setDeleting(null); result.reload(); } }
+      finally { setOpening(false); }
+    }}>{opening ? 'Eliminando…' : 'Eliminar cotización'}</button></div></Dialog>}
   </>;
 }
 
-function Editor({ initial, editable, close }: { initial: QuoteDraft | null; editable: boolean; close: () => void }) {
+function Editor({ initial, editable, edit, close }: { initial: QuoteDraft | null; editable: boolean; edit?: () => void; close: () => void }) {
   const { api, notify } = useCore();
   const [saved, setSaved] = useState(initial), [data, setData] = useState<QuoteInput>(() => initial?.data ?? newQuote()), [busy, setBusy] = useState(false), [error, setError] = useState(''), [dirty, setDirty] = useState(false), [conflict, setConflict] = useState(false);
   const [preview, setPreview] = useState<{ input: QuoteInput; value: QuoteCalculation } | null>(null), [calculationError, setCalculationError] = useState('');
@@ -44,7 +95,7 @@ function Editor({ initial, editable, close }: { initial: QuoteDraft | null; edit
   const change = <K extends keyof QuoteInput>(key: K, value: QuoteInput[K]) => { setData(previous => ({ ...previous, [key]: value })); setDirty(true); };
   const item = <K extends keyof QuoteItem>(index: number, key: K, value: QuoteItem[K]) => change('items', data.items.map((row, i) => i === index ? { ...row, [key]: value } : row));
   const back = () => { if (!busy && (!dirty || confirm('Hay cambios sin guardar. ¿Volver al listado?'))) close(); };
-  return <><Heading title={saved ? saved.quote_number ?? `Cotización · referencia interna ${saved.id}` : 'Nueva cotización'} description={`Estado: ${data.status} · Moneda: HNL`} action={<button disabled={busy} onClick={back}>Volver</button>} />
+  return <><Heading title={saved ? saved.quote_number ?? `Cotización · referencia interna ${saved.id}` : 'Nueva cotización'} description={`Estado: ${data.status} · Moneda: HNL`} action={<div className="actions">{edit && <button onClick={edit}>Editar</button>}<button disabled={busy} onClick={back}>Volver</button></div>} />
     <p className="quote-stage">El número se asigna al guardar. Los totales de la vista previa usan el mismo cálculo del servidor que guarda la cotización.</p>
     <Notice>{error}</Notice>
     {conflict && <p role="status">Tus cambios se conservan en pantalla. Vuelve al listado y abre la versión actual antes de reintentarlos.</p>}

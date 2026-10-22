@@ -30,6 +30,10 @@ use crate::{CoreAdmin, Database, admin::validate_person};
 
 type HmacSha1 = Hmac<Sha1>;
 
+#[path = "business_mail.rs"]
+mod business_mail;
+pub use business_mail::{BusinessMail, BusinessMailAttachment};
+
 #[derive(Debug)]
 pub enum CoreError {
     NotFound,

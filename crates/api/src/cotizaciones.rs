@@ -1,11 +1,28 @@
 use super::*;
-use bastion_cotizaciones::{QuoteDraft, QuoteFilter, QuoteInput, QuotePage};
+use bastion_cotizaciones::{
+    QuoteDraft, QuoteEmailInput, QuoteFilter, QuoteInput, QuoteMailService, QuotePage, QuoteStatus,
+};
 
 pub(super) fn routes(state: ApiState) -> Router<ApiState> {
     Router::new()
         .route("/api/v1/cotizaciones", get(list).post(create))
         .route("/api/v1/cotizaciones/calculate", post(preview))
-        .route("/api/v1/cotizaciones/{id}", get(detail).put(replace))
+        .route(
+            "/api/v1/cotizaciones/document-readiness",
+            get(document_readiness),
+        )
+        .route("/api/v1/cotizaciones/{id}/pdf", get(pdf))
+        .route("/api/v1/cotizaciones/{id}/emails", post(queue_email))
+        .route("/api/v1/cotizaciones/{id}/emails/{job}", get(email_job))
+        .route(
+            "/api/v1/cotizaciones/{id}",
+            get(detail).put(replace).delete(remove),
+        )
+        .route(
+            "/api/v1/cotizaciones/{id}/status",
+            axum::routing::patch(change_status),
+        )
+        .route("/api/v1/cotizaciones/{id}/clone", post(clone_quote))
         .layer(RequestBodyLimitLayer::new(GENERAL_REQUEST_BODY_LIMIT))
         .route_layer(middleware::from_fn_with_state(state, guard))
 }
@@ -25,25 +42,32 @@ async fn preview(
 }
 
 async fn guard(State(state): State<ApiState>, request: Request, next: Next) -> Response {
-    let result = tokio::time::timeout(Duration::from_secs(30), async {
-        let user = actor(&state, request.headers()).await?;
-        let capability = if request.method() == Method::GET || request.method() == Method::HEAD {
-            "ver"
-        } else {
-            "editar"
-        };
-        state
-            .cotizaciones
-            .check_access(user.id, capability)
-            .await
-            .map_err(ApiError)?;
-        state
-            .cotizaciones
-            .consume_request(user.id)
-            .await
-            .map_err(ApiError)?;
-        Ok::<_, ApiError>(next.run(request).await)
-    })
+    let document_operation =
+        request.uri().path().ends_with("/pdf") || request.uri().path().ends_with("/emails");
+    let result = tokio::time::timeout(
+        Duration::from_secs(if document_operation { 60 } else { 30 }),
+        async {
+            let user = actor(&state, request.headers()).await?;
+            let capability = if request.method() == Method::DELETE {
+                "eliminar"
+            } else if request.method() == Method::GET || request.method() == Method::HEAD {
+                "ver"
+            } else {
+                "editar"
+            };
+            state
+                .cotizaciones
+                .check_access(user.id, capability)
+                .await
+                .map_err(ApiError)?;
+            state
+                .cotizaciones
+                .consume_request(user.id)
+                .await
+                .map_err(ApiError)?;
+            Ok::<_, ApiError>(next.run(request).await)
+        },
+    )
     .await;
     match result {
         Ok(Ok(response)) => response,
@@ -117,6 +141,121 @@ async fn replace(
         )),
         Err(error) => Err(ApiError(error)),
     }
+}
+
+#[derive(serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+struct StatusInput {
+    status: QuoteStatus,
+}
+
+fn expected_version(headers: &axum::http::HeaderMap) -> Result<u64, ApiError> {
+    version(single_header(headers, "if-match")?).ok_or(ApiError(CoreError::Invalid))
+}
+
+async fn document_readiness(
+    State(state): State<ApiState>,
+    headers: axum::http::HeaderMap,
+) -> Result<Json<bastion_cotizaciones::QuoteDocumentReadiness>, ApiError> {
+    let user = actor(&state, &headers).await?;
+    state
+        .cotizaciones
+        .document_readiness(user.id, &state.core)
+        .await
+        .map(Json)
+        .map_err(ApiError)
+}
+async fn pdf(
+    State(state): State<ApiState>,
+    headers: axum::http::HeaderMap,
+    Path(id): Path<u64>,
+) -> Result<Json<bastion_cotizaciones::QuoteDocument>, ApiError> {
+    let user = actor(&state, &headers).await?;
+    state
+        .cotizaciones
+        .pdf(user.id, id, expected_version(&headers)?)
+        .await
+        .map(Json)
+        .map_err(ApiError)
+}
+async fn queue_email(
+    State(state): State<ApiState>,
+    headers: axum::http::HeaderMap,
+    Path(id): Path<u64>,
+    Json(input): Json<QuoteEmailInput>,
+) -> Result<(StatusCode, Json<bastion_cotizaciones::QuoteEmailJob>), ApiError> {
+    let user = actor(&state, &headers).await?;
+    QuoteMailService::new(state.core)
+        .queue(
+            user.id,
+            id,
+            expected_version(&headers)?,
+            single_header(&headers, "idempotency-key")?,
+            input,
+        )
+        .await
+        .map(|job| (StatusCode::ACCEPTED, Json(job)))
+        .map_err(ApiError)
+}
+async fn email_job(
+    State(state): State<ApiState>,
+    headers: axum::http::HeaderMap,
+    Path((id, job)): Path<(u64, u64)>,
+) -> Result<Json<bastion_cotizaciones::QuoteEmailJob>, ApiError> {
+    let user = actor(&state, &headers).await?;
+    QuoteMailService::new(state.core)
+        .job(user.id, id, job)
+        .await
+        .map(Json)
+        .map_err(ApiError)
+}
+
+async fn change_status(
+    State(state): State<ApiState>,
+    headers: axum::http::HeaderMap,
+    Path(id): Path<u64>,
+    Json(input): Json<StatusInput>,
+) -> Result<Response, ApiError> {
+    let user = actor(&state, &headers).await?;
+    state
+        .cotizaciones
+        .change_status(user.id, id, expected_version(&headers)?, input.status)
+        .await
+        .map(|draft| response(draft, false))
+        .map_err(ApiError)
+}
+
+async fn clone_quote(
+    State(state): State<ApiState>,
+    headers: axum::http::HeaderMap,
+    Path(id): Path<u64>,
+) -> Result<Response, ApiError> {
+    let user = actor(&state, &headers).await?;
+    state
+        .cotizaciones
+        .clone_quote(
+            user.id,
+            id,
+            expected_version(&headers)?,
+            single_header(&headers, "idempotency-key")?,
+        )
+        .await
+        .map(|draft| response(draft, true))
+        .map_err(ApiError)
+}
+
+async fn remove(
+    State(state): State<ApiState>,
+    headers: axum::http::HeaderMap,
+    Path(id): Path<u64>,
+) -> Result<StatusCode, ApiError> {
+    let user = actor(&state, &headers).await?;
+    state
+        .cotizaciones
+        .delete(user.id, id, expected_version(&headers)?)
+        .await
+        .map_err(ApiError)?;
+    Ok(StatusCode::NO_CONTENT)
 }
 
 fn single_header<'a>(headers: &'a axum::http::HeaderMap, name: &str) -> Result<&'a str, ApiError> {
