@@ -1,5 +1,5 @@
-export interface ProcessRecord {
-  marked: boolean; note: string; version: number;
+export interface ProcessReview { marked: boolean; note: string; version: number }
+export interface ProcessRecord extends ProcessReview {
   proceso_id: string; entidad: string; expediente: string; fecha_recepcion: string;
   puntaje: number; rubro: string; resumen_corto: string; source: Record<string, string>;
 }

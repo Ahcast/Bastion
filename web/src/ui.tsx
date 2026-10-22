@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useRef, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import type { ReactNode, RefObject } from 'react';
 import { createPortal } from 'react-dom';
 import type { ApiClient } from './api.js';
@@ -48,13 +48,18 @@ export function Dialog({ title, close, children }: { title: string; close: () =>
   useFocusTrap(ref, true, close);
   return createPortal(<div className="modal-backdrop" onMouseDown={e => { if (e.target === e.currentTarget) close(); }}><div className="modal" ref={ref} role="dialog" aria-modal="true" aria-labelledby="dialog-title"><div className="modal-head"><h2 id="dialog-title">{title}</h2><button onClick={close} aria-label="Cerrar diálogo" type="button">×</button></div>{children}</div></div>, document.body);
 }
-export function useLoad<T>(load: (signal: AbortSignal) => Promise<T>, dependencies: unknown[] = []) {
+export function useLoad<T>(load: (signal: AbortSignal) => Promise<T>, dependencies: unknown[] = [], keepDataOnReload = false) {
   const [data, setData] = useState<T | null>(null), [error, setError] = useState(''), [version, setVersion] = useState(0);
+  const previousDependencies = useRef<unknown[]>([]);
+  const reload = useCallback(() => setVersion(v => v + 1), []);
   useEffect(() => {
-    const controller = new AbortController(); setError(''); setData(null);
+    const changed = previousDependencies.current.length !== dependencies.length || dependencies.some((value, index) => !Object.is(value, previousDependencies.current[index]));
+    previousDependencies.current = [...dependencies];
+    const controller = new AbortController(); setError('');
+    if (!keepDataOnReload || changed) setData(null);
     void load(controller.signal).then(value => { if (!controller.signal.aborted) setData(value); }).catch(reason => { if (!controller.signal.aborted) setError(message(reason)); });
     return () => controller.abort();
   // Dependencies describe the request; changing tabs cancels stale responses.
   }, [...dependencies, version]);
-  return { data, error, reload: () => setVersion(v => v + 1) };
+  return { data, error, reload, setData };
 }
