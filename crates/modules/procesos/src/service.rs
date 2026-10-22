@@ -212,8 +212,13 @@ impl ProcessService {
 
     pub async fn entities(&self, actor: u64) -> Result<serde_json::Value, CoreError> {
         let mut tx = self.begin(actor, "consulta", "ver").await?;
-        let names = sqlx::query_scalar::<_, String>(&format!("SELECT DISTINCT r.entidad FROM procesos_rows r WHERE NOT ({MUNICIPAL_ENTITY}) ORDER BY r.entidad LIMIT 5001"))
-            .fetch_all(&mut *tx).await?;
+        let mut query = QueryBuilder::<MySql>::new(
+            "SELECT DISTINCT r.entidad FROM procesos_rows r WHERE NOT (",
+        );
+        query
+            .push(MUNICIPAL_ENTITY)
+            .push(") ORDER BY r.entidad LIMIT 5001");
+        let names: Vec<String> = query.build_query_scalar().fetch_all(&mut *tx).await?;
         if names.len() > 5000 {
             return Err(CoreError::Conflict);
         }
