@@ -150,13 +150,22 @@ impl AppConfig {
     }
 }
 
-fn parse_allowed_modules(value: &str) -> Result<Vec<&str>, ConfigError> {
+fn parse_allowed_modules(value: &str) -> Result<Vec<&'static str>, ConfigError> {
     if value.trim().is_empty() {
         return Ok(Vec::new());
     }
     let mut modules = Vec::new();
     for module in value.split(',').map(str::trim) {
-        if !matches!(module, "procesos" | "cotizaciones") || modules.contains(&module) {
+        let module = match module {
+            "procesos" => "procesos",
+            "cotizaciones" => "cotizaciones",
+            _ => {
+                return Err(ConfigError {
+                    variable: "BASTION_ALLOWED_MODULES",
+                });
+            }
+        };
+        if modules.contains(&module) {
             return Err(ConfigError {
                 variable: "BASTION_ALLOWED_MODULES",
             });
