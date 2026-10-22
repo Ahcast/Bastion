@@ -4,6 +4,7 @@ use futures_util::TryStreamExt;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use sqlx::{FromRow, MySql, QueryBuilder, Transaction};
+use std::collections::BTreeMap;
 
 use crate::{FIELDS, MAX_ROWS, ScoutRow, parse_csv};
 
@@ -240,34 +241,60 @@ impl ProcessService {
         }
         let rows = parse_csv(csv)?;
         let mut result = ImportResult::default();
-        for row in rows {
-            let current: Option<(String, NaiveDateTime, serde_json::Value)> = sqlx::query_as("SELECT contenido_hash,ultima_deteccion,source_json FROM procesos_rows WHERE proceso_id=? FOR UPDATE")
-                .bind(&row.proceso_id).fetch_optional(&mut *tx).await?;
-            match current {
-                Some((_, seen, _)) if row.ultima_deteccion.naive_utc() < seen => {
-                    result.stale += 1;
-                }
-                Some((_, seen, source))
-                    if row.ultima_deteccion.naive_utc() == seen
-                        && source
-                            != serde_json::to_value(&row.source)
-                                .map_err(|_| CoreError::Invalid)? =>
-                {
-                    return Err(CoreError::Conflict);
-                }
-                Some((hash, _, _)) => {
-                    if hash == row.contenido_hash {
-                        result.unchanged += 1;
-                    } else {
-                        result.updated += 1;
-                    }
-                    save_row(&mut tx, &row).await?;
-                }
-                None => {
-                    save_row(&mut tx, &row).await?;
-                    result.inserted += 1;
-                }
+        let mut existing = BTreeMap::new();
+        if !rows.is_empty() {
+            let mut query = QueryBuilder::<MySql>::new(
+                "SELECT proceso_id,contenido_hash,ultima_deteccion FROM procesos_rows WHERE proceso_id IN (",
+            );
+            let mut ids = query.separated(",");
+            for row in &rows {
+                ids.push_bind(&row.proceso_id);
             }
+            query.push(") FOR UPDATE");
+            let current = query
+                .build_query_as::<(String, String, NaiveDateTime)>()
+                .fetch_all(&mut *tx)
+                .await?;
+            existing.extend(
+                current
+                    .into_iter()
+                    .map(|(id, hash, seen)| (id, (hash, seen))),
+            );
+        }
+        let mut pending = Vec::new();
+        for row in &rows {
+            let old = existing.get(&row.proceso_id);
+            if old.is_some_and(|(_, seen)| row.ultima_deteccion.naive_utc() < *seen) {
+                result.stale += 1;
+                continue;
+            }
+            match old {
+                Some((hash, _)) if *hash == row.contenido_hash => result.unchanged += 1,
+                Some(_) => result.updated += 1,
+                None => result.inserted += 1,
+            }
+            let source = serde_json::to_string(&row.source).map_err(|_| CoreError::Invalid)?;
+            // Bound each statement below the usual MySQL 5.7 packet budget.
+            if source.len() > 1024 * 1024 {
+                return Err(CoreError::Invalid);
+            }
+            let same_observation =
+                old.is_some_and(|(_, seen)| row.ultima_deteccion.naive_utc() == *seen);
+            pending.push((row, source, same_observation));
+        }
+        let mut start = 0;
+        while start < pending.len() {
+            let mut end = start;
+            let mut bytes = 0;
+            while end < pending.len()
+                && end - start < 100
+                && (end == start || bytes + pending[end].1.len() <= 512 * 1024)
+            {
+                bytes += pending[end].1.len();
+                end += 1;
+            }
+            save_batch(&mut tx, &pending[start..end]).await?;
+            start = end;
         }
         result.import_id = sqlx::query("INSERT INTO procesos_imports (actor_id,file_hash,result_json,created_at) VALUES (?,?,'{}',UTC_TIMESTAMP(6))")
             .bind(actor).bind(hash).execute(&mut *tx).await?.last_insert_id();
@@ -397,12 +424,51 @@ impl ProcessService {
     }
 }
 
-async fn save_row(tx: &mut Transaction<'_, MySql>, row: &ScoutRow) -> Result<(), CoreError> {
-    sqlx::query("INSERT INTO procesos_rows (proceso_id,entidad,expediente,fecha_recepcion,ultima_deteccion,puntaje,rubro,resumen_corto,contenido_hash,source_json) VALUES (?,?,?,?,?,?,?,?,?,?) ON DUPLICATE KEY UPDATE entidad=VALUES(entidad),expediente=VALUES(expediente),fecha_recepcion=VALUES(fecha_recepcion),ultima_deteccion=VALUES(ultima_deteccion),puntaje=VALUES(puntaje),rubro=VALUES(rubro),resumen_corto=VALUES(resumen_corto),contenido_hash=VALUES(contenido_hash),source_json=VALUES(source_json)")
-        .bind(&row.proceso_id).bind(&row.entidad).bind(&row.expediente).bind(row.fecha_recepcion.naive_utc())
-        .bind(row.ultima_deteccion.naive_utc()).bind(row.puntaje).bind(&row.rubro).bind(&row.resumen_corto)
-        .bind(&row.contenido_hash).bind(serde_json::to_value(&row.source).map_err(|_| CoreError::Invalid)?)
-        .execute(&mut **tx).await?;
+async fn save_batch(
+    tx: &mut Transaction<'_, MySql>,
+    rows: &[(&ScoutRow, String, bool)],
+) -> Result<(), CoreError> {
+    let mut compare = QueryBuilder::<MySql>::new("SELECT COUNT(*) FROM procesos_rows WHERE ");
+    let mut comparisons = 0;
+    for (row, source, same_observation) in rows {
+        if !same_observation {
+            continue;
+        }
+        if comparisons > 0 {
+            compare.push(" OR ");
+        }
+        compare
+            .push("(proceso_id=")
+            .push_bind(&row.proceso_id)
+            .push(" AND source_json<>CAST(")
+            .push_bind(source)
+            .push(" AS JSON))");
+        comparisons += 1;
+    }
+    if comparisons > 0 {
+        let conflicts: i64 = compare.build_query_scalar().fetch_one(&mut **tx).await?;
+        if conflicts > 0 {
+            return Err(CoreError::Conflict);
+        }
+    }
+    let mut query = QueryBuilder::<MySql>::new(
+        "INSERT INTO procesos_rows (proceso_id,entidad,expediente,fecha_recepcion,ultima_deteccion,puntaje,rubro,resumen_corto,contenido_hash,source_json) ",
+    );
+    query.push_values(rows, |mut fields, (row, source, _)| {
+        fields
+            .push_bind(&row.proceso_id)
+            .push_bind(&row.entidad)
+            .push_bind(&row.expediente)
+            .push_bind(row.fecha_recepcion.naive_utc())
+            .push_bind(row.ultima_deteccion.naive_utc())
+            .push_bind(row.puntaje)
+            .push_bind(&row.rubro)
+            .push_bind(&row.resumen_corto)
+            .push_bind(&row.contenido_hash)
+            .push_bind(source);
+    });
+    query.push(" ON DUPLICATE KEY UPDATE entidad=VALUES(entidad),expediente=VALUES(expediente),fecha_recepcion=VALUES(fecha_recepcion),ultima_deteccion=VALUES(ultima_deteccion),puntaje=VALUES(puntaje),rubro=VALUES(rubro),resumen_corto=VALUES(resumen_corto),contenido_hash=VALUES(contenido_hash),source_json=VALUES(source_json)");
+    query.build().execute(&mut **tx).await?;
     Ok(())
 }
 

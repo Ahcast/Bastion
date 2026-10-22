@@ -36,6 +36,18 @@ pub(super) fn routes(state: ApiState) -> Router<ApiState> {
 
 // Identity, module status and permission are checked before buffering uploaded CSV.
 async fn guard(State(state): State<ApiState>, request: Request, next: Next) -> Response {
+    match tokio::time::timeout(
+        Duration::from_secs(60),
+        guarded_request(state, request, next),
+    )
+    .await
+    {
+        Ok(response) => response,
+        Err(_) => ApiError(CoreError::Overloaded).into_response(),
+    }
+}
+
+async fn guarded_request(state: ApiState, request: Request, next: Next) -> Response {
     let actor = match actor(&state, request.headers()).await {
         Ok(actor) => actor,
         Err(error) => return error.into_response(),
@@ -68,10 +80,7 @@ async fn guard(State(state): State<ApiState>, request: Request, next: Next) -> R
     } else {
         None
     };
-    match tokio::time::timeout(Duration::from_secs(60), next.run(request)).await {
-        Ok(response) => response,
-        Err(_) => ApiError(CoreError::Overloaded).into_response(),
-    }
+    next.run(request).await
 }
 
 async fn status(

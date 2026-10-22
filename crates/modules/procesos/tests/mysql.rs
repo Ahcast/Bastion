@@ -40,6 +40,26 @@ fn csv(id: char, observation: &str, hash: char) -> String {
     )
 }
 
+fn batch_csv(count: u64, start: u64, last: Option<&str>) -> String {
+    let seed = csv('a', "2026-10-21T22:00:00-06:00", 'f');
+    let mut reader = csv::Reader::from_reader(seed.trim_start_matches('\u{feff}').as_bytes());
+    let record = reader.records().next().unwrap().unwrap();
+    let mut writer = csv::Writer::from_writer(Vec::new());
+    writer.write_record(FIELDS).unwrap();
+    for index in start..start + count {
+        let mut fields = record.iter().map(str::to_owned).collect::<Vec<_>>();
+        fields[1] = format!("hc:{index:064x}");
+        writer.write_record(fields).unwrap();
+    }
+    if let Some(last) = last {
+        let mut reader = csv::Reader::from_reader(last.trim_start_matches('\u{feff}').as_bytes());
+        for record in reader.records() {
+            writer.write_record(record.unwrap().iter()).unwrap();
+        }
+    }
+    String::from_utf8(writer.into_inner().unwrap()).unwrap()
+}
+
 #[tokio::test]
 async fn mysql57_import_permissions_history_and_disable() {
     let Ok(url) = std::env::var("BASTION_PROCESOS_TEST_URL") else {
@@ -158,6 +178,27 @@ async fn mysql57_import_permissions_history_and_disable() {
         service.export(3, &filter).await,
         Err(CoreError::Forbidden)
     ));
+    // Expected Scout volume; a second actor must not duplicate the same 600 rows.
+    sqlx::query("UPDATE procesos_imports SET created_at=UTC_TIMESTAMP(6)-INTERVAL 5 MINUTE")
+        .execute(&pool)
+        .await
+        .unwrap();
+    let bulk = batch_csv(600, 0, None);
+    let started = std::time::Instant::now();
+    assert_eq!(service.import(1, &bulk).await.unwrap().inserted, 600);
+    assert_eq!(service.import(2, &bulk).await.unwrap().unchanged, 600);
+    eprintln!(
+        "600 synthetic Scout rows plus second-actor reimport: {:?}",
+        started.elapsed()
+    );
+    // A conflict after the first write batch must roll back those earlier writes.
+    let rollback = batch_csv(101, 1000, Some(&inconsistent));
+    assert!(matches!(
+        service.import(1, &rollback).await,
+        Err(CoreError::Conflict)
+    ));
+    assert_eq!(service.status(1).await.unwrap()["total"], 602);
+    assert!(service.detail(2, &id).await.unwrap().marked);
     core.admin()
         .set_module_enabled(1, "procesos", false)
         .await
@@ -193,7 +234,7 @@ async fn mysql57_import_permissions_history_and_disable() {
             .fetch_one(&pool)
             .await
             .unwrap(),
-        2
+        602
     );
     assert_eq!(
         sqlx::query_scalar::<_, i64>(
@@ -202,6 +243,6 @@ async fn mysql57_import_permissions_history_and_disable() {
         .fetch_one(&pool)
         .await
         .unwrap(),
-        4
+        6
     );
 }

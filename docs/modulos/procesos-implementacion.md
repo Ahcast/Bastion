@@ -32,6 +32,8 @@ Importación manual de archivo analizado, hasta 8 MiB de CSV y 5.000 filas por s
 
 Entidades/rubros hasta 500 caracteres, expediente hasta 255 y resumen IA hasta 16.384; rechazar excesos sin recortar texto. Listados omiten los datos fuente completos, que se consultan en el detalle. Cuota general de 120 solicitudes/minuto por actor y dos importaciones nuevas confirmadas/minuto; reimportar el mismo archivo devuelve su resultado sin consumir otra importación. La identidad de idempotencia es `(actor, SHA-256 del CSV)` y se conserva en `procesos_imports`. La exportación de consulta neutraliza fórmulas de hoja de cálculo y no reemplaza el maestro original para reimportar.
 
+Para MySQL remoto, se consultan metadatos por lote y se insertan/actualizan hasta 100 filas o 512 KiB de JSON fuente por sentencia. Una fila puede ocupar hasta 1 MiB de JSON fuente serializado; se rechaza el exceso sin recortar datos. Todos los lotes pertenecen a la misma transacción. La exportación consume un flujo de filas acotado en lugar de cargar todo el histórico.
+
 ## Primer corte implementado
 
 Consulta de estado, listado paginado por expediente/resumen/descripción, entidad, fechas de recepción y marca; detalle de campos fuente y análisis; marcas/notas compartidas con control de versión; importación manual y exportación. Contrato HTTP: [procesos.openapi.yaml](procesos.openapi.yaml). La pantalla carga bajo demanda y la sección Procesos en Ajustes explica su estado pendiente. La allowlist y el estado administrativo se comprueban también en cada operación del servidor. La compatibilidad de migraciones comprueba versiones y checksums de su ledger.
