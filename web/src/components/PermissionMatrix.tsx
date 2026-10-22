@@ -23,7 +23,7 @@ export function PermissionMatrix({ catalog, registry, permissions, protectedRole
   const editable = catalog.filter(module => moduleIsConfigurable(module, registry));
   const state = (module: PermissionModule, col: PermissionColumn): State => module.kind === 'session' ? col === 'ver' : module.kind === 'administration' ? protectedRole : protectedRole && moduleIsConfigurable(module, registry) ? true : permissionState(permissions, module.id, col);
   return <div className="permission-matrix-wrap"><table className="permission-matrix">
-    <caption>Crear y Editar están vinculados: ambos habilitan crear y modificar. Una casilla parcial indica acceso a recursos específicos.</caption>
+    <caption>Crear y editar comparten un permiso; Eliminar se configura por separado. Ambos requieren Ver. Una casilla parcial indica acceso a recursos específicos.</caption>
     <thead><tr><th scope="col">Módulo</th>{PERMISSION_COLUMNS.map(col => <th key={col.id} scope="col"><span className="permission-column-title">{col.label}</span><Check label="Marcar todo" name={`Marcar todo en ${col.label}`} state={combined(editable.map(module => state(module, col.id)))} disabled={disabled || protectedRole || !editable.length} change={enabled => column(col.id, enabled)} /></th>)}</tr></thead>
     <tbody>{catalog.map(module => {
       const configurable = moduleIsConfigurable(module, registry), available = registry.find(entry => entry.module_id === module.id);

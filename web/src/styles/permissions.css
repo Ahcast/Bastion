@@ -29,9 +29,9 @@
 .permission-confirmation{white-space:pre-wrap;overflow-wrap:anywhere;font-size:14px}
 @media(max-width:640px){
  .permission-role-selector{width:100%}
- .permission-matrix th,.permission-matrix td{padding:10px 7px}
- .permission-matrix thead th:first-child{width:40%}
- .permission-matrix thead th{width:20%}
+ .permission-matrix th,.permission-matrix td{padding:10px 5px}
+ .permission-matrix thead th:first-child{width:36%}
+ .permission-matrix thead th{width:21.333%}
  .permission-matrix thead .permission-check,.permission-matrix td .permission-check{flex-direction:column;justify-content:center;gap:6px;text-align:center;font-size:12px}
  .permission-matrix thead th:not(:first-child){text-align:center}
  .permission-matrix tbody th strong{font-size:14px}
@@ -41,4 +41,3 @@
  .permission-additional{padding:14px 12px}
  .permission-footer .actions{display:grid;grid-template-columns:1fr}
 }
-

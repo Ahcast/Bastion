@@ -55,7 +55,7 @@ Para Roles y Pantallas, el contrato declara cada campo y regla antes de implemen
 
 ## Área Ajustes
 
-La edición visual de permisos por rol se especifica en `14-permisos-por-rol.md`. Reemplaza el editor JSON por casillas y mantiene el contrato `ver`/`editar`/`eliminar`: Crear y Editar son dos controles vinculados del permiso existente `editar`, según confirmación del usuario. Conserva permisos adicionales y la administración exclusiva del Administrador del sistema.
+La edición visual de permisos por rol se especifica en `14-permisos-por-rol.md`. Reemplaza el editor JSON por casillas y mantiene el contrato `ver`/`editar`/`eliminar`: las columnas son Ver, Crear y editar (una sola casilla del permiso `editar`) y Eliminar, según confirmación del usuario. Conserva permisos adicionales y la administración exclusiva del Administrador del sistema.
 
 La navegación muestra una entrada única `Ajustes`. Dentro de ella el core presenta:
 

@@ -10,7 +10,7 @@ import '../styles/permissions.css';
 
 export default function Roles() {
   const { access } = useCore();
-  return access.is_system_administrator ? <RoleEditor /> : <><Heading title="Permisos por rol" description="Controla acceso por módulo: ver, crear y editar." /><Notice>Esta pantalla está reservada al Administrador del sistema.</Notice></>;
+  return access.is_system_administrator ? <RoleEditor /> : <><Heading title="Permisos por rol" description="Controla el acceso por módulo: ver, crear y editar, o eliminar." /><Notice>Esta pantalla está reservada al Administrador del sistema.</Notice></>;
 }
 
 function RoleEditor() {
@@ -56,7 +56,7 @@ function RoleEditor() {
   };
   const extras = additionalPermissions(draft, catalog), protectedRole = role?.protected ?? false;
   return <>
-    <Heading title="Permisos por rol" description="Controla acceso por módulo: ver, crear y editar." action={<label className="permission-role-selector">Rol<select aria-label="Rol" value={roleId ?? ''} disabled={!result.data || saving} onChange={event => { const id = Number(event.target.value); if (id !== roleId) navigate(() => setRoleId(id)); }}><option value="" disabled>Selecciona un rol</option>{roles.map(item => <option key={item.id} value={item.id}>{item.name}{item.protected ? ' · Integrado' : ''}</option>)}</select></label>} />
+    <Heading title="Permisos por rol" description="Controla el acceso por módulo: ver, crear y editar, o eliminar." action={<label className="permission-role-selector">Rol<select aria-label="Rol" value={roleId ?? ''} disabled={!result.data || saving} onChange={event => { const id = Number(event.target.value); if (id !== roleId) navigate(() => setRoleId(id)); }}><option value="" disabled>Selecciona un rol</option>{roles.map(item => <option key={item.id} value={item.id}>{item.name}{item.protected ? ' · Integrado' : ''}</option>)}</select></label>} />
     <div className="permission-role-tools"><p>{role?.description || 'Los roles personalizados comienzan sin permisos.'}</p><button disabled={saving} onClick={() => { void navigate(() => { setDraft(original ?? []); setError(''); setSuccess(''); setCreating(true); }); }}>Nuevo rol</button>{role && !role.protected && <button className="text-button" disabled={saving} onClick={async () => {
       if (!await navigate(() => {}) || !window.confirm(`¿Eliminar el rol «${role.name}»?`)) return;
       setSaving(true); setError('');
@@ -67,7 +67,7 @@ function RoleEditor() {
     {protectedRole && <p className="notice">Rol integrado: tiene acceso completo a las funciones disponibles. Sus permisos están protegidos y no se pueden modificar.</p>}
     {!result.data ? !result.error && <Loading /> : !roles.length ? <p className="empty">No hay roles disponibles. Crea un rol para configurar sus permisos.</p> : !ready ? !error ? <Loading /> : <button onClick={() => setLoadVersion(value => value + 1)}>Reintentar carga</button> : <>
       <PermissionMatrix catalog={catalog} registry={registry} permissions={draft} protectedRole={protectedRole} disabled={saving} cell={(module, column, enabled) => change(setModulePermission(draft, module, column, enabled))} row={(module, enabled) => change(setPermissionRow(draft, module, enabled))} column={(column, enabled) => change(setPermissionColumn(draft, catalog.filter(module => moduleIsConfigurable(module, registry)).map(module => module.id), column, enabled))} />
-      {extras.length > 0 && <details className="permission-additional"><summary>{extras.length} permisos específicos o adicionales conservados</summary><p>Incluyen alcances específicos, eliminación y permisos fuera de la matriz. Se conservarán salvo que confirmes su retirada.</p><ul>{extras.map(permission => <li key={permissionKey(permission)}>{describe(permission)}</li>)}</ul></details>}
+      {extras.length > 0 && <details className="permission-additional"><summary>{extras.length} permisos específicos o adicionales conservados</summary><p>Incluyen alcances específicos y permisos fuera de la matriz. Se conservarán salvo que confirmes su retirada.</p><ul>{extras.map(permission => <li key={permissionKey(permission)}>{describe(permission)}</li>)}</ul></details>}
       {!protectedRole && <div className="permission-footer"><p role="status">{saving ? 'Guardando permisos…' : dirty ? 'Tienes cambios sin guardar.' : 'Sin cambios pendientes.'}</p><div className="actions"><button className="primary" disabled={saving || !dirty} onClick={() => void save()}>Guardar cambios</button><button disabled={saving || !dirty} onClick={() => setConfirmation({ permissions: original, text: 'Se descartarán los cambios sin guardar de este rol.', label: 'Descartar cambios' })}>Descartar cambios</button><button className="danger" disabled={saving || !draft.length} onClick={() => {
         const detail = extras.length ? `\n\nTambién se quitarán estos permisos adicionales:\n${extras.map(describe).join('\n')}` : '';
         setConfirmation({ permissions: [], text: `Se limpiarán todos los permisos del rol «${role?.name}».${detail}\n\nSe aplicará cuando pulses Guardar cambios.`, label: 'Limpiar borrador' });

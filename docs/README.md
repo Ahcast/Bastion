@@ -148,4 +148,4 @@ El informe se obtuvo de una copia de frontend Angular compilado y backend Larave
 - Roles y Pantallas: el backend valida todas las entradas y relaciones, con nombres normalizados/únicos, límites explícitos y restricciones en MySQL para evitar duplicados concurrentes; no se confía en validación del frontend.
 - El catálogo de módulos de primera etapa se deriva de `01-aplicacion-actual-y-paridad.md`.
 
-- 2026-10-22: el usuario confirma sustituir el editor JSON de permisos por una matriz visual. Crear y Editar quedan vinculados al permiso existente editar; se conserva el contrato, los permisos adicionales y la administración exclusiva del Administrador del sistema. Ver 14-permisos-por-rol.md.
+- 2026-10-22: el usuario confirma sustituir el editor JSON de permisos por una matriz visual con columnas Ver, Crear y editar (una sola casilla del permiso existente editar) y Eliminar independiente; se conserva el contrato, los permisos adicionales y la administración exclusiva del Administrador del sistema. Ver 14-permisos-por-rol.md.
