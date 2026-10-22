@@ -72,7 +72,10 @@ async fn mysql57_drafts_permissions_idempotency_versions_and_disable() {
         Err(CoreError::Forbidden)
     ));
     sqlx::query("INSERT INTO role_permissions (role_id,module_id,scope_hash,scope_key,capability) VALUES (2,'cotizaciones',UNHEX(SHA2('documentos',256)),'documentos','ver')").execute(&pool).await.unwrap();
-    assert!(service.list(2, &QuoteFilter::default()).await.is_ok());
+    service
+        .list(2, &QuoteFilter::default())
+        .await
+        .expect("A role with document read permission must access the enabled module");
     assert!(matches!(
         service
             .create(2, "synthetic-create-key-0001", input())

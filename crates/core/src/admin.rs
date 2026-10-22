@@ -899,7 +899,7 @@ impl CoreAdmin {
         if self.require_admin(actor).await.is_ok() {
             return Ok(());
         }
-        let allowed:Option<u8>=sqlx::query_scalar("SELECT 1 FROM users u JOIN role_permissions rp ON rp.role_id=u.role_id WHERE u.id=? AND u.status='active' AND rp.module_id=? AND rp.capability=? AND (rp.scope_key=? OR rp.scope_key='*') LIMIT 1")
+        let allowed:Option<i64>=sqlx::query_scalar("SELECT 1 FROM users u JOIN role_permissions rp ON rp.role_id=u.role_id WHERE u.id=? AND u.status='active' AND rp.module_id=? AND rp.capability=? AND (rp.scope_key=? OR rp.scope_key='*') LIMIT 1")
             .bind(actor).bind(module).bind(capability).bind(scope).fetch_optional(&self.database.pool).await?;
         if allowed.is_some() {
             Ok(())
