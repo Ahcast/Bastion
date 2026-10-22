@@ -189,7 +189,7 @@ async fn mysql57_import_permissions_history_and_disable() {
     // Upgrade existing rows, including both offset and UTC source timestamps.
     sqlx::query("UPDATE procesos_rows SET source_json=JSON_SET(source_json,'$.primera_deteccion','2026-10-22T01:00:00Z') WHERE proceso_id=?")
         .bind(format!("hc:{}", "e".repeat(64))).execute(&pool).await.unwrap();
-    sqlx::query("ALTER TABLE procesos_rows DROP COLUMN primera_deteccion")
+    sqlx::query("ALTER TABLE procesos_rows DROP INDEX ix_procesos_primera_deteccion, DROP COLUMN primera_deteccion")
         .execute(&pool)
         .await
         .unwrap();
