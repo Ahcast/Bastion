@@ -37,6 +37,8 @@ El informe se obtuvo de una copia de frontend Angular compilado y backend Larave
 
 ## Registro de decisiones
 
+- 2026-10-22: el usuario confirma incorporación incremental de Scout aunque el rastreo o análisis del ciclo queden parciales. Se valida una publicación atómica finalizada con SHA-256 y total completo; solo se incorporan filas con extracción completa, análisis confirmado y hash vigente. Pendientes, errores y extracciones incompletas se difieren sin borrar ni sobrescribir históricos, marcas o notas. La interfaz informa filas diferidas; un fallo de autenticación de IA sigue necesitando corrección y no se interpreta como análisis exitoso.
+
 - 2026-10-22: Ajustes > Procesos muestra como información de solo lectura los reportes main/scout/combiner/clasificador de Scout, última ejecución, estado por etapa, contadores y análisis IA. Usa consulta/ver del módulo activo, consulta cada 60 segundos y no ejecuta scripts ni importaciones. Archivos y campos acotados, sin JSON crudo ni excepciones/configuración. Sustituye la ficha estática dentro del Core; ver `modulos/procesos-implementacion.md`.
 
 - 2026-10-22: el usuario confirma menú por cotización con Ver, Editar, Marcar como enviado, conversiones, Aprobar, Clonar, PDF, correo y Eliminar. Ambas conversiones quedan visibles y deshabilitadas hasta desarrollar sus módulos. PDF usa el diseño Legacy como referencia para Typst y correo conserva destinatarios/copias/mensaje y programación. Empresa, compilación PDF, almacenamiento privado y SMTP siguen como servicios del Core. Implementación y condiciones de habilitación: `modulos/cotizaciones-acciones.md`.

@@ -94,6 +94,8 @@ pub struct ImportResult {
     pub unchanged: u32,
     pub stale: u32,
     pub replayed: bool,
+    #[serde(default)]
+    pub deferred: u32,
 }
 
 #[derive(Serialize, FromRow)]
@@ -336,31 +338,23 @@ impl ProcessService {
         actor: u64,
         delivery: &crate::ReadyDelivery,
     ) -> Result<ImportResult, CoreError> {
-        self.import_as(
-            DomainActor::User(actor),
-            &delivery.csv,
-            Some((&delivery.run_id, delivery.total)),
-        )
-        .await
+        self.import_as(DomainActor::User(actor), &delivery.csv, Some(delivery))
+            .await
     }
 
     pub async fn import_local_scout(
         &self,
         delivery: &crate::ReadyDelivery,
     ) -> Result<ImportResult, CoreError> {
-        self.import_as(
-            DomainActor::LocalScout,
-            &delivery.csv,
-            Some((&delivery.run_id, delivery.total)),
-        )
-        .await
+        self.import_as(DomainActor::LocalScout, &delivery.csv, Some(delivery))
+            .await
     }
 
     async fn import_as(
         &self,
         actor: DomainActor,
         csv: &str,
-        delivery: Option<(&str, usize)>,
+        delivery: Option<&crate::ReadyDelivery>,
     ) -> Result<ImportResult, CoreError> {
         let mut tx = self.begin_as(actor, "importacion", "editar").await?;
         // Database-backed quota survives restarts and applies across instances.
@@ -377,6 +371,7 @@ impl ProcessService {
             let mut result: ImportResult =
                 serde_json::from_value(previous).map_err(|_| CoreError::Conflict)?;
             result.replayed = true;
+            result.deferred = delivery.map_or(0, |delivery| delivery.deferred as u32);
             return Ok(result);
         }
         let recent: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM procesos_imports WHERE actor_id <=> ? AND source_key <=> ? AND created_at>UTC_TIMESTAMP(6)-INTERVAL 1 MINUTE")
@@ -385,10 +380,13 @@ impl ProcessService {
             return Err(CoreError::Locked);
         }
         let rows = parse_csv(csv)?;
-        if delivery.is_some_and(|(_, total)| rows.len() != total) {
+        if delivery.is_some_and(|delivery| rows.len() != delivery.total) {
             return Err(CoreError::Invalid);
         }
-        let mut result = ImportResult::default();
+        let mut result = ImportResult {
+            deferred: delivery.map_or(0, |delivery| delivery.deferred as u32),
+            ..Default::default()
+        };
         let mut existing = BTreeMap::new();
         if !rows.is_empty() {
             let mut query = QueryBuilder::<MySql>::new(
@@ -453,9 +451,11 @@ impl ProcessService {
             .execute(&mut *tx)
             .await?;
         let mut details = value;
-        if let Some((run_id, _)) = delivery {
-            details["run_id"] = serde_json::json!(run_id);
+        if let Some(delivery) = delivery {
+            details["run_id"] = serde_json::json!(delivery.run_id);
             details["file_sha256"] = serde_json::json!(hex::encode(hash));
+            details["source_file_sha256"] = serde_json::json!(delivery.sha256());
+            details["source_total"] = serde_json::json!(delivery.source_total);
         }
         CoreAdmin::record_actor_event(
             &mut tx,

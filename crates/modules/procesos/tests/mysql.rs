@@ -81,7 +81,9 @@ impl DeliveryFiles {
         let mut reader = csv::Reader::from_reader(legacy.trim_start_matches('\u{feff}').as_bytes());
         let mut writer = csv::Writer::from_writer(Vec::new());
         writer.write_record(SCOUT_FIELDS).unwrap();
+        let mut total = 0;
         for record in reader.records() {
+            total += 1;
             let mut fields = record
                 .unwrap()
                 .iter()
@@ -100,7 +102,7 @@ impl DeliveryFiles {
             "\u{feff}{}",
             String::from_utf8(writer.into_inner().unwrap()).unwrap()
         );
-        let manifest = serde_json::json!({"status":"exitoso","output_ready":true,"run_id":"2026-10-22","maestro_sha256":hex::encode(Sha256::digest(csv.as_bytes())),"total":1,"stages":{"scout":"exitoso","combiner":"exitoso","clasificador":"exitoso"}});
+        let manifest = serde_json::json!({"status":"exitoso","output_ready":true,"run_id":"2026-10-22","maestro_sha256":hex::encode(Sha256::digest(csv.as_bytes())),"total":total,"stages":{"scout":"exitoso","combiner":"exitoso","clasificador":"exitoso"}});
         std::fs::write(path.join("maestro.csv"), csv).unwrap();
         std::fs::write(path.join("main.json"), manifest.to_string()).unwrap();
         Self(path)
@@ -108,6 +110,32 @@ impl DeliveryFiles {
     fn read(&self) -> ReadyDelivery {
         ReadyDelivery::read(&self.0.join("maestro.csv")).unwrap()
     }
+    fn partial(&self) -> ReadyDelivery {
+        let path = self.0.join("main.json");
+        let mut manifest: serde_json::Value =
+            serde_json::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap();
+        manifest["status"] = serde_json::json!("parcial");
+        manifest["output_ready"] = serde_json::json!(false);
+        manifest["stages"]["scout"] = serde_json::json!("parcial");
+        manifest["stages"]["clasificador"] = serde_json::json!("parcial");
+        std::fs::write(path, manifest.to_string()).unwrap();
+        self.read()
+    }
+}
+
+fn combine_partial(rows: &[(&str, bool)]) -> String {
+    let mut writer = csv::Writer::from_writer(Vec::new());
+    writer.write_record(FIELDS).unwrap();
+    for (source, pending) in rows {
+        let mut reader = csv::Reader::from_reader(source.trim_start_matches('\u{feff}').as_bytes());
+        let record = reader.records().next().unwrap().unwrap();
+        let mut fields = record.iter().map(str::to_owned).collect::<Vec<_>>();
+        if *pending {
+            fields[20] = "pendiente".into();
+        }
+        writer.write_record(fields).unwrap();
+    }
+    String::from_utf8(writer.into_inner().unwrap()).unwrap()
 }
 impl Drop for DeliveryFiles {
     fn drop(&mut self) {
@@ -571,6 +599,54 @@ async fn mysql57_import_permissions_history_and_disable() {
         service.entities(3).await,
         Err(CoreError::Forbidden)
     ));
+    // A finalized partial cycle adds eligible rows while leaving pending versions untouched.
+    sqlx::query("UPDATE procesos_imports SET created_at=UTC_TIMESTAMP(6)-INTERVAL 5 MINUTE")
+        .execute(&pool)
+        .await
+        .unwrap();
+    let ready_d = csv('d', "2026-10-22T22:00:00-06:00", 'd');
+    let later_b = csv('b', "2026-10-22T22:00:00-06:00", 'b');
+    let pending_old = csv('a', "2026-10-22T22:00:00-06:00", 'f');
+    let old_source = service.detail(1, &id).await.unwrap().source;
+    let partial_files = DeliveryFiles::new(&combine_partial(&[
+        (&ready_d, false),
+        (&later_b, true),
+        (&pending_old, true),
+    ]));
+    let partial = partial_files.partial();
+    let first_partial = local.import_local_scout(&partial).await.unwrap();
+    assert_eq!(first_partial.inserted, 1);
+    assert_eq!(first_partial.deferred, 2);
+    assert!(local.import_local_scout(&partial).await.unwrap().replayed);
+    // Changing only a pending row must reuse the receipt for the unchanged ready subset.
+    let changed_pending = csv('a', "2026-10-22T23:00:00-06:00", 'e');
+    let pending_files = DeliveryFiles::new(&combine_partial(&[
+        (&ready_d, false),
+        (&later_b, true),
+        (&changed_pending, true),
+    ]));
+    let replay = local
+        .import_local_scout(&pending_files.partial())
+        .await
+        .unwrap();
+    assert!(replay.replayed);
+    assert_eq!(replay.import_id, first_partial.import_id);
+    let next_files = DeliveryFiles::new(&combine_partial(&[
+        (&ready_d, false),
+        (&later_b, false),
+        (&changed_pending, true),
+    ]));
+    let next_partial = local
+        .import_local_scout(&next_files.partial())
+        .await
+        .unwrap();
+    assert_eq!(next_partial.inserted, 1);
+    assert_eq!(next_partial.unchanged, 1);
+    assert_eq!(next_partial.deferred, 1);
+    let preserved = service.detail(1, &id).await.unwrap();
+    assert!(preserved.marked);
+    assert_eq!(preserved.note, "=1+1");
+    assert_eq!(preserved.source, old_source);
     core.admin()
         .set_module_enabled(1, "procesos", false)
         .await
@@ -622,7 +698,7 @@ async fn mysql57_import_permissions_history_and_disable() {
             .fetch_one(&pool)
             .await
             .unwrap(),
-        602
+        604
     );
     assert_eq!(
         sqlx::query_scalar::<_, i64>(
@@ -631,6 +707,6 @@ async fn mysql57_import_permissions_history_and_disable() {
         .fetch_one(&pool)
         .await
         .unwrap(),
-        8
+        10
     );
 }

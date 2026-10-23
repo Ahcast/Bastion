@@ -16,7 +16,7 @@ function Report({ report }: { report: ScoutReport }) {
       {report.matches_current_run === false && <p className="scout-other-cycle">Este reporte corresponde a otro ciclo.</p>}
       <dl className="scout-run-facts"><div><dt>Ciclo</dt><dd>{run.run_id}</dd></div><div><dt>Inicio</dt><dd>{scoutDate(run.started_at)}</dd></div><div><dt>Fin</dt><dd>{scoutDate(run.finished_at)}</dd></div><div><dt>Duración</dt><dd>{run.duration_seconds === null ? 'No informada' : `${Math.floor(run.duration_seconds / 60)} min ${run.duration_seconds % 60} s`}</dd></div>
         {run.deadline && <div><dt>Límite horario</dt><dd>{scoutDate(run.deadline)}</dd></div>}
-        {run.output_ready !== null && <div><dt>Entrega informada</dt><dd>{run.output_ready ? 'Lista para incorporar' : 'Todavía no está lista'}</dd></div>}
+        {run.output_ready !== null && <div><dt>Ciclo completo</dt><dd>{run.output_ready ? 'Finalizado' : 'Todavía no está completo; se pueden incorporar las filas ya listas'}</dd></div>}
         <div><dt>Resultado / motivo</dt><dd>{run.reason ? scoutReasons[run.reason] ?? scoutReasons.other : 'No informado'}</dd></div>
         {run.retry_stages.length > 0 && <div><dt>Etapas para reintentar</dt><dd>{run.retry_stages.map(stage => scoutStageNames[stage]).join(', ')}</dd></div>}
       </dl>

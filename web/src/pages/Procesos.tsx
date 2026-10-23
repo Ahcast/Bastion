@@ -7,7 +7,7 @@ import { initialProcessFilters, nextProcessExpiry, processDate, processQuery } f
 import type { ProcessFilters, ProcessPage, ProcessRecord, ProcessReview, ProcessStatus } from '../processes.js';
 import { ProcessDetailContent, ProcessFilterBar, ProcessInsights, ProcessTable } from '../components/ProcessWorkspace.js';
 
-interface ImportResult { inserted: number; updated: number; unchanged: number; stale: number; replayed: boolean }
+interface ImportResult { inserted: number; updated: number; unchanged: number; stale: number; replayed: boolean; deferred?: number }
 
 export default function Procesos() {
   const { api, access, notify } = useCore();
@@ -75,7 +75,8 @@ export default function Procesos() {
       setBusy(true); setRefreshing(true);
       try {
         const imported = await api.request<ImportResult>('/api/v1/procesos/refresh', { method: 'POST', body: {} });
-        notify(imported.replayed ? 'Los resultados de Scout ya estaban cargados.' : `${imported.inserted} nuevos · ${imported.updated} actualizados · ${imported.unchanged} sin cambios · ${imported.stale} antiguos omitidos.`);
+        const summary = imported.replayed ? 'Los procesos listos de Scout ya estaban cargados.' : `${imported.inserted} nuevos · ${imported.updated} actualizados · ${imported.unchanged} sin cambios · ${imported.stale} antiguos omitidos.`;
+        notify(summary + (imported.deferred ? ` ${imported.deferred} pendientes de completar extracción o análisis.` : ''));
         setPage(1); reload(); status.reload(); entities.reload();
       } catch (error) { notify(message(error)); } finally { setBusy(false); setRefreshing(false); }
     }}>{refreshing ? 'Actualizando…' : 'Actualizar'}</button>{moduleCan(access, 'procesos', 'exportacion', 'ver') && <button disabled={busy} onClick={async () => {

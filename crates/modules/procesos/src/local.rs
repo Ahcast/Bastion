@@ -5,7 +5,7 @@ use std::{
     path::Path,
 };
 
-use crate::{MAX_CSV_BYTES, MAX_ROWS, parse_csv};
+use crate::{FIELDS, MAX_CSV_BYTES, MAX_ROWS, SCOUT_FIELDS, parse_csv};
 use serde::Deserialize;
 use sha2::{Digest, Sha256};
 
@@ -48,6 +48,8 @@ pub struct ReadyDelivery {
     pub(crate) csv: String,
     pub(crate) run_id: String,
     pub(crate) total: usize,
+    pub(crate) source_total: usize,
+    pub(crate) deferred: usize,
     sha256: String,
 }
 
@@ -64,12 +66,18 @@ impl ReadyDelivery {
         let before = read_regular(&manifest_path, MAX_MANIFEST_BYTES)?;
         let manifest: Manifest =
             serde_json::from_slice(&before).map_err(|_| LocalDeliveryError::Invalid)?;
-        if !manifest.output_ready || manifest.status != "exitoso" {
-            return Err(LocalDeliveryError::Pending);
-        }
-        if ["scout", "combiner", "clasificador"]
-            .iter()
-            .any(|stage| manifest.stages.get(*stage).map(String::as_str) != Some("exitoso"))
+        let partial = manifest.status == "parcial" && !manifest.output_ready;
+        let complete = manifest.status == "exitoso" && manifest.output_ready;
+        let accepted_stage = |name: &str| {
+            matches!(
+                manifest.stages.get(name).map(String::as_str),
+                Some("exitoso")
+            ) || (partial && manifest.stages.get(name).map(String::as_str) == Some("parcial"))
+        };
+        if (!partial && !complete)
+            || manifest.stages.get("combiner").map(String::as_str) != Some("exitoso")
+            || !accepted_stage("scout")
+            || !accepted_stage("clasificador")
         {
             return Err(LocalDeliveryError::Pending);
         }
@@ -95,21 +103,84 @@ impl ReadyDelivery {
         if read_regular(&manifest_path, MAX_MANIFEST_BYTES)? != before {
             return Err(LocalDeliveryError::Changed);
         }
-        let csv = String::from_utf8(bytes).map_err(|_| LocalDeliveryError::Invalid)?;
+        let source_csv = String::from_utf8(bytes).map_err(|_| LocalDeliveryError::Invalid)?;
+        let (csv, ready) = if partial {
+            analyzed_subset(&source_csv, total)?
+        } else {
+            (source_csv, total)
+        };
         if parse_csv(&csv)
             .map_err(|_| LocalDeliveryError::Invalid)?
             .len()
-            != total
+            != ready
         {
             return Err(LocalDeliveryError::Invalid);
         }
         Ok(Self {
             csv,
             run_id: manifest.run_id,
-            total,
+            total: ready,
+            source_total: total,
+            deferred: total - ready,
             sha256: hash,
         })
     }
+}
+
+fn analyzed_subset(source: &str, expected: usize) -> Result<(String, usize), LocalDeliveryError> {
+    if source.contains('\0') {
+        return Err(LocalDeliveryError::Invalid);
+    }
+    let mut reader = csv::Reader::from_reader(source.trim_start_matches('\u{feff}').as_bytes());
+    let headers = reader
+        .headers()
+        .map_err(|_| LocalDeliveryError::Invalid)?
+        .clone();
+    if !headers.iter().eq(FIELDS) && !headers.iter().eq(SCOUT_FIELDS) {
+        return Err(LocalDeliveryError::Invalid);
+    }
+    let mut writer = csv::Writer::from_writer(Vec::new());
+    writer
+        .write_record(&headers)
+        .map_err(|_| LocalDeliveryError::Invalid)?;
+    let mut total = 0;
+    let mut ready = 0;
+    for record in reader.records() {
+        total += 1;
+        if total > MAX_ROWS {
+            return Err(LocalDeliveryError::Invalid);
+        }
+        let record = record.map_err(|_| LocalDeliveryError::Invalid)?;
+        // Both supported schemas have identical status/hash column positions.
+        if record.get(10) == Some("completo")
+            && record.get(20) == Some("analizado")
+            && record.get(11).is_some_and(|hash| !hash.is_empty())
+            && record.get(19) == record.get(11)
+            && record.get(23) == Some("")
+        {
+            writer
+                .write_record(&record)
+                .map_err(|_| LocalDeliveryError::Invalid)?;
+            ready += 1;
+        }
+    }
+    if total != expected {
+        return Err(LocalDeliveryError::Invalid);
+    }
+    if ready == 0 {
+        return Err(LocalDeliveryError::Pending);
+    }
+    // Preserve the exact CSV and its existing receipt when every row is already ready.
+    if ready == total {
+        return Ok((source.to_owned(), ready));
+    }
+    let selected = writer
+        .into_inner()
+        .map_err(|_| LocalDeliveryError::Invalid)?;
+    Ok((
+        String::from_utf8(selected).map_err(|_| LocalDeliveryError::Invalid)?,
+        ready,
+    ))
 }
 
 pub(crate) fn read_regular(path: &Path, limit: usize) -> Result<Vec<u8>, LocalDeliveryError> {
@@ -170,6 +241,17 @@ mod tests {
             fs::write(self.0.join("maestro.csv"), csv).unwrap();
             let manifest = serde_json::json!({"status":"exitoso","output_ready":ready,"run_id":"2026-10-22","maestro_sha256":hex::encode(Sha256::digest(csv.as_bytes())),"total":total,"stages":{"scout":"exitoso","combiner":"exitoso","clasificador":"exitoso"}});
             fs::write(self.0.join("main.json"), manifest.to_string()).unwrap();
+        }
+
+        fn publish_partial(&self, csv: &str, total: usize) {
+            self.publish(csv, total, false);
+            let path = self.0.join("main.json");
+            let mut manifest: serde_json::Value =
+                serde_json::from_str(&fs::read_to_string(&path).unwrap()).unwrap();
+            manifest["status"] = serde_json::json!("parcial");
+            manifest["stages"]["scout"] = serde_json::json!("parcial");
+            manifest["stages"]["clasificador"] = serde_json::json!("parcial");
+            fs::write(path, manifest.to_string()).unwrap();
         }
     }
     impl Drop for Files {
@@ -243,5 +325,116 @@ mod tests {
             ReadyDelivery::read(&path),
             Err(LocalDeliveryError::Invalid)
         ));
+    }
+
+    fn mixed(fixtures: &[String]) -> String {
+        let mut writer = csv::Writer::from_writer(Vec::new());
+        writer.write_record(FIELDS).unwrap();
+        for (index, fixture) in fixtures.iter().enumerate() {
+            let mut reader =
+                csv::Reader::from_reader(fixture.trim_start_matches('\u{feff}').as_bytes());
+            for record in reader.records() {
+                let mut fields = record
+                    .unwrap()
+                    .iter()
+                    .map(str::to_owned)
+                    .collect::<Vec<_>>();
+                fields[1] = format!("hc:{index:064x}");
+                writer.write_record(fields).unwrap();
+            }
+        }
+        String::from_utf8(writer.into_inner().unwrap()).unwrap()
+    }
+
+    #[test]
+    fn partial_snapshot_imports_only_ready_rows_without_changing_the_source() {
+        let files = Files::new();
+        let ready = crate::scout::tests::fixture(None);
+        let pending = crate::scout::tests::fixture(Some(("analisis_estado", "pendiente")));
+        let incomplete = crate::scout::tests::fixture(Some(("extraccion_estado", "incompleto")));
+        let stale = crate::scout::tests::fixture(Some(("hash_analizado", &"c".repeat(64))));
+        let error = crate::scout::tests::fixture(Some(("analisis_error", "error")));
+        let source = mixed(&[ready.clone(), pending, incomplete, stale, error]);
+        files.publish_partial(&source, 5);
+        let delivery = ReadyDelivery::read(&files.0.join("maestro.csv")).unwrap();
+        assert_eq!(delivery.total, 1);
+        assert_eq!(delivery.source_total, 5);
+        assert_eq!(delivery.deferred, 4);
+        assert_eq!(parse_csv(&delivery.csv).unwrap().len(), 1);
+        assert_eq!(
+            fs::read_to_string(files.0.join("maestro.csv")).unwrap(),
+            source
+        );
+        assert_eq!(
+            delivery.sha256(),
+            hex::encode(Sha256::digest(source.as_bytes()))
+        );
+
+        // An analysis finishes on the next run; the new eligible row joins the delivery.
+        let next = mixed(&[ready.clone(), ready]);
+        files.publish_partial(&next, 2);
+        let updated = ReadyDelivery::read(&files.0.join("maestro.csv")).unwrap();
+        assert_eq!(updated.total, 2);
+        assert_eq!(updated.deferred, 0);
+        assert_eq!(updated.csv, next);
+    }
+
+    #[test]
+    fn partial_delivery_still_requires_integrity_and_rejects_invalid_ready_rows() {
+        let files = Files::new();
+        let path = files.0.join("maestro.csv");
+        let csv = crate::scout::tests::fixture(None);
+        files.publish_partial(&csv, 2);
+        assert!(matches!(
+            ReadyDelivery::read(&path),
+            Err(LocalDeliveryError::Invalid)
+        ));
+        files.publish_partial(&csv, 1);
+        fs::write(&path, csv.clone() + "\n").unwrap();
+        assert!(matches!(
+            ReadyDelivery::read(&path),
+            Err(LocalDeliveryError::Changed)
+        ));
+        let bad = crate::scout::tests::fixture(Some(("puntaje", "101")));
+        files.publish_partial(&bad, 1);
+        assert!(matches!(
+            ReadyDelivery::read(&path),
+            Err(LocalDeliveryError::Invalid)
+        ));
+        let pending = crate::scout::tests::fixture(Some(("analisis_estado", "pendiente")));
+        files.publish_partial(&pending, 1);
+        assert!(matches!(
+            ReadyDelivery::read(&path),
+            Err(LocalDeliveryError::Pending)
+        ));
+        files.publish_partial(&csv, 1);
+        let manifest_path = files.0.join("main.json");
+        let mut manifest: serde_json::Value =
+            serde_json::from_str(&fs::read_to_string(&manifest_path).unwrap()).unwrap();
+        manifest["status"] = serde_json::json!("ejecutando");
+        fs::write(&manifest_path, manifest.to_string()).unwrap();
+        assert!(matches!(
+            ReadyDelivery::read(&path),
+            Err(LocalDeliveryError::Pending)
+        ));
+    }
+
+    #[test]
+    fn changes_to_pending_rows_preserve_the_selected_receipt_and_multiline_values() {
+        let files = Files::new();
+        let ready = crate::scout::tests::fixture(Some((
+            "descripcion",
+            "Texto, con comillas \"y\"\nsegunda línea",
+        )));
+        let pending = crate::scout::tests::fixture(Some(("analisis_estado", "pendiente")));
+        let error = crate::scout::tests::fixture(Some(("analisis_estado", "error")));
+        files.publish_partial(&mixed(&[ready.clone(), pending]), 2);
+        let first = ReadyDelivery::read(&files.0.join("maestro.csv")).unwrap();
+        files.publish_partial(&mixed(&[ready, error]), 2);
+        let next = ReadyDelivery::read(&files.0.join("maestro.csv")).unwrap();
+        assert_ne!(first.sha256(), next.sha256());
+        assert_eq!(first.csv, next.csv);
+        assert!(first.csv.contains("segunda línea"));
+        assert_eq!(parse_csv(&next.csv).unwrap().len(), 1);
     }
 }

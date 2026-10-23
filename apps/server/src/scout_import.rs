@@ -66,6 +66,7 @@ pub async fn run(service: ProcessService, config: ScoutImportConfig) {
                     unchanged = receipt.unchanged,
                     stale = receipt.stale,
                     replayed = receipt.replayed,
+                    deferred = receipt.deferred,
                     "local Scout delivery confirmed"
                 );
                 last_state = Some("confirmed");

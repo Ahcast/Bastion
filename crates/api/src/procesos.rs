@@ -218,7 +218,7 @@ fn local_delivery_problem(error: bastion_procesos::LocalDeliveryError) -> Respon
     let (status, detail) = match error {
         LocalDeliveryError::Pending | LocalDeliveryError::Changed => (
             StatusCode::CONFLICT,
-            "Scout todavía no terminó o está publicando sus resultados. Intenta actualizar más tarde.",
+            "Scout aún no publicó filas listas para incorporar o está actualizando sus resultados. Intenta más tarde.",
         ),
         LocalDeliveryError::Invalid => (
             StatusCode::UNPROCESSABLE_ENTITY,

@@ -14,7 +14,7 @@ test('Scout status shows missing reports, previous cycles, IA counts and unknown
   assert.equal(scoutMetricName('clasificador', 'total'), 'Procesos revisados');
   assert.equal(scoutMetricName('combiner', 'total'), 'Procesos en el maestro');
   const markup = renderToStaticMarkup(<ScoutStatusPanel data={data} />);
-  for (const text of ['Última ejecución reportada', 'Análisis IA', 'Tokens de entrada', 'Analizados con IA', 'Pendientes', 'otro ciclo', 'Sin reporte publicado', 'No informado', 'No informada', '19:00', '22 oct', 'Todavía no está lista']) assert.ok(markup.includes(text), text);
+  for (const text of ['Última ejecución reportada', 'Análisis IA', 'Tokens de entrada', 'Analizados con IA', 'Pendientes', 'otro ciclo', 'Sin reporte publicado', 'No informado', 'No informada', '19:00', '22 oct', 'se pueden incorporar las filas ya listas']) assert.ok(markup.includes(text), text);
   assert.ok(markup.includes('<dd>0</dd>'));
   assert.ok(!markup.includes('type="submit"'));
   assert.ok(!markup.includes('<input'));

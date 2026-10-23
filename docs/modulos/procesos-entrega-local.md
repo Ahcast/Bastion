@@ -4,7 +4,11 @@ Decisión del 22 de octubre de 2026: Scout y Bastion están en el mismo servidor
 
 ## Publicación y lectura
 
-Scout conserva su publicación atómica actual: termina `maestro.csv` y después `main.json`. El receptor lee el manifiesto hermano `/var/lib/bastion-scout/main.json`, comprueba `status=exitoso`, `output_ready=true`, las tres etapas exitosas, `run_id`, SHA-256 y total de filas. Lee el CSV con límite de 8 MiB, verifica su huella y vuelve a leer el manifiesto para detectar cambios concurrentes. Un resultado parcial, ausente o incongruente queda pendiente sin modificar procesos.
+Recepción incremental: se admiten manifiestos finalizados `exitoso` o `parcial`, con combinación exitosa y etapas de extracción/clasificación exitosas o parciales. Una ejecución todavía activa, una combinación fallida o una publicación incongruente se rechazan. SHA-256, cantidad total y lectura estable se verifican sobre el archivo completo antes de seleccionar filas.
+
+En un ciclo parcial solo se incorporan filas con `extraccion_estado=completo`, `analisis_estado=analizado`, hash analizado igual al de contenido y sin error de análisis. Se mantienen las validaciones de cada fila seleccionada. Las demás filas se contabilizan como `deferred`, no sustituyen versiones previas y permanecen disponibles para reintentos de Scout. Sin filas listas se devuelve pendiente. El recibo se identifica por el CSV incorporado, de modo que cambios exclusivos en filas diferidas no duplican importaciones; la auditoría conserva también la huella y el total de la publicación fuente. Esto admite avances por ejecución publicada, sin afirmar que un ciclo parcial terminó.
+
+Scout conserva su publicación atómica actual: termina `maestro.csv` y después `main.json`. El receptor valida un ciclo finalizado exitoso o parcial, `run_id`, SHA-256 y total de filas. Lee el CSV completo con límite de 8 MiB, verifica su huella y vuelve a leer el manifiesto para detectar cambios concurrentes. Un resultado ausente, activo o incongruente queda pendiente sin modificar procesos. Una publicación parcial estable permite incorporar su subconjunto listo.
 
 El manifiesto no puede seleccionar otra ruta ni una URL. El backend solo abre los dos archivos configurados en el servidor; rechaza enlaces simbólicos y archivos no regulares. El usuario del servicio Rust necesita lectura/travesía sobre la carpeta de Scout, sin permiso de escritura. Los archivos originales no se renombran, borran ni marcan desde Bastion.
 
