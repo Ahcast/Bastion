@@ -65,3 +65,9 @@ Código ejecutado: `78743be826c4d57ea9e46f6459fa912566c50241`; [CI aprobado](htt
 Backend instalado en AWS Lightsail y frontend en Bluehost desde artifacts del mismo commit, con procedencia y hashes SHA-256 comprobados. Se crearon respaldos privados de la base y del frontend. Las dos migraciones de Cotizaciones se aplicaron; los 835 procesos y los conteos de datos existentes se conservaron. API HTTPS: health live/ready 200; consulta anónima de Cotizaciones/Procesos 401. Se verificaron por HTTPS los hashes de HTML/assets y la carga de la pantalla de acceso sin errores de consola.
 
 Cotizaciones quedó incluido y permitido por el ambiente, **sin activación administrativa**. El Administrador puede activarlo en Ajustes > Core > Módulos. Se conservó la activación de Procesos y la recepción automática de Scout siguió desactivada. Rutas internas y respaldos reales permanecen en los registros privados de despliegue.
+
+## Corrección de selección publicada — 2026-10-23
+
+Código `8f6f6006410a46bf164accba9718e936c4c6e445`, [CI aprobado](https://github.com/Ahcast/Bastion/actions/runs/39934649964): 57 pruebas frontend y 59 Rust/MySQL, incluidas asociación autorizada, rechazo de identificadores inexistentes, copias falsificadas ignoradas, conservación de instantáneas, modo manual, clonación, compatibilidad de recibos anteriores y RTN en la plantilla PDF. La UI comprueba búsqueda/paginación con selección retenida, Enter sin guardar, permisos y destinatario sugerido sin envío automático.
+
+Backend AWS y frontend Bluehost instalados desde artifacts de ese commit, con hashes verificados y respaldos privados previos. No hubo migraciones; se conservaron datos, activación de módulos y configuración de documentos. Se comprobaron 20 recursos públicos por HTTPS, health 200 y acceso anónimo 401. La comprobación funcional autenticada se realizó con datos sintéticos en CI; no se crearon clientes o cotizaciones de prueba ni se enviaron correos en el ambiente del usuario.
