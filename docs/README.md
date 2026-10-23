@@ -37,6 +37,8 @@ El informe se obtuvo de una copia de frontend Angular compilado y backend Larave
 
 ## Registro de decisiones
 
+- 2026-10-23: el usuario solicita Convertir a cotización desde Procesos: entidad como cliente manual, expediente como referencia e ítems con cantidades originales de Scout. Abre un borrador en el editor y usa el guardado normal. Recordatorio informativo inline, sin confirmación ni bloqueo, con enlace al original. Cantidades no verificables quedan vacías y no se inventan. Ver `modulos/procesos-cotizacion.md`.
+
 - 2026-10-23: el usuario aporta el logo de Castillo IT para cotizaciones, facturas y notas de entrega. Firma/sello se aplican a cotizaciones en la parte inferior izquierda, a la altura de subtotales/totales. Los recursos originales son privados y compartidos por el Core; no se publican en GitHub ni en Bluehost. Ver `15-identidad-documental.md`; las plantillas PDF de los módulos pendientes conservan su estado de implementación.
 
 - 2026-10-22: el usuario confirma incorporación incremental de Scout aunque el rastreo o análisis del ciclo queden parciales. Se valida una publicación atómica finalizada con SHA-256 y total completo; solo se incorporan filas con extracción completa, análisis confirmado y hash vigente. Pendientes, errores y extracciones incompletas se difieren sin borrar ni sobrescribir históricos, marcas o notas. La interfaz informa filas diferidas; un fallo de autenticación de IA sigue necesitando corrección y no se interpreta como análisis exitoso.

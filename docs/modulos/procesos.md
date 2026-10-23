@@ -23,6 +23,8 @@ Columnas observadas/derivadas: expediente, entidad, resumen, fecha de recepción
 
 ## Botones y acciones
 
+Nueva acción acordada el 23 de octubre: [convertir un proceso a cotización](procesos-cotizacion.md), con cliente, referencia e ítems precargados y recordatorio no bloqueante de revisión del original.
+
 Actualizar (consulta estado/datos); Importar CSV (ingiere y actualiza filas); Exportar CSV (descarga); Ver todo el proceso (detalle); marcar/desmarcar (De interés); Guardar nota; anterior/siguiente; Depurar procesos antiguos (mantenimiento, acción destructiva restringida).
 
 ## Settings bajo Ajustes

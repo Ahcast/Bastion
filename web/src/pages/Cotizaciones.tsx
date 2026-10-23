@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
+import type { ProcessQuoteSeed } from '../processQuote.js';
+import { ProcessQuoteNotice } from '../components/ProcessQuoteNotice.js';
 import { ApiError, message } from '../api.js';
 import { Dialog, Heading, Loading, Notice, Table, useCore, useLoad } from '../ui.js';
 import { QuoteActions } from '../components/QuoteActions.js';
@@ -11,17 +13,20 @@ import { moduleCan } from '../types.js';
 import { newQuote, newQuoteItem, quoteStatuses } from '../quotes.js';
 import type { DiscountType, QuoteDraft, QuoteInput, QuoteItem, QuotePage, QuoteCalculation, QuoteStatus, QuoteSummary } from '../quotes.js';
 
-export default function Cotizaciones() {
+interface ProcessQuoteProps { processSeed?: ProcessQuoteSeed | null; clearProcessSeed?: () => void }
+
+export default function Cotizaciones({ processSeed, clearProcessSeed }: ProcessQuoteProps = {}) {
   const { access } = useCore();
   if (!moduleCan(access, 'cotizaciones', 'documentos', 'ver')) return <Notice>No tienes acceso a Cotizaciones.</Notice>;
-  return <Workspace />;
+  return <Workspace processSeed={processSeed} clearProcessSeed={clearProcessSeed} />;
 }
 
-function Workspace() {
+function Workspace({ processSeed, clearProcessSeed }: ProcessQuoteProps) {
+  const [seed, setSeed] = useState(processSeed);
   const { api, access, notify } = useCore();
-  const [selected, setSelected] = useState<QuoteDraft | 'new' | null>(null);
+  const [selected, setSelected] = useState<QuoteDraft | 'new' | null>(processSeed ? 'new' : null);
   const [search, setSearch] = useState(''), [query, setQuery] = useState(''), [page, setPage] = useState(1), [error, setError] = useState(''), [opening, setOpening] = useState(false);
-  const [mode, setMode] = useState<'view' | 'edit'>('view'), [deleting, setDeleting] = useState<QuoteSummary | null>(null);
+  const [mode, setMode] = useState<'view' | 'edit'>(processSeed ? 'edit' : 'view'), [deleting, setDeleting] = useState<QuoteSummary | null>(null);
   const [email, setEmail] = useState<QuoteSummary | null>(null);
   const cloneAttempt = useRef<{ id: number; version: number; key: string } | null>(null);
   const editable = moduleCan(access, 'cotizaciones', 'documentos', 'editar');
@@ -51,7 +56,7 @@ function Workspace() {
     } catch (reason) { setError(message(reason)); if (reason instanceof ApiError && reason.status === 412) result.reload(); }
     finally { setOpening(false); }
   };
-  if (selected) return <Editor key={selected === 'new' ? 'new' : selected.id} initial={selected === 'new' ? null : selected} editable={editable && mode === 'edit'} edit={editable && mode === 'view' ? () => setMode('edit') : undefined} close={() => { setSelected(null); result.reload(); }} />;
+  if (selected) return <Editor key={selected === 'new' ? 'new' : selected.id} initial={selected === 'new' ? null : selected} seed={seed} editable={editable && mode === 'edit'} edit={editable && mode === 'view' ? () => setMode('edit') : undefined} close={() => { setSelected(null); setSeed(null); clearProcessSeed?.(); result.reload(); }} />;
   return <><Heading title="Cotizaciones" description="Prepara y consulta tus cotizaciones." action={editable && <button className="primary" onClick={() => { setMode('edit'); setSelected('new'); }}>Nueva cotización</button>} />
     {documents.data && !documents.data.pdf && <p className="quote-stage">PDF requiere la configuración de Empresa en Ajustes del Core y el servicio de documentos del servidor.</p>}
     <Notice>{documents.error}</Notice>
@@ -81,19 +86,20 @@ function Workspace() {
   </>;
 }
 
-function Editor({ initial, editable, edit, close }: { initial: QuoteDraft | null; editable: boolean; edit?: () => void; close: () => void }) {
+function Editor({ initial, editable, edit, close, seed }: { seed?: ProcessQuoteSeed | null; initial: QuoteDraft | null; editable: boolean; edit?: () => void; close: () => void }) {
   const { api, access, notify } = useCore();
-  const [saved, setSaved] = useState(initial), [data, setData] = useState<QuoteInput>(() => initial?.data ?? newQuote()), [busy, setBusy] = useState(false), [error, setError] = useState(''), [dirty, setDirty] = useState(false), [conflict, setConflict] = useState(false);
+  const [saved, setSaved] = useState(initial), [data, setData] = useState<QuoteInput>(() => initial?.data ?? seed?.data ?? newQuote()), [busy, setBusy] = useState(false), [error, setError] = useState(''), [dirty, setDirty] = useState(Boolean(seed)), [conflict, setConflict] = useState(false);
   const [preview, setPreview] = useState<{ input: QuoteInput; value: QuoteCalculation } | null>(null), [calculationError, setCalculationError] = useState('');
+  const missingQuantities = seed ? data.items.filter(item => !item.quantity.trim()).length : 0;
   useEffect(() => {
-    if (!editable || (saved && !dirty)) return;
+    if (!editable || (saved && !dirty) || missingQuantities) return;
     const controller = new AbortController(), input = data;
     setCalculationError('');
     const timer = setTimeout(() => {
       void api.request<QuoteCalculation>('/api/v1/cotizaciones/calculate', { method: 'POST', body: input, signal: controller.signal }).then(value => { if (!controller.signal.aborted) setPreview({ input, value }); }).catch(reason => { if (!controller.signal.aborted) setCalculationError(message(reason)); });
     }, 450);
     return () => { clearTimeout(timer); controller.abort(); };
-  }, [api, data, editable, saved, dirty]);
+  }, [api, data, editable, saved, dirty, missingQuantities]);
   const calculation = saved && !dirty ? saved.calculation : preview?.input === data ? preview.value : null;
   const attempt = useRef<{ body: string; key: string } | null>(null);
   const change = <K extends keyof QuoteInput>(key: K, value: QuoteInput[K]) => { setData(previous => ({ ...previous, [key]: value })); setDirty(true); };
@@ -101,6 +107,7 @@ function Editor({ initial, editable, edit, close }: { initial: QuoteDraft | null
   const back = () => { if (!busy && (!dirty || confirm('Hay cambios sin guardar. ¿Volver al listado?'))) close(); };
   return <><Heading title={saved ? saved.quote_number ?? `Cotización · referencia interna ${saved.id}` : 'Nueva cotización'} description={`Estado: ${data.status} · Moneda: HNL`} action={<div className="actions">{edit && <button onClick={edit}>Editar</button>}<button disabled={busy} onClick={back}>Volver</button></div>} />
     {!saved && <p className="quote-note">El número se asigna al guardar.</p>}
+    {seed && <ProcessQuoteNotice seed={seed} missingQuantities={missingQuantities} />}
     <Notice>{error}</Notice>
     {conflict && <p role="status">Tus cambios se conservan en pantalla. Vuelve al listado y abre la versión actual antes de reintentarlos.</p>}
     <form className="quote-editor" onSubmit={async event => {
@@ -142,7 +149,7 @@ function Editor({ initial, editable, edit, close }: { initial: QuoteDraft | null
           <div className="quote-summary">
             <section className="quote-section" aria-labelledby="quote-discount-title"><div className="quote-section-heading"><h2 id="quote-discount-title">Descuento general</h2></div><div className="quote-discount-fields"><label>Tipo<select value={data.discount_type} onChange={event => change('discount_type', event.target.value as DiscountType)}><option value="amount">Monto (HNL)</option><option value="percent">Porcentaje</option></select></label><Decimal label="Valor del descuento general" value={data.discount_value} percent={data.discount_type === 'percent'} change={value => change('discount_value', value)} /></div></section>
             <Notice>{calculationError}</Notice>
-            {calculation ? <QuoteTotalsPanel calculation={calculation} /> : !calculationError && <p role="status">Calculando totales…</p>}
+            {calculation ? <QuoteTotalsPanel calculation={calculation} /> : !calculationError && !missingQuantities && <p role="status">Calculando totales…</p>}
           </div>
         </div>
         {editable && <div className="quote-save"><button className="primary" type="submit">{busy ? 'Guardando…' : 'Guardar cotización'}</button></div>}

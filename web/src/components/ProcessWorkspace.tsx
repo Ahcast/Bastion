@@ -54,9 +54,10 @@ export function ProcessTable({ rows, selected, select, mark, canMark, busy, deta
 
 export function Score({ value }: { value: number }) { return <span className="process-score"><strong>{value}<small>/100</small></strong><span className="process-score-track" aria-hidden="true"><span style={{ width: `${value}%` }} /></span></span>; }
 
-export function ProcessDetailContent({ row, noteEditor }: { row: ProcessRecord; noteEditor?: ReactNode }) {
+export function ProcessDetailContent({ row, noteEditor, action }: { row: ProcessRecord; noteEditor?: ReactNode; action?: ReactNode }) {
   const items = processItems(row.source.items ?? '');
   return <div className="process-detail">
+    {action && <div className="actions">{action}</div>}
     <div className="process-facts"><div><span>Calificación IA</span><Score value={row.puntaje} /></div><div><span>Rubro</span><strong>{row.rubro}</strong></div><div><span>Fecha recepción</span><strong>{processDate(row.fecha_recepcion)}</strong></div><div><span>Entidad</span><strong>{row.entidad}</strong></div></div>
     <div className="process-detail-columns"><div><section><h3>Resumen</h3><p className="process-text">{row.resumen_corto}</p></section><section><h3>Descripción / especificaciones</h3><p className="process-text">{row.source.descripcion || 'Sin descripción fuente.'}</p></section><a href={row.source.url} target="_blank" rel="noopener noreferrer">Abrir en HonduCompras ↗</a></div>
       <div><section><h3>Ítems analizados <span className="process-item-count">{items.length}</span></h3>{items.length ? <ol className="process-items">{items.map((item, index) => <li key={index}>{item}</li>)}</ol> : <p>Sin ítems analizados.</p>}</section><section><h3>Nota compartida</h3>{noteEditor ?? <p className="process-text">{row.note || 'Sin nota.'}</p>}</section></div></div>

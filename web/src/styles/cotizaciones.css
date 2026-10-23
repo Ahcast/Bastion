@@ -120,3 +120,5 @@
  .quote-editor-bottom{gap:24px}
  .quote-save button{width:100%}
 }
+
+.quote-source-notice{padding:10px 14px;margin:16px 0;border:1px solid var(--line);border-left:3px solid var(--rust);border-radius:6px;background:var(--panel);color:var(--muted);font-size:13px;line-height:1.5}.quote-source-notice p{margin:0}.quote-source-notice p+p{margin-top:5px}.quote-source-notice a{white-space:normal;overflow-wrap:anywhere}

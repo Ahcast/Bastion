@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import '../styles/procesos.css';
 import { ApiError, message } from '../api.js';
 import { Form, Heading, Loading, Notice, useCore, useLoad } from '../ui.js';
@@ -7,9 +7,12 @@ import { initialProcessFilters, nextProcessExpiry, processDate, processQuery } f
 import type { ProcessFilters, ProcessPage, ProcessRecord, ProcessReview, ProcessStatus } from '../processes.js';
 import { ProcessDetailContent, ProcessFilterBar, ProcessInsights, ProcessTable } from '../components/ProcessWorkspace.js';
 
+import { quoteFromProcess } from '../processQuote.js';
+import type { ProcessQuoteSeed } from '../processQuote.js';
+
 interface ImportResult { inserted: number; updated: number; unchanged: number; stale: number; replayed: boolean; deferred?: number }
 
-export default function Procesos() {
+export default function Procesos({ openQuote }: { openQuote?: (seed: ProcessQuoteSeed) => void } = {}) {
   const { api, access, notify } = useCore();
   const [filters, setFilters] = useState<ProcessFilters>(initialProcessFilters), [search, setSearch] = useState('');
   const [page, setPage] = useState(1), [refreshing, setRefreshing] = useState(false), [busy, setBusy] = useState(false), [selected, setSelected] = useState<string | null>(null);
@@ -95,19 +98,34 @@ export default function Procesos() {
           setBusy(true);
           try { await updateReview(row, { marked }); }
           catch (error) { notify(message(error)); } finally { setBusy(false); }
-        }} detail={row => <Detail key={row.proceso_id} summary={row} synchronize={saved} save={updateReview} />} />
+        }} detail={row => <Detail key={row.proceso_id} summary={row} synchronize={saved} save={updateReview} openQuote={openQuote} />} />
           <div className="process-pagination"><p>Abre una fila para ver el detalle aquí mismo.</p><div><button disabled={page === 1} onClick={() => { setPage(page - 1); setSelected(null); }}>Anterior</button><span>Página {page}</span><button disabled={!result.data.has_more} onClick={() => { setPage(page + 1); setSelected(null); }}>Siguiente</button></div></div></> : !result.error && <Loading />}
       </section>
     </>}
   </div>;
 }
 
-function Detail({ summary, synchronize, save }: { summary: ProcessRecord; synchronize: (id: string, review: ProcessReview) => void; save: (row: ProcessRecord, changes: { note: string }) => Promise<void> }) {
+function Detail({ summary, synchronize, save, openQuote }: { openQuote?: (seed: ProcessQuoteSeed) => void; summary: ProcessRecord; synchronize: (id: string, review: ProcessReview) => void; save: (row: ProcessRecord, changes: { note: string }) => Promise<void> }) {
+  const [converting, setConverting] = useState(false), [conversionError, setConversionError] = useState('');
+  const conversionLock = useRef(false);
+  const conversionRequest = useRef<AbortController | null>(null);
+  useEffect(() => () => conversionRequest.current?.abort(), []);
   const id = summary.proceso_id;
   const { api, access, notify } = useCore(), result = useLoad(signal => api.request<ProcessRecord>(`/api/v1/procesos/rows/${encodeURIComponent(id)}`, { signal }), [id]);
   useEffect(() => { if (result.data && result.data.version > summary.version) synchronize(id, result.data); }, [result.data, summary.version]);
   const row = result.data && (summary.version >= result.data.version ? { ...result.data, marked: summary.marked, note: summary.note, version: summary.version } : result.data);
-  return <><Notice>{result.error}</Notice>{result.error && <button onClick={result.reload}>Reintentar detalle</button>}{row ? <ProcessDetailContent row={row} noteEditor={moduleCan(access, 'procesos', 'notas', 'editar') ? <Form fields={[{ name: 'note', label: 'Nota para todos los usuarios', multiline: true, maxLength: 10000 }]} initial={{ note: row.note }} submit="Guardar nota" onSubmit={async values => {
+  const canConvert = Boolean(openQuote && moduleCan(access, 'cotizaciones', 'documentos', 'ver') && moduleCan(access, 'cotizaciones', 'documentos', 'editar'));
+  return <><Notice>{conversionError || result.error}</Notice>{result.error && <button onClick={result.reload}>Reintentar detalle</button>}{row ? <ProcessDetailContent row={row} action={openQuote && <button type="button" className="primary" disabled={converting || !canConvert} title={!canConvert ? 'Requiere Cotizaciones habilitado y permisos para ver y editar.' : undefined} onClick={async () => {
+    if (!canConvert || conversionLock.current) return;
+    conversionLock.current = true; setConverting(true); setConversionError('');
+    const controller = new AbortController(); conversionRequest.current = controller;
+    try {
+      // Revalidate access, expiry and the latest Scout content before handing off.
+      const current = await api.request<ProcessRecord>(`/api/v1/procesos/rows/${encodeURIComponent(id)}`, { signal: controller.signal });
+      if (!controller.signal.aborted) openQuote(quoteFromProcess(current));
+    } catch (reason) { if (!controller.signal.aborted) setConversionError(message(reason)); }
+    finally { conversionLock.current = false; if (!controller.signal.aborted) setConverting(false); }
+  }}>{converting ? 'Preparando…' : 'Convertir a cotización'}</button>} noteEditor={moduleCan(access, 'procesos', 'notas', 'editar') ? <Form fields={[{ name: 'note', label: 'Nota para todos los usuarios', multiline: true, maxLength: 10000 }]} initial={{ note: row.note }} submit="Guardar nota" onSubmit={async values => {
     await save(row, { note: values.note ?? '' }); notify('Nota compartida guardada.');
   }} /> : undefined} /> : !result.error && <Loading />}</>;
 }

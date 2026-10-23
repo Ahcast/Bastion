@@ -26,6 +26,8 @@ Preparar cotizaciones, calcular líneas/impuestos/descuentos, generar PDF, adjun
 
 ## Botones y acciones
 
+Nueva acción acordada el 23 de octubre: [convertir un proceso a cotización](procesos-cotizacion.md), con cliente, referencia e ítems precargados y recordatorio no bloqueante de revisión del original.
+
 Listado: Nueva, Ver, Editar, PDF, Marcar como enviado, Aprobar, Convertir a orden, Convertir a factura, Enviar por correo, Clonar, Eliminar, selección individual/total, acciones masivas y paginación.
 
 Editor: Guardar; Editar/Cancelar; Agregar/Quitar ítem; PDF; cargar, ver, descargar y eliminar adjunto; volver. Vista previa y totales se actualizan durante edición.
