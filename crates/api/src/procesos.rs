@@ -7,6 +7,10 @@ struct RefreshRequest {}
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
+struct ScoutStatusQuery {}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
 struct ReviewRequest {
     marked: Option<bool>,
     note: Option<String>,
@@ -15,6 +19,7 @@ struct ReviewRequest {
 pub(super) fn routes(state: ApiState) -> Router<ApiState> {
     Router::new()
         .route("/api/v1/procesos/status", get(status))
+        .route("/api/v1/procesos/scout-status", get(scout_status))
         .route("/api/v1/procesos/entities", get(entities))
         .route("/api/v1/procesos/rows", get(rows))
         .route("/api/v1/procesos/rows/{id}", get(detail))
@@ -50,6 +55,7 @@ async fn guarded_request(state: ApiState, request: Request, next: Next) -> Respo
     let (scope, capability, expensive) = match path {
         "/api/v1/procesos/refresh" => ("importacion", "editar", true),
         "/api/v1/procesos/export" => ("exportacion", "ver", true),
+        "/api/v1/procesos/scout-status" => ("consulta", "ver", true),
         _ => ("consulta", "ver", false),
     };
     let access = if path.ends_with("/review") {
@@ -89,6 +95,24 @@ async fn status(
         .await
         .map(Json)
         .map_err(ApiError)
+}
+
+async fn scout_status(
+    State(state): State<ApiState>,
+    headers: axum::http::HeaderMap,
+    Query(_query): Query<ScoutStatusQuery>,
+) -> Result<Json<bastion_procesos::ScoutDiagnostics>, ApiError> {
+    let actor = actor(&state, &headers).await?;
+    let path = state.scout_csv_path.clone();
+    let report =
+        tokio::task::spawn_blocking(move || bastion_procesos::ScoutDiagnostics::read(&path))
+            .await
+            .map_err(|_| ApiError(CoreError::Overloaded))?;
+    state
+        .procesos
+        .check_access(actor.id, "consulta", "ver")
+        .await?;
+    Ok(Json(report))
 }
 
 async fn entities(
@@ -213,6 +237,9 @@ mod tests {
 
     #[test]
     fn refresh_cannot_select_a_file_or_upload_csv() {
+        assert!(serde_json::from_str::<ScoutStatusQuery>("{}").is_ok());
+        assert!(serde_json::from_str::<ScoutStatusQuery>(r#"{"path":"/etc/passwd"}"#).is_err());
+        assert!(serde_json::from_str::<ScoutStatusQuery>(r#"{"file":"config.json"}"#).is_err());
         assert!(serde_json::from_str::<RefreshRequest>("{}").is_ok());
         for payload in [
             r#"{"path":"/etc/passwd"}"#,

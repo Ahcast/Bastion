@@ -37,6 +37,8 @@ El informe se obtuvo de una copia de frontend Angular compilado y backend Larave
 
 ## Registro de decisiones
 
+- 2026-10-22: Ajustes > Procesos muestra como información de solo lectura los reportes main/scout/combiner/clasificador de Scout, última ejecución, estado por etapa, contadores y análisis IA. Usa consulta/ver del módulo activo, consulta cada 60 segundos y no ejecuta scripts ni importaciones. Archivos y campos acotados, sin JSON crudo ni excepciones/configuración. Sustituye la ficha estática dentro del Core; ver `modulos/procesos-implementacion.md`.
+
 - 2026-10-22: el usuario confirma menú por cotización con Ver, Editar, Marcar como enviado, conversiones, Aprobar, Clonar, PDF, correo y Eliminar. Ambas conversiones quedan visibles y deshabilitadas hasta desarrollar sus módulos. PDF usa el diseño Legacy como referencia para Typst y correo conserva destinatarios/copias/mensaje y programación. Empresa, compilación PDF, almacenamiento privado y SMTP siguen como servicios del Core. Implementación y condiciones de habilitación: `modulos/cotizaciones-acciones.md`.
 
 - 2026-10-22: por autorización del usuario se publica el primer corte técnico de Cotizaciones en GitHub y luego AWS/Bluehost. El código `78743be` pasó CI con MySQL 5.7, se respaldaron base/frontend y se aplicaron dos migraciones. Cotizaciones queda disponible pero sin activar; Procesos y sus 835 registros se conservaron. Ver la evidencia y pendientes en `modulos/cotizaciones-implementacion.md`.

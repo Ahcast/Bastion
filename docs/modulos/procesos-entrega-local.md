@@ -25,3 +25,5 @@ El receptor incorpora la versión del maestro disponible en cada revisión. Si S
 Scout actual publica `resumen` y `items` como texto numerado, un ítem por línea. El lector también conserva compatibilidad con `resumen_corto`/JSON de la entrega anterior. Ambos formatos se validan explícitamente; se mantienen los valores fuente y los ID/hash originales. Los enlaces HTTP originales de `sicc.honducompras.gob.hn` son referencias del proceso y no se descargan desde el backend.
 
 La publicación del código y su validación se hacen primero en GitHub. Configurar permisos de carpeta, aplicar migraciones y habilitar el receptor en el servidor son pasos de despliegue posteriores.
+
+`Ajustes > Procesos` consulta además los reportes hermanos `scout.json`, `combiner.json` y `clasificador.json` junto a `main.json`, sin abrir el CSV ni ejecutar etapas. El usuario del servicio necesita lectura sobre esos cuatro archivos. La información es independiente de la habilitación del trabajador periódico; requiere la activación y consulta normal del módulo. No indica por sí misma que un CSV ya haya sido importado. Ver los límites y la proyección informativa en `procesos-implementacion.md`.

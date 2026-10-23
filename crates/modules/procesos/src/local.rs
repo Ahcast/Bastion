@@ -112,7 +112,7 @@ impl ReadyDelivery {
     }
 }
 
-fn read_regular(path: &Path, limit: usize) -> Result<Vec<u8>, LocalDeliveryError> {
+pub(crate) fn read_regular(path: &Path, limit: usize) -> Result<Vec<u8>, LocalDeliveryError> {
     let metadata = fs::symlink_metadata(path).map_err(file_error)?;
     if !metadata.is_file() || metadata.file_type().is_symlink() || metadata.len() > limit as u64 {
         return Err(LocalDeliveryError::Invalid);

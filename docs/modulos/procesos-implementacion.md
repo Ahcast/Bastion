@@ -60,6 +60,18 @@ Consulta de estado/estadísticas, listado paginado por expediente/contenido fuen
 
 La validación de GitHub incluye una instancia desechable de MySQL 5.7, migraciones repetidas, idempotencia, actualización del mismo ID, archivos antiguos, permisos, límites y desactivación. Los ejemplos y pruebas son sintéticos. El despliegue y la equivalencia visual Legacy requieren validación posterior.
 
+## Información de Scout en Ajustes
+
+Decisión del 22 de octubre de 2026: `Ajustes > Procesos` presenta el último estado publicado por Scout en modo de solo lectura, con la misma entrada central que otros módulos. Sustituye la ficha estática antes situada dentro de Core. Requiere módulo activo y el permiso existente `procesos/consulta/ver`; no agrega permisos, settings editables, ejecución de comandos ni acceso directo a SQL/archivos para API/MCP.
+
+`GET /api/v1/procesos/scout-status` lee exclusivamente `main.json`, `scout.json`, `combiner.json` y `clasificador.json` junto al maestro configurado en el backend. No lee `config.json`, CSV, SQLite ni logs; no ejecuta Scout ni IA, ni incorpora datos. Verifica autorización antes de leer y antes de responder. Mantiene los límites y cuota del módulo. `main.json` admite hasta 32 KiB; cada reporte de etapa hasta 512 KiB. Solo archivos regulares sin enlace simbólico final; se comprueba lectura estable y la estabilidad del manifiesto principal durante la consulta. No acepta parámetros de ruta/nombre ni URLs.
+
+Se proyectan campos conocidos: ciclo, estado reportado, inicio, fin, duración cuando existe fin, límite horario, motivo operativo, disponibilidad de entrega y etapas pendientes; contadores de extracción/consolidación/análisis, pendientes, errores, reutilización de caché y tokens de entrada/salida cuando estén presentes. Fechas en hora de Honduras, formato de 24 horas. Ausencia de campo no se convierte en cero. La información se consulta al abrir y cada 60 segundos; Volver a consultar solo hace GET.
+
+Reportes ausentes, sin lectura, inválidos o cambiantes se indican por separado. Una etapa de otro ciclo se identifica como tal; si no hay manifiesto principal válido no se atribuye pertenencia al ciclo actual. No se infiere la salud del proceso del sistema operativo a partir de un estado `ejecutando` persistido. Es el último estado escrito, no un monitor del servicio. `output_ready` es la entrega informada por Scout; la importación conserva su validación separada de CSV/huella.
+
+No se devuelve JSON crudo, mensajes de excepción, listas de URLs, rutas locales ni configuración; los motivos se reducen a códigos conocidos y las incidencias a presencia/contadores. Los retiros del maestro son operaciones de Scout y no cambian la conservación del histórico de Bastion. Esta información no requiere una migración nueva.
+
 ## Pendientes que no deben resolverse por inferencia
 
 - Políticas editables y depuración quedan aplazadas por decisión del usuario. La política vigente es conservación total; no habilitar operaciones destructivas hasta acordar criterio y protección de filas con marcas/notas.

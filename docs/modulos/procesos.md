@@ -29,6 +29,8 @@ Actualizar (consulta estado/datos); Importar CSV (ingiere y actualiza filas); Ex
 
 Primer corte confirmado el 21 de octubre de 2026: CSV analizado de bastion-scout, marcas y notas compartidas, conservación total de registros. Se presenta esta política en la sección del módulo, sin campos editables. La depuración queda pendiente por decisión del usuario y no se habilita ni se ejecuta automáticamente.
 
+El 22 de octubre se añade en `Ajustes > Procesos` la información de solo lectura de los cuatro reportes JSON de Scout: última ejecución y estado por etapa, extracción, consolidación, análisis IA, pendientes, incidencias y tokens disponibles. Consulta con el permiso existente `procesos/consulta/ver` y módulo activo. No ejecuta scripts, IA ni importación; véase el contrato de implementación.
+
 No se confirman settings específicos en el módulo actual; se registra la sección central. Configuración de importación, retención, filtros por defecto y calendario son `Pendientes de decisión`.
 
 ## API y datos
