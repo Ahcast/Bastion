@@ -24,39 +24,67 @@ after(() => { css.deregister(); void window.happyDOM.abort(); });
 const sample: ProcessRecord = {
   proceso_id: 'scout-one', entidad: 'Hospital', expediente: 'EXP-001', fecha_recepcion: '2099-10-23T19:00:00Z',
   puntaje: 88, rubro: 'Equipos', resumen_corto: 'Taladros', marked: false, note: '', version: 1,
-  source: { items_fuente: JSON.stringify([['1', '20', 'Taladro ABB XYZ-001, 220V', 'unidades'], ['2', '2.50', 'Cable <script>malicioso</script>', 'metros']]), items: '1. Taladro\n2. Cable', url: 'https://example.test/proceso?id=1' },
+  source: { descripcion: 'DESCRIPCIÓN AGRUPADA QUE NO DEBE CARGARSE', items_fuente: JSON.stringify([['56111805', 'Categoría general', 'Taladro y cable, todos los productos en una sola especificación', '1']]), items: '1. 20 × Taladro ABB XYZ-001, 220V\n2. 2.50 metros de cable <script>malicioso</script>', url: 'https://example.test/proceso?id=1' },
 };
 const withSource = (source: Record<string, string>) => ({ ...sample, source: { ...sample.source, ...source } });
 const totals = { subtotal: '0.00', importe_exonerado: '0.00', importe_exento: '0.00', importe_gravado_15: '0.00', importe_gravado_18: '0.00', descuentos_rebajas: '0.00', isv_15: '0.00', isv_18: '0.00', total: '0.00' };
 
-test('conversion preserves source rows, quantities, unit and full specification; uses manual client and no guessed prices', () => {
+test('conversion uses separate analyzed items and their quantities even when the original source groups all products', () => {
   const seed = quoteFromProcess(sample, new Date('2026-10-23T02:00:00Z'));
   assert.equal(seed.data.client_name, 'Hospital'); assert.equal(seed.data.id_client, null);
   assert.equal(seed.data.order_number, 'EXP-001'); assert.equal(seed.data.quote_date, '2026-10-22');
   assert.deepEqual(seed.data.items.map(item => item.quantity), ['20', '2.50']);
-  assert.equal(seed.data.items[0]?.description, 'Taladro ABB XYZ-001, 220V · unidades');
-  assert.equal(seed.data.items[1]?.description, 'Cable <script>malicioso</script> · metros');
+  assert.equal(seed.data.items[0]?.description, 'Taladro ABB XYZ-001, 220V');
+  assert.equal(seed.data.items[1]?.description, 'metros de cable <script>malicioso</script>');
   assert.ok(seed.data.items.every(item => item.unit_price === '0'));
   assert.equal(seed.data.status, 'Borrador'); assert.equal(seed.data.notes, '');
   assert.equal(seed.missingQuantities, 0);
 });
 
-test('quantities are parsed without floating point or guesses, including ambiguous comma separators', () => {
+test('quantities preserve exact decimals and normalize valid thousands separators and leading zeroes', () => {
   for (const value of ['1', '0', '20.0001', '999999999999.9999']) assert.equal(sourceQuantity(value), value);
   assert.equal(sourceQuantity(' 2,50 '), '2.50');
-  for (const value of ['1,000', '1,200.00', '20 unidades', '-2', '1e3', '2.12345', '1000000000000', '']) assert.equal(sourceQuantity(value), '');
+  assert.equal(sourceQuantity('11,700'), '11700'); assert.equal(sourceQuantity('02'), '2');
+  assert.equal(sourceQuantity('1,200.00'), '1200.00');
+  for (const value of ['1,20,00', '20 unidades', '-2', '1e3', '2.12345', '1000000000000', '']) assert.equal(sourceQuantity(value), '');
   const seed = quoteFromProcess(withSource({ items_fuente: '[]', items: '1. 50 guantes\n2. Papel' }));
-  assert.deepEqual(seed.data.items.map(item => item.quantity), ['', '']);
-  assert.equal(seed.data.items[0]?.description, '50 guantes'); assert.equal(seed.missingQuantities, 2);
+  assert.deepEqual(seed.data.items.map(item => item.quantity), ['50', '']);
+  assert.equal(seed.data.items[0]?.description, 'guantes'); assert.equal(seed.missingQuantities, 1);
 });
 
-test('unrecognized or oversized source data fails explicitly without truncating or dropping rows', () => {
-  for (const value of ['broken json', '{}', '[{"cantidad":"2"}]', '[["1","2"]]']) assert.throws(() => quoteFromProcess(withSource({ items_fuente: value })));
-  assert.throws(() => quoteFromProcess(withSource({ items_fuente: JSON.stringify(Array.from({ length: 201 }, () => ['1', '2', 'X'])) })), /200/);
-  assert.throws(() => quoteFromProcess(withSource({ items_fuente: JSON.stringify([['1', '2', 'X'.repeat(3001)]]) })), /3000/);
+test('oversized analyzed data fails explicitly without truncation; source rows and generic descriptions never replace analyzed items', () => {
+  for (const raw of ['broken json', '{}', '[{"cantidad":"2"}]', '[["1","2"]]']) assert.equal(quoteFromProcess(withSource({ items_fuente: raw })).data.items.length, 2);
+  assert.throws(() => quoteFromProcess(withSource({ items: JSON.stringify(Array.from({ length: 201 }, () => '2 unidades de prueba')) })), /200/);
+  assert.throws(() => quoteFromProcess(withSource({ items: '1. '+ 'X'.repeat(3001) })), /3000/);
   assert.throws(() => quoteFromProcess({ ...sample, entidad: 'X'.repeat(256) }), /longitud/);
   assert.throws(() => quoteFromProcess({ ...sample, expediente: 'X'.repeat(101) }), /longitud/);
-  assert.throws(() => quoteFromProcess(withSource({ items_fuente: '[]', items: '' })), /no contiene/);
+  assert.throws(() => quoteFromProcess(withSource({ items: '' })), /no contiene ítems analizados/);
+});
+
+test('a real Scout grouped row becomes three coffee, sugar and tea quotation lines with quantities', () => {
+  const seed = quoteFromProcess(withSource({
+    items_fuente: JSON.stringify([['50201708','Bebidas de Café','café, azúcar y té','1']]),
+    items: '1. 1 × café molido, presentación de una libra\n2. 1 × azúcar morena, bolsa de 1800 gramos\n3. 1 × té en sobres, caja de 50 unidades',
+  }));
+  assert.equal(seed.data.items.length,3);
+  assert.deepEqual(seed.data.items.map(item=>item.quantity),['1','1','1']);
+  assert.deepEqual(seed.data.items.map(item=>item.description),['café molido, presentación de una libra','azúcar morena, bolsa de 1800 gramos','té en sobres, caja de 50 unidades']);
+});
+
+test('a single generic relay row becomes eight individual lines; model and voltage numbers are preserved', () => {
+  const quantities=['150','150','50','50','50','50','50','50'];
+  const items=quantities.map((quantity,index)=>(index+1)+'. '+quantity+' unidades de relé ABB CR-M024DC4LG, 24 VDC, 6 A.').join('\n');
+  const seed=quoteFromProcess(withSource({items}));
+  assert.equal(seed.data.items.length,8);assert.deepEqual(seed.data.items.map(item=>item.quantity),quantities);
+  assert.ok(seed.data.items.every(item=>item.description.includes('CR-M024DC4LG, 24 VDC, 6 A')));
+});
+
+test('named quantity and numbered legacy items are separate from specifications; missing quantities remain empty', () => {
+  const seed=quoteFromProcess(withSource({items: JSON.stringify(['02 juegos de ballestas para autobús 2014','Cantidad: 1; UAV Wingtra ONE Gen II, serie 5203','Papel bond de 500 hojas','1x10x12 pies','24 VDC, 6 A','3M cinta adhesiva'])}));
+  assert.deepEqual(seed.data.items.map(item=>item.quantity),['2','1','','','','']);
+  assert.equal(seed.data.items[0]?.description,'juegos de ballestas para autobús 2014');
+  assert.equal(seed.data.items[1]?.description,'UAV Wingtra ONE Gen II, serie 5203');
+  assert.equal(seed.data.items[2]?.description,'Papel bond de 500 hojas');
 });
 
 test('only HTTP(S) original links without credentials are offered', () => {
@@ -65,7 +93,7 @@ test('only HTTP(S) original links without credentials are offered', () => {
 });
 
 async function workspace(options: { editable?: boolean; quotesActive?: boolean; expires?: boolean; standaloneQuote?: boolean; standaloneProcess?: boolean; missing?: boolean; hold?: boolean } = {}) {
-  const record = options.missing ? withSource({ items_fuente: '[]' }) : sample;
+  const record = options.missing ? withSource({ items: '1. Taladro ABB XYZ-001\n2. Cable en metros' }) : sample;
   const modules = [{ module_id: 'procesos', display_name: 'Procesos' }, ...(options.quotesActive === false ? [] : [{ module_id: 'cotizaciones', display_name: 'Cotizaciones' }])];
   const access = { is_system_administrator: false, modules, permissions: [
     { module_id: 'procesos', scope_key: 'consulta', capability: 'ver' },

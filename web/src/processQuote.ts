@@ -10,14 +10,28 @@ export interface ProcessQuoteSeed {
   missingQuantities: number;
 }
 
-// Scout preserves HonduCompras cells as [number, quantity, specifications, unit, ...].
-// Only unambiguous decimals are accepted; never infer a quantity from AI prose.
+// Quantities are read from individual analyzed items, never from a generic source row.
 export function sourceQuantity(value: string): string {
-  const raw = value.trim();
-  if (/^[0-9]{1,12}(?:\.[0-9]{1,4})?$/.test(raw)) return raw;
-  // A single comma followed by three digits could be a decimal or a thousands separator.
-  if (/^[0-9]{1,12},(?:[0-9]{1,2}|[0-9]{4})$/.test(raw)) return raw.replace(',', '.');
-  return '';
+  let raw = value.trim();
+  if (/^[1-9][0-9]{0,2}(?:,[0-9]{3})+(?:\.[0-9]{1,4})?$/.test(raw)) raw = raw.replaceAll(',', '');
+  else if (/^[0-9]{1,12},[0-9]{1,4}$/.test(raw)) raw = raw.replace(',', '.');
+  if (!/^[0-9]{1,12}(?:\.[0-9]{1,4})?$/.test(raw)) return '';
+  return raw.replace(/^0+(?=[0-9])/, '');
+}
+
+function analyzedItem(text: string): QuoteItem {
+  const original = { ...newQuoteItem(), description: text, quantity: '' };
+  const named = /^(?:cantidad|cant\.?|qty|quantity)\s*[:=]?\s*([0-9]+(?:[.,][0-9]+)*)\s*(?:[×x:;,]\s*|\s+)(.+)$/iu.exec(text);
+  const multiplied = /^([0-9]+(?:[.,][0-9]+)*)\s*[×x]\s*(.+)$/iu.exec(text);
+  const leading = /^([0-9]+(?:[.,][0-9]+)*)\s+(.+)$/u.exec(text);
+  const match = named ?? multiplied ?? leading;
+  if (!match) return original;
+  const quantity = sourceQuantity(match[1]!);
+  const description = match[2]!.trim();
+  // A dimension, model number or electrical specification is not a requested quantity.
+  if (!quantity || !description || /^[0-9]/u.test(description)
+    || (!named && !multiplied && /^(?:v(?:dc|ac)?|a|ah|hz|khz|w|kw|kv|hp|rpm|mm|cm|pulg(?:adas?|\.)?|inch(?:es)?|gb|mb|tb|puertos|voltios|amperios|usd|hnl|l)(?=[\s,;:.]|$)/iu.test(description))) return original;
+  return { ...original, description, quantity };
 }
 
 function originalUrl(value: string | undefined): string | null {
@@ -28,24 +42,8 @@ function originalUrl(value: string | undefined): string | null {
 }
 
 export function quoteFromProcess(row: ProcessRecord, now = new Date()): ProcessQuoteSeed {
-  let source: unknown;
-  try { source = JSON.parse(row.source.items_fuente || '[]'); }
-  catch { throw new Error('No se pueden leer los ítems originales de Scout. Revisa el proceso original.'); }
-  if (!Array.isArray(source)) throw new Error('No se reconoce el formato de los ítems originales de Scout. Revisa el proceso original.');
-  let items: QuoteItem[];
-  if (Array.isArray(source) && source.length && source.every(cells => Array.isArray(cells) && cells.length >= 3 && cells.every(cell => typeof cell === 'string'))) {
-    items = (source as string[][]).map(cells => ({
-      ...newQuoteItem(),
-      // Keep the unit and any additional source cells; never join by position with AI items.
-      description: cells.slice(2).filter(cell => cell.trim()).join(' · '),
-      quantity: sourceQuantity(cells[1]!),
-    }));
-  } else if (Array.isArray(source) && source.length) {
-    throw new Error('No se reconoce el formato de los ítems originales de Scout. Revisa el proceso original.');
-  } else {
-    items = processItems(row.source.items ?? '').map(description => ({ ...newQuoteItem(), description, quantity: '' }));
-  }
-  if (!items.length) throw new Error('El proceso no contiene ítems para cargar en la cotización.');
+  const items = processItems(row.source.items ?? '').map(text => analyzedItem(text.trim()));
+  if (!items.length) throw new Error('El proceso no contiene ítems analizados para cargar en la cotización.');
   if (items.length > 200) throw new Error('El proceso supera los 200 ítems admitidos por cotización. No se ha recortado el listado.');
   if (items.some(item => item.description.length > 3000)) throw new Error('Una especificación supera los 3000 caracteres admitidos por ítem. Revisa el proceso original.');
   if (row.entidad.length > 255 || row.expediente.length > 100) throw new Error('La entidad o el expediente supera la longitud admitida en Cotizaciones. No se han recortado los datos.');

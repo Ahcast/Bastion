@@ -37,6 +37,8 @@ El informe se obtuvo de una copia de frontend Angular compilado y backend Larave
 
 ## Registro de decisiones
 
+- 2026-10-23: corrección solicitada de Procesos → Cotización: una línea por ítem analizado de Scout con su cantidad, en lugar de filas originales que agrupan varios productos. No usar descripción ni items_fuente como línea genérica. Se conserva el aviso no bloqueante. El usuario indica continuar la publicación; ver `modulos/procesos-cotizacion.md`.
+
 - 2026-10-23: Facturas adopta los lineamientos de frontend de Cotizaciones: listado compacto, buscador único de cliente manual/catálogo, generales, ítems en tabla adaptable y notas/totales separados. El servidor valida la selección y conserva la instantánea del cliente. Se mantiene el menú de nueve acciones y el alcance de borradores sin emisión fiscal. El usuario autoriza subir este corte al repositorio; ver `modulos/facturas-implementacion.md`.
 
 - 2026-10-23: el usuario confirma para Facturas un botón desplegable por fila con Ver, Editar, Marcar como enviado, Ingresar pago, Clonar, PDF, Nota de entrega, Emitir Recibo y Eliminar, en ese orden. El corte actual conecta Ver/Editar y muestra las demás opciones deshabilitadas hasta implementar sus casos de uso; no se amplían permisos ni se dan por definidas reglas pendientes. Ver `modulos/facturas-implementacion.md`.
