@@ -1,5 +1,7 @@
 /target/
 /dist/
+/tmp/pdfs/
+/output/pdf/
 /.tools/
 /web/node_modules/
 /web/dist/

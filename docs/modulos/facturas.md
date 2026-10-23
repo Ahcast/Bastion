@@ -36,6 +36,8 @@ Resumen recalculado: importes exonerado/exento/gravado, descuentos, ISV, pagado,
 
 El PDF de factura, la nota de entrega y el recibo se generan con Typst mediante el servicio compartido del core. Se conservan las acciones y el flujo actuales; el módulo provee los datos de cada documento y define el permiso correspondiente. Las plantillas y su versionado quedan por definir.
 
+Identidad visual confirmada el 2026-10-23: factura y nota de entrega usan el logo de Castillo IT suministrado como recurso compartido del Core, conforme a `../15-identidad-documental.md`. Esta decisión no habilita todavía las acciones PDF pendientes ni agrega firma/sello a estos documentos.
+
 ## Settings bajo Ajustes
 
 La numeración fiscal/datos de empresa y SMTP son settings del Core identificados en el informe. Cada factura tendrá una sección propia bajo Ajustes; cualquier setting extra (defaults de términos, pagos, impresión) queda `Pendiente de decisión`.

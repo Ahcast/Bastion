@@ -37,6 +37,8 @@ El informe se obtuvo de una copia de frontend Angular compilado y backend Larave
 
 ## Registro de decisiones
 
+- 2026-10-23: el usuario aporta el logo de Castillo IT para cotizaciones, facturas y notas de entrega. Firma/sello se aplican a cotizaciones en la parte inferior izquierda, a la altura de subtotales/totales. Los recursos originales son privados y compartidos por el Core; no se publican en GitHub ni en Bluehost. Ver `15-identidad-documental.md`; las plantillas PDF de los módulos pendientes conservan su estado de implementación.
+
 - 2026-10-22: el usuario confirma incorporación incremental de Scout aunque el rastreo o análisis del ciclo queden parciales. Se valida una publicación atómica finalizada con SHA-256 y total completo; solo se incorporan filas con extracción completa, análisis confirmado y hash vigente. Pendientes, errores y extracciones incompletas se difieren sin borrar ni sobrescribir históricos, marcas o notas. La interfaz informa filas diferidas; un fallo de autenticación de IA sigue necesitando corrección y no se interpreta como análisis exitoso.
 
 - 2026-10-22: Ajustes > Procesos muestra como información de solo lectura los reportes main/scout/combiner/clasificador de Scout, última ejecución, estado por etapa, contadores y análisis IA. Usa consulta/ver del módulo activo, consulta cada 60 segundos y no ejecuta scripts ni importaciones. Archivos y campos acotados, sin JSON crudo ni excepciones/configuración. Sustituye la ficha estática dentro del Core; ver `modulos/procesos-implementacion.md`.

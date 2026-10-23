@@ -33,7 +33,10 @@
   ..q.items.map(item => (item.description, money(item.unit_price), item.quantity, money(item.discount_amount), item.tax_label, money(item.total))).flatten(),
 )
 #v(14pt)
-#align(right, block(width: 285pt)[
+#block(breakable: false)[
+ #grid(columns: (1fr, 285pt), gutter: 18pt, align: top,
+  if q.signature { image("signature.png", width: 175pt, height: 150pt, fit: "contain") },
+  [
   #table(columns: (1fr, auto), stroke: none, inset: (y: 3pt), align: (left, right),
     [Importe Exonerado], money(q.totals.importe_exonerado),
     [Importe Exento], money(q.totals.importe_exento),
@@ -45,7 +48,9 @@
     table.cell(colspan: 2, line(length: 100%, stroke: 1.3pt + ink)),
     strong[ TOTAL A PAGAR ], strong(money(q.totals.total)),
   )
-])
+  ],
+ )
+]
 #if q.amount_words != "" [#v(12pt) #strong[VALOR EN LETRAS: #q.amount_words]]
 #if q.terms != "" [
   #v(16pt) #line(length: 100%, stroke: 0.5pt + rgb("d9dee5"))
@@ -53,9 +58,6 @@
   #par(q.terms)
 ]
 #v(24pt)
-#grid(columns: (1fr, 170pt), gutter: 18pt,
-  block(breakable: false)[#line(length: 230pt, stroke: 0.5pt + muted) \
+#block(breakable: false)[#line(length: 230pt, stroke: 0.5pt + muted) \
     #strong(q.prepared_by_name) \
-    #text(fill: muted)[Acompañando en cada proyecto]],
-  if q.signature { image("signature.png", width: 160pt, height: 110pt, fit: "contain") },
-)
+    #text(fill: muted)[Acompañando en cada proyecto]]

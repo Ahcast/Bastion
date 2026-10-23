@@ -29,6 +29,8 @@ La fecha de la copia usa Honduras (UTC−06), no el reloj del navegador. Su vige
 
 ## Documentos compartidos del Core
 
+Identidad visual confirmada el 2026-10-23: logo de Castillo IT en la cabecera; firma y sello suministrados en la columna inferior izquierda, al lado de los subtotales/totales, en un bloque que no se divide entre páginas. Los PNG originales se instalan como recursos privados compartidos del Core; no se incluyen en el repositorio ni se publican como assets del frontend. Ver `../15-identidad-documental.md`.
+
 `company.profile` pertenece a Ajustes > Core > Empresa, exclusivo del Administrador. Campos: nombre, RTN, correo, teléfono y dirección, derivados de la cabecera existente. No se presupone que los defaults compilados del Legacy sean datos vigentes de la empresa; se configuran explícitamente.
 
 Typst 0.15.1 se ejecuta con plantilla fija y JSON de datos, raíz de archivos limitada a un directorio temporal privado, dos compilaciones simultáneas y plazo de 20 segundos. El contenido del cliente no se evalúa como código. Logo y sello/firma, si se configuran, son archivos PNG privados administrados por el operador; no se aceptan rutas o URLs desde el navegador. La plantilla conserva cabecera, cliente, referencia, fechas, seis columnas de ítems, bases/impuestos, valor en letras, términos y preparador. Su numeración de páginas admite documentos largos.
