@@ -4,6 +4,7 @@ import { Dialog, Heading, Loading, Notice, Table, useCore, useLoad } from '../ui
 import { QuoteActions } from '../components/QuoteActions.js';
 import { QuoteEmailComposer } from '../components/QuoteEmailComposer.js';
 import { QuoteClientPicker } from '../components/QuoteClientPicker.js';
+import { Decimal, QuoteItems } from '../components/QuoteItems.js';
 import { downloadPdf } from '../quoteDocuments.js';
 import type { DocumentReadiness, QuotePdf } from '../quoteDocuments.js';
 import { moduleCan } from '../types.js';
@@ -51,12 +52,13 @@ function Workspace() {
     finally { setOpening(false); }
   };
   if (selected) return <Editor key={selected === 'new' ? 'new' : selected.id} initial={selected === 'new' ? null : selected} editable={editable && mode === 'edit'} edit={editable && mode === 'view' ? () => setMode('edit') : undefined} close={() => { setSelected(null); result.reload(); }} />;
-  return <><Heading title="Cotizaciones" description="Prepara cotizaciones con descuentos, impuestos y totales calculados por el servidor." action={editable && <button className="primary" onClick={() => { setMode('edit'); setSelected('new'); }}>Nueva cotización</button>} />
-    {!documents.data?.pdf && <p className="quote-stage">PDF requiere la configuración de Empresa en Ajustes del Core y el servicio de documentos del servidor.</p>}
+  return <><Heading title="Cotizaciones" description="Prepara y consulta tus cotizaciones." action={editable && <button className="primary" onClick={() => { setMode('edit'); setSelected('new'); }}>Nueva cotización</button>} />
+    {documents.data && !documents.data.pdf && <p className="quote-stage">PDF requiere la configuración de Empresa en Ajustes del Core y el servicio de documentos del servidor.</p>}
     <Notice>{documents.error}</Notice>
-    <form className="row quote-search" onSubmit={event => { event.preventDefault(); setQuery(search); setPage(1); }}><label>Buscar cliente, referencia o ítem<input value={search} maxLength={200} onChange={event => setSearch(event.target.value)} /></label><button type="submit">Buscar</button></form>
+    <section className="quote-list" aria-labelledby="quote-list-title"><div className="quote-list-heading"><h2 id="quote-list-title">Listado de cotizaciones</h2>{result.data && <span>{result.data.items.length} en esta página</span>}</div>
+    <form className="quote-search" onSubmit={event => { event.preventDefault(); setQuery(search); setPage(1); }}><label><span className="quote-sr-only">Buscar cliente, referencia o ítem</span><input placeholder="Buscar por cliente, referencia o ítem" value={search} maxLength={200} onChange={event => setSearch(event.target.value)} /></label><button type="submit">Buscar</button></form>
     <Notice>{error || result.error}</Notice>
-    {result.data ? <><Table columns={['Número', 'Cliente', 'Fecha', 'Vence', 'Total (HNL)', 'Estado', 'Ítems', 'Acción']} rows={result.data.items.map(draft => [draft.quote_number ?? 'Sin numerar', draft.client_name || 'Sin cliente', draft.quote_date, draft.valid_until, draft.total, draft.status, draft.item_count, <QuoteActions number={draft.quote_number ?? String(draft.id)} busy={opening} actions={[
+    {result.data ? <><Table columns={['Número', 'Cliente', 'Fecha', 'Vence', 'Total (HNL)', 'Estado', 'Ítems', 'Acción']} rows={result.data.items.map(draft => [<span className="quote-number">{draft.quote_number ?? 'Sin numerar'}</span>, <div className="quote-list-client">{draft.client_name || 'Sin cliente'}{draft.order_number && <small>{draft.order_number}</small>}</div>, draft.quote_date, draft.valid_until, <span className="quote-money">{draft.total ?? '—'}</span>, <span className="quote-status" data-state={draft.status}>{draft.status}</span>, draft.item_count, <QuoteActions number={draft.quote_number ?? String(draft.id)} busy={opening} actions={[
       { label: 'Ver', run: () => void open(draft, 'view') },
       { label: 'Editar', disabled: !editable, reason: !editable ? 'Sin permiso de edición' : undefined, run: () => void open(draft, 'edit') },
       { label: 'Marcar como enviado', disabled: !editable, run: () => void status(draft, 'Enviada') },
@@ -67,7 +69,8 @@ function Workspace() {
       { label: 'PDF', disabled: !documents.data?.pdf, reason: !documents.data?.pdf ? 'Configura Empresa y el servicio de documentos' : undefined, run: () => { setError(''); setOpening(true); void api.request<QuotePdf>(`/api/v1/cotizaciones/${draft.id}/pdf`, { ifMatch: draft.version }).then(downloadPdf).catch(reason => setError(message(reason))).finally(() => setOpening(false)); } },
       { label: 'Enviar por correo', disabled: !editable || !documents.data?.pdf || !documents.data?.email, reason: !editable ? 'Sin permiso de edición' : !documents.data?.pdf ? 'Configura Empresa y documentos' : !documents.data?.email ? 'Configura SMTP global y tus credenciales en Mi cuenta' : undefined, run: () => setEmail(draft) },
       { label: 'Eliminar', disabled: !removable, danger: true, run: () => setDeleting(draft) },
-    ]} />])} /><div className="row"><button disabled={page === 1 || opening} onClick={() => setPage(p => p - 1)}>Anterior</button><span>Página {page}</span><button disabled={!result.data.has_more || opening} onClick={() => setPage(p => p + 1)}>Siguiente</button></div></> : !result.error && <Loading />}
+    ]} />])} /><div className="quote-pagination"><button disabled={page === 1 || opening} onClick={() => setPage(p => p - 1)}>Anterior</button><span>Página {page}</span><button disabled={!result.data.has_more || opening} onClick={() => setPage(p => p + 1)}>Siguiente</button></div></> : !result.error && <Loading />}
+    </section>
     {email && <QuoteEmailComposer summary={email} close={() => setEmail(null)} sent={result.reload} />}
     {deleting && <Dialog title={`Eliminar ${deleting.quote_number ?? 'cotización'}`} close={() => { if (!opening) setDeleting(null); }}><p>Esta acción elimina la cotización y no se puede deshacer.</p><Notice>{error}</Notice><div className="actions"><button disabled={opening} onClick={() => setDeleting(null)}>Cancelar</button><button disabled={opening} className="danger" onClick={async () => {
       setError(''); setOpening(true);
@@ -97,10 +100,10 @@ function Editor({ initial, editable, edit, close }: { initial: QuoteDraft | null
   const item = <K extends keyof QuoteItem>(index: number, key: K, value: QuoteItem[K]) => change('items', data.items.map((row, i) => i === index ? { ...row, [key]: value } : row));
   const back = () => { if (!busy && (!dirty || confirm('Hay cambios sin guardar. ¿Volver al listado?'))) close(); };
   return <><Heading title={saved ? saved.quote_number ?? `Cotización · referencia interna ${saved.id}` : 'Nueva cotización'} description={`Estado: ${data.status} · Moneda: HNL`} action={<div className="actions">{edit && <button onClick={edit}>Editar</button>}<button disabled={busy} onClick={back}>Volver</button></div>} />
-    <p className="quote-stage">El número se asigna al guardar. Los totales de la vista previa usan el mismo cálculo del servidor que guarda la cotización.</p>
+    {!saved && <p className="quote-note">El número se asigna al guardar.</p>}
     <Notice>{error}</Notice>
     {conflict && <p role="status">Tus cambios se conservan en pantalla. Vuelve al listado y abre la versión actual antes de reintentarlos.</p>}
-    <form className="stack" onSubmit={async event => {
+    <form className="quote-editor" onSubmit={async event => {
       event.preventDefault(); if (busy || !editable || conflict) return;
       setError(''); setBusy(true);
       try {
@@ -115,42 +118,41 @@ function Editor({ initial, editable, edit, close }: { initial: QuoteDraft | null
       } catch (reason) { setError(message(reason)); if (reason instanceof ApiError && reason.status === 412) setConflict(true); }
       finally { setBusy(false); }
     }}>
-      <fieldset disabled={busy || !editable || conflict} className="form-fields quote-form"><legend>Datos de cotización</legend><div className="quote-fields">
-        <div>{editable && moduleCan(access, 'clientes', 'catalogo', 'ver') ? <QuoteClientPicker selected={data.id_client ? { id: data.id_client, cliente_name: data.client_name, rtn: data.client_rtn ?? '', email: data.client_email ?? '' } : null} change={client => { setData(previous => ({ ...previous, id_client: client?.id ?? null, client_name: client?.cliente_name ?? previous.client_name, client_rtn: client?.rtn ?? '', client_email: client?.email ?? '' })); setDirty(true); }} /> : editable && <p className="muted">El catálogo requiere el módulo Clientes habilitado y permiso para verlo.</p>}
-        <label>{data.id_client ? 'Cliente seleccionado' : 'Cliente (manual)'}<input maxLength={255} readOnly={Boolean(data.id_client)} value={data.client_name} onChange={e => change('client_name', e.target.value)} /></label>
-        {data.id_client && <><p className="muted">{data.client_rtn && `RTN: ${data.client_rtn} · `}{data.client_email || 'Sin correo registrado'}</p>{editable && !moduleCan(access, 'clientes', 'catalogo', 'ver') && <button type="button" onClick={() => { setData(previous => ({ ...previous, id_client: null, client_rtn: '', client_email: '' })); setDirty(true); }}>Usar cliente manual</button>}</>}</div>
-        <label>Referencia de orden<input maxLength={100} value={data.order_number} onChange={e => change('order_number', e.target.value)} /></label>
-        <label>Fecha<input type="date" min="1000-01-01" max="9999-12-31" required value={data.quote_date} onChange={e => change('quote_date', e.target.value)} /></label>
-        <label>Vigencia (días)<input type="number" min={0} max={3650} required value={data.valid_days} onChange={e => change('valid_days', Number(e.target.value))} /></label>
-        <label>Estado<select value={data.status} onChange={e => change('status', e.target.value as QuoteStatus)}>{quoteStatuses.map(status => <option key={status}>{status}</option>)}</select></label>
-        <div><strong>Contacto / preparado por</strong><p>{saved ? `${saved.data.prepared_by_name} · ${saved.data.contact_email}` : 'Se asigna al usuario que guarda la cotización.'}</p></div>
-      </div>
-      <div className="row"><h2>Ítems</h2><button type="button" disabled={data.items.length >= 200} onClick={() => change('items', [...data.items, newQuoteItem()])}>Agregar ítem</button></div>
-      {data.items.length === 0 && <p className="muted">Agrega los productos o servicios de la cotización.</p>}
-      {data.items.map((row, index) => <fieldset className="quote-item" key={index}><legend>Ítem {index + 1}</legend><label>Descripción<textarea maxLength={3000} rows={2} value={row.description} onChange={e => item(index, 'description', e.target.value)} /></label><div className="quote-fields">
-        <Decimal label="Cantidad" value={row.quantity} change={value => item(index, 'quantity', value)} />
-        <Decimal label="Precio unitario (HNL)" value={row.unit_price} change={value => item(index, 'unit_price', value)} />
-        <label>Descuento<select value={row.discount_type} onChange={e => item(index, 'discount_type', e.target.value as DiscountType)}><option value="amount">Monto (HNL)</option><option value="percent">Porcentaje</option></select></label>
-        <Decimal label="Valor del descuento" value={row.discount_value} percent={row.discount_type === 'percent'} change={value => item(index, 'discount_value', value)} />
-        <label>Impuesto<select value={row.tax_type} onChange={e => item(index, 'tax_type', e.target.value as QuoteItem['tax_type'])}><option value="none">Exento</option><option value="isv15">ISV 15%</option><option value="isv18">ISV 18%</option></select></label>
-      </div><button type="button" className="danger" onClick={() => change('items', data.items.filter((_, i) => i !== index))}>Quitar ítem</button></fieldset>)}
-      <h2>Descuento general</h2><div className="quote-fields"><label>Tipo<select value={data.discount_type} onChange={e => change('discount_type', e.target.value as DiscountType)}><option value="amount">Monto (HNL)</option><option value="percent">Porcentaje</option></select></label><Decimal label="Valor del descuento general" value={data.discount_value} percent={data.discount_type === 'percent'} change={value => change('discount_value', value)} /></div>
-      <label>Notas privadas<textarea rows={3} maxLength={3000} value={data.notes} onChange={e => change('notes', e.target.value)} /></label>
-      <label>Términos<textarea rows={3} maxLength={5000} value={data.terms} onChange={e => change('terms', e.target.value)} /></label>
-      {editable && <button className="primary" type="submit">{busy ? 'Guardando…' : 'Guardar cotización'}</button>}
+      <fieldset disabled={busy || !editable || conflict} className="form-fields quote-form"><legend className="quote-sr-only">Datos de cotización</legend>
+        <section className="quote-section" aria-labelledby="quote-general-title">
+          <div className="quote-section-heading"><h2 id="quote-general-title">Generales</h2><span>HNL</span></div>
+          <div className="quote-general-fields">
+            <QuoteClientPicker value={data.client_name} selected={data.id_client ? { id: data.id_client, cliente_name: data.client_name, rtn: data.client_rtn ?? '', email: data.client_email ?? '' } : null}
+              canSearch={moduleCan(access, 'clientes', 'catalogo', 'ver')} readOnly={!editable}
+              change={(name, client) => { setData(previous => ({ ...previous, id_client: client?.id ?? null, client_name: name, client_rtn: client?.rtn ?? '', client_email: client?.email ?? '' })); setDirty(true); }} />
+            <label className="quote-order-reference">Referencia de orden<input maxLength={100} value={data.order_number} onChange={event => change('order_number', event.target.value)} /></label>
+            <label>Fecha<input type="date" min="1000-01-01" max="9999-12-31" required value={data.quote_date} onChange={event => change('quote_date', event.target.value)} /></label>
+            <label>Vigencia (días)<input type="number" min={0} max={3650} required value={data.valid_days} onChange={event => change('valid_days', Number(event.target.value))} /></label>
+            <label>Estado<select value={data.status} onChange={event => change('status', event.target.value as QuoteStatus)}>{quoteStatuses.map(status => <option key={status}>{status}</option>)}</select></label>
+          </div>
+          <p className="quote-prepared"><span>Preparado por</span> {saved ? `${saved.data.prepared_by_name} · ${saved.data.contact_email}` : 'Se asignará al usuario que guarda la cotización.'}</p>
+        </section>
+        <QuoteItems items={data.items} calculation={calculation} change={item} remove={index => change('items', data.items.filter((_, i) => i !== index))} add={() => change('items', [...data.items, newQuoteItem()])} />
+        <div className="quote-editor-bottom">
+          <section className="quote-section" aria-labelledby="quote-notes-title">
+            <div className="quote-section-heading"><h2 id="quote-notes-title">Notas y términos</h2></div>
+            <div className="stack"><label>Notas privadas<textarea rows={3} maxLength={3000} value={data.notes} onChange={event => change('notes', event.target.value)} /></label>
+            <label>Términos<textarea rows={3} maxLength={5000} value={data.terms} onChange={event => change('terms', event.target.value)} /></label></div>
+          </section>
+          <div className="quote-summary">
+            <section className="quote-section" aria-labelledby="quote-discount-title"><div className="quote-section-heading"><h2 id="quote-discount-title">Descuento general</h2></div><div className="quote-discount-fields"><label>Tipo<select value={data.discount_type} onChange={event => change('discount_type', event.target.value as DiscountType)}><option value="amount">Monto (HNL)</option><option value="percent">Porcentaje</option></select></label><Decimal label="Valor del descuento general" value={data.discount_value} percent={data.discount_type === 'percent'} change={value => change('discount_value', value)} /></div></section>
+            <Notice>{calculationError}</Notice>
+            {calculation ? <QuoteTotalsPanel calculation={calculation} /> : !calculationError && <p role="status">Calculando totales…</p>}
+          </div>
+        </div>
+        {editable && <div className="quote-save"><button className="primary" type="submit">{busy ? 'Guardando…' : 'Guardar cotización'}</button></div>}
       </fieldset>
     </form>
-    <Notice>{calculationError}</Notice>
-    {calculation ? <QuoteTotalsPanel calculation={calculation} /> : !calculationError && <p role="status">Calculando totales…</p>}
   </>;
 }
 
 export function QuoteTotalsPanel({ calculation }: { calculation: QuoteCalculation }) {
   const t = calculation.totals;
   const entries = [['Subtotal', t.subtotal], ['Importe exonerado', t.importe_exonerado], ['Importe exento', t.importe_exento], ['Importe gravado 15%', t.importe_gravado_15], ['Importe gravado 18%', t.importe_gravado_18], ['Descuentos y rebajas', t.descuentos_rebajas], ['ISV 15%', t.isv_15], ['ISV 18%', t.isv_18], ['Total a pagar', t.total]];
-  return <section className="card quote-totals" aria-label="Totales de cotización"><h2>Totales</h2><p>Válida hasta {calculation.valid_until} · HNL</p><dl>{entries.map(([label, value]) => <div key={label}><dt>{label}</dt><dd>L {value}</dd></div>)}</dl></section>;
-}
-
-function Decimal({ label, value, change, positive = false, percent = false }: { label: string; value: string; change: (value: string) => void; positive?: boolean; percent?: boolean }) {
-  return <label>{label}<input type="text" inputMode="decimal" required maxLength={17} pattern={percent ? '(?:[0-9]{1,2}(?:[.][0-9]{1,4})?|100(?:[.]0{1,4})?)' : '[0-9]{1,12}(?:[.][0-9]{1,4})?'} title={percent ? 'De 0 a 100; hasta 4 decimales con punto.' : 'Número sin signo; hasta 4 decimales con punto.'} value={value} onChange={e => { e.target.setCustomValidity(positive && /^0+(?:\.0+)?$/.test(e.target.value) ? 'La cantidad debe ser mayor que cero.' : ''); change(e.target.value); }} /></label>;
+  return <section className="quote-totals" aria-label="Totales de cotización"><h2>Totales</h2><p className="quote-note">Válida hasta {calculation.valid_until} · HNL</p><dl>{entries.map(([label, value]) => <div key={label}><dt>{label}</dt><dd>L {value}</dd></div>)}</dl></section>;
 }

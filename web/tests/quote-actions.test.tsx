@@ -115,23 +115,23 @@ test('email opens with the generated PDF, shared defaults and an explicit versio
   }finally{await app.dispose();}
 });
 
-test('new quote selects a paginated catalog client, retains selection across search and saves the association',async()=>{
+test('one client combobox searches, paginates, preserves selection and saves the catalog association',async()=>{
   const app=await workspace(true,true);try{
     await app.click(Array.from(app.container.querySelectorAll('button')).find(button=>button.textContent==='Nueva cotización')!);
-    const catalog=()=>Array.from(app.container.querySelectorAll('label')).find(label=>label.textContent?.startsWith('Cliente del catálogo'))!.querySelector('select')!;
-    await act(async()=>{catalog().value='41';catalog().dispatchEvent(new Event('change',{bubbles:true}));});
+    const input=app.container.querySelector<HTMLInputElement>('input[role="combobox"]')!;
+    assert.equal(app.container.querySelectorAll('input[role="combobox"]').length,1);
+    assert.equal(app.calls.some(call=>call.path==='/api/v1/clientes/catalogo'),false,'catalog waits until the field opens');
+    await app.click(app.container.querySelector('button[aria-label="Mostrar clientes"]'));
+    await app.click(Array.from(app.container.querySelectorAll('[role="option"]')).find(option=>option.textContent?.includes('Cliente del catálogo'))!);
+    assert.equal(input.value,'Cliente del catálogo');assert.equal(input.readOnly,false);
     assert.ok(app.container.textContent?.includes('RTN: 08011900000000'));
-    const selectedName=Array.from(app.container.querySelectorAll('label')).find(label=>label.textContent?.startsWith('Cliente seleccionado'))!.querySelector('input')!;
-    assert.equal(selectedName.value,'Cliente del catálogo');assert.equal(selectedName.readOnly,true);
+    assert.equal(input.getAttribute('aria-expanded'),'false');
+    await app.click(app.container.querySelector('button[aria-label="Mostrar clientes"]'));
     await app.click(Array.from(app.container.querySelectorAll('button')).find(button=>button.textContent==='Más clientes')!);
-    assert.equal(catalog().value,'41');assert.ok(catalog().textContent?.includes('Cliente siguiente'));
-    const search=Array.from(app.container.querySelectorAll('label')).find(label=>label.textContent?.startsWith('Buscar cliente por'))!.querySelector('input')!;
-    await act(async()=>{Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,'value')!.set!.call(search,'José & Cía');search.dispatchEvent(new Event('input',{bubbles:true}));});
-    const calculations=app.calls.filter(call=>call.method==='POST').length;
-    await act(async()=>{search.dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',bubbles:true,cancelable:true}));});
-    assert.equal(app.calls.filter(call=>call.method==='POST').length,calculations,'search Enter must not submit the quotation');
-    assert.ok(app.calls.some(call=>call.query.includes('search=Jos%C3%A9%20%26%20C%C3%ADa')&&call.query.includes('page=1')));
-    assert.equal(catalog().value,'41');
+    assert.equal(input.value,'Cliente del catálogo');
+    assert.ok(app.container.textContent?.includes('Cliente siguiente'));
+    await act(async()=>{input.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true,cancelable:true}));});
+    assert.equal(input.getAttribute('aria-expanded'),'false');assert.equal(input.value,'Cliente del catálogo');
     await act(async()=>{app.container.querySelector('form')!.dispatchEvent(new Event('submit',{bubbles:true,cancelable:true}));});
     const saved=app.calls.find(call=>call.path==='/api/v1/cotizaciones'&&call.method==='POST')!;
     assert.equal(saved.body?.id_client,41);assert.equal(saved.body?.client_name,'Cliente del catálogo');
@@ -139,17 +139,57 @@ test('new quote selects a paginated catalog client, retains selection across sea
   }finally{await app.dispose();}
 });
 
-test('manual mode clears the catalog association and its contact data',async()=>{
-  const app=await workspace(true,true);try{
+test('typing in the same client field searches and becomes manual without submitting or retaining catalog contact data',async()=>{
+  const app=await workspace(true,true,true);try{
     await app.action('Editar');
-    const select=Array.from(app.container.querySelectorAll('label')).find(label=>label.textContent?.startsWith('Cliente del catálogo'))!.querySelector('select')!;
-    await act(async()=>{select.value='41';select.dispatchEvent(new Event('change',{bubbles:true}));});
-    await app.click(Array.from(app.container.querySelectorAll('button')).find(button=>button.textContent==='Usar cliente manual')!);
-    const manual=Array.from(app.container.querySelectorAll('label')).find(label=>label.textContent?.startsWith('Cliente (manual)'))!.querySelector('input')!;
-    assert.equal(manual.readOnly,false);
+    const input=app.container.querySelector<HTMLInputElement>('input[role="combobox"]')!;
+    await act(async()=>{Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,'value')!.set!.call(input,'José & Cía');input.dispatchEvent(new Event('input',{bubbles:true}));});
+    await act(async()=>{await new Promise(resolve=>setTimeout(resolve,240));});
+    assert.ok(app.calls.some(call=>call.query.includes('search=Jos%C3%A9%20%26%20C%C3%ADa')&&call.query.includes('page=1')));
+    await act(async()=>{input.dispatchEvent(new KeyboardEvent('keydown',{key:'ArrowDown',bubbles:true,cancelable:true}));});
+    assert.ok(input.getAttribute('aria-activedescendant'));
+    await act(async()=>{input.dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',bubbles:true,cancelable:true}));});
+    assert.equal(input.value,'José & Cía');assert.equal(input.getAttribute('aria-expanded'),'false');
+    assert.equal(app.calls.some(call=>call.method==='PUT'),false);
     await act(async()=>{app.container.querySelector('form')!.dispatchEvent(new Event('submit',{bubbles:true,cancelable:true}));});
     const saved=app.calls.find(call=>call.method==='PUT')!;
-    assert.equal(saved.body?.id_client,null);assert.equal(saved.body?.client_rtn,'');assert.equal(saved.body?.client_email,'');
+    assert.equal(saved.body?.id_client,null);assert.equal(saved.body?.client_name,'José & Cía');
+    assert.equal(saved.body?.client_rtn,'');assert.equal(saved.body?.client_email,'');
+  }finally{await app.dispose();}
+});
+
+test('the client field supports keyboard selection without duplicate controls or an accidental form submit',async()=>{
+  const app=await workspace(true,true);try{
+    await app.action('Editar');
+    const input=app.container.querySelector<HTMLInputElement>('input[role="combobox"]')!;
+    await app.click(app.container.querySelector('button[aria-label="Mostrar clientes"]'));
+    await act(async()=>{await new Promise(resolve=>setTimeout(resolve,240));});
+    await act(async()=>{input.dispatchEvent(new KeyboardEvent('keydown',{key:'ArrowDown',bubbles:true,cancelable:true}));});
+    await act(async()=>{input.dispatchEvent(new KeyboardEvent('keydown',{key:'ArrowDown',bubbles:true,cancelable:true}));});
+    await act(async()=>{input.dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',bubbles:true,cancelable:true}));});
+    assert.equal(input.value,'Cliente del catálogo');assert.equal(input.getAttribute('aria-expanded'),'false');
+    assert.equal(app.calls.some(call=>call.method==='PUT'),false);
+    await act(async()=>{input.dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',bubbles:true,cancelable:true}));});
+    await act(async()=>{app.container.querySelector('form')!.dispatchEvent(new Event('submit',{bubbles:true,cancelable:true}));});
+    assert.equal(app.calls.find(call=>call.method==='PUT')?.body?.id_client,41);
+  }finally{await app.dispose();}
+});
+
+test('item rows remain editable in the table and removal does not overwrite the following item',async()=>{
+  const app=await workspace();try{
+    await app.action('Editar');
+    const table=app.container.querySelector('table[aria-label="Ítems de cotización"]')!;
+    assert.ok(table);assert.equal(table.querySelectorAll('tbody tr').length,1);
+    await app.click(Array.from(app.container.querySelectorAll('button')).find(button=>button.textContent?.includes('Agregar ítem'))!);
+    assert.equal(table.querySelectorAll('tbody tr').length,2);
+    const description=table.querySelectorAll('textarea')[1]!;
+    await act(async()=>{Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype,'value')!.set!.call(description,'Segundo producto');description.dispatchEvent(new Event('input',{bubbles:true}));});
+    await app.click(table.querySelector('button[aria-label="Quitar ítem 1"]'));
+    assert.equal(table.querySelectorAll('tbody tr').length,1);
+    assert.equal(table.querySelector('textarea')?.value,'Segundo producto');
+    await act(async()=>{app.container.querySelector('form')!.dispatchEvent(new Event('submit',{bubbles:true,cancelable:true}));});
+    const items=app.calls.find(call=>call.method==='PUT')?.body?.items as {description:string}[];
+    assert.equal(items.length,1);assert.equal(items[0]?.description,'Segundo producto');
   }finally{await app.dispose();}
 });
 

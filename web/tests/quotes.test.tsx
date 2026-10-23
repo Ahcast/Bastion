@@ -23,7 +23,7 @@ test('the draft screen distinguishes read access, edit access and unavailable mo
     const access = { is_system_administrator: false, modules: active ? [{ module_id: 'cotizaciones', display_name: 'Cotizaciones' }] : [], permissions: [{ module_id: 'cotizaciones', scope_key: 'documentos', capability: 'ver' }, ...(edit ? [{ module_id: 'cotizaciones', scope_key: 'documentos', capability: 'editar' }] : [])] };
     const markup = renderToStaticMarkup(<CoreContext.Provider value={{ api: new ApiClient('https://example.test'), access, notify: () => {} }}><Cotizaciones /></CoreContext.Provider>);
     assert.equal(markup.includes('Nueva cotización'), active && edit);
-    assert.equal(markup.includes('Prepara cotizaciones'), active);
+    assert.equal(markup.includes('Listado de cotizaciones'), active);
     assert.equal(markup.includes('No tienes acceso'), !active);
   }
 });

@@ -8,6 +8,8 @@ La hoja CSS declara el concepto **“Bastion · Concreto”**: una interfaz mate
 
 ## Decisiones visuales derivadas
 
+Para Cotizaciones, la indicación del 23 de octubre de 2026 compacta Generales, reúne cliente manual/catálogo en un buscador desplegable, presenta ítems en tabla adaptable y separa el listado mediante reglas, búsqueda corta y datos secundarios. Se usan como referencia visual el HTML y la imagen aportados, sin incorporar sus datos de ejemplo ni campos ajenos al contrato. Ver [organización, interacción y límites](modulos/cotizaciones-frontend.md).
+
 Para Procesos, la indicación explícita del 22 de octubre de 2026 sustituye el diálogo/drawer por el detalle debajo de su fila, tal como `WorkTable`/`ProcessInline` de la referencia. Usa los mismos tokens, dos columnas de contenido y adaptación móvil; véase `modulos/procesos-implementacion.md`.
 
 - Compartir un solo sistema visual entre el core y todos los módulos. Los módulos consumen los tokens centrales; no definen paletas propias.
