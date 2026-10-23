@@ -62,7 +62,6 @@ pub struct QuoteAttachmentWrite {
     pub attachment: QuoteAttachment,
     pub quote_version: u64,
 }
-const FIELDS: &str = "attachment_id AS id,filename,title,mime,byte_size,created_at";
 
 impl QuoteService {
     pub async fn attachments(
@@ -76,7 +75,7 @@ impl QuoteService {
         }
         let mut tx = self.begin(actor, "ver").await?;
         let quote = load(&mut tx, id).await?;
-        let mut items: Vec<QuoteAttachment> = sqlx::query_as(&format!("SELECT {FIELDS} FROM cotizaciones_documents WHERE quote_id=? AND kind='attachment' ORDER BY created_at DESC,attachment_id DESC LIMIT 26 OFFSET ?"))
+        let mut items: Vec<QuoteAttachment> = sqlx::query_as("SELECT attachment_id AS id,filename,title,mime,byte_size,created_at FROM cotizaciones_documents WHERE quote_id=? AND kind='attachment' ORDER BY created_at DESC,attachment_id DESC LIMIT 26 OFFSET ?")
             .bind(id).bind((page - 1) * 25).fetch_all(&mut *tx).await?;
         let has_more = items.len() > 25;
         items.truncate(25);
