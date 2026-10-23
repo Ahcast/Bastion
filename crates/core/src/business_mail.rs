@@ -36,7 +36,7 @@ impl BusinessMail {
                 .iter()
                 .map(|file| file.bytes.len())
                 .sum::<usize>()
-                > 8 * 1024 * 1024
+                > 20 * 1024 * 1024
         {
             return Err(CoreError::Invalid);
         }
@@ -60,7 +60,7 @@ impl BusinessMail {
         let mut body=MultiPart::mixed().multipart(MultiPart::alternative().singlepart(SinglePart::plain(self.message)).singlepart(SinglePart::html(format!("<div style=\"font-family:Arial,sans-serif;color:#1f2933;line-height:1.55\">{html}</div>"))));
         for file in self.attachments {
             if file.filename.is_empty()
-                || file.filename.len() > 180
+                || file.filename.chars().count() > 255
                 || file.filename.contains(['\r', '\n', '/', '\\'])
             {
                 return Err(CoreError::Invalid);

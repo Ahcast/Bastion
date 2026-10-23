@@ -12,6 +12,13 @@ pub use documents::{QuoteDocument, QuoteDocumentReadiness};
 mod mail;
 pub use mail::{QuoteEmailInput, QuoteEmailJob, QuoteMailService};
 
+#[path = "attachments.rs"]
+mod attachments;
+pub use attachments::{
+    MAX_ATTACHMENT_BYTES, QuoteAttachment, QuoteAttachmentInput, QuoteAttachmentPage,
+    QuoteAttachmentWrite,
+};
+
 use crate::{
     QuoteCalculation, QuoteDraft, QuoteFilter, QuoteInput, QuotePage, QuoteStatus, QuoteSummary,
     calculate,

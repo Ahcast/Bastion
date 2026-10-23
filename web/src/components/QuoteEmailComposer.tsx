@@ -1,25 +1,28 @@
 import { useEffect, useRef, useState } from 'react';
 import { ApiError, message } from '../api.js';
 import { Dialog, Loading, Notice, useCore, useLoad } from '../ui.js';
-import { downloadPdf, emailFailure, hondurasSchedule } from '../quoteDocuments.js';
+import { viewPdf, emailFailure, hondurasSchedule } from '../quoteDocuments.js';
 import type { QuoteEmailInput, QuoteEmailJob, QuotePdf } from '../quoteDocuments.js';
+import { emailAttachmentError, fileSize } from '../quoteAttachments.js';
+import type { AttachmentPage } from '../quoteAttachments.js';
 import type { QuoteDraft, QuoteSummary } from '../quotes.js';
 
 export function QuoteEmailComposer({ summary, close, sent }: { summary: QuoteSummary; close: () => void; sent: () => void }) {
   const { api, notify } = useCore();
   const [submitting, setSubmitting] = useState(false);
   const loaded = useLoad(async signal => {
-    const [draft, pdf] = await Promise.all([api.request<QuoteDraft>(`/api/v1/cotizaciones/${summary.id}`, { signal }), api.request<QuotePdf>(`/api/v1/cotizaciones/${summary.id}/pdf`, { signal, ifMatch: summary.version })]);
-    if (draft.version !== summary.version) throw new Error('La cotización cambió. Cierra y vuelve a abrir el envío desde la versión actual.');
-    return { draft, pdf };
+    const [draft, pdf, attachments] = await Promise.all([api.request<QuoteDraft>(`/api/v1/cotizaciones/${summary.id}`, { signal }), api.request<QuotePdf>(`/api/v1/cotizaciones/${summary.id}/pdf`, { signal, ifMatch: summary.version }), api.request<AttachmentPage>(`/api/v1/cotizaciones/${summary.id}/attachments?page=1`, { signal })]);
+    if (draft.version !== summary.version || attachments.quote_version !== summary.version) throw new Error('La cotización cambió. Cierra y vuelve a abrir el envío desde la versión actual.');
+    return { draft, pdf, attachments };
   }, [summary.id, summary.version]);
-  return <Dialog title={`Enviar ${summary.quote_number ?? 'cotización'} por correo`} close={() => { if (!submitting) close(); }}><Notice>{loaded.error}</Notice>{loaded.error && <button onClick={loaded.reload}>Reintentar PDF</button>}{loaded.data ? <Composer initial={loaded.data.draft} pdf={loaded.data.pdf} submitting={setSubmitting} sent={() => { sent(); notify('Cotización enviada.'); }} /> : !loaded.error && <Loading />}</Dialog>;
+  return <Dialog title={`Enviar ${summary.quote_number ?? 'cotización'} por correo`} close={() => { if (!submitting) close(); }}><Notice>{loaded.error}</Notice>{loaded.error && <button onClick={loaded.reload}>Reintentar PDF</button>}{loaded.data ? <Composer initial={loaded.data.draft} pdf={loaded.data.pdf} attachments={loaded.data.attachments} submitting={setSubmitting} sent={() => { sent(); notify('Cotización enviada.'); }} /> : !loaded.error && <Loading />}</Dialog>;
 }
-function Composer({ initial, pdf, sent, submitting }: { initial: QuoteDraft; pdf: QuotePdf; sent: () => void; submitting: (value: boolean) => void }) {
+function Composer({ initial, pdf, attachments, sent, submitting }: { initial: QuoteDraft; pdf: QuotePdf; attachments: AttachmentPage; sent: () => void; submitting: (value: boolean) => void }) {
   const { api, notify } = useCore();
   const process = initial.data.order_number || initial.quote_number || '';
   const [fields, setFields] = useState({ to: initial.data.client_email ?? '', cc: '', bcc: '', subject: `Cotización ${process}`, message: `Estimados ${initial.data.client_name || 'Cliente'}\n\nAdjunto la cotización correspondiente al proceso ${process}`, scheduled: '' });
   const [busy, setBusy] = useState(false), [error, setError] = useState(''), [job, setJob] = useState<QuoteEmailJob | null>(null), [conflict, setConflict] = useState(false);
+  const attachmentError = emailAttachmentError(attachments, pdf);
   const attempt = useRef<{ body: string; key: string } | null>(null);
   useEffect(() => {
     if (!job || !['pending', 'delivering'].includes(job.delivery_status)) return;
@@ -33,8 +36,8 @@ function Composer({ initial, pdf, sent, submitting }: { initial: QuoteDraft; pdf
     }, 2500);
     return () => { clearTimeout(timer); controller.abort(); };
   }, [job, api, initial.id]);
-  return <><div className="quote-email-document"><strong>PDF de la cotización</strong><p>{pdf.filename}</p><button onClick={() => downloadPdf(pdf)}>Ver / descargar PDF</button><p>El PDF se adjunta al correo. Las notas privadas no se incluyen.</p></div><Notice>{error}</Notice>{job ? <section aria-label="Estado del correo" role="status"><p>{job.delivery_status === 'sent' ? 'Correo enviado.' : job.delivery_status === 'failed' ? emailFailure(job.last_error_code) : job.delivery_status === 'cancelled' ? 'Envío cancelado.' : job.delivery_status === 'delivering' ? 'Enviando correo…' : fields.scheduled ? 'Envío programado. Puedes cerrar esta ventana.' : 'Envío en cola. Puedes cerrar esta ventana.'}</p>{job.delivery_status === 'failed' && <button onClick={() => { setJob(null); attempt.current = null; setError(''); }}>Preparar otro envío</button>}{error && ['pending', 'delivering'].includes(job.delivery_status) && <button onClick={async () => { try { const updated = await api.request<QuoteEmailJob>(`/api/v1/cotizaciones/${initial.id}/emails/${job.id}`); setError(''); setJob(updated); if (updated.delivery_status === 'sent') sent(); } catch (reason) { setError(message(reason)); } }}>Consultar estado</button>}</section> : <form className="stack" onSubmit={async event => {
-    event.preventDefault(); if (busy || conflict) return;
+  return <><div className="quote-email-document"><strong>PDF de la cotización</strong><p>{pdf.filename}</p><button type="button" onClick={() => { try { viewPdf(pdf); } catch (reason) { setError(message(reason)); } }}>Ver PDF</button><p>El PDF se adjunta al correo. Las notas privadas no se incluyen.</p></div>{attachments.items.length > 0 && <section className="quote-email-attachments" aria-label="Archivos incluidos"><strong>Archivos incluidos</strong><ul>{attachments.items.map(file => <li key={file.id}>{file.title || file.filename} · {fileSize(file.byte_size)}</li>)}</ul></section>}<p className="quote-note">El correo incluye el PDF y los archivos guardados. Hasta 10 archivos adicionales y 20 MiB en conjunto.</p><Notice>{error || attachmentError}</Notice>{job ? <section aria-label="Estado del correo" role="status"><p>{job.delivery_status === 'sent' ? 'Correo enviado.' : job.delivery_status === 'failed' ? emailFailure(job.last_error_code) : job.delivery_status === 'cancelled' ? 'Envío cancelado.' : job.delivery_status === 'delivering' ? 'Enviando correo…' : fields.scheduled ? 'Envío programado. Puedes cerrar esta ventana.' : 'Envío en cola. Puedes cerrar esta ventana.'}</p>{job.delivery_status === 'failed' && <button onClick={() => { setJob(null); attempt.current = null; setError(''); }}>Preparar otro envío</button>}{error && ['pending', 'delivering'].includes(job.delivery_status) && <button onClick={async () => { try { const updated = await api.request<QuoteEmailJob>(`/api/v1/cotizaciones/${initial.id}/emails/${job.id}`); setError(''); setJob(updated); if (updated.delivery_status === 'sent') sent(); } catch (reason) { setError(message(reason)); } }}>Consultar estado</button>}</section> : <form className="stack" onSubmit={async event => {
+    event.preventDefault(); if (busy || conflict || attachmentError) return;
     setError(''); setBusy(true); submitting(true);
     try {
       const input: QuoteEmailInput = { to: fields.to, cc: fields.cc, bcc: fields.bcc, subject: fields.subject, message: fields.message, scheduled_at: hondurasSchedule(fields.scheduled) };
@@ -44,7 +47,7 @@ function Composer({ initial, pdf, sent, submitting }: { initial: QuoteDraft; pdf
       notify(fields.scheduled ? 'Envío programado.' : 'Envío en cola.');
     } catch (reason) { setError(message(reason)); if (reason instanceof ApiError && reason.status === 412) setConflict(true); }
     finally { setBusy(false); submitting(false); }
-  }}><fieldset className="form-fields" disabled={busy || conflict}>
+  }}><fieldset className="form-fields" disabled={busy || conflict || Boolean(attachmentError)}>
     <label>Para<input type="email" maxLength={255} value={fields.to} onChange={e => setFields({ ...fields, to: e.target.value })} /></label>
     <label>CC<input maxLength={1000} value={fields.cc} onChange={e => setFields({ ...fields, cc: e.target.value })} placeholder="Correos separados por coma o punto y coma" /></label>
     <label>CCO<input maxLength={1000} value={fields.bcc} onChange={e => setFields({ ...fields, bcc: e.target.value })} /></label>

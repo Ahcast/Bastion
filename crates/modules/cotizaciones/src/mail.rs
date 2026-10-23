@@ -26,7 +26,18 @@ struct Envelope {
     object_key: String,
     filename: String,
     sha256: Vec<u8>,
+    #[serde(default)]
+    attachments: Vec<MailFile>,
 }
+#[derive(Serialize, Deserialize, sqlx::FromRow)]
+struct MailFile {
+    object_key: String,
+    filename: String,
+    mime: String,
+    sha256: Vec<u8>,
+    byte_size: u32,
+}
+
 #[derive(Clone)]
 pub struct QuoteMailService {
     core: CoreService,
@@ -99,15 +110,6 @@ impl QuoteMailService {
             &document.content_base64,
         )
         .map_err(|_| CoreError::Invalid)?;
-        let envelope = Envelope {
-            input: input.clone(),
-            object_key: document.object_key,
-            filename: document.filename,
-            sha256: Sha256::digest(raw).to_vec(),
-        };
-        let encrypted = self
-            .core
-            .seal_domain_json(&serde_json::to_value(envelope).map_err(|_| CoreError::Invalid)?)?;
         let scheduled_at = schedule(input.scheduled_at.as_deref())?;
         let mut tx = self.quotes.begin(actor, "editar").await?;
         let current = load(&mut tx, id).await?;
@@ -128,6 +130,19 @@ impl QuoteMailService {
             tx.commit().await?;
             return self.job(actor, id, job).await;
         }
+        let attachments:Vec<MailFile> = sqlx::query_as("SELECT object_key,filename,mime,sha256,byte_size FROM cotizaciones_documents WHERE quote_id=? AND kind='attachment' ORDER BY created_at,attachment_id LIMIT 11")
+            .bind(id).fetch_all(&mut *tx).await?;
+        validate_mail_files(raw.len(), &attachments)?;
+        let envelope = Envelope {
+            input: input.clone(),
+            object_key: document.object_key,
+            filename: document.filename,
+            sha256: Sha256::digest(&raw).to_vec(),
+            attachments,
+        };
+        let encrypted = self
+            .core
+            .seal_domain_json(&serde_json::to_value(envelope).map_err(|_| CoreError::Invalid)?)?;
         let job=sqlx::query("INSERT INTO cotizaciones_email_jobs (quote_id,quote_version,actor_id,key_hash,request_hash,payload_ciphertext,scheduled_at,created_at) VALUES (?,?,?,?,?,?,?,UTC_TIMESTAMP(6))")
             .bind(id).bind(expected).bind(actor).bind(key_hash).bind(hash).bind(encrypted).bind(scheduled_at).execute(&mut *tx).await?.last_insert_id();
         CoreAdmin::record_domain_event(
@@ -184,7 +199,31 @@ impl QuoteMailService {
             if Sha256::digest(&bytes).as_slice() != envelope.sha256.as_slice() {
                 return Err(CoreError::Invalid);
             }
+            validate_mail_files(bytes.len(), &envelope.attachments)?;
+            let mut files = vec![BusinessMailAttachment {
+                filename: envelope.filename,
+                mime: "application/pdf".into(),
+                bytes,
+            }];
+            for file in envelope.attachments {
+                let bytes = DocumentService::from_environment()
+                    .get(file.object_key)
+                    .await?;
+                if bytes.len() != file.byte_size as usize
+                    || Sha256::digest(&bytes).as_slice() != file.sha256.as_slice()
+                {
+                    return Err(CoreError::Invalid);
+                }
+                files.push(BusinessMailAttachment {
+                    filename: file.filename,
+                    mime: file.mime,
+                    bytes,
+                });
+            }
             let (to, cc, bcc) = recipients(&envelope.input)?;
+            if self.quotes.detail(actor, id).await?.version != version {
+                return Err(CoreError::PreconditionFailed);
+            }
             self.quotes.check_access(actor, "editar").await?;
             self.core
                 .send_business_mail(
@@ -195,11 +234,7 @@ impl QuoteMailService {
                         bcc,
                         subject: envelope.input.subject,
                         message: envelope.input.message,
-                        attachments: vec![BusinessMailAttachment {
-                            filename: envelope.filename,
-                            mime: "application/pdf".into(),
-                            bytes,
-                        }],
+                        attachments: files,
                     },
                 )
                 .await?;
@@ -311,6 +346,22 @@ fn recipients(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn mail_attachments_are_bounded_and_older_jobs_remain_readable() {
+        let make = |size| MailFile {
+            object_key: "cotizaciones/1/attachments/test".into(),
+            filename: "test.bin".into(),
+            mime: "application/octet-stream".into(),
+            sha256: vec![0; 32],
+            byte_size: size,
+        };
+        assert!(validate_mail_files(1, &[make(20 * 1024 * 1024 - 1)]).is_ok());
+        assert!(validate_mail_files(1, &[make(20 * 1024 * 1024)]).is_err());
+        let many: Vec<_> = (0..11).map(|_| make(1)).collect();
+        assert!(validate_mail_files(1, &many).is_err());
+        let older:Envelope=serde_json::from_value(serde_json::json!({"input":input(),"object_key":"cotizaciones/1/pdf/test","filename":"quote.pdf","sha256":[0]})).unwrap();
+        assert!(older.attachments.is_empty());
+    }
     fn input() -> QuoteEmailInput {
         QuoteEmailInput {
             to: "to@example.test".into(),
@@ -344,4 +395,20 @@ mod tests {
         );
         assert!(schedule(Some("2099-10-22T13:00:00")).is_err());
     }
+}
+fn validate_mail_files(pdf_bytes: usize, files: &[MailFile]) -> Result<(), CoreError> {
+    if files.len() > 10
+        || files
+            .iter()
+            .any(|file| file.byte_size as usize > super::MAX_ATTACHMENT_BYTES)
+        || files
+            .iter()
+            .map(|file| file.byte_size as usize)
+            .sum::<usize>()
+            .saturating_add(pdf_bytes)
+            > super::MAX_ATTACHMENT_BYTES
+    {
+        return Err(CoreError::Invalid);
+    }
+    Ok(())
 }

@@ -15,6 +15,7 @@ pub struct QuoteDocument {
 #[derive(Serialize)]
 pub struct QuoteDocumentReadiness {
     pub pdf: bool,
+    pub attachments: bool,
     pub company: bool,
     pub email: bool,
 }
@@ -29,6 +30,7 @@ impl QuoteService {
         let company = self.admin.document_company().await.is_ok();
         Ok(QuoteDocumentReadiness {
             pdf: company && DocumentService::from_environment().configured(),
+            attachments: DocumentService::from_environment().configured(),
             company,
             email: core.business_mail_configured(actor).await?,
         })

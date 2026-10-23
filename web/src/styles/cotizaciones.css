@@ -122,3 +122,14 @@
 }
 
 .quote-source-notice{padding:10px 14px;margin:16px 0;border:1px solid var(--line);border-left:3px solid var(--rust);border-radius:6px;background:var(--panel);color:var(--muted);font-size:13px;line-height:1.5}.quote-source-notice p{margin:0}.quote-source-notice p+p{margin-top:5px}.quote-source-notice a{white-space:normal;overflow-wrap:anywhere}
+
+.quote-attachments{margin:28px 0;min-width:0}
+.quote-attachments .quote-section-heading button{font-size:13px;padding:7px 11px}
+.quote-attachment-list,.quote-attachment-pending ul{list-style:none;padding:0;margin:14px 0}
+.quote-attachment-list li,.quote-attachment-pending li{display:flex;justify-content:space-between;align-items:center;gap:16px;border-bottom:1px solid var(--line);padding:12px 0;min-width:0}
+.quote-attachment-list li>span,.quote-attachment-pending li>span{font-size:14px;overflow-wrap:anywhere;min-width:0;flex:1}
+.quote-attachments small{display:block;font-size:11px;margin-top:3px;color:var(--muted)}
+.quote-attachment-pending{background:var(--panel);border:1px solid var(--line);padding:14px;margin-top:14px}
+.quote-attachment-pending button{font-size:12px}
+.quote-email-attachments{font-size:13px;overflow-wrap:anywhere}
+@media(max-width:640px){.quote-attachment-list li,.quote-attachment-pending li{align-items:flex-start;flex-wrap:wrap}.quote-attachment-list .actions{width:100%}}

@@ -6,10 +6,12 @@ import { Dialog, Heading, Loading, Notice, Table, useCore, useLoad } from '../ui
 import { QuoteActions } from '../components/QuoteActions.js';
 import { QuoteEmailComposer } from '../components/QuoteEmailComposer.js';
 import { QuoteClientPicker } from '../components/QuoteClientPicker.js';
+import { QuoteAttachments } from '../components/QuoteAttachments.js';
 import { Decimal, QuoteItems } from '../components/QuoteItems.js';
-import { downloadPdf } from '../quoteDocuments.js';
+import { reservePdfViewer } from '../quoteDocuments.js';
 import type { DocumentReadiness, QuotePdf } from '../quoteDocuments.js';
 import { moduleCan } from '../types.js';
+import { useUnsavedChanges } from '../navigationGuard.js';
 import { newQuote, newQuoteItem, quoteStatuses } from '../quotes.js';
 import type { DiscountType, QuoteDraft, QuoteInput, QuoteItem, QuotePage, QuoteCalculation, QuoteStatus, QuoteSummary } from '../quotes.js';
 
@@ -56,6 +58,13 @@ function Workspace({ processSeed, clearProcessSeed }: ProcessQuoteProps) {
     } catch (reason) { setError(message(reason)); if (reason instanceof ApiError && reason.status === 412) result.reload(); }
     finally { setOpening(false); }
   };
+  const previewPdf = (draft: QuoteSummary) => {
+    setError(''); let viewer: ReturnType<typeof reservePdfViewer>;
+    try { viewer = reservePdfViewer(); } catch (reason) { setError(message(reason)); return; }
+    setOpening(true);
+    void api.request<QuotePdf>(`/api/v1/cotizaciones/${draft.id}/pdf`, { ifMatch: draft.version }).then(value => viewer.show(value))
+      .catch(reason => { viewer.close(); setError(message(reason)); }).finally(() => setOpening(false));
+  };
   if (selected) return <Editor key={selected === 'new' ? 'new' : selected.id} initial={selected === 'new' ? null : selected} seed={seed} editable={editable && mode === 'edit'} edit={editable && mode === 'view' ? () => setMode('edit') : undefined} close={() => { setSelected(null); setSeed(null); clearProcessSeed?.(); result.reload(); }} />;
   return <><Heading title="Cotizaciones" description="Prepara y consulta tus cotizaciones." action={editable && <button className="primary" onClick={() => { setMode('edit'); setSelected('new'); }}>Nueva cotización</button>} />
     {documents.data && !documents.data.pdf && <p className="quote-stage">PDF requiere la configuración de Empresa en Ajustes del Core y el servicio de documentos del servidor.</p>}
@@ -71,7 +80,7 @@ function Workspace({ processSeed, clearProcessSeed }: ProcessQuoteProps) {
       { label: 'Convertir a factura', disabled: true, reason: 'Disponible al incorporar Facturas' },
       { label: 'Aprobar', disabled: !editable, run: () => void status(draft, 'Aprobada') },
       { label: 'Clonar', disabled: !editable, run: () => void clone(draft) },
-      { label: 'PDF', disabled: !documents.data?.pdf, reason: !documents.data?.pdf ? 'Configura Empresa y el servicio de documentos' : undefined, run: () => { setError(''); setOpening(true); void api.request<QuotePdf>(`/api/v1/cotizaciones/${draft.id}/pdf`, { ifMatch: draft.version }).then(downloadPdf).catch(reason => setError(message(reason))).finally(() => setOpening(false)); } },
+      { label: 'PDF', disabled: !documents.data?.pdf, reason: !documents.data?.pdf ? 'Configura Empresa y el servicio de documentos' : undefined, run: () => previewPdf(draft) },
       { label: 'Enviar por correo', disabled: !editable || !documents.data?.pdf || !documents.data?.email, reason: !editable ? 'Sin permiso de edición' : !documents.data?.pdf ? 'Configura Empresa y documentos' : !documents.data?.email ? 'Configura SMTP global y tus credenciales en Mi cuenta' : undefined, run: () => setEmail(draft) },
       { label: 'Eliminar', disabled: !removable, danger: true, run: () => setDeleting(draft) },
     ]} />])} /><div className="quote-pagination"><button disabled={page === 1 || opening} onClick={() => setPage(p => p - 1)}>Anterior</button><span>Página {page}</span><button disabled={!result.data.has_more || opening} onClick={() => setPage(p => p + 1)}>Siguiente</button></div></> : !result.error && <Loading />}
@@ -89,6 +98,9 @@ function Workspace({ processSeed, clearProcessSeed }: ProcessQuoteProps) {
 function Editor({ initial, editable, edit, close, seed }: { seed?: ProcessQuoteSeed | null; initial: QuoteDraft | null; editable: boolean; edit?: () => void; close: () => void }) {
   const { api, access, notify } = useCore();
   const [saved, setSaved] = useState(initial), [data, setData] = useState<QuoteInput>(() => initial?.data ?? seed?.data ?? newQuote()), [busy, setBusy] = useState(false), [error, setError] = useState(''), [dirty, setDirty] = useState(Boolean(seed)), [conflict, setConflict] = useState(false);
+  const [attachmentBusy, setAttachmentBusy] = useState(false), [pendingFiles, setPendingFiles] = useState(0);
+  useUnsavedChanges(dirty || pendingFiles > 0, busy || attachmentBusy);
+  const documents = useLoad(signal => api.request<DocumentReadiness>('/api/v1/cotizaciones/document-readiness', { signal }));
   const [preview, setPreview] = useState<{ input: QuoteInput; value: QuoteCalculation } | null>(null), [calculationError, setCalculationError] = useState('');
   const missingQuantities = seed ? data.items.filter(item => !item.quantity.trim()).length : 0;
   useEffect(() => {
@@ -104,14 +116,14 @@ function Editor({ initial, editable, edit, close, seed }: { seed?: ProcessQuoteS
   const attempt = useRef<{ body: string; key: string } | null>(null);
   const change = <K extends keyof QuoteInput>(key: K, value: QuoteInput[K]) => { setData(previous => ({ ...previous, [key]: value })); setDirty(true); };
   const item = <K extends keyof QuoteItem>(index: number, key: K, value: QuoteItem[K]) => change('items', data.items.map((row, i) => i === index ? { ...row, [key]: value } : row));
-  const back = () => { if (!busy && (!dirty || confirm('Hay cambios sin guardar. ¿Volver al listado?'))) close(); };
-  return <><Heading title={saved ? saved.quote_number ?? `Cotización · referencia interna ${saved.id}` : 'Nueva cotización'} description={`Estado: ${data.status} · Moneda: HNL`} action={<div className="actions">{edit && <button onClick={edit}>Editar</button>}<button disabled={busy} onClick={back}>Volver</button></div>} />
+  const back = () => { if (!busy && !attachmentBusy && (!(dirty || pendingFiles) || confirm('Hay cambios sin guardar. ¿Volver al listado?'))) close(); };
+  return <><Heading title={saved ? saved.quote_number ?? `Cotización · referencia interna ${saved.id}` : 'Nueva cotización'} description={`Estado: ${data.status} · Moneda: HNL`} action={<div className="actions">{edit && <button onClick={edit}>Editar</button>}<button disabled={busy || attachmentBusy} onClick={back}>Volver</button></div>} />
     {!saved && <p className="quote-note">El número se asigna al guardar.</p>}
     {seed && <ProcessQuoteNotice seed={seed} missingQuantities={missingQuantities} />}
     <Notice>{error}</Notice>
     {conflict && <p role="status">Tus cambios se conservan en pantalla. Vuelve al listado y abre la versión actual antes de reintentarlos.</p>}
     <form className="quote-editor" onSubmit={async event => {
-      event.preventDefault(); if (busy || !editable || conflict) return;
+      event.preventDefault(); if (busy || attachmentBusy || !editable || conflict) return;
       setError(''); setBusy(true);
       try {
         let updated: QuoteDraft;
@@ -125,7 +137,7 @@ function Editor({ initial, editable, edit, close, seed }: { seed?: ProcessQuoteS
       } catch (reason) { setError(message(reason)); if (reason instanceof ApiError && reason.status === 412) setConflict(true); }
       finally { setBusy(false); }
     }}>
-      <fieldset disabled={busy || !editable || conflict} className="form-fields quote-form"><legend className="quote-sr-only">Datos de cotización</legend>
+      <fieldset disabled={busy || attachmentBusy || !editable || conflict} className="form-fields quote-form"><legend className="quote-sr-only">Datos de cotización</legend>
         <section className="quote-section" aria-labelledby="quote-general-title">
           <div className="quote-section-heading"><h2 id="quote-general-title">Generales</h2><span>HNL</span></div>
           <div className="quote-general-fields">
@@ -152,8 +164,12 @@ function Editor({ initial, editable, edit, close, seed }: { seed?: ProcessQuoteS
             {calculation ? <QuoteTotalsPanel calculation={calculation} /> : !calculationError && !missingQuantities && <p role="status">Calculando totales…</p>}
           </div>
         </div>
-        {editable && <div className="quote-save"><button className="primary" type="submit">{busy ? 'Guardando…' : 'Guardar cotización'}</button></div>}
+
       </fieldset>
+      <QuoteAttachments quoteId={saved?.id ?? null} version={saved?.version ?? 0} editable={editable} disabled={busy || conflict}
+        storageReady={Boolean(documents.data?.attachments ?? documents.data?.pdf)} busyChanged={setAttachmentBusy} pendingChanged={setPendingFiles}
+        versionChanged={version => setSaved(previous => previous ? { ...previous, version } : previous)} conflict={() => setConflict(true)} />
+      {editable && <div className="quote-save"><button disabled={busy || attachmentBusy || conflict} className="primary" type="submit">{busy ? 'Guardando…' : 'Guardar cotización'}</button></div>}
     </form>
   </>;
 }

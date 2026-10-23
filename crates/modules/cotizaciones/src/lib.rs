@@ -4,8 +4,9 @@ mod calculation;
 mod service;
 pub use calculation::{CalculatedItem, QuoteCalculation, QuoteTotals, calculate};
 pub use service::{
-    QuoteDocument, QuoteDocumentReadiness, QuoteEmailInput, QuoteEmailJob, QuoteMailService,
-    QuoteService,
+    MAX_ATTACHMENT_BYTES, QuoteAttachment, QuoteAttachmentInput, QuoteAttachmentPage,
+    QuoteAttachmentWrite, QuoteDocument, QuoteDocumentReadiness, QuoteEmailInput, QuoteEmailJob,
+    QuoteMailService, QuoteService,
 };
 
 use bastion_core::CoreError;

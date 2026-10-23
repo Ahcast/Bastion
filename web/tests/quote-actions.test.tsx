@@ -5,6 +5,7 @@ import { act } from 'react';
 import Cotizaciones from '../src/pages/Cotizaciones.js';
 import { CoreContext } from '../src/ui.js';
 import { ApiClient } from '../src/api.js';
+import { NavigationGuardProvider } from '../src/navigationGuard.js';
 import { newQuote } from '../src/quotes.js';
 import type { QuoteDraft } from '../src/quotes.js';
 const window = new Window();
@@ -20,6 +21,7 @@ async function workspace(editable = true, clients = false, linked = false) {
   const totals = { subtotal:'100.00', importe_exonerado:'0.00',importe_exento:'0.00',importe_gravado_15:'100.00',importe_gravado_18:'0.00',descuentos_rebajas:'0.00',isv_15:'15.00',isv_18:'0.00',total:'115.00' };
   let draft: QuoteDraft = { id:1,version:1,status:'Borrador',currency:'HNL',quote_number:'COT-000001',data:input,calculation:{ data:input,valid_until:'2026-11-21',items:[],totals } };
   let failure = 0;
+  let attachments: {id:string;filename:string;title:string;mime:string;byte_size:number;created_at:string}[] = [];
   const calls: { path:string; query:string; method:string; match:string|null; key:string|null; body:Record<string,unknown>|null }[] = [];
   const api = new ApiClient('https://api.example.test',async (url,options) => {
     const path = new URL(String(url)).pathname, method=options?.method ?? 'GET', headers = new Headers(options?.headers);
@@ -29,6 +31,14 @@ async function workspace(editable = true, clients = false, linked = false) {
       return Response.json({items:[{id:page===2?42:41,cliente_name:page===2?'Cliente siguiente':'Cliente del catálogo',email:'cliente@example.test',rtn:'08011900000000'}],page,page_size:25,has_more:page===1});
     }
     if (failure && method !== 'GET') { const status=failure;failure=0;return Response.json({title:'Conflict',detail:'Recarga la versión actual.'},{status}); }
+    if(path.endsWith('/attachments')) {
+      if(method==='POST') {
+        const input=JSON.parse(String(options?.body)); const file={id:(attachments.length+1).toString(16).padStart(48,'0'),filename:input.filename,title:input.title,mime:input.filename.endsWith('.pdf')?'application/pdf':'application/octet-stream',byte_size:atob(input.content_base64).length,created_at:'2026-10-23T00:00:00'};
+        attachments=[file,...attachments]; draft={...draft,version:draft.version+1};
+        return Response.json({attachment:file,quote_version:draft.version},{status:201});
+      }
+      return Response.json({items:attachments,page:1,has_more:false,quote_version:draft.version});
+    }
     if (method === 'DELETE') return new Response(null,{status:204});
     if (path.endsWith('/document-readiness')) return Response.json({pdf:true,company:true,email:true});
     if (path.endsWith('/pdf')) return Response.json({filename:'COT-000001.pdf',mime:'application/pdf',content_base64:btoa('%PDF-synthetic')});
@@ -42,7 +52,7 @@ async function workspace(editable = true, clients = false, linked = false) {
     return Response.json(draft);
   });
   const container=document.createElement('div');container.id='app';document.body.append(container);const root=createRoot(container);
-  await act(async () => root.render(<CoreContext.Provider value={{api,access:{is_system_administrator:editable,modules:[{module_id:'cotizaciones',display_name:'Cotizaciones'},...(clients?[{module_id:'clientes',display_name:'Clientes'}]:[])],permissions:[{module_id:'cotizaciones',scope_key:'documentos',capability:'ver'}]},notify:()=>{}}}><Cotizaciones/></CoreContext.Provider>));
+  await act(async () => root.render(<CoreContext.Provider value={{api,access:{is_system_administrator:editable,modules:[{module_id:'cotizaciones',display_name:'Cotizaciones'},...(clients?[{module_id:'clientes',display_name:'Clientes'}]:[])],permissions:[{module_id:'cotizaciones',scope_key:'documentos',capability:'ver'}]},notify:()=>{}}}><NavigationGuardProvider><Cotizaciones/></NavigationGuardProvider></CoreContext.Provider>));
   const click=async (element:Element|null) => {assert.ok(element);await act(async()=>{ element.dispatchEvent(new MouseEvent('click',{bubbles:true})); });};
   const action=async(label:string)=>{await click(container.querySelector('button[aria-haspopup="menu"]'));const item=Array.from(document.querySelectorAll('button[role="menuitem"]')).find(button=>button.textContent?.startsWith(label));assert.ok(item);await click(item);};
   return {container,calls,click,action,fail:(status:number)=>{failure=status;},dispose:async()=>{await act(async()=>root.unmount());container.remove();}};
@@ -209,5 +219,48 @@ test('email suggests the saved catalog client address without sending automatica
     const dialog=document.querySelector('[role="dialog"]')!;
     assert.equal(dialog.querySelector<HTMLInputElement>('input[type="email"]')?.value,'cliente@example.test');
     assert.equal(app.calls.some(call=>call.method==='POST'),false);
+  }finally{await app.dispose();}
+});
+test('multiple selected files remain pending until the quote is saved and upload one by one with the returned versions',async()=>{
+  const app=await workspace();try{
+    await app.click(Array.from(app.container.querySelectorAll('button')).find(button=>button.textContent==='Nueva cotización')!);
+    const input=app.container.querySelector<HTMLInputElement>('input[type="file"]')!;assert.equal(input.multiple,true);
+    Object.defineProperty(input,'files',{configurable:true,value:[new window.File(['%PDF-synthetic'],'a.pdf'),new window.File(['data'],'b.txt')]});
+    await act(async()=>{input.dispatchEvent(new Event('change',{bubbles:true}));});
+    const upload=()=>Array.from(app.container.querySelectorAll<HTMLButtonElement>('button')).find(button=>button.textContent==='Subir 2 archivos')!;
+    assert.equal(upload().disabled,true);assert.ok(app.container.textContent?.includes('Guarda la cotización'));
+    assert.equal(app.calls.some(call=>call.path.endsWith('/attachments')&&call.method==='POST'),false);
+    await act(async()=>{app.container.querySelector('form')!.dispatchEvent(new Event('submit',{bubbles:true,cancelable:true}));});
+    assert.equal(upload().disabled,false);await app.click(upload());
+    await act(async()=>{await new Promise(resolve=>setTimeout(resolve,30));});
+    const sent=app.calls.filter(call=>call.path.endsWith('/attachments')&&call.method==='POST');
+    assert.equal(sent.length,2);assert.equal(sent[0]?.match,'"2"');assert.equal(sent[1]?.match,'"3"');
+    assert.ok(sent[0]?.key);assert.notEqual(sent[0]?.key,sent[1]?.key);
+    assert.deepEqual(sent.map(call=>call.body?.filename),['a.pdf','b.txt']);
+    assert.equal(app.container.textContent?.includes('pendiente de subir'),false);
+    assert.ok(app.container.textContent?.includes('a.pdf'));assert.ok(app.container.textContent?.includes('b.txt'));
+    await act(async()=>{app.container.querySelector('form')!.dispatchEvent(new Event('submit',{bubbles:true,cancelable:true}));});
+    assert.equal(app.calls.find(call=>call.method==='PUT')?.match,'"4"');
+  }finally{await app.dispose();}
+});
+test('a failed attachment retains its idempotency key and oversized selections do not upload',async()=>{
+  const app=await workspace();try{
+    await app.action('Editar');
+    const picker=app.container.querySelector<HTMLInputElement>('input[type="file"]')!;
+    const tooBig=new window.File(['x'],'huge.txt');Object.defineProperty(tooBig,'size',{value:21*1024*1024});
+    Object.defineProperty(picker,'files',{configurable:true,value:[tooBig]});
+    await act(async()=>{picker.dispatchEvent(new Event('change',{bubbles:true}));});
+    assert.ok(app.container.textContent?.includes('hasta 20 MiB'));
+    assert.equal(app.calls.some(call=>call.path.endsWith('/attachments')&&call.method==='POST'),false);
+    Object.defineProperty(picker,'files',{configurable:true,value:[new window.File(['data'],'retry.txt')]});
+    await act(async()=>{picker.dispatchEvent(new Event('change',{bubbles:true}));});
+    app.fail(503);
+    await app.click(Array.from(app.container.querySelectorAll('button')).find(button=>button.textContent==='Subir 1 archivo')!);
+    await act(async()=>{await new Promise(resolve=>setTimeout(resolve,30));});
+    assert.ok(app.container.textContent?.includes('pendiente de subir'));
+    await app.click(Array.from(app.container.querySelectorAll('button')).find(button=>button.textContent==='Subir 1 archivo')!);
+    await act(async()=>{await new Promise(resolve=>setTimeout(resolve,30));});
+    const attempts=app.calls.filter(call=>call.path.endsWith('/attachments')&&call.method==='POST');
+    assert.equal(attempts.length,2);assert.equal(attempts[0]?.key,attempts[1]?.key);assert.equal(attempts[0]?.match,attempts[1]?.match);
   }finally{await app.dispose();}
 });

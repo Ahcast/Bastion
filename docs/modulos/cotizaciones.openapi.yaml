@@ -1,12 +1,122 @@
 openapi: 3.1.0
 info:
   title: Bastion Cotizaciones
-  version: 0.3.0
+  version: 0.4.0
   description: Cotizaciones, acciones por documento, PDF Typst y correo inmediato/programado. Conversiones deshabilitadas
     por acuerdo hasta incorporar sus módulos. Ver cotizaciones-acciones.md.
 security:
   - session: []
 paths:
+  /api/v1/cotizaciones/{id}/attachments:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: {type: integer, minimum: 1}
+    get:
+      operationId: listQuoteAttachments
+      x-permission: cotizaciones/documentos/ver
+      parameters:
+        - name: page
+          in: query
+          schema: {type: integer, minimum: 1, maximum: 10000, default: 1}
+      responses:
+        "200":
+          description: Metadatos privados; 25 por página, sin claves ni URLs de objetos.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, page, has_more, quote_version]
+                properties:
+                  items:
+                    type: array
+                    items: {$ref: "#/components/schemas/Attachment"}
+                  page: {type: integer}
+                  has_more: {type: boolean}
+                  quote_version: {type: integer}
+        default: {$ref: "#/components/responses/Problem"}
+    post:
+      operationId: uploadQuoteAttachment
+      x-permission: cotizaciones/documentos/editar
+      parameters:
+        - $ref: "#/components/parameters/Csrf"
+        - $ref: "#/components/parameters/IfMatch"
+        - $ref: "#/components/parameters/Idempotency"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [filename, content_base64]
+              properties:
+                filename: {type: string, minLength: 1, maxLength: 255}
+                title: {type: string, maxLength: 255, default: ""}
+                content_base64:
+                  type: string
+                  contentEncoding: base64
+                  description: No vacío; máximo decodificado 20 MiB. JSON máximo 28 MiB.
+      responses:
+        "201":
+          description: Alta o respuesta idempotente original; incrementa versión de cotización.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [attachment, quote_version]
+                properties:
+                  attachment: {$ref: "#/components/schemas/Attachment"}
+                  quote_version: {type: integer}
+        default: {$ref: "#/components/responses/Problem"}
+  /api/v1/cotizaciones/{id}/attachments/{attachment}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: {type: integer, minimum: 1}
+      - $ref: "#/components/parameters/AttachmentId"
+    delete:
+      operationId: deleteQuoteAttachment
+      x-permission: cotizaciones/documentos/editar
+      parameters:
+        - $ref: "#/components/parameters/Csrf"
+        - $ref: "#/components/parameters/IfMatch"
+      responses:
+        "200":
+          description: Metadatos eliminados y limpieza privada encolada; nueva revisión.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [quote_version]
+                properties:
+                  quote_version: {type: integer}
+        default: {$ref: "#/components/responses/Problem"}
+  /api/v1/cotizaciones/{id}/attachments/{attachment}/content:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: {type: integer, minimum: 1}
+      - $ref: "#/components/parameters/AttachmentId"
+    get:
+      operationId: getQuoteAttachmentContent
+      x-permission: cotizaciones/documentos/ver
+      responses:
+        "200":
+          description: Contenido privado verificado; PDF para visor, binario para descarga explícita.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [filename, mime, content_base64]
+                properties:
+                  filename: {type: string}
+                  mime: {type: string, enum: [application/pdf, application/octet-stream]}
+                  content_base64: {type: string, contentEncoding: base64}
+        default: {$ref: "#/components/responses/Problem"}
   /api/v1/cotizaciones:
     get:
       operationId: listQuoteDrafts
@@ -331,6 +441,11 @@ components:
       in: cookie
       name: __Host-bastion_session
   parameters:
+    AttachmentId:
+      name: attachment
+      in: path
+      required: true
+      schema: {type: string, pattern: "^[0-9a-f]{48}$"}
     Csrf:
       name: X-CSRF-Token
       in: header
@@ -383,6 +498,16 @@ components:
               detail:
                 type: string
   schemas:
+    Attachment:
+      type: object
+      required: [id, filename, title, mime, byte_size, created_at]
+      properties:
+        id: {type: string, pattern: "^[0-9a-f]{48}$"}
+        filename: {type: string, maxLength: 255}
+        title: {type: string, maxLength: 255}
+        mime: {type: string, enum: [application/pdf, application/octet-stream]}
+        byte_size: {type: integer, minimum: 1, maximum: 20971520}
+        created_at: {type: string, description: UTC DATETIME sin sufijo}
     Summary:
       type: object
       required:

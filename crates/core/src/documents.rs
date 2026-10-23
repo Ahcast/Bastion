@@ -11,6 +11,7 @@ use std::{
 };
 
 const MAX_DOCUMENT_BYTES: u64 = 8 * 1024 * 1024;
+const MAX_STORAGE_BYTES: u64 = 20 * 1024 * 1024;
 static PDF_SLOTS: tokio::sync::Semaphore = tokio::sync::Semaphore::const_new(2);
 static STORAGE_SLOTS: tokio::sync::Semaphore = tokio::sync::Semaphore::const_new(4);
 
@@ -168,7 +169,7 @@ impl DocumentService {
     pub async fn put(&self, key: String, bytes: Vec<u8>) -> Result<(), CoreError> {
         validate_key(&key)?;
         let permit = storage_permit().await?;
-        if bytes.len() as u64 > MAX_DOCUMENT_BYTES {
+        if bytes.len() as u64 > MAX_STORAGE_BYTES {
             return Err(CoreError::Invalid);
         }
         let this = self.clone();
@@ -198,7 +199,7 @@ impl DocumentService {
             let mut command = this.storage_command("get-object", &key)?;
             command.arg(&file);
             run(command, Duration::from_secs(20))?;
-            bounded_read(&file)
+            bounded_read_limit(&file, MAX_STORAGE_BYTES)
         })
         .await
         .map_err(|_| CoreError::Overloaded)?
@@ -291,13 +292,16 @@ impl Drop for WorkDirectory {
     }
 }
 fn bounded_read(path: &Path) -> Result<Vec<u8>, CoreError> {
+    bounded_read_limit(path, MAX_DOCUMENT_BYTES)
+}
+fn bounded_read_limit(path: &Path, limit: u64) -> Result<Vec<u8>, CoreError> {
     use std::io::Read;
     let file = fs::File::open(path).map_err(|_| CoreError::Overloaded)?;
     let mut bytes = Vec::new();
-    file.take(MAX_DOCUMENT_BYTES + 1)
+    file.take(limit + 1)
         .read_to_end(&mut bytes)
         .map_err(|_| CoreError::Overloaded)?;
-    if bytes.len() as u64 > MAX_DOCUMENT_BYTES {
+    if bytes.len() as u64 > limit {
         return Err(CoreError::Invalid);
     }
     Ok(bytes)
