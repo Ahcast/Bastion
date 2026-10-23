@@ -50,3 +50,7 @@ API actual: CRUD parcial, listado/detalle, documentos, estados, entrega, clonaci
 ## Pendientes
 
 Campos completos, fórmulas/redondeo, transición de estados, tipos/tamaño de adjunto, alcance del borrado, relación exacta de gastos y comportamiento de conversión deben confirmarse con UI/esquema.
+
+## Implementación local (2026-10-23)
+
+Primer corte de listado/filtros, detalle, alta/edición, cálculo servidor, estados derivados y gastos. El usuario confirma agregar el catálogo de destinos en Ajustes > Órdenes de compra; sus campos son identificador y descripción, con alta/renombrado versionados. Es una ampliación autorizada, no un CRUD confirmado del Legacy. Los demás ajustes quedan pendientes. Ver [alcance, diferencias y pruebas](ordenes-de-compra-implementacion.md) y [OpenAPI](ordenes-de-compra.openapi.yaml). No se considera cerrada la paridad ni desplegado.

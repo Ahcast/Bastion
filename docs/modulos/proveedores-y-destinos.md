@@ -38,3 +38,7 @@ API actual: consulta/listado, catálogo para selects, alta y edición de proveed
 ## Pendientes
 
 Confirmar gestión de destinos, campos/validaciones completos, reglas de duplicados y permisos de mantenimiento.
+
+## Decisión posterior (2026-10-23)
+
+El usuario confirma administrar destinos bajo Ajustes > Órdenes de compra. El catálogo nuevo pertenece al dominio ordenes_compra, con contrato propio para consulta y alta/renombrado autorizados. No se incluye el módulo Proveedores en esta entrega ni se reutilizan sus futuros IDs/tablas. La gestión nueva no se atribuye al Legacy. Ver ordenes-de-compra-implementacion.md.

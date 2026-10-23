@@ -97,3 +97,7 @@ Completar validación integral del esquema MySQL y las sesiones existentes, alma
 
 - [MySQL 5.7 Reference Manual: tipo JSON](https://dev.mysql.com/doc/refman/5.7/en/json.html).
 - [MySQL Product Support EOL Announcements](https://www.mysql.com/support/eol-notice.html): MySQL 5.7 pasó a Sustaining Support el 25 de octubre de 2023; Oracle recomienda actualizar a MySQL 8.0.
+
+## Órdenes de compra: primer corte local
+
+`crates/modules/ordenes_compra` es dueño de órdenes, cálculo y catálogo de destinos confirmado bajo Ajustes. Tiene migraciones/ledger propios y no escribe tablas de otros módulos. Clientes manuales son instantáneas hasta definir vinculación; conversiones quedan pendientes. Destinos es catálogo de dominio, no un almacén alternativo de settings. Ver `modulos/ordenes-de-compra-implementacion.md`.

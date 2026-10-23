@@ -177,3 +177,10 @@ Esquema SQL completo y límites MySQL para los campos; versión de mantenimiento
 ## Inicio conectado a módulos
 
 Comprobar cifras reales de Procesos y Cotizaciones, selección de área, rangos en Honduras, importes decimales exactos, exclusión de procesos vencidos, ausencia de solicitudes sin permiso, bloqueo del módulo desactivado, cero frente a error parcial y uso en celular. Casos completos en [16-dashboard-modulos.md](16-dashboard-modulos.md).
+
+## Órdenes de compra: corte inicial
+
+- Listar/filtrar y crear/editar cabecera, cliente manual, productos y gastos con el cálculo del servidor; costo y venta respetan los nombres invertidos del Legacy. Estado derivado de factura y productos, sin transiciones inventadas.
+- Agregar/renombrar destinos desde Ajustes con su permiso independiente; unicidad, versión, existencia del destino y bloqueo cuando catálogo vacío. No hay borrado de destinos.
+- Verificar activación/allowlist/migración, sesión/CSRF, permisos, alta idempotente, ETag/If-Match y auditoría transaccional. UI conserva cambios ante errores/conflictos y reutiliza el alta ambigua.
+- Quedan pendientes la ejecución de integración MySQL 5.7 en CI, documentos, proveedores, clonación, borrado, conversiones, integración con Clientes y MCP; no declarar terminada la paridad ni desplegado este corte. Ver `modulos/ordenes-de-compra-implementacion.md`.

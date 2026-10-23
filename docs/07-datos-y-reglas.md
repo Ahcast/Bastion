@@ -62,3 +62,7 @@ Antes de migrar: inventario y exportación de esquema, conteos, perfiles de dato
 ## Pendientes
 
 Esquema completo MySQL, versión de mantenimiento exacta de Bluehost, estados válidos, reglas fiscales actualizadas, fórmulas exactas/redondeo, integridad de conversiones, CSVs de ejemplo anonimizados y retención de registros de negocio que requiera una regla específica por módulo. MySQL 5.7 entró en Sustaining Support de Oracle en 2023; revisar con Bluehost la actualización soportada antes de producción.
+
+## Órdenes: precisión y catálogo nuevo
+
+El corte local conserva `sale_price` como costo y `purchase_price` como venta, según el controlador Legacy. Usa enteros escalados para agregar bases antes de redondear; ISV 15%, gastos a centavos e inversión/total persistidos atómicamente. No presupone validación contable ni IDs Legacy. Destinos tiene identificadores nuevos y pertenece a Órdenes por confirmación del usuario del 2026-10-23; no se importa catálogo real. Ver `modulos/ordenes-de-compra-implementacion.md`.

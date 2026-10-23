@@ -13,10 +13,11 @@ const ProcessSettings = lazy(() => import('./ProcessSettings.js'));
 export function SettingsNavigation({ access, section, select }: { access: Access; section: SettingsSection; select: (section: SettingsSection) => void }) {
   return <nav className="settings-navigation" aria-label="Secciones de Ajustes">{settingsSections(access).map(entry => <button key={entry.id} aria-current={section === entry.id ? 'page' : undefined} onClick={() => select(entry.id)}>{entry.label}</button>)}</nav>;
 }
+const OrderSettings = lazy(() => import('./OrdenesCompra.js').then(module => ({ default: module.OrderSettings })));
 export default function Settings({ section, select }: { section: SettingsSection; select: (section: SettingsSection) => void }) {
   const { access } = useCore();
   const selected = settingsSections(access).find(entry => entry.id === section) ?? { id: 'cuenta', label: 'Mi cuenta' };
-  return <section aria-label="Ajustes"><div className="settings-location"><span>Ajustes</span><span aria-hidden="true"> / </span><strong>{selected.label}</strong></div><SettingsNavigation access={access} section={selected.id} select={select} /><div key={selected.id}><Suspense fallback={<Loading />}>{selected.id === 'personas' ? <People /> : selected.id === 'usuarios' ? <Users /> : selected.id === 'roles' ? <Roles /> : selected.id === 'core' ? <CoreSettings /> : selected.id === 'clientes' ? <ClientSettings /> : selected.id === 'cotizaciones' ? <QuoteSettings /> : selected.id === 'procesos' ? <ProcessSettings /> : <Account />}</Suspense></div></section>;
+  return <section aria-label="Ajustes"><div className="settings-location"><span>Ajustes</span><span aria-hidden="true"> / </span><strong>{selected.label}</strong></div><SettingsNavigation access={access} section={selected.id} select={select} /><div key={selected.id}><Suspense fallback={<Loading />}>{selected.id === 'personas' ? <People /> : selected.id === 'usuarios' ? <Users /> : selected.id === 'roles' ? <Roles /> : selected.id === 'core' ? <CoreSettings /> : selected.id === 'clientes' ? <ClientSettings /> : selected.id === 'ordenes_compra' ? <OrderSettings /> : selected.id === 'cotizaciones' ? <QuoteSettings /> : selected.id === 'procesos' ? <ProcessSettings /> : <Account />}</Suspense></div></section>;
 }
 function CoreSettings() {
   const [tab, setTab] = useState('modules');

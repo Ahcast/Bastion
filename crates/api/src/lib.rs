@@ -31,6 +31,7 @@ use url::Url;
 
 mod clientes;
 mod cotizaciones;
+mod ordenes_compra;
 mod procesos;
 
 const GENERAL_REQUEST_BODY_LIMIT: usize = 1024 * 1024;
@@ -41,6 +42,7 @@ struct ApiState {
     procesos: bastion_procesos::ProcessService,
     cotizaciones: bastion_cotizaciones::QuoteService,
     clientes: bastion_clientes::ClientService,
+    ordenes_compra: bastion_ordenes_compra::OrderService,
     procesos_jobs: std::sync::Arc<tokio::sync::Semaphore>,
     scout_csv_path: std::path::PathBuf,
 }
@@ -264,6 +266,7 @@ pub fn router(
         procesos: bastion_procesos::ProcessService::new(core.database(), core.admin()),
         cotizaciones: bastion_cotizaciones::QuoteService::new(core.database(), core.admin()),
         clientes: bastion_clientes::ClientService::new(core.database(), core.admin()),
+        ordenes_compra: bastion_ordenes_compra::OrderService::new(core.database(), core.admin()),
         procesos_jobs: std::sync::Arc::new(tokio::sync::Semaphore::new(1)),
         scout_csv_path,
     };
@@ -358,6 +361,7 @@ pub fn router(
         .merge(procesos::routes(api_state.clone()))
         .merge(cotizaciones::routes(api_state.clone()))
         .merge(clientes::routes(api_state.clone()))
+        .merge(ordenes_compra::routes(api_state.clone()))
         .fallback(not_found)
         .with_state(api_state)
         .layer(middleware::from_fn(problem_details))

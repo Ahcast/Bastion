@@ -53,3 +53,7 @@ SMTP usa configuración global autorizada y credenciales personales cifradas. TL
 ## Estado y verificaciones pendientes
 
 El ambiente de pruebas tiene frontend, backend HTTPS y conectividad MySQL TLS comprobados. Esto no constituye aprobación de producción ni cierra los criterios funcionales. Faltan pruebas integrales con usuarios, funciones pendientes del Core, configuración y validación de Cloudflare, privilegios mínimos de MySQL, separación de ambientes, almacenamiento privado, restauraciones, observabilidad, límites y objetivos operativos. Mantener cada pendiente explícito y no crear datos o estadísticas ficticias para aparentar implementación.
+
+## Órdenes de compra: incorporación pendiente
+
+El corte local incorpora migraciones propias con `migrate` y sincroniza disponibilidad al arrancar, sin DDL en `serve`. Requiere `ordenes_compra` en `BASTION_ALLOWED_MODULES`, migraciones exactas y habilitación administrativa; destinos se carga explícitamente desde Ajustes. CI prepara bases MySQL 5.7 aisladas para servicio/HTTP. Este cambio no ejecuta migraciones remotas ni instala artifacts; conserva Bluehost/AWS/MySQL. Ver `modulos/ordenes-de-compra-implementacion.md`.

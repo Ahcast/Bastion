@@ -1,0 +1,7 @@
+.order-filters{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,200px),1fr));gap:16px;margin-bottom:20px}
+.order-filters .actions{grid-column:1/-1;flex-wrap:wrap}
+.order-editor input,.order-editor textarea,.order-editor select,.order-filters input,.order-filters select{min-width:0}
+.order-tax{display:flex;align-items:center;gap:8px}.order-tax input{width:auto}
+.order-focus-heading{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+.order-totals dt,.order-totals dd{min-width:0;overflow-wrap:anywhere}
+@media(max-width:390px){.order-totals dl>div{flex-wrap:wrap;gap:4px 12px}.order-totals dd{margin-left:auto;text-align:right}}

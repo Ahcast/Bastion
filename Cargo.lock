@@ -184,6 +184,7 @@ dependencies = [
  "bastion-clientes",
  "bastion-core",
  "bastion-cotizaciones",
+ "bastion-ordenes-compra",
  "bastion-procesos",
  "chrono",
  "ipnet",
@@ -260,6 +261,19 @@ name = "bastion-mcp"
 version = "0.1.0"
 
 [[package]]
+name = "bastion-ordenes-compra"
+version = "0.1.0"
+dependencies = [
+ "bastion-core",
+ "chrono",
+ "serde",
+ "serde_json",
+ "sha2 0.10.9",
+ "sqlx",
+ "tokio",
+]
+
+[[package]]
 name = "bastion-procesos"
 version = "0.1.0"
 dependencies = [
@@ -286,6 +300,7 @@ dependencies = [
  "bastion-clientes",
  "bastion-core",
  "bastion-cotizaciones",
+ "bastion-ordenes-compra",
  "bastion-procesos",
  "dotenvy",
  "tokio",

@@ -2,6 +2,8 @@
 
 ## Estado de esta entrega
 
+Órdenes de compra incorpora un primer corte local: listado/filtros, detalle, alta/edición, productos, gastos, cálculo Rust y catálogo de destinos bajo Ajustes (confirmado por el usuario). Integra permisos, auditoría, versiones e idempotencia del Core y nace desactivado. Adjuntos, proveedores, conversiones, clonación y borrado siguen pendientes. Ver [alcance, contrato y verificación](docs/modulos/ordenes-de-compra-implementacion.md). No se ha desplegado.
+
 Clientes incorpora búsqueda, paginación, alta con coincidencias por nombre/RTN, edición con versión y catálogo paginado. Integra permisos, activación y auditoría del Core. Por confirmación del usuario, se publica sin ajustes editables; la sección en Ajustes indica su definición pendiente. Catálogo nuevo de Bastion, sin migración automática del Legacy. Ver [contrato y límites](docs/modulos/clientes-implementacion.md).
 
 Cotizaciones está en desarrollo local: listado, editor, numeración, vigencia, estados y cálculo decimal en Rust cotejado con la copia Legacy, con vista previa y control de versión. Se integra al registro del Core y permanece desactivado por defecto. La validación contable, catálogo Clientes, PDF, adjuntos, correo y conversiones requieren las siguientes etapas; ver [alcance del corte](docs/modulos/cotizaciones-implementacion.md). El corte técnico se publicó en el ambiente de pruebas; Cotizaciones queda disponible en Ajustes > Core > Módulos y sin activar. No se presenta como módulo terminado ni aprobado para producción.

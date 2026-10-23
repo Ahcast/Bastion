@@ -1,0 +1,136 @@
+openapi: 3.1.0
+info:
+  title: Bastion Órdenes de compra
+  version: 0.1.0
+  description: Primer corte local. Órdenes compartidas entre usuarios autorizados, cliente manual y destinos administrados en Ajustes. Sesión, CSRF y origen del Core; 120 solicitudes/minuto/actor, cuerpo 1 MiB, plazo 30 segundos. Sin adjuntos, proveedores, conversiones, clonación, borrado ni MCP.
+security:
+  - session: []
+paths:
+  /api/v1/ordenes-compra:
+    get:
+      summary: Listar con ordenes_compra/documentos/ver
+      parameters:
+        - {name: search, in: query, schema: {type: string, maxLength: 200}}
+        - {name: status, in: query, schema: {enum: [Pendiente, Listo, Entregado]}}
+        - {name: min_total, in: query, schema: {$ref: '#/components/schemas/Money'}}
+        - {name: max_total, in: query, schema: {$ref: '#/components/schemas/Money'}}
+        - {name: page, in: query, schema: {type: integer, minimum: 1, maximum: 10000}}
+        - {name: page_size, in: query, schema: {type: integer, minimum: 1, maximum: 100}}
+      responses:
+        '200': {description: 'items (id, version, n_orders, n_bill, client_name, order_date, status, total), page, page_size, has_more'}
+    post:
+      summary: Crear con ordenes_compra/documentos/editar
+      description: Idempotency-Key de 16–128 caracteres ASCII alfanuméricos o guion/guion bajo, por actor y contenido normalizado; conserva recibo original, conflicto de contenido 409. Destino debe existir. Sin alta implícita en Clientes.
+      parameters:
+        - {name: Idempotency-Key, in: header, required: true, schema: {type: string, minLength: 16, maxLength: 128}}
+      requestBody: {$ref: '#/components/requestBodies/Order'}
+      responses:
+        '201': {description: 'Orden con id, version, currency HNL, status derivado, data y calculation; ETag y Location'}
+        '409': {description: Clave reutilizada con contenido distinto}
+  /api/v1/ordenes-compra/calculate:
+    post:
+      summary: Calcular con ordenes_compra/documentos/editar
+      description: No persiste ni exige completar cabecera. Misma normalización y cálculo que guardar.
+      requestBody: {$ref: '#/components/requestBodies/Order'}
+      responses:
+        '200': {description: 'data, status y totals (subtotal, subtotal_exonerado, tax, total, products_investment, other_expenses, investment_total, profit), importes como cadenas con dos decimales'}
+  /api/v1/ordenes-compra/{id}:
+    parameters:
+      - {name: id, in: path, required: true, schema: {type: integer, minimum: 1}}
+    get:
+      summary: Consultar con ordenes_compra/documentos/ver
+      responses:
+        '200': {description: Orden y ETag fuerte}
+    put:
+      summary: Reemplazar con ordenes_compra/documentos/editar
+      parameters:
+        - {$ref: '#/components/parameters/Version'}
+      requestBody: {$ref: '#/components/requestBodies/Order'}
+      responses:
+        '200': {description: Orden con versión incrementada y ETag}
+        '412': {description: Versión obsoleta; no se modifica el registro}
+  /api/v1/ordenes-compra/destinations:
+    get:
+      summary: Catálogo con documentos/ver o destinos/ver
+      responses:
+        '200': {description: 'Array de id, version, destination; hasta 1000 destinos, ordenado por nombre'}
+    post:
+      summary: Alta bajo Ajustes con ordenes_compra/destinos/editar
+      description: Nombre normalizado, único; máximo 1000 destinos. Idempotente por nombre normalizado, no crea duplicados al reintentar.
+      requestBody: {$ref: '#/components/requestBodies/Destination'}
+      responses:
+        '200': {description: Destino existente o nuevo y ETag}
+  /api/v1/ordenes-compra/destinations/{id}:
+    parameters:
+      - {name: id, in: path, required: true, schema: {type: integer, minimum: 1}}
+    put:
+      summary: Renombrar con ordenes_compra/destinos/editar
+      parameters:
+        - {$ref: '#/components/parameters/Version'}
+      requestBody: {$ref: '#/components/requestBodies/Destination'}
+      responses:
+        '200': {description: Destino con nueva versión y ETag}
+        '409': {description: Nombre ya usado}
+        '412': {description: Versión obsoleta}
+components:
+  securitySchemes:
+    session: {type: apiKey, in: cookie, name: __Host-bastion_session}
+  parameters:
+    Version: {name: If-Match, in: header, required: true, schema: {type: string, pattern: '^"[1-9][0-9]*"$'}}
+  requestBodies:
+    Order:
+      required: true
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/OrderInput'}
+    Destination:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: false
+            required: [destination]
+            properties:
+              destination: {type: string, minLength: 1, maxLength: 255}
+  schemas:
+    Money: {type: string, pattern: '^[0-9]{1,12}(\.[0-9]{1,4})?$'}
+    OrderInput:
+      type: object
+      additionalProperties: false
+      required: [n_orders, n_bill, order_date, received_date, client_name, client_rtn, id_destination, comments, products, expenses]
+      properties:
+        n_orders: {type: string, maxLength: 50}
+        n_bill: {type: string, maxLength: 120}
+        order_date: {type: string, format: date}
+        received_date: {type: [string, 'null'], format: date}
+        client_name: {type: string, maxLength: 255}
+        client_rtn: {type: string, maxLength: 30}
+        id_destination: {type: [integer, 'null'], minimum: 1}
+        comments: {type: string, maxLength: 3000}
+        products:
+          type: array
+          maxItems: 200
+          items:
+            type: object
+            additionalProperties: false
+            required: [description, cantidad, sale_price, purchase_price, tracking, isv, status, coments]
+            properties:
+              description: {type: string, maxLength: 2000}
+              cantidad: {type: integer, minimum: 0, maximum: 1000000}
+              sale_price: {$ref: '#/components/schemas/Money'}
+              purchase_price: {$ref: '#/components/schemas/Money'}
+              tracking: {type: string, maxLength: 255}
+              isv: {type: boolean}
+              status: {enum: [Pendiente, Comprado]}
+              coments: {type: string, maxLength: 1000}
+        expenses:
+          type: array
+          maxItems: 200
+          items:
+            type: object
+            additionalProperties: false
+            required: [description, amount]
+            properties:
+              description: {type: string, maxLength: 255}
+              amount: {$ref: '#/components/schemas/Money'}
