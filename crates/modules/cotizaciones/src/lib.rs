@@ -65,7 +65,13 @@ pub struct QuoteItem {
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct QuoteInput {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub id_client: Option<u64>,
     pub client_name: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub client_rtn: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub client_email: String,
     pub order_number: String,
     pub quote_date: NaiveDate,
     pub valid_days: u16,
@@ -91,6 +97,9 @@ pub struct QuoteInput {
 impl QuoteInput {
     pub fn validate(&self) -> Result<(), CoreError> {
         if self.client_name.chars().count() > 255
+            || self.id_client == Some(0)
+            || self.client_rtn.chars().count() > 30
+            || self.client_email.chars().count() > 254
             || self.order_number.chars().count() > 100
             || self.contact_email.chars().count() > 254
             || self.prepared_by_name.chars().count() > 250
@@ -243,6 +252,19 @@ mod tests {
         let input = serde_json::json!({"client_name":"", "order_number":"", "quote_date":"2026-10-22", "valid_days":15, "contact_email":"", "prepared_by_name":"", "notes":"", "terms":"", "discount_type":"amount", "discount_value":"0", "items":[]});
         let parsed: QuoteInput = serde_json::from_value(input.clone()).unwrap();
         assert!(parsed.validate().is_ok());
+        assert_eq!(parsed.id_client, None);
+        assert!(parsed.client_rtn.is_empty());
+        assert!(parsed.client_email.is_empty());
+        let serialized = serde_json::to_value(&parsed).unwrap();
+        for field in ["id_client", "client_rtn", "client_email"] {
+            assert!(
+                serialized.get(field).is_none(),
+                "Preserve pre-catalog request hashes"
+            );
+        }
+        let mut invalid_client = parsed.clone();
+        invalid_client.id_client = Some(0);
+        assert!(invalid_client.validate().is_err());
         for status in ["Borrador", "Enviada", "Aprobada", "Rechazada", "Convertido"] {
             let mut value = input.clone();
             value["status"] = serde_json::json!(status);
@@ -251,7 +273,7 @@ mod tests {
         let mut invalid_status = input.clone();
         invalid_status["status"] = serde_json::json!("Pagada");
         assert!(serde_json::from_value::<QuoteInput>(invalid_status).is_err());
-        for field in ["total", "quote_number", "id_client"] {
+        for field in ["total", "quote_number", "unknown_client_field"] {
             let mut value = input.clone();
             value[field] = serde_json::json!("untrusted");
             assert!(serde_json::from_value::<QuoteInput>(value).is_err());

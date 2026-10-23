@@ -3,6 +3,7 @@ import { ApiError, message } from '../api.js';
 import { Dialog, Heading, Loading, Notice, Table, useCore, useLoad } from '../ui.js';
 import { QuoteActions } from '../components/QuoteActions.js';
 import { QuoteEmailComposer } from '../components/QuoteEmailComposer.js';
+import { QuoteClientPicker } from '../components/QuoteClientPicker.js';
 import { downloadPdf } from '../quoteDocuments.js';
 import type { DocumentReadiness, QuotePdf } from '../quoteDocuments.js';
 import { moduleCan } from '../types.js';
@@ -78,7 +79,7 @@ function Workspace() {
 }
 
 function Editor({ initial, editable, edit, close }: { initial: QuoteDraft | null; editable: boolean; edit?: () => void; close: () => void }) {
-  const { api, notify } = useCore();
+  const { api, access, notify } = useCore();
   const [saved, setSaved] = useState(initial), [data, setData] = useState<QuoteInput>(() => initial?.data ?? newQuote()), [busy, setBusy] = useState(false), [error, setError] = useState(''), [dirty, setDirty] = useState(false), [conflict, setConflict] = useState(false);
   const [preview, setPreview] = useState<{ input: QuoteInput; value: QuoteCalculation } | null>(null), [calculationError, setCalculationError] = useState('');
   useEffect(() => {
@@ -115,7 +116,9 @@ function Editor({ initial, editable, edit, close }: { initial: QuoteDraft | null
       finally { setBusy(false); }
     }}>
       <fieldset disabled={busy || !editable || conflict} className="form-fields quote-form"><legend>Datos de cotización</legend><div className="quote-fields">
-        <label>Cliente (manual)<input maxLength={255} value={data.client_name} onChange={e => change('client_name', e.target.value)} /></label>
+        <div>{editable && moduleCan(access, 'clientes', 'catalogo', 'ver') ? <QuoteClientPicker selected={data.id_client ? { id: data.id_client, cliente_name: data.client_name, rtn: data.client_rtn ?? '', email: data.client_email ?? '' } : null} change={client => { setData(previous => ({ ...previous, id_client: client?.id ?? null, client_name: client?.cliente_name ?? previous.client_name, client_rtn: client?.rtn ?? '', client_email: client?.email ?? '' })); setDirty(true); }} /> : editable && <p className="muted">El catálogo requiere el módulo Clientes habilitado y permiso para verlo.</p>}
+        <label>{data.id_client ? 'Cliente seleccionado' : 'Cliente (manual)'}<input maxLength={255} readOnly={Boolean(data.id_client)} value={data.client_name} onChange={e => change('client_name', e.target.value)} /></label>
+        {data.id_client && <><p className="muted">{data.client_rtn && `RTN: ${data.client_rtn} · `}{data.client_email || 'Sin correo registrado'}</p>{editable && !moduleCan(access, 'clientes', 'catalogo', 'ver') && <button type="button" onClick={() => { setData(previous => ({ ...previous, id_client: null, client_rtn: '', client_email: '' })); setDirty(true); }}>Usar cliente manual</button>}</>}</div>
         <label>Referencia de orden<input maxLength={100} value={data.order_number} onChange={e => change('order_number', e.target.value)} /></label>
         <label>Fecha<input type="date" min="1000-01-01" max="9999-12-31" required value={data.quote_date} onChange={e => change('quote_date', e.target.value)} /></label>
         <label>Vigencia (días)<input type="number" min={0} max={3650} required value={data.valid_days} onChange={e => change('valid_days', Number(e.target.value))} /></label>

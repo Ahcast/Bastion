@@ -4,7 +4,15 @@ Fecha: 2026-10-22. Estado: primer corte publicado en el ambiente de pruebas; mó
 
 ## Ampliación de acciones publicada
 
-Se incorpora el menú solicitado y sus comandos, PDF Typst y correo en cola/programado. Ver [contrato, límites y pendientes](cotizaciones-acciones.md). Las conversiones permanecen visibles y deshabilitadas por decisión del usuario. Esta ampliación pasó CI y se publicó desde `8576ffc`; se conservaron datos y activación. PDF/correo permanecen deshabilitados por ambiente mientras el usuario configura S3 y hasta verificar Empresa/SMTP. La sección de publicación al final describe el corte anterior; la evidencia de esta ampliación está en cotizaciones-acciones.md.
+Se incorpora el menú solicitado y sus comandos, PDF Typst y correo en cola/programado. Ver [contrato, límites y pendientes](cotizaciones-acciones.md). Las conversiones permanecen visibles y deshabilitadas por decisión del usuario. Esta ampliación pasó CI y se publicó desde `8576ffc`; se conservaron datos y activación. Los documentos se activaron después de verificar S3 con la identidad del servicio. La sección de publicación al final describe el corte anterior; la evidencia de esta ampliación está en cotizaciones-acciones.md.
+
+## Selección de Clientes — 2026-10-23
+
+Se corrige el editor que solo ofrecía entrada manual. Al crear o editar, con Clientes habilitado y permiso `clientes/catalogo/ver`, se consulta su catálogo paginado y se permite buscar por nombre, RTN o correo. Cambiar de página o buscar conserva el cliente seleccionado; Enter en la búsqueda no guarda la cotización. El catálogo vacío o un error no descartan el formulario y permiten continuar con cliente manual. Ver una cotización no consulta el catálogo.
+
+`id_client` opcional vincula el cliente de Bastion; los documentos anteriores sin este campo siguen siendo manuales. Al seleccionar otro cliente, el servicio de Clientes comprueba permiso, habilitación y existencia dentro de la transacción de Cotizaciones, y aporta nombre, RTN y correo; no se confía en copias enviadas por el navegador. La relación y esos datos quedan en el JSON del documento, sin nueva migración. El RTN se incorpora al PDF y el correo se propone en Para, que sigue siendo editable. Clonar limpia la relación y sus datos; volver a manual limpia RTN y correo asociados.
+
+Adaptación explícita respecto a Legacy: se conserva la instantánea de nombre/RTN/correo al guardar y al editar otros campos de la misma cotización; una edición posterior en Clientes no altera un PDF o correo ya preparado. Reemplazar el cliente requiere acceso al catálogo; consultar y editar otros campos de una cotización existente conserva su instantánea incluso si Clientes se desactiva. No se importan identificadores del sistema anterior ni se modifican sus registros.
 
 ## Alcance implementado
 
@@ -40,7 +48,7 @@ Queda pendiente reconciliar los casos límite de redondeo con ejemplos contables
 
 El contador nuevo empieza en cero y no implica continuidad con producción. Antes de migrar cotizaciones del Legacy se deben reconciliar números, referencias, importes, contactos y archivos. Este corte no migra datos.
 
-Pendientes: catálogo Clientes, PDF/Typst y plantilla, adjuntos privados, correo inmediato/programado, clonación, eliminación confirmada, conversiones, acciones masivas y MCP. La ampliación de acciones actualiza este alcance: conversiones visibles y deshabilitadas por acuerdo; PDF y correo requieren su configuración efectiva. Los demás pendientes se detallan en cotizaciones-acciones.md. Los settings propios siguen pendientes y Ajustes lo indica.
+Pendientes: adjuntos adicionales, conversiones, acciones masivas, MCP y reconciliación contable. Catálogo Clientes, PDF, correo, clonación y eliminación confirmada cuentan con implementación; sus condiciones y límites se detallan arriba y en cotizaciones-acciones.md. Los settings propios siguen pendientes y Ajustes lo indica.
 
 El usuario autorizó la publicación en GitHub y AWS. El corte técnico se desplegó con respaldo previo; esto no lo convierte en módulo terminado ni en aprobación de producción.
 

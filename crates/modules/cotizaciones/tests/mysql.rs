@@ -7,7 +7,10 @@ use sqlx::mysql::MySqlPoolOptions;
 
 fn input() -> QuoteInput {
     QuoteInput {
+        id_client: None,
         client_name: "Cliente sintético".into(),
+        client_rtn: String::new(),
+        client_email: String::new(),
         order_number: "ORD-PRUEBA".into(),
         quote_date: "2026-10-22".parse().unwrap(),
         valid_days: 30,
@@ -58,7 +61,7 @@ async fn mysql57_drafts_permissions_idempotency_versions_and_disable() {
         .unwrap();
     sqlx::query("INSERT INTO users (id,person_id,role_id,email,status) VALUES (1,1,1,'admin@example.test','active'),(2,2,2,'viewer@example.test','active')").execute(&pool).await.unwrap();
     let core = CoreService::new(database.clone(), "x".repeat(32), [1; 32]).unwrap();
-    let service = QuoteService::new(database, core.admin());
+    let service = QuoteService::new(database.clone(), core.admin());
     service.synchronize_release(true).await.unwrap();
     assert!(matches!(
         service.list(1, &QuoteFilter::default()).await,
@@ -336,9 +339,120 @@ async fn mysql57_drafts_permissions_idempotency_versions_and_disable() {
         .set_module_enabled(1, "cotizaciones", true)
         .await
         .unwrap();
+    verify_client_selection(&core, &database, &service).await;
     service.synchronize_release(false).await.unwrap();
     assert!(matches!(
         service.detail(1, one.id).await,
         Err(CoreError::NotFound)
     ));
+}
+
+async fn verify_client_selection(core: &CoreService, database: &Database, quotes: &QuoteService) {
+    use bastion_clientes::{ClientInput, ClientService};
+    ClientService::migrate(database).await.unwrap();
+    let clients = ClientService::new(database.clone(), core.admin());
+    clients.synchronize_release(true).await.unwrap();
+    core.admin()
+        .set_module_enabled(1, "clientes", true)
+        .await
+        .unwrap();
+    let client = clients
+        .create(
+            1,
+            "synthetic-client-link-01",
+            ClientInput {
+                cliente_name: "Cliente de catálogo".into(),
+                rtn: "08011900000000".into(),
+                email: "catalog@example.test".into(),
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap()
+        .client;
+    let mut request = input();
+    request.id_client = Some(client.id);
+    request.client_name = "Nombre falsificado".into();
+    request.client_rtn = "falso".into();
+    request.client_email = "forged@example.test".into();
+    let created = quotes
+        .create(1, "synthetic-selected-quote-01", request.clone())
+        .await
+        .unwrap();
+    assert_eq!(created.data.id_client, Some(client.id));
+    assert_eq!(created.data.client_name, client.data.cliente_name);
+    assert_eq!(created.data.client_rtn, client.data.rtn);
+    assert_eq!(created.data.client_email, client.data.email);
+    assert_eq!(created.calculation.data.client_rtn, client.data.rtn);
+    let mut changed_client = client.data.clone();
+    changed_client.email = "updated@example.test".into();
+    clients
+        .replace(1, client.id, client.version, changed_client)
+        .await
+        .unwrap();
+    let replay = quotes
+        .create(1, "synthetic-selected-quote-01", request.clone())
+        .await
+        .unwrap();
+    assert_eq!(replay.id, created.id);
+    assert_eq!(replay.data.client_email, "catalog@example.test");
+    let mut invalid = request.clone();
+    invalid.id_client = Some(u64::MAX);
+    assert!(matches!(
+        quotes
+            .create(1, "synthetic-missing-client-01", invalid)
+            .await,
+        Err(CoreError::NotFound)
+    ));
+    sqlx::query("INSERT INTO role_permissions (role_id,module_id,scope_hash,scope_key,capability) VALUES (2,'cotizaciones',UNHEX(SHA2('documentos',256)),'documentos','editar')").execute(database.pool()).await.unwrap();
+    assert!(matches!(
+        quotes
+            .create(2, "synthetic-denied-client-01", request.clone())
+            .await,
+        Err(CoreError::Forbidden)
+    ));
+    sqlx::query("INSERT INTO role_permissions (role_id,module_id,scope_hash,scope_key,capability) VALUES (2,'clientes',UNHEX(SHA2('catalogo',256)),'catalogo','ver')").execute(database.pool()).await.unwrap();
+    let permitted = quotes
+        .create(2, "synthetic-allowed-client-01", request.clone())
+        .await
+        .unwrap();
+    assert_eq!(permitted.data.client_email, "updated@example.test");
+    core.admin()
+        .set_module_enabled(1, "clientes", false)
+        .await
+        .unwrap();
+    assert!(matches!(
+        quotes
+            .create(1, "synthetic-disabled-client-01", request.clone())
+            .await,
+        Err(CoreError::NotFound)
+    ));
+    request.notes = "Editar sin reemplazar cliente".into();
+    let edited = quotes
+        .replace(1, created.id, created.version, request.clone())
+        .await
+        .unwrap();
+    assert_eq!(edited.data.client_name, "Cliente de catálogo");
+    assert_eq!(edited.data.client_email, "catalog@example.test");
+    assert_eq!(
+        quotes.detail(1, created.id).await.unwrap().data.id_client,
+        Some(client.id)
+    );
+    let cloned = quotes
+        .clone_quote(1, edited.id, edited.version, "synthetic-client-clone-01")
+        .await
+        .unwrap();
+    assert_eq!(cloned.data.id_client, None);
+    assert!(cloned.data.client_name.is_empty());
+    assert!(cloned.data.client_rtn.is_empty());
+    assert!(cloned.data.client_email.is_empty());
+    request.id_client = None;
+    request.client_name = "Cliente manual".into();
+    let manual = quotes
+        .replace(1, edited.id, edited.version, request)
+        .await
+        .unwrap();
+    assert_eq!(manual.data.client_name, "Cliente manual");
+    assert!(manual.data.client_rtn.is_empty());
+    assert!(manual.data.client_email.is_empty());
 }

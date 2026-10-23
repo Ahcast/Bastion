@@ -18,7 +18,7 @@ export function QuoteEmailComposer({ summary, close, sent }: { summary: QuoteSum
 function Composer({ initial, pdf, sent, submitting }: { initial: QuoteDraft; pdf: QuotePdf; sent: () => void; submitting: (value: boolean) => void }) {
   const { api, notify } = useCore();
   const process = initial.data.order_number || initial.quote_number || '';
-  const [fields, setFields] = useState({ to: '', cc: '', bcc: '', subject: `Cotización ${process}`, message: `Estimados ${initial.data.client_name || 'Cliente'}\n\nAdjunto la cotización correspondiente al proceso ${process}`, scheduled: '' });
+  const [fields, setFields] = useState({ to: initial.data.client_email ?? '', cc: '', bcc: '', subject: `Cotización ${process}`, message: `Estimados ${initial.data.client_name || 'Cliente'}\n\nAdjunto la cotización correspondiente al proceso ${process}`, scheduled: '' });
   const [busy, setBusy] = useState(false), [error, setError] = useState(''), [job, setJob] = useState<QuoteEmailJob | null>(null), [conflict, setConflict] = useState(false);
   const attempt = useRef<{ body: string; key: string } | null>(null);
   useEffect(() => {

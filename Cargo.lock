@@ -243,6 +243,7 @@ name = "bastion-cotizaciones"
 version = "0.1.0"
 dependencies = [
  "base64 0.22.1",
+ "bastion-clientes",
  "bastion-core",
  "chrono",
  "hex",

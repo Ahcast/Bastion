@@ -6,6 +6,7 @@
 .quote-item{padding:18px;border:1px solid var(--line);display:grid;gap:16px;min-width:0}
 .quote-item legend,.quote-form>legend{padding:0 8px;font-weight:600}
 .quote-form select,.quote-form input,.quote-form textarea{width:100%}
+.quote-client{min-width:0}.quote-client .row{flex-wrap:wrap;align-items:end}.quote-client .row label{flex:1;min-width:150px}.quote-client select{max-width:100%}
 @media(max-width:700px){.quote-fields{grid-template-columns:1fr}.quote-form{padding:14px}.quote-search{align-items:stretch;flex-direction:column}}
 
 .quote-totals{margin-top:24px}.quote-totals dl{margin:0}.quote-totals dl>div{display:flex;justify-content:space-between;gap:20px;border-bottom:1px solid var(--line);padding:9px 0}.quote-totals dd{font-family:var(--mono);margin:0}.quote-totals dl>div:last-child{font-weight:600;border-bottom:0;border-top:2px solid var(--ink);font-size:18px}

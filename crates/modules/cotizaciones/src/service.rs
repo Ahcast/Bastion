@@ -153,6 +153,35 @@ impl QuoteService {
         Ok(result)
     }
 
+    async fn resolve_client(
+        &self,
+        tx: &mut Transaction<'_, MySql>,
+        actor: u64,
+        input: &mut QuoteInput,
+        current: Option<&QuoteInput>,
+    ) -> Result<(), CoreError> {
+        if let Some(id) = input.id_client {
+            if let Some(previous) = current.filter(|previous| previous.id_client == Some(id)) {
+                // Retain the saved document identity when only other fields change.
+                input.client_name.clone_from(&previous.client_name);
+                input.client_rtn.clone_from(&previous.client_rtn);
+                input.client_email.clone_from(&previous.client_email);
+            } else {
+                let client =
+                    bastion_clientes::ClientService::new(self.database.clone(), self.admin.clone())
+                        .document_snapshot(actor, id, tx)
+                        .await?;
+                input.client_name = client.cliente_name;
+                input.client_rtn = client.rtn;
+                input.client_email = client.email;
+            }
+        } else {
+            input.client_rtn.clear();
+            input.client_email.clear();
+        }
+        Ok(())
+    }
+
     pub async fn create(
         &self,
         actor: u64,
@@ -184,6 +213,8 @@ impl QuoteService {
             return Ok(result);
         }
         let mut input = input;
+        self.resolve_client(&mut tx, actor, &mut input, None)
+            .await?;
         input.prepared_by_name = name;
         input.contact_email = email;
         let calculation = calculate(&input)?;
@@ -234,6 +265,8 @@ impl QuoteService {
         }
         let version = expected.checked_add(1).ok_or(CoreError::Invalid)?;
         let mut input = input;
+        self.resolve_client(&mut tx, actor, &mut input, Some(&current.data))
+            .await?;
         input.prepared_by_name = current.data.prepared_by_name;
         input.contact_email = current.data.contact_email;
         let calculation = calculate(&input)?;
@@ -331,7 +364,10 @@ impl QuoteService {
             return Err(CoreError::PreconditionFailed);
         }
         let mut input = original.data;
+        input.id_client = None;
         input.client_name.clear();
+        input.client_rtn.clear();
+        input.client_email.clear();
         input.prepared_by_name = name;
         input.contact_email = email;
         input.status = QuoteStatus::Borrador;

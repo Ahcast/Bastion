@@ -137,6 +137,31 @@ impl ClientService {
         Ok(client)
     }
 
+    /// Resolve a document selection inside the caller's transaction, keeping
+    /// catalog authorization and SQL ownership in Clientes.
+    pub async fn document_snapshot(
+        &self,
+        actor: u64,
+        id: u64,
+        tx: &mut Transaction<'_, MySql>,
+    ) -> Result<CatalogClient, CoreError> {
+        self.admin
+            .authorize(actor, "clientes", "catalogo", "ver")
+            .await?;
+        let enabled: Option<bool> = sqlx::query_scalar("SELECT (included_in_release AND environment_allowed AND enabled) FROM module_registry WHERE module_id='clientes' FOR UPDATE")
+            .fetch_optional(&mut **tx).await?;
+        if enabled != Some(true) {
+            return Err(CoreError::NotFound);
+        }
+        let client = load(tx, id).await?;
+        Ok(CatalogClient {
+            id: client.id,
+            cliente_name: client.data.cliente_name,
+            rtn: client.data.rtn,
+            email: client.data.email,
+        })
+    }
+
     pub async fn create(
         &self,
         actor: u64,

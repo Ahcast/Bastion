@@ -4,6 +4,7 @@ version.workspace = true
 edition.workspace = true
 
 [dependencies]
+bastion-clientes = { path = "../clientes" }
 bastion-core = { path = "../../core" }
 base64.workspace = true
 hex.workspace = true

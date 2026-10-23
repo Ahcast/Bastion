@@ -152,7 +152,7 @@ fn pdf_payload(
 ) -> Result<serde_json::Value, CoreError> {
     let items=quote.data.items.iter().zip(&quote.calculation.items).map(|(item,calculated)|serde_json::json!({"description":item.description,"unit_price":item.unit_price,"quantity":item.quantity,"discount_amount":calculated.discount_amount,"tax_label":match calculated.tax_type {crate::TaxType::Exempt=>"Exento",crate::TaxType::Isv15=>"ISV 15%",crate::TaxType::Isv18=>"ISV 18%"},"total":calculated.total})).collect::<Vec<_>>();
     Ok(
-        serde_json::json!({"number":quote.quote_number.as_deref().unwrap_or("Sin numerar"),"company":company,"contact_email":quote.data.contact_email,"client_name":quote.data.client_name,"client_rtn":"","order_number":quote.data.order_number,"date":quote.data.quote_date.format("%d/%m/%Y").to_string(),"valid_until":quote.calculation.valid_until.parse::<chrono::NaiveDate>().map_err(|_|CoreError::Invalid)?.format("%d/%m/%Y").to_string(),"totals":quote.calculation.totals,"items":items,"terms":quote.data.terms,"prepared_by_name":quote.data.prepared_by_name,"amount_words":amount_words(&quote.calculation.totals.total)?,"logo":branding.0,"signature":branding.1}),
+        serde_json::json!({"number":quote.quote_number.as_deref().unwrap_or("Sin numerar"),"company":company,"contact_email":quote.data.contact_email,"client_name":quote.data.client_name,"client_rtn":quote.data.client_rtn,"order_number":quote.data.order_number,"date":quote.data.quote_date.format("%d/%m/%Y").to_string(),"valid_until":quote.calculation.valid_until.parse::<chrono::NaiveDate>().map_err(|_|CoreError::Invalid)?.format("%d/%m/%Y").to_string(),"totals":quote.calculation.totals,"items":items,"terms":quote.data.terms,"prepared_by_name":quote.data.prepared_by_name,"amount_words":amount_words(&quote.calculation.totals.total)?,"logo":branding.0,"signature":branding.1}),
     )
 }
 fn amount_words(value: &str) -> Result<String, CoreError> {
@@ -283,6 +283,9 @@ mod tests {
     use super::*;
     fn payload() -> serde_json::Value {
         let input: QuoteInput = serde_json::from_value(serde_json::json!({"client_name":"Cliente sintético","order_number":"PROC-1","quote_date":"2026-10-22","valid_days":30,"contact_email":"contact@example.test","prepared_by_name":"Preparador sintético","notes":"PRIVATE-NOTE-MUST-NOT-LEAVE","terms":"Términos #read(\"/etc/passwd\")","discount_type":"amount","discount_value":"0","items":[{"description":"Equipo #include(\"/etc/passwd\")","quantity":"2","unit_price":"100","discount_type":"amount","discount_value":"0","tax_type":"isv15"}]})).unwrap();
+        let mut input = input;
+        input.id_client = Some(41);
+        input.client_rtn = "08011900000000".into();
         let calculation = calculate(&input).unwrap();
         let quote = QuoteDraft {
             id: 1,
@@ -310,6 +313,7 @@ mod tests {
         assert_eq!(value["totals"]["total"], "230.00");
         assert_eq!(value["items"][0]["total"], "200.00");
         assert_eq!(value["valid_until"], "21/11/2026");
+        assert_eq!(value["client_rtn"], "08011900000000");
     }
     #[tokio::test]
     async fn real_typst_template_renders_untrusted_text_as_data() {

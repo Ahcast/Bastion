@@ -474,6 +474,19 @@ components:
         - discount_value
         - items
       properties:
+        id_client:
+          type: [integer, "null"]
+          minimum: 1
+          default: null
+          description: Cliente de Bastion. Una selección nueva exige Clientes habilitado y clientes/catalogo/ver; null conserva la entrada manual.
+        client_rtn:
+          type: string
+          readOnly: true
+          description: Instantánea obtenida del catálogo al seleccionar el cliente. Vacía en modo manual.
+        client_email:
+          type: string
+          readOnly: true
+          description: Instantánea del catálogo; destinatario sugerido y editable al preparar correo.
         client_name:
           type: string
           maxLength: 255
