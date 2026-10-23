@@ -27,10 +27,11 @@ pub struct InvoiceItem {
     pub discount_type: DiscountType,
     pub discount_value: String,
     pub tax_type: TaxType,
-    #[serde(default)]
-    pub tracking: String,
-    #[serde(default)]
-    pub coments: String,
+    // Read old drafts without returning or persisting these retired fields.
+    #[serde(default, rename = "tracking", skip_serializing)]
+    _legacy_tracking: String,
+    #[serde(default, rename = "coments", skip_serializing)]
+    _legacy_comments: String,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]

@@ -101,8 +101,6 @@ components:
         discount_type: {$ref: '#/components/schemas/DiscountType'}
         discount_value: {$ref: '#/components/schemas/Decimal'}
         tax_type: {type: string, enum: [none, isv15, isv18]}
-        tracking: {type: string, maxLength: 255, default: ''}
-        coments: {type: string, maxLength: 1000, default: ''}
     Expense:
       type: object
       additionalProperties: false

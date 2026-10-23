@@ -21,7 +21,7 @@ Primer corte local iniciado el 2026-10-22: borradores sin numeración fiscal, li
 | Descuento | `discount_type`, `discount_value` | Monto o porcentaje. |
 | Estado | `status` | Estados acordados: Borrador, Enviado y Pagado. Borrador es el estado inicial. |
 | Referencias | `purchase_order_exempt_number`, `registration_certificate_number`, `sag_registration_number`, `client_request_id` | Referencias de orden/exoneración/registro/solicitud. |
-| Ítem | descripción, cantidad, precio venta, costo, proveedor, tracking, comentarios, descuento e impuesto | Calcula venta, costo e impuestos (exento/ISV 15/18). |
+| Ítem | descripción, cantidad, precio venta, costo, proveedor, descuento e impuesto | Calcula venta, costo e impuestos (exento/ISV 15/18). Sin tracking ni comentarios por confirmación del usuario del 2026-10-23. |
 | Gastos | `amount`, `notes`, categoría pendiente | Gastos adicionales/inversión. |
 | Notas | `notes`, `public_notes` | Notas privadas y públicas. |
 | Pago | `amount`, método, referencia, fecha | Actualiza pagado/saldo; un pago parcial conserva el estado Enviado y el saldo cero lleva a Pagado. Método permitido por confirmar. |

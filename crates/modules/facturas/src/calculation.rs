@@ -32,14 +32,9 @@ pub fn calculate(input: &InvoiceInput) -> Result<InvoiceCalculation, CoreError> 
     }
     let mut retained = Vec::new();
     for item in &data.items {
-        if item.tracking.chars().count() > 255 || item.coments.chars().count() > 1000 {
-            return Err(CoreError::Invalid);
-        }
         let mut item = item.clone();
         item.cost_price = money(cents(&item.cost_price)?);
-        item.tracking = item.tracking.trim().into();
-        item.coments = item.coments.trim().into();
-        // Keep cost/tracking associated with the original row when the shared
+        // Keep cost associated with the original row when the shared
         // calculator discards a completely empty commercial line.
         if !item.description.trim().is_empty()
             || cents(&item.quantity)? != 0
@@ -192,6 +187,19 @@ mod tests {
             "notes":"", "public_notes":"Nota pública", "expenses":[{"description":"Flete", "amount":"5.125"}],
             "items":[{"description":"Equipo", "quantity":"2", "unit_price":"100", "cost_price":"60.125", "discount_type":"percent", "discount_value":"10", "tax_type":"isv15"}]
         })).unwrap()
+    }
+    #[test]
+    fn legacy_item_metadata_is_readable_but_never_serialized() {
+        let mut stored = serde_json::to_value(input()).unwrap();
+        stored["items"][0]["tracking"] = serde_json::json!("Anterior");
+        stored["items"][0]["coments"] = serde_json::json!("Comentario anterior");
+        let previous: InvoiceInput = serde_json::from_value(stored).unwrap();
+        let result = calculate(&previous).unwrap();
+        assert_eq!(result.totals.total, "207.00");
+        let serialized = serde_json::to_value(result).unwrap();
+        let item = serialized["data"]["items"][0].as_object().unwrap();
+        assert!(!item.contains_key("tracking"));
+        assert!(!item.contains_key("coments"));
     }
     #[test]
     fn commercial_taxes_costs_expenses_and_profit_are_decimal() {

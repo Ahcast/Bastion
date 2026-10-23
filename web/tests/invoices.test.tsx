@@ -23,6 +23,8 @@ test('invoice date follows Honduras calendar and no fiscal fields or payments ar
   assert.equal(input.invoice_date, '2026-10-22');
   for (const field of ['invoice_number', 'status', 'total', 'payments', 'quote_id', 'client_request_id']) assert.ok(!(field in input));
   assert.equal(input.items[0]?.cost_price, '0');
+  assert.ok(!('tracking' in input.items[0]!));
+  assert.ok(!('coments' in input.items[0]!));
   assert.equal(newInvoice().payment_term_type, 'contado');
   assert.equal(newInvoice().credit_days, 0);
 });
@@ -50,6 +52,8 @@ test('invoice rows do not assign a server total to a different item after blank 
   const shortened = { ...calculation, data: { ...input, items: [] }, items: [{ total: '999.99' }] } as unknown as InvoiceCalculation;
   const html = renderToStaticMarkup(<InvoiceItems items={input.items} calculation={shortened} change={() => {}} remove={() => {}} add={() => {}} />);
   assert.ok(html.includes('Ítems de factura'));
+  assert.ok(!html.includes('Tracking'));
+  assert.ok(!html.includes('Comentarios'));
   assert.ok(!html.includes('L 999.99'));
   assert.ok(html.includes('Total del ítem 1'));
 });
