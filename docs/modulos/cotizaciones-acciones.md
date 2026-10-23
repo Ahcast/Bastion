@@ -78,3 +78,12 @@ La cola persistente registra limpieza antes de subir a S3 y retira objetos falli
 Correo incluye PDF y todos los adjuntos guardados al encolar, como Legacy: máximo técnico de 10 adjuntos adicionales y 20 MiB combinados con el PDF. La UI muestra los incluidos y bloquea si exceden los topes. El trabajador verifica de nuevo hashes, tamaños, permisos y revisión después de recuperar los archivos y antes de SMTP. Cambiar adjuntos invalida un correo pendiente de la revisión anterior. Los trabajos históricos sin adjuntos siguen siendo legibles.
 
 Verificación: pruebas de selección múltiple, revisiones encadenadas, reintento con misma clave, límites, visor sin descarga, permisos, idempotencia concurrente, aislamiento entre cotizaciones, limpieza, copia sin adjuntos y cola invalidada antes de SMTP. La integración utiliza bases desechables y transporte local privado de archivos sintéticos, sin credenciales S3 ni envíos reales.
+
+
+## Publicación de adjuntos y visor - 2026-10-23
+
+[GitHub Actions aprobado](https://github.com/Ahcast/Bastion/actions/runs/40005119285), commit e35a13d19ae4fa193e4ff8a58c85a775279ec4ed: 81 pruebas frontend, tipos/build, formato, compilación Rust, integración MySQL 5.7 y generación Typst. La integración de adjuntos verificó el límite real de 20 MiB, aislamiento/permisos, reintentos concurrentes, limpieza y cancelación por cambio de revisión antes de SMTP. La prueba HTTP confirmó el límite dedicado sin aumentar el de los formularios ordinarios.
+
+AWS y Bluehost se publicaron desde artifacts de ese commit con verificación de hashes ZIP, tar y archivos. Migración 0004 aplicada después de respaldo privado; se compararon los INSERT lógicos de las tablas de negocio y los metadatos anteriores de documentos durante la parada. Activación de módulos y configuración quedaron conservadas. HTTPS comprobó health 200, hashes de 22 assets y 401 sin sesión en listado/contenido de adjuntos.
+
+La revisión local del navegador usó únicamente archivos sintéticos: selección múltiple de PDF y texto, subida de ambos y apertura del PDF en otra pestaña con URL Blob, sin activar descarga. La herramienta de inspección no permite observar el contenido de una pestaña Blob; no se eludió esa restricción. No se crearon documentos sintéticos ni se enviaron correos en producción.

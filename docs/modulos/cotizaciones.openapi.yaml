@@ -358,7 +358,11 @@ paths:
                   - pdf
                   - company
                   - email
+                  - attachments
                 properties:
+                  attachments:
+                    type: boolean
+                    description: Almacenamiento privado disponible; no exige los datos de Empresa.
                   pdf:
                     type: boolean
                   company:
@@ -477,7 +481,7 @@ components:
             $ref: "#/components/schemas/Input"
   responses:
     Problem:
-      description: "RFC 9457: 401 sin sesión, 403 sin permiso/CSRF, 404 desactivado/ausente, 409 conflicto de idempotencia,
+      description: "RFC 9457: 400 entrada o If-Match inválido/ausente, 401 sin sesión, 403 sin permiso/CSRF, 404 desactivado/ausente, 409 conflicto de idempotencia,
         412 versión obsoleta, 413 cuerpo, 422 entrada, 429 cuota o 503 timeout/infraestructura."
       content:
         application/problem+json:
