@@ -139,3 +139,7 @@ El Core debe poder desplegarse solo en el ambiente de prueba, operar sin módulo
 - MySQL 5.7 está confirmado para Bluehost; quedan por verificar la versión de mantenimiento exacta, capacidades de TLS/remote MySQL del plan y compatibilidad de migraciones sobre esa versión. 5.7 admite el tipo nativo `JSON`, con validación de settings en Rust.
 - Revisar con Bluehost la ruta de actualización de MySQL antes de producción, dado el estado de Sustaining Support de MySQL 5.7.
 - Cada ficha de módulo especificará qué roles reciben permisos `ver` o `editar` para cada setting; el mecanismo común de autorización por rol, módulo y alcance ya está definido.
+
+## Inicio con módulos disponibles
+
+Procesos y Cotizaciones alimentan el panel con datos reales, controles Mes/Año/Todo y Actualizar, resúmenes separados por permiso y estados de carga/error parcial. Cada módulo calcula su dominio; el Core comparte calendario y presentación. Contrato y criterios: [16-dashboard-modulos.md](16-dashboard-modulos.md).

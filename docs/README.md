@@ -165,3 +165,4 @@ El informe se obtuvo de una copia de frontend Angular compilado y backend Larave
 
 - 2026-10-22: Clientes publicado en GitHub y desplegado en AWS/Bluehost desde `c86e8142763bea59adcad7dfb442daa4e96a3526`, tras CI exitoso (46 pruebas Rust y 42 frontend), artifacts verificados y respaldos privados. Migración propia aplicada; datos y módulos existentes conservados. Clientes queda disponible, desactivado hasta su activación administrativa. Salud HTTPS y hashes públicos comprobados; ver evidencia y límites en `modulos/clientes-implementacion.md`.
 
+- 2026-10-23: Inicio consume resúmenes reales de Procesos y Cotizaciones por sus permisos existentes. Mes/Año/Todo, Actualizar, recepciones vigentes, estados e importes registrados; calendario de Honduras, errores parciales y presentación móvil. Core comparte contrato/calendario y cada módulo conserva sus consultas. No requiere migración. Ver [16-dashboard-modulos.md](16-dashboard-modulos.md).

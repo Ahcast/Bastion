@@ -174,3 +174,6 @@ Esquema SQL completo y límites MySQL para los campos; versión de mantenimiento
 - Ajustes propios sin campos editables por confirmación del usuario del 2026-10-22; pendiente de futura definición.
 - No afirmar migración Legacy, borrado, MCP ni paridad visual sin sus validaciones.
 
+## Inicio conectado a módulos
+
+Comprobar cifras reales de Procesos y Cotizaciones, selección de área, rangos en Honduras, importes decimales exactos, exclusión de procesos vencidos, ausencia de solicitudes sin permiso, bloqueo del módulo desactivado, cero frente a error parcial y uso en celular. Casos completos en [16-dashboard-modulos.md](16-dashboard-modulos.md).

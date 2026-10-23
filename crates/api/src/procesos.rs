@@ -18,6 +18,7 @@ struct ReviewRequest {
 
 pub(super) fn routes(state: ApiState) -> Router<ApiState> {
     Router::new()
+        .route("/api/v1/procesos/dashboard", get(dashboard))
         .route("/api/v1/procesos/status", get(status))
         .route("/api/v1/procesos/scout-status", get(scout_status))
         .route("/api/v1/procesos/entities", get(entities))
@@ -92,6 +93,20 @@ async fn status(
     state
         .procesos
         .overview(actor.id, &filter)
+        .await
+        .map(Json)
+        .map_err(ApiError)
+}
+
+async fn dashboard(
+    State(state): State<ApiState>,
+    headers: axum::http::HeaderMap,
+    Query(query): Query<bastion_core::DashboardQuery>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    let user = actor(&state, &headers).await?;
+    state
+        .procesos
+        .dashboard(user.id, query.period)
         .await
         .map(Json)
         .map_err(ApiError)

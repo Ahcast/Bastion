@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use bastion_core::{CoreError, CoreService, Database, DomainActor};
+use bastion_core::{CoreError, CoreService, DashboardPeriod, Database, DomainActor};
 use bastion_procesos::{
     FIELDS, ProcessFilter, ProcessService, ProcessSort, ReadyDelivery, SCOUT_FIELDS,
 };
@@ -184,6 +184,13 @@ async fn mysql57_import_permissions_history_and_disable() {
         .unwrap();
     assert!(matches!(service.status(3).await, Err(CoreError::Forbidden)));
     let empty = service.status(1).await.unwrap();
+    assert!(matches!(
+        service.dashboard(3, DashboardPeriod::All).await,
+        Err(CoreError::Forbidden)
+    ));
+    let summary = service.dashboard(1, DashboardPeriod::Month).await.unwrap();
+    assert_eq!(summary["metrics"]["active"], 0);
+    assert!(summary["recent"].as_array().unwrap().is_empty());
     assert_eq!(empty["total"], 0);
     assert!(
         empty["weekly"]
@@ -205,6 +212,14 @@ async fn mysql57_import_permissions_history_and_disable() {
     );
     let shared = service.review(2, &id, 1, None, Some("=1+1")).await.unwrap();
     assert_eq!(shared.version, 2);
+    let summary = service.dashboard(1, DashboardPeriod::All).await.unwrap();
+    assert_eq!(summary["metrics"]["active"], 1);
+    assert_eq!(summary["metrics"]["marked"], 1);
+    assert_eq!(summary["metrics"]["entities"], 1);
+    assert_eq!(summary["series"][0]["bucket"], "2099-10");
+    assert_eq!(summary["recent"][0]["proceso_id"], id);
+    assert!(summary["recent"][0].get("note").is_none());
+    assert!(summary["recent"][0].get("source").is_none());
     assert!(matches!(
         service.review(1, &id, 1, Some(false), None).await,
         Err(CoreError::PreconditionFailed)
@@ -556,6 +571,21 @@ async fn mysql57_import_permissions_history_and_disable() {
             .unwrap();
     }
     let current = service.rows(1, &search).await.unwrap();
+    let summary = service.dashboard(1, DashboardPeriod::All).await.unwrap();
+    let future: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM procesos_rows WHERE fecha_recepcion>UTC_TIMESTAMP(6)",
+    )
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(summary["metrics"]["active"], future);
+    assert!(
+        summary["recent"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .all(|row| row["proceso_id"] != id && row["proceso_id"] != bulk_first)
+    );
     assert_eq!(current.total, 1);
     assert_eq!(current.items[0].proceso_id, municipality);
     assert!(
@@ -651,6 +681,10 @@ async fn mysql57_import_permissions_history_and_disable() {
         .set_module_enabled(1, "procesos", false)
         .await
         .unwrap();
+    assert!(matches!(
+        service.dashboard(1, DashboardPeriod::All).await,
+        Err(CoreError::NotFound)
+    ));
     assert!(matches!(
         service.rows(1, &filter).await,
         Err(CoreError::NotFound)

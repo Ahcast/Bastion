@@ -5,6 +5,7 @@ use bastion_cotizaciones::{
 
 pub(super) fn routes(state: ApiState) -> Router<ApiState> {
     Router::new()
+        .route("/api/v1/cotizaciones/dashboard", get(dashboard))
         .route("/api/v1/cotizaciones", get(list).post(create))
         .route("/api/v1/cotizaciones/calculate", post(preview))
         .route(
@@ -85,6 +86,20 @@ async fn list(
     state
         .cotizaciones
         .list(user.id, &filter)
+        .await
+        .map(Json)
+        .map_err(ApiError)
+}
+
+async fn dashboard(
+    State(state): State<ApiState>,
+    headers: axum::http::HeaderMap,
+    Query(query): Query<bastion_core::DashboardQuery>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    let user = actor(&state, &headers).await?;
+    state
+        .cotizaciones
+        .dashboard(user.id, query.period)
         .await
         .map(Json)
         .map_err(ApiError)

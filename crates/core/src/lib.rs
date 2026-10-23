@@ -3,6 +3,7 @@
 mod admin;
 mod config;
 mod database;
+mod dashboard;
 mod documents;
 mod service;
 
@@ -12,6 +13,7 @@ pub use admin::{
 };
 pub use config::{AppConfig, ConfigError, DatabaseConfig};
 pub use database::Database;
+pub use dashboard::{DashboardPeriod, DashboardPoint, DashboardQuery, DashboardWindow};
 pub use documents::{DocumentCompany, DocumentService};
 pub use service::{
     AccessCatalog, AuthCookies, AuthenticatedUser, BootstrapBegin, BootstrapComplete, BusinessMail,

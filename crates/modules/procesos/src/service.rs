@@ -6,6 +6,9 @@ use sha2::{Digest, Sha256};
 use sqlx::{FromRow, MySql, QueryBuilder, Row, Transaction};
 use std::collections::BTreeMap;
 
+#[path = "dashboard.rs"]
+mod dashboard;
+
 use crate::scout::{export_value, numbered_items};
 use crate::{MAX_ROWS, SCOUT_FIELDS, ScoutRow, parse_csv};
 

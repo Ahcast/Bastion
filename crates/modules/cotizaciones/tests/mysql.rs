@@ -1,4 +1,4 @@
-use bastion_core::{CoreError, CoreService, Database};
+use bastion_core::{CoreError, CoreService, DashboardPeriod, Database};
 use bastion_cotizaciones::{
     DiscountType, QuoteFilter, QuoteInput, QuoteItem, QuoteMailService, QuoteService, QuoteStatus,
     TaxType,
@@ -75,6 +75,14 @@ async fn mysql57_drafts_permissions_idempotency_versions_and_disable() {
         service.list(2, &QuoteFilter::default()).await,
         Err(CoreError::Forbidden)
     ));
+    assert!(matches!(
+        service.dashboard(2, DashboardPeriod::All).await,
+        Err(CoreError::Forbidden)
+    ));
+    assert_eq!(
+        service.dashboard(1, DashboardPeriod::All).await.unwrap()["metrics"]["total"],
+        0
+    );
     sqlx::query("INSERT INTO role_permissions (role_id,module_id,scope_hash,scope_key,capability) VALUES (2,'cotizaciones',UNHEX(SHA2('documentos',256)),'documentos','ver')").execute(&pool).await.unwrap();
     service
         .list(2, &QuoteFilter::default())
@@ -97,6 +105,40 @@ async fn mysql57_drafts_permissions_idempotency_versions_and_disable() {
     assert_eq!(one.data.prepared_by_name, "Admin test");
     assert_eq!(one.data.contact_email, "admin@example.test");
     assert_eq!(one.calculation.valid_until, "2026-11-21");
+    let summary = service.dashboard(2, DashboardPeriod::All).await.unwrap();
+    assert_eq!(summary["metrics"]["total"], 1);
+    assert_eq!(summary["metrics"]["amount"], one.calculation.totals.total);
+    assert_eq!(summary["distribution"][0]["label"], "Borrador");
+    assert_eq!(summary["series"][0]["bucket"], "2026-10");
+    assert_eq!(summary["recent"][0]["quote_number"], "COT-000001");
+    assert!(summary["recent"][0].get("notes").is_none());
+    sqlx::query("UPDATE cotizaciones_drafts SET calculation_json=JSON_REMOVE(calculation_json,'$.totals.total') WHERE id=?").bind(one.id).execute(&pool).await.unwrap();
+    let unpriced = service.dashboard(2, DashboardPeriod::All).await.unwrap();
+    assert_eq!(unpriced["metrics"]["total"], 1);
+    assert_eq!(unpriced["metrics"]["without_total"], 1);
+    assert_eq!(unpriced["metrics"]["amount"], "0.00");
+    assert!(unpriced["recent"][0]["total"].is_null());
+    sqlx::query("UPDATE cotizaciones_drafts SET calculation_json=JSON_SET(calculation_json,'$.totals.total',?) WHERE id=?").bind(&one.calculation.totals.total).bind(one.id).execute(&pool).await.unwrap();
+    // A date outside the selected Honduras month cannot affect its summary.
+    sqlx::query("UPDATE cotizaciones_drafts SET data_json=JSON_SET(data_json,'$.quote_date','2000-01-01') WHERE id=?").bind(one.id).execute(&pool).await.unwrap();
+    let month = service.dashboard(1, DashboardPeriod::Month).await.unwrap();
+    assert_eq!(month["metrics"]["total"], 0);
+    assert_eq!(month["metrics"]["amount"], "0.00");
+    assert!(
+        month["series"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .all(|point| point["count"] == 0 && point["amount"] == "0.00")
+    );
+    sqlx::query(
+        "UPDATE cotizaciones_drafts SET data_json=JSON_SET(data_json,'$.quote_date',?) WHERE id=?",
+    )
+    .bind(one.data.quote_date.to_string())
+    .bind(one.id)
+    .execute(&pool)
+    .await
+    .unwrap();
     let mut changed = input();
     changed.notes = "Cambio".into();
     changed.status = QuoteStatus::Aprobada;
@@ -320,6 +362,10 @@ async fn mysql57_drafts_permissions_idempotency_versions_and_disable() {
         .set_module_enabled(1, "cotizaciones", false)
         .await
         .unwrap();
+    assert!(matches!(
+        service.dashboard(1, DashboardPeriod::All).await,
+        Err(CoreError::NotFound)
+    ));
     assert!(matches!(
         service.detail(1, one.id).await,
         Err(CoreError::NotFound)

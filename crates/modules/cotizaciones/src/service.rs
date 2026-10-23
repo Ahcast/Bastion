@@ -2,6 +2,9 @@ use bastion_core::{CoreAdmin, CoreError, Database};
 use sha2::{Digest, Sha256};
 use sqlx::{MySql, QueryBuilder, Transaction};
 
+#[path = "dashboard.rs"]
+mod dashboard;
+
 #[path = "documents.rs"]
 mod documents;
 pub use documents::{QuoteDocument, QuoteDocumentReadiness};

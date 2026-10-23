@@ -101,3 +101,7 @@ El adaptador MCP no invoca endpoints internos mediante una ruta privilegiada ni 
 ## Pendiente de especificación por endpoint
 
 Quedan por definir los nombres de rutas/DTO del core y de cada módulo, paginación concreta por listado, cuotas generales por operación, errores específicos, rutas de login/OTP y tiempos de retención de idempotencia. La vigencia del desafío, `Mantenerme loggeado`, la delegación de usuario, OAuth Authorization Code + PKCE, los tiempos/rotación/revocación de tokens y los límites TOTP por cuenta/IP se encuentran definidos en `08-seguridad-y-permisos.md`. Cada decisión se añade a OpenAPI y a la ficha del módulo antes de implementar la operación.
+
+## Resúmenes para Inicio
+
+GET /api/v1/procesos/dashboard y GET /api/v1/cotizaciones/dashboard admiten period=month|year|all. Reutilizan autenticación, límites y permiso de lectura del módulo activo. Contratos, criterios de fecha y límites en [16-dashboard-modulos.md](16-dashboard-modulos.md).

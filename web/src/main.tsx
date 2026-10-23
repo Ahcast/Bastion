@@ -5,6 +5,7 @@ import App, { ConfigurationError } from './App.js';
 import { NavigationGuardProvider } from './navigationGuard.js';
 import { ApiClient, apiOrigin } from './api.js';
 import './styles/panel.css';
+import './styles/dashboard.css';
 import './styles/cotizaciones.css';
 declare global { interface Window { BASTION_API_BASE?: string } }
 class ErrorBoundary extends Component<{ children: ReactNode }, { failed: boolean }> {
