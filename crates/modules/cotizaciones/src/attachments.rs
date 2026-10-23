@@ -152,9 +152,7 @@ impl QuoteService {
         sqlx::query("INSERT INTO cotizaciones_documents (object_key,quote_id,quote_version,kind,filename,mime,sha256,byte_size,created_at,attachment_id,title) VALUES (?,?,?,'attachment',?,?,?,?,UTC_TIMESTAMP(6),?,?)")
             .bind(&object_key).bind(id).bind(version).bind(&filename).bind(mime).bind(&sha).bind(byte_size).bind(&attachment_id).bind(&title).execute(&mut *tx).await?;
         bump_attachment_revision(&mut tx, actor, id, expected, version).await?;
-        let attachment = sqlx::query_as(&format!(
-            "SELECT {FIELDS} FROM cotizaciones_documents WHERE attachment_id=?"
-        ))
+        let attachment = sqlx::query_as("SELECT attachment_id AS id,filename,title,mime,byte_size,created_at FROM cotizaciones_documents WHERE attachment_id=?")
         .bind(&attachment_id)
         .fetch_one(&mut *tx)
         .await?;
