@@ -12,3 +12,9 @@ Se revisaron como referencia visual la exportación HTML local y la imagen de í
 - Notas/términos y descuento/totales quedan separados debajo de los ítems. La versión, idempotencia, PDF y correo mantienen sus contratos y controles de acceso.
 
 La revisión visual usa exclusivamente registros sintéticos y verifica tamaños de escritorio, tableta y móvil, ausencia de desbordamiento y conservación del borrador al cambiar de tamaño. Las pruebas de interacción cubren el buscador único, asociación/manual, teclado y edición/eliminación de filas; no añaden pruebas que repliquen CSS.
+
+## Publicación verificada — 2026-10-23
+
+Frontend publicado desde `d4b0605c15d988c2be4531f87571e654882d7ff0`, con [CI aprobado](https://github.com/Ahcast/Bastion/actions/runs/39939442577): 59 pruebas frontend, tipos/build y comprobaciones generales Rust/MySQL. Se instalaron 33 archivos en Bluehost desde el artifact verificado, con respaldo privado y conservación de cabeceras/assets anteriores. Se verificaron por HTTPS los hashes de 20 recursos públicos y la versión nueva; API live/ready 200 y acceso anónimo 401. Este corte solo actualiza frontend: no reinicia AWS, no aplica migraciones ni escribe datos de negocio.
+
+La prueba visual con datos sintéticos cubrió escritorio de 1440 px, tableta de 834 px y móvil de 390 px. El ancho desplazable coincidió con el ancho disponible en tableta/móvil, el borrador se conservó al redimensionar y la consola quedó sin errores/advertencias. Se comprobaron también búsqueda sin coincidencias, modo manual y nombres largos dentro del menú móvil. No se usaron documentos reales ni se enviaron correos para probar el diseño.
