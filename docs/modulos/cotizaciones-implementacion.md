@@ -2,9 +2,9 @@
 
 Fecha: 2026-10-22. Estado: primer corte publicado en el ambiente de pruebas; módulo incompleto y desactivado por defecto.
 
-## Ampliación de acciones en curso
+## Ampliación de acciones publicada
 
-Se incorpora el menú solicitado y sus comandos, PDF Typst y correo en cola/programado. Ver [contrato, límites y pendientes](cotizaciones-acciones.md). Las conversiones permanecen visibles y deshabilitadas por decisión del usuario. La verificación y publicación de esta ampliación siguen pendientes; la sección de publicación al final describe el corte anterior.
+Se incorpora el menú solicitado y sus comandos, PDF Typst y correo en cola/programado. Ver [contrato, límites y pendientes](cotizaciones-acciones.md). Las conversiones permanecen visibles y deshabilitadas por decisión del usuario. Esta ampliación pasó CI y se publicó desde `8576ffc`; se conservaron datos y activación. PDF/correo permanecen deshabilitados por ambiente mientras el usuario configura S3 y hasta verificar Empresa/SMTP. La sección de publicación al final describe el corte anterior; la evidencia de esta ampliación está en cotizaciones-acciones.md.
 
 ## Alcance implementado
 

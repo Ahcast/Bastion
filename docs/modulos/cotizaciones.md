@@ -26,13 +26,13 @@ Preparar cotizaciones, calcular líneas/impuestos/descuentos, generar PDF, adjun
 
 ## Botones y acciones
 
-Listado: Nueva, Editar/Abrir, PDF, Marcar como enviado, Convertir a orden, Convertir a factura, Enviar por correo, Clonar, Eliminar, selección individual/total, acciones masivas y paginación.
+Listado: Nueva, Ver, Editar, PDF, Marcar como enviado, Aprobar, Convertir a orden, Convertir a factura, Enviar por correo, Clonar, Eliminar, selección individual/total, acciones masivas y paginación.
 
 Editor: Guardar; Editar/Cancelar; Agregar/Quitar ítem; PDF; cargar, ver, descargar y eliminar adjunto; volver. Vista previa y totales se actualizan durante edición.
 
 Correo: previsualizar PDF/adjuntos; seleccionar documentos; Enviar ahora o Programar envío; cerrar/cancelar. El backend genera PDF y puede procesar correo programado.
 
-El PDF de cotización se genera con Typst mediante el servicio compartido del core. Se conservan la acción y el flujo actual; los datos de cotización y su permiso de generación corresponden a este módulo. La plantilla y su versionado quedan por definir.
+El PDF de cotización se genera con Typst mediante el servicio compartido del core. Se conservan la acción y el flujo actual; los datos de cotización y su permiso de generación corresponden a este módulo. La plantilla inicial `cotizacion-v1` y las condiciones de habilitación se describen en cotizaciones-acciones.md. Las conversiones siguen visibles y deshabilitadas por acuerdo.
 
 ## Settings bajo Ajustes
 

@@ -36,7 +36,7 @@ La vista previa Angular calcula sin los redondeos intermedios del backend y suma
 
 El prorrateo legado puede distribuir más o menos centavos que el descuento general solicitado; se conserva y se prueba, sin introducir reparto de residuos. El total bruto sin redondear y el redondeo de descuentos por línea también pueden producir resultados límite no intuitivos con cantidades fraccionarias. Deben reconciliarse con ejemplos anonimizados antes de producción; no afirmar equivalencia contable por esta revisión estática.
 
-Pendientes de implementación/paridad: catálogo Clientes, PDF/Typst, adjuntos privados, correo/programación, clonación, eliminación confirmada, conversiones y acciones masivas. Pendientes de validación: sesión real, esquema SQL Legacy, ejemplos contables y continuidad del contador al migrar. Los settings propios siguen sin definirse.
+Actualización posterior: menú, estados, clonación, eliminación confirmada, PDF Typst y correo/programación se incorporan según cotizaciones-acciones.md; PDF/correo esperan la configuración operativa de S3/Empresa/SMTP. Adjuntos adicionales, vínculo al catálogo Clientes, conversiones y acciones masivas siguen pendientes. Pendientes de validación: sesión real, esquema SQL Legacy, ejemplos contables y continuidad del contador al migrar. Los settings propios siguen sin definirse.
 
 ## Cotejo de acciones por fila
 

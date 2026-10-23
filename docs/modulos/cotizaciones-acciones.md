@@ -1,6 +1,6 @@
 # Cotizaciones: acciones por documento
 
-Decisiones del usuario, 22 de octubre de 2026: menú desplegable por cotización con las diez opciones siguientes; las conversiones permanecen visibles y deshabilitadas hasta implementar sus módulos. PDF toma como referencia el diseño de CastilloIT y correo conserva destinatarios, copias, mensaje y envío inmediato/programado. Desarrollo en curso; verificar CI y despliegue antes de considerarlo publicado.
+Decisiones del usuario, 22 de octubre de 2026: menú desplegable por cotización con las diez opciones siguientes; las conversiones permanecen visibles y deshabilitadas hasta implementar sus módulos. PDF toma como referencia el diseño de CastilloIT y correo conserva destinatarios, copias, mensaje y envío inmediato/programado. Menú publicado en el ambiente de pruebas desde el commit `8576ffcce61b1ed18d6ec20f4c3b6b8b3e892083`; PDF/correo están implementados y probados en CI, con habilitación operativa pendiente de acceso S3 y configuración.
 
 ## Acciones y paridad
 
@@ -52,3 +52,11 @@ Límites técnicos del corte: PDF hasta 8 MiB, hasta 50 destinatarios distintos;
 Se agregan pruebas de interacción del menú, lectura frente a edición, estados sin recarga, versiones, permisos, clonación idempotente y confirmación de eliminación; pruebas de contenido/MIME de PDF y zona horaria; pruebas Rust/MySQL para estados, copia, permisos y auditoría, y generación real de plantilla con texto malicioso tratado como datos.
 
 Las conversiones siguen deshabilitadas por acuerdo. Adjuntos adicionales, selección de documentos externos, catálogo de cliente vinculado al correo, acciones masivas, interoperabilidad MCP y reconciliación contable siguen pendientes. No se presentan como terminados por añadir el menú. PDF y correo se habilitan al configurar Empresa, documentos privados y SMTP; sus errores de infraestructura no simulan resultados.
+
+## Publicación verificada - 2026-10-22
+
+[GitHub Actions aprobado](https://github.com/Ahcast/Bastion/actions/runs/39875208159): 50 pruebas frontend, tipos/build, Rust, MySQL 5.7 y compilación real de la plantilla con texto no confiable. Backend AWS y frontend Bluehost instalados desde artifacts del mismo commit, con hashes ZIP/tar/archivos comprobados y respaldos privados previos. La migración 0003 se aplicó y se conservaron la cotización existente, los 835 procesos y la activación de Clientes, Cotizaciones y Procesos. Se verificaron HTTPS, hashes de 18 assets públicos, health 200, consulta de negocio anónima 401 y arranque del acceso sin errores de consola. No se hicieron envíos reales ni escrituras de prueba en documentos del usuario.
+
+Un primer intento se revirtió al detectar diferencias de CHECKSUM TABLE. Se comprobó que ese cálculo era inestable para JSON de MySQL 5.7 y que los INSERT del respaldo coincidían exactamente; el despliegue final verificó SHA-256 del contenido lógico de las tablas durante la migración. No hubo cambios de datos de negocio.
+
+El usuario configurará el acceso S3 y avisará. `BASTION_DOCUMENTS_ENABLED=false` conserva PDF/correo deshabilitados hasta comprobar lectura/escritura/eliminación y privacidad bajo el usuario restringido del servicio. Empresa y SMTP se configuran por sus flujos del Core. Quedan pendientes la prueba autenticada de PDF/correo con esa configuración y la reconciliación contable. Credenciales, bucket real, respaldos y resultados operativos se conservan fuera del repositorio público.
