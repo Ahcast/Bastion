@@ -111,7 +111,8 @@ async fn scout_status(
     state
         .procesos
         .check_access(actor.id, "consulta", "ver")
-        .await?;
+        .await
+        .map_err(ApiError)?;
     Ok(Json(report))
 }
 
