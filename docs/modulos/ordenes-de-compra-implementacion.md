@@ -1,4 +1,4 @@
-# Órdenes de compra: primer corte local
+# Órdenes de compra: primer corte
 
 ## Alcance y evidencia
 
@@ -38,7 +38,7 @@ Límites técnicos nuevos, no atribuidos al Legacy: 200 productos/gastos por ord
 
 Cliente manual se conserva en la orden como instantánea; todavía no crea, vincula ni fusiona registros en Clientes. El selector de cliente y filtro por ID quedan pendientes del contrato entre módulos. El precio/cantidad negativos que el Legacy no rechaza sistemáticamente se rechazan en este corte; no se replican valores corruptos.
 
-No hay selector de proveedor, archivos privados, borrado, clonación, conversión a factura/cotización, origen de cotización, gastos generales ni MCP. Las acciones futuras se muestran deshabilitadas con motivo. Guardar una referencia de factura aplica el estado cotejado, pero no crea una factura ni ejecuta el comando separado Marcar entregada (que en Legacy completa fecha de entrega si falta); ese comando sigue pendiente. La edición permite fecha opcional, como el controlador update. No se considera terminada la paridad, ni se publica/despliega este corte, ni se migra información Legacy.
+No hay selector de proveedor, archivos privados, borrado, clonación, conversión a factura/cotización, origen de cotización, gastos generales ni MCP. Las acciones futuras se muestran deshabilitadas con motivo. Guardar una referencia de factura aplica el estado cotejado, pero no crea una factura ni ejecuta el comando separado Marcar entregada (que en Legacy completa fecha de entrega si falta); ese comando sigue pendiente. La edición permite fecha opcional, como el controlador update. La paridad sigue incompleta y no se migra información Legacy; la publicación técnica posterior se documenta al final.
 
 ## Verificación local
 
@@ -55,3 +55,13 @@ Se conserva el despliegue frontend Bluehost, backend/API/MCP AWS y MySQL Bluehos
 El usuario solicita subir a GitHub y después a AWS. Se prepara un release de Órdenes sobre main vigente, conservando los cambios ya publicados y excluyendo trabajos locales de otros módulos. Publicación y despliegue quedan sujetos a CI exitoso, artifacts de ese commit verificados, respaldo privado, migración aditiva y salud HTTPS. El frontend sigue en Bluehost; el backend en AWS. La instalación no activa el módulo automáticamente ni crea destinos de ejemplo.
 
 Preparación del release sobre main actualizado: 68 pruebas frontend, comprobación de tipos y build correctos. El conteo incluye pruebas ya publicadas del Dashboard y no incorpora el trabajo local de Facturas. La integración MySQL se verificará en CI antes de instalar.
+
+## Publicación verificada — 2026-10-23
+
+Código publicado en [59a8057564cc6a72b3f5213f4283b488f0343f09](https://github.com/Ahcast/Bastion/commit/59a8057564cc6a72b3f5213f4283b488f0343f09), después del [CI exitoso](https://github.com/Ahcast/Bastion/actions/runs/39998520884): formato, compilación, 66 pruebas Rust (incluida integración real con dos bases aisladas de MySQL 5.7 para Órdenes), 68 pruebas frontend, tipos y build.
+
+Se verificaron los SHA-256 de los ZIP, paquetes y archivos antes de instalar. Backend actualizado en AWS y 34 archivos de frontend publicados en Bluehost, con respaldo privado, conservación de cabeceras/assets anteriores y cambio atómico del HTML. Migración propia versión 1 aplicada; sin importar datos Legacy ni crear órdenes o destinos de prueba.
+
+La primera instalación se revirtió automáticamente al detectar diferencias en CHECKSUM TABLE. La inspección comprobó que esos checksums no eran repetibles en las tablas JSON y que los INSERT de negocio seguían idénticos al respaldo. Las diferencias reales eran el ledger nuevo y la limpieza de desafíos OTP vencidos al restaurar el servicio. El reintento conservó las tablas aditivas vacías verificadas y comparó hashes de datos lógicos y esquemas de todas las tablas existentes antes y después de migrate; la comparación fue correcta.
+
+Comprobación HTTPS: frontend BUILD del mismo commit y hashes de 21 recursos públicos correctos; API live/ready 200, Órdenes y Destinos anónimos 401. Se conservaron datos de negocio, activación de los módulos existentes y configuración de documentos. Órdenes queda incluido y permitido, **desactivado hasta su activación administrativa en Ajustes > Core > Módulos**; el catálogo de destinos comienza vacío. La validación operativa con usuarios, las funciones pendientes y la restauración integral de respaldos siguen abiertas.

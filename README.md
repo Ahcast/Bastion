@@ -2,7 +2,7 @@
 
 ## Estado de esta entrega
 
-Órdenes de compra incorpora un primer corte local: listado/filtros, detalle, alta/edición, productos, gastos, cálculo Rust y catálogo de destinos bajo Ajustes (confirmado por el usuario). Integra permisos, auditoría, versiones e idempotencia del Core y nace desactivado. Adjuntos, proveedores, conversiones, clonación y borrado siguen pendientes. Ver [alcance, contrato y verificación](docs/modulos/ordenes-de-compra-implementacion.md). No se ha desplegado.
+Órdenes de compra incorpora un primer corte publicado: listado/filtros, detalle, alta/edición, productos, gastos, cálculo Rust y catálogo de destinos bajo Ajustes. Integra permisos, auditoría, versiones e idempotencia del Core. Backend AWS y frontend Bluehost verificados el 2026-10-23; el módulo queda disponible y desactivado hasta su activación administrativa. Adjuntos, proveedores, conversiones, clonación y borrado siguen pendientes. Ver [alcance, contrato y evidencia](docs/modulos/ordenes-de-compra-implementacion.md).
 
 Clientes incorpora búsqueda, paginación, alta con coincidencias por nombre/RTN, edición con versión y catálogo paginado. Integra permisos, activación y auditoría del Core. Por confirmación del usuario, se publica sin ajustes editables; la sección en Ajustes indica su definición pendiente. Catálogo nuevo de Bastion, sin migración automática del Legacy. Ver [contrato y límites](docs/modulos/clientes-implementacion.md).
 
