@@ -498,7 +498,7 @@ mod tests {
                 .await
                 .unwrap()
                 .status(),
-            StatusCode::UNPROCESSABLE_ENTITY
+            StatusCode::BAD_REQUEST
         );
         let response = app
             .clone()
