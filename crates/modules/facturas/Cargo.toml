@@ -1,0 +1,18 @@
+[package]
+name = "bastion-facturas"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+bastion-clientes = { path = "../clientes" }
+bastion-core = { path = "../../core" }
+bastion-cotizaciones = { path = "../cotizaciones" }
+chrono.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+sqlx.workspace = true
+
+[dev-dependencies]
+bastion-core = { path = "../../core", features = ["test-support"] }
+tokio.workspace = true

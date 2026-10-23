@@ -75,6 +75,8 @@ Esta estrategia permite lanzar y probar el core primero y avanzar por módulos s
 - PDFs generados y adjuntos privados se guardan en almacenamiento privado de objetos en AWS, separado del disco de despliegue del backend. El Core valida permisos antes de permitir lectura o descarga; los objetos no son públicos y no caducan mientras exista su registro asociado. Al borrar el registro, el flujo autorizado confirma y audita también el borrado de sus archivos. Servicio, versionado y respaldo quedan por definir técnicamente.
 - La generación de PDF usa Typst mediante un servicio común del Core. Cotizaciones incorpora Typst 0.15.1 con plantilla fija versionada en `crates/modules/cotizaciones/templates`, datos JSON sin evaluación de código, raíz temporal privada y límites de concurrencia/plazo. Empresa y SMTP siguen en el Core; la habilitación operativa exige verificar almacenamiento privado y configuración. Otras plantillas y su política de evolución siguen pendientes; ver `modulos/cotizaciones-acciones.md`.
 
+Facturas reutiliza como dependencia de código el calculador puro de Cotizaciones, igual a la delegación observada en Legacy. Esta dependencia no requiere activar Cotizaciones ni concede acceso a sus datos; los casos de uso, tablas, migraciones, permisos y API de Facturas permanecen separados. El primer corte solo persiste borradores sin emisión fiscal; ver `modulos/facturas-implementacion.md`.
+
 ## Observabilidad
 
 Registrar solicitudes, módulo/caso de uso, latencia, errores y actor autenticado usando identificadores de correlación. No registrar contraseñas, tokens, credenciales SMTP ni contenido privado de documentos.

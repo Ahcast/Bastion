@@ -2,6 +2,8 @@
 
 ## Estado de esta entrega
 
+Facturas comienza con un corte local de borradores: listado, editor manual, venta/impuestos, costos, gastos, inversión, utilidad y saldo calculados en Rust. Integra registro, permisos, auditoría, idempotencia y versiones del Core; permanece desactivado por defecto. Emisión, numeración fiscal, pagos, documentos y conversiones siguen pendientes. Ver [alcance y límites](docs/modulos/facturas-implementacion.md). Este corte no se ha desplegado.
+
 Órdenes de compra incorpora un primer corte publicado: listado/filtros, detalle, alta/edición, productos, gastos, cálculo Rust y catálogo de destinos bajo Ajustes. Integra permisos, auditoría, versiones e idempotencia del Core. Backend AWS y frontend Bluehost verificados el 2026-10-23; el módulo queda disponible y desactivado hasta su activación administrativa. Adjuntos, proveedores, conversiones, clonación y borrado siguen pendientes. Ver [alcance, contrato y evidencia](docs/modulos/ordenes-de-compra-implementacion.md).
 
 Clientes incorpora búsqueda, paginación, alta con coincidencias por nombre/RTN, edición con versión y catálogo paginado. Integra permisos, activación y auditoría del Core. Por confirmación del usuario, se publica sin ajustes editables; la sección en Ajustes indica su definición pendiente. Catálogo nuevo de Bastion, sin migración automática del Legacy. Ver [contrato y límites](docs/modulos/clientes-implementacion.md).

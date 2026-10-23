@@ -37,6 +37,12 @@ El informe se obtuvo de una copia de frontend Angular compilado y backend Larave
 
 ## Registro de decisiones
 
+- 2026-10-23: Facturas adopta los lineamientos de frontend de Cotizaciones: listado compacto, buscador único de cliente manual/catálogo, generales, ítems en tabla adaptable y notas/totales separados. El servidor valida la selección y conserva la instantánea del cliente. Se mantiene el menú de nueve acciones y el alcance de borradores sin emisión fiscal. El usuario autoriza subir este corte al repositorio; ver `modulos/facturas-implementacion.md`.
+
+- 2026-10-23: el usuario confirma para Facturas un botón desplegable por fila con Ver, Editar, Marcar como enviado, Ingresar pago, Clonar, PDF, Nota de entrega, Emitir Recibo y Eliminar, en ese orden. El corte actual conecta Ver/Editar y muestra las demás opciones deshabilitadas hasta implementar sus casos de uso; no se amplían permisos ni se dan por definidas reglas pendientes. Ver `modulos/facturas-implementacion.md`.
+
+- 2026-10-22: a solicitud del usuario comienza Facturas con un corte local de borradores sin emisión ni numeración fiscal. Listado/editor, cálculo comercial puro reutilizado de Cotizaciones, inversión/gastos, permisos y auditoría del Core, idempotencia y control de versión. Las reglas aún pendientes de pagos, numeración, envío y corrección no se presumen resueltas. Se incorpora desactivado y sin ajustes editables; no se declara completo ni desplegado. Ver `modulos/facturas-implementacion.md` y `modulos/facturas.openapi.yaml`.
+
 - 2026-10-23: el usuario solicita Convertir a cotización desde Procesos: entidad como cliente manual, expediente como referencia e ítems con cantidades originales de Scout. Abre un borrador en el editor y usa el guardado normal. Recordatorio informativo inline, sin confirmación ni bloqueo, con enlace al original. Cantidades no verificables quedan vacías y no se inventan. Ver `modulos/procesos-cotizacion.md`.
 
 - 2026-10-23: el usuario solicita adjuntar varios archivos en Cotizaciones y abrir PDF en el navegador sin descarga automática. Se implementa almacenamiento privado mediante el Core, control de revisiones y adjuntos incluidos en correo según Legacy; límites técnicos documentados en modulos/cotizaciones-acciones.md. No cambia la separación de despliegue.

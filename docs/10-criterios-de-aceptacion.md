@@ -184,3 +184,11 @@ Comprobar cifras reales de Procesos y Cotizaciones, selección de área, rangos 
 - Agregar/renombrar destinos desde Ajustes con su permiso independiente; unicidad, versión, existencia del destino y bloqueo cuando catálogo vacío. No hay borrado de destinos.
 - Verificar activación/allowlist/migración, sesión/CSRF, permisos, alta idempotente, ETag/If-Match y auditoría transaccional. UI conserva cambios ante errores/conflictos y reutiliza el alta ambigua.
 - Quedan pendientes la ejecución de integración MySQL 5.7 en CI, documentos, proveedores, clonación, borrado, conversiones, integración con Clientes y MCP; no declarar terminada la paridad ni desplegado este corte. Ver `modulos/ordenes-de-compra-implementacion.md`.
+
+## Facturas: corte inicial de borradores
+
+- Guardar y consultar borradores sin asignar números fiscales ni registrar pagos ficticios. Crédito conserva saldo; contado de total positivo no se guarda hasta implementar su pago total.
+- Vista previa y guardado usan el mismo cálculo decimal del servidor; costos y gastos producen inversión/utilidad conforme al cotejo estático documentado.
+- Activación/allowlist/migraciones, permisos ver/editar, CSRF, creación idempotente, edición con ETag/If-Match y auditoría transaccional se comprueban con datos sintéticos.
+- La UI protege cambios sin guardar, conserva datos ante fallos/conflictos y mantiene la clave al reintentar un alta ambigua. Ajustes indica los pendientes sin campos inventados.
+- No cerrar paridad, validación contable, emisión, pagos, documentos, migración Legacy, settings o MCP con este corte. Ver `modulos/facturas-implementacion.md`.

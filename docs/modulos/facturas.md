@@ -4,6 +4,10 @@
 
 Emitir y administrar facturas, pagos/saldos y documentos derivados (PDF, nota de entrega y recibo), con origen desde cotización u orden.
 
+## Estado de implementación
+
+Primer corte local iniciado el 2026-10-22: borradores sin numeración fiscal, listado/detalle/editor, cálculo comercial, costos y gastos con permisos y auditoría del Core. No implementa emisión, pagos ni documentos; ver [alcance, diferencias y pendientes](facturas-implementacion.md) y [OpenAPI](facturas.openapi.yaml). La ficha siguiente conserva el alcance objetivo y no implica que esté todo implementado.
+
 ## Campos
 
 | Campo | Nombre técnico | Función/validación conocida |
@@ -27,6 +31,8 @@ Emitir y administrar facturas, pagos/saldos y documentos derivados (PDF, nota de
 Estados acordados: `Borrador`, `Enviado` y `Pagado`. Los pagos parciales no cambian `Enviado`; la factura pasa a `Pagado` solo cuando el saldo llega a cero. La condición exacta que marca una factura como `Enviado` sigue pendiente: el informe distingue la acción manual “Marcar como enviado” del envío por correo. También falta definir cómo se corrige una factura después de enviarla; no asumir que puede editarse libremente ni inventar una acción de anulación.
 
 ## Botones y acciones
+
+Confirmación del usuario del 2026-10-23: cada fila ofrece un único botón desplegable con este orden exacto: **Ver, Editar, Marcar como enviado, Ingresar pago, Clonar, PDF, Nota de entrega, Emitir Recibo, Eliminar**. En el corte de borradores, Ver y Editar funcionan con los permisos vigentes; las demás opciones permanecen visibles y deshabilitadas con el motivo hasta completar sus casos de uso.
 
 Listado: Nueva factura, Ingresar pago (fecha/monto/método/referencia; Guardar pago/Cancelar), Marcar como enviado, Clonar, PDF, Nota de entrega, Emitir recibo, Eliminar, abrir/editar y paginación.
 
