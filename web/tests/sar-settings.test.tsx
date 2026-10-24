@@ -39,7 +39,8 @@ test('SAR saves all four fields atomically, uses the server status and retains e
       const body = JSON.parse(String(init.body));
       assert.deepEqual(Object.keys(body).sort(), ['settings', 'version']);
       assert.equal(body.version, record.version);
-      if (writes > 1) return Response.json({ detail: 'Version changed' }, { status: 412 });
+      if (writes === 2) return Response.json({ detail: 'Version changed' }, { status: 412 });
+      if (writes === 3) { assert.equal(body.settings.sar_text, ' Texto de prueba '); return Response.json(record); }
       assert.deepEqual(body.settings, { limit_range: '100', limit_date: '2026-10-23', current_invoice: '90', sar_text: 'Texto de prueba' });
       record = { settings: body.settings, version: 'b'.repeat(64), status: { days_remaining: 0, invoices_remaining: 10, date_expired: false, range_expired: false } };
       return Response.json(record);
@@ -82,6 +83,9 @@ test('SAR saves all four fields atomically, uses the server status and retains e
     await act(async () => button('Cancelar cambios').click());
     assert.equal(container.querySelector<HTMLTextAreaElement>('[name="sar_text"]')?.value, 'Texto de prueba');
     assert.equal(writes, 2);
+    await change('sar_text', ' Texto de prueba '); await submit();
+    assert.equal(writes, 3);
+    assert.equal(container.querySelector<HTMLTextAreaElement>('[name="sar_text"]')?.value, 'Texto de prueba');
+    assert.equal(button('Guardar SAR').disabled, true);
   } finally { await act(async () => root.unmount()); container.remove(); }
 });
-

@@ -34,7 +34,7 @@ function SarEditor({ initial, saved, reload }: { initial: SarRecord; saved: (val
     <form className="stack" aria-label="Configuración SAR" onSubmit={async event => {
       event.preventDefault(); if (busy || conflict || !dirty) return;
       setBusy(true); setError('');
-      try { const result = await api.request<SarRecord>('/api/v1/settings/sar', { method: 'PUT', body: { settings: values, version: initial.version } }); saved(result); notify('Configuración SAR guardada.'); }
+      try { const result = await api.request<SarRecord>('/api/v1/settings/sar', { method: 'PUT', body: { settings: values, version: initial.version } }); setValues(result.settings); saved(result); notify('Configuración SAR guardada.'); }
       catch (reason) { if (reason instanceof ApiError && reason.status === 412) { setConflict(true); setError('La configuración cambió. Tus cambios se conservan; recarga la versión actual antes de guardar.'); } else setError(message(reason)); }
       finally { setBusy(false); }
     }}><Notice>{error}</Notice><fieldset className="form-fields" disabled={busy}>
@@ -46,4 +46,3 @@ function SarEditor({ initial, saved, reload }: { initial: SarRecord; saved: (val
       <div className="actions"><button type="submit" className="primary" disabled={!dirty || conflict}>{busy ? 'Guardando…' : 'Guardar SAR'}</button><button type="button" disabled={!dirty} onClick={() => { setValues(initial.settings); setError(''); }}>Cancelar cambios</button><button type="button" onClick={() => { void navigate(reload); }}>Recargar configuración SAR</button></div>
     </fieldset></form></>;
 }
-
