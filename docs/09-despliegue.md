@@ -57,3 +57,7 @@ El ambiente de pruebas tiene frontend, backend HTTPS y conectividad MySQL TLS co
 ## Órdenes de compra: incorporación verificada
 
 El corte local incorpora migraciones propias con `migrate` y sincroniza disponibilidad al arrancar, sin DDL en `serve`. Requiere `ordenes_compra` en `BASTION_ALLOWED_MODULES`, migraciones exactas y habilitación administrativa; destinos se carga explícitamente desde Ajustes. CI prepara bases MySQL 5.7 aisladas para servicio/HTTP. El 2026-10-23 se publicaron en GitHub y se instalaron en AWS/Bluehost los artifacts verificados de 59a8057 tras CI exitoso y respaldo privado; migración 1 aplicada. El módulo permanece desactivado y los módulos existentes se conservan. Se mantiene Bluehost/AWS/MySQL. Ver `modulos/ordenes-de-compra-implementacion.md`.
+
+## Facturas: incorporación verificada
+
+El 2026-10-23 se instalaron en AWS y Bluehost los artifacts verificados de `f6c5a1d` (workflow 40038962819), después de respaldo privado. Se aplicó la migración propia 1 y se comprobó que las 43 tablas existentes y la activación de los módulos previos se conservaron. Facturas queda disponible en el ambiente y desactivado hasta su activación administrativa. Salud HTTPS 200, acceso sin sesión 401 y 35 archivos públicos verificados. Ver `modulos/facturas-implementacion.md` para alcance y límites.

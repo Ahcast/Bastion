@@ -1,4 +1,4 @@
-# Facturas: primer corte local
+# Facturas: primer corte de borradores
 
 ## Alcance y evidencia
 
@@ -26,7 +26,7 @@ Desde la confirmación del 2026-10-23, el listado usa un desplegable por fila co
 
 No hay numeración/SAR, emisión, envío/estados, pagos/recibos, PDF/nota de entrega, clonación, eliminación, conversiones, selección de proveedores ni MCP. Referencias de exoneración se conservan en dominio, sin añadir controles no verificados a la UI. Se preserva el cálculo cotejado de Cotizaciones, incluido su prorrateo sin redistribución de residuos; ver `cotizaciones-paridad.md`. El costo se asocia al mismo ítem al descartar filas vacías, evitando el desfase de índices observado en el merge Legacy. No se afirma validación fiscal/contable ni equivalencia visual sin sesión real y ejemplos anonimizados.
 
-Ajustes muestra la etapa y los pendientes, sin inventar settings. Se mantienen Bluehost/AWS/MySQL. No se migran datos Legacy ni se instala este corte en servidores. El módulo sigue incompleto hasta cerrar las reglas de la ficha y sus ajustes.
+Ajustes muestra la etapa y los pendientes, sin inventar settings. Se mantienen Bluehost/AWS/MySQL. No se migran datos Legacy. El despliegue verificado se documenta al final de esta ficha. El módulo sigue incompleto hasta cerrar las reglas de la ficha y sus ajustes.
 
 ## Validación
 
@@ -45,6 +45,17 @@ Por solicitud del usuario se aplica `cotizaciones-frontend.md`: listado con regl
 
 `id_client` es opcional y pertenece al catálogo de Bastion. Seleccionar otro cliente requiere Clientes activo y `clientes/catalogo/ver`; el contrato `ClientService::document_snapshot` resuelve nombre, RTN y correo dentro de la transacción. Se guarda una instantánea y editar otros campos conserva esos datos aunque Clientes se desactive. Volver a manual limpia la relación, RTN y correo. Los documentos anteriores siguen siendo manuales; no hay nueva migración ni se importan IDs Legacy. Las claves idempotentes se verifican antes de consultar el catálogo mutable, de modo que un reintento idéntico conserva su resultado original tras cambios en Clientes.
 
-Se conserva el desplegable de nueve acciones solicitado, los permisos y los pendientes de emisión fiscal/pagos/documentos. Esta entrega se publica en GitHub; su publicación no instala ni activa el módulo en servidores.
+Se conserva el desplegable de nueve acciones solicitado, los permisos y los pendientes de emisión fiscal/pagos/documentos. Esta entrega se publica en GitHub; el despliegue posterior se documenta al final y mantiene la activación administrativa pendiente.
 
-Validación de la subida del 2026-10-23: paquete aislado basado en main actualizado, compilación y formato Rust correctos, pruebas de dominio locales correctas y 89 pruebas frontend/tipos/build correctos. Las pruebas con MySQL 5.7 se ejecutan en CI con bases aisladas; los tests locales sin esas variables no validan persistencia real. Se conserva la activación administrativa pendiente y no se instala este commit en servidores.
+Validación de la subida del 2026-10-23: paquete aislado basado en main actualizado, compilación y formato Rust correctos, pruebas de dominio locales correctas y 89 pruebas frontend/tipos/build correctos. Las pruebas con MySQL 5.7 se ejecutan en CI con bases aisladas; los tests locales sin esas variables no validan persistencia real. Se conserva la activación administrativa pendiente; el despliegue posterior se documenta a continuación.
+
+## Despliegue verificado — 2026-10-23
+
+Por solicitud del usuario se instala el commit [`f6c5a1d`](https://github.com/Ahcast/Bastion/commit/f6c5a1d4a498997382b6a957b74072b341594b5d) en AWS (backend) y Bluehost (frontend), tras [Core checks exitoso](https://github.com/Ahcast/Bastion/actions/runs/40038962819). Se usan los artifacts de ese mismo commit, verificando SHA-256 del ZIP, paquete y archivos; no se despliega el checkout local compartido.
+
+- Respaldo privado de la base y configuración antes de migrar. Migración propia `_facturas_migrations` versión 1 aplicada; comparación lógica de las 43 tablas previas sin cambios de esquema o datos. Se conservan la activación de los módulos existentes y la configuración de documentos.
+- AWS ejecuta el binario verificado: salud pública `/health/live` y `/health/ready` responden 200; `/api/v1/facturas` sin sesión responde 401.
+- Facturas se agrega a la disponibilidad del ambiente y permanece desactivado (`included_in_release=1, environment_allowed=1, enabled=0`). Su activación se realiza desde Ajustes por un administrador.
+- Frontend instalado con respaldo privado y cambio atómico del HTML, conservando configuración pública, reglas del hosting y assets anteriores. Se verifican 35 archivos públicos por HTTPS y el fallback SPA de `/facturas`. Los ítems no llevan tracking ni comentarios.
+
+CI valida Rust/MySQL 5.7 y 89 pruebas frontend; localmente pasan las cinco pruebas de cálculo de Facturas y el build frontend. La comprobación del despliegue no crea documentos comerciales ni sustituye una prueba autenticada del módulo activo. Los pendientes de emisión, pagos y documentos derivados se mantienen.
