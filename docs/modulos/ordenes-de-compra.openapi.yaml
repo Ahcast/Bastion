@@ -102,7 +102,7 @@ components:
       properties:
         approved_quote:
           $ref: "./cotizaciones.openapi.yaml#/components/schemas/Input"
-          description: Instantánea aprobada, solo creada por conversión; inmutable al editar. Crear manualmente con este campo se rechaza.
+          description: Instantánea comercial aprobada sin notas privadas ni contactos internos, solo creada por conversión; inmutable al editar. Crear manualmente con este campo se rechaza.
         n_orders: {type: string, maxLength: 50}
         n_bill: {type: string, maxLength: 120}
         order_date: {type: string, format: date}

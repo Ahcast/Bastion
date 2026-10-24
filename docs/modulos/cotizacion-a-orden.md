@@ -1,6 +1,6 @@
 # Cotización aprobada → orden de compra
 
-Confirmación del usuario (2026-10-23): la orden representa la cotización aprobada por el cliente. Se conservan productos, cantidades decimales, descuentos, ISV 15/18%, exoneraciones, notas, términos e importes. El precio se copia inicialmente a costo y venta según el mapeo Legacy; el costo sigue siendo operativo y editable.
+Confirmación del usuario (2026-10-23): la orden representa la cotización aprobada por el cliente. Se conservan productos, cantidades decimales, descuentos, ISV 15/18%, exoneraciones, términos e importes. El precio se copia inicialmente a costo y venta según el mapeo Legacy; el costo sigue siendo operativo y editable.
 
 La conversión requiere estado Aprobada. Preparar/cancelar no cambia documentos. Guardar registra origen y revisión, crea la orden y marca la cotización Convertido atómicamente. Se representa una cotización mediante una orden; los reintentos devuelven la operación original. Dividir una cotización en varias órdenes queda fuera de este flujo.
 
@@ -11,3 +11,5 @@ La composición vive en bastion-workflows. Cotizaciones y Órdenes exponen puert
 El límite HTTP de Órdenes y de las rutas de conversión es 3 MiB para alojar productos y su instantánea; Cotizaciones ordinarias conserva 1 MiB, y adjuntos su límite separado. Se conservan 200 productos, 200 gastos, cuota 120/minuto/actor por módulo y plazo de 30 segundos.
 
 Ver contrato OpenAPI cotizacion-a-orden.openapi.yaml. No se copian archivos, ni se implementa emisión de factura o MCP en este avance.
+
+La orden recibe condiciones comerciales aprobadas. Las notas privadas de la cotización, correo/contacto interno del autor, correo del cliente y vínculo de catálogo permanecen en Cotizaciones; no se exponen por el permiso de lectura de Órdenes. Se conserva el identificador de origen para consultar el documento con sus permisos propios.

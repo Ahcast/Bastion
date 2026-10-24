@@ -85,7 +85,7 @@ async fn mysql57_conversion_http_auth_csrf_origin_permissions_version_and_save()
         .await
         .unwrap();
     sqlx::query("INSERT INTO ordenes_destinations (id,destination,name_key) VALUES (1,'Destino sintético','destino sintético')").execute(&pool).await.unwrap();
-    let input:QuoteInput=serde_json::from_value(serde_json::json!({"client_name":"HTTP Cliente","order_number":"OC-HTTP","quote_date":"2026-10-23","valid_days":30,"status":"Aprobada","notes":"","terms":"","discount_type":"amount","discount_value":"1","items":[{"description":"Equipo","quantity":"1.25","unit_price":"100","discount_type":"amount","discount_value":"0","tax_type":"isv18"}]})).unwrap();
+    let input:QuoteInput=serde_json::from_value(serde_json::json!({"client_name":"HTTP Cliente","order_number":"OC-HTTP","quote_date":"2026-10-23","valid_days":30,"status":"Aprobada","notes":"Nota privada de cotización","terms":"Entrega acordada","discount_type":"amount","discount_value":"1","items":[{"description":"Equipo","quantity":"1.25","unit_price":"100","discount_type":"amount","discount_value":"0","tax_type":"isv18"}]})).unwrap();
     let source = quotes
         .create(1, "synthetic-http-source-0001", input)
         .await
@@ -169,6 +169,15 @@ async fn mysql57_conversion_http_auth_csrf_origin_permissions_version_and_save()
     let seed: serde_json::Value =
         serde_json::from_slice(&to_bytes(response.into_body(), 1024 * 1024).await.unwrap())
             .unwrap();
+
+    assert_eq!(seed["data"]["approved_quote"]["notes"], "");
+    assert_eq!(seed["data"]["approved_quote"]["contact_email"], "");
+    assert_eq!(seed["data"]["approved_quote"]["prepared_by_name"], "");
+    assert_eq!(seed["data"]["approved_quote"]["terms"], "Entrega acordada");
+    assert_eq!(
+        quotes.detail(1, source.id).await.unwrap().data.notes,
+        "Nota privada de cotización"
+    );
     let mut data = seed["data"].clone();
     data["id_destination"] = serde_json::json!(1);
     let payload = serde_json::to_string(&data).unwrap();

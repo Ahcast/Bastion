@@ -9,7 +9,7 @@ pub fn source() -> QuoteDraft {
     let input: QuoteInput = serde_json::from_value(json!({
         "client_name":"Cliente sintético", "client_rtn":"08019000000000", "order_number":"OC-PRUEBA",
         "quote_date":"2026-10-22", "valid_days":30,"status":"Aprobada",
-        "notes":"Notas aprobadas", "terms":"Términos aprobados",
+        "notes":"Notas privadas", "contact_email":"interno@example.test", "prepared_by_name":"Contacto interno", "terms":"Términos aprobados",
         "discount_type":"percent","discount_value":"5",
         "items":[
             {"description":"ISV 15","quantity":"1.25","unit_price":"100","discount_type":"amount","discount_value":"2","tax_type":"isv15"},
@@ -45,10 +45,19 @@ fn preserves_all_commercial_amounts_and_source_without_database_mutations() {
         seed.calculation.totals.total,
         source.calculation.totals.total
     );
+
+    let approved = seed.data.approved_quote.as_ref().unwrap();
+    assert_eq!(approved.terms, source.data.terms);
     assert_eq!(
-        serde_json::to_value(&seed.data.approved_quote).unwrap(),
-        serde_json::to_value(Some(&source.data)).unwrap()
+        serde_json::to_value(&approved.items).unwrap(),
+        serde_json::to_value(&source.data.items).unwrap()
     );
+    assert_eq!(approved.discount_value, source.data.discount_value);
+    assert!(approved.notes.is_empty());
+    assert!(approved.contact_email.is_empty());
+    assert!(approved.prepared_by_name.is_empty());
+    assert!(approved.client_email.is_empty());
+    assert!(approved.id_client.is_none());
     assert_eq!(serde_json::to_value(&source).unwrap(), original);
     assert!(seed.data.id_destination.is_none());
     assert!(seed.calculation.ensure_saveable().is_err());

@@ -19,7 +19,7 @@ const { createRoot } = await import('react-dom/client');
 after(()=>window.happyDOM.abort());
 
 async function workspace(status: QuoteStatus = 'Aprobada', canOrder = true, failures: (number | 'network')[] = []) {
-  const quote={...newQuote(),status,client_name:'Cliente aprobado',order_number:'OC-APROBADA',notes:'<script>dato</script>',terms:'Entrega acordada',discount_type:'percent' as const,discount_value:'5',
+  const quote={...newQuote(),status,client_name:'Cliente aprobado',order_number:'OC-APROBADA',notes:'Nota privada',terms:'Entrega acordada <script>dato</script>',discount_type:'percent' as const,discount_value:'5',
     items:[{description:'Equipo',quantity:'1.25',unit_price:'100.00',discount_type:'amount' as const,discount_value:'2.00',tax_type:'isv18' as const}]};
   const commercial={subtotal:'125.00',importe_exonerado:'0.00',importe_exento:'0.00',importe_gravado_15:'0.00',importe_gravado_18:'116.38',descuentos_rebajas:'8.62',isv_15:'0.00',isv_18:'20.95',total:'137.33'};
   const data:OrderInput={...newOrder(),n_orders:'OC-APROBADA',client_name:quote.client_name,approved_quote:quote,products:[{description:'Equipo',cantidad:'1.25',sale_price:'100.00',purchase_price:'100.00',tracking:'',isv:false,status:'Pendiente',coments:''}]};

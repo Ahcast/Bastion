@@ -15,6 +15,20 @@ pub struct QuoteOrderSeed {
     pub calculation: OrderCalculation,
 }
 
+// A purchase order receives approved commercial terms, not private quote notes
+// or the author's contact/catalog metadata. The source remains available by ID.
+fn approved_snapshot(
+    source: &bastion_cotizaciones::QuoteInput,
+) -> bastion_cotizaciones::QuoteInput {
+    let mut snapshot = source.clone();
+    snapshot.id_client = None;
+    snapshot.client_email.clear();
+    snapshot.prepared_by_name.clear();
+    snapshot.contact_email.clear();
+    snapshot.notes.clear();
+    snapshot
+}
+
 pub fn seed_quote_order(source: &QuoteDraft, date: NaiveDate) -> Result<QuoteOrderSeed, CoreError> {
     if !matches!(source.data.status, QuoteStatus::Aprobada) {
         return Err(CoreError::Conflict);
@@ -39,7 +53,7 @@ pub fn seed_quote_order(source: &QuoteDraft, date: NaiveDate) -> Result<QuoteOrd
         })
         .collect();
     let data = OrderInput {
-        approved_quote: Some(source.data.clone()),
+        approved_quote: Some(approved_snapshot(&source.data)),
         n_orders: if quote.data.order_number.chars().count() <= 50 {
             quote.data.order_number.clone()
         } else {
@@ -120,7 +134,8 @@ pub async fn convert_quote_order(
         .order_conversion_source(&mut tx, id, expected)
         .await?;
     if serde_json::to_value(&input.approved_quote).map_err(|_| CoreError::Invalid)?
-        != serde_json::to_value(Some(&source.data)).map_err(|_| CoreError::Invalid)?
+        != serde_json::to_value(Some(approved_snapshot(&source.data)))
+            .map_err(|_| CoreError::Invalid)?
     {
         return Err(CoreError::Conflict);
     }
