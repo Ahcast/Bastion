@@ -66,3 +66,7 @@ Esquema completo MySQL, versión de mantenimiento exacta de Bluehost, estados v�
 ## Órdenes: precisión y catálogo nuevo
 
 El corte local conserva `sale_price` como costo y `purchase_price` como venta, según el controlador Legacy. Usa enteros escalados para agregar bases antes de redondear; ISV 15%, gastos a centavos e inversión/total persistidos atómicamente. No presupone validación contable ni IDs Legacy. Destinos tiene identificadores nuevos y pertenece a Órdenes por confirmación del usuario del 2026-10-23; no se importa catálogo real. Ver `modulos/ordenes-de-compra-implementacion.md`.
+
+## Cotización aprobada como orden de compra
+
+Confirmación del usuario del 2026-10-23: la orden representa la cotización aprobada por el cliente. La conversión conserva su instantánea comercial, decimales, descuentos, ISV 15/18%, exoneraciones, notas, términos y total; no transforma 18% en 15% ni descarta descuentos. La edición operativa no modifica esa instantánea. Creación, relación de origen/revisión y estado Convertido se guardan atómicamente con idempotencia. El cálculo manual anterior sigue vigente para órdenes sin instantánea. Ver [cotizacion-a-orden.md](modulos/cotizacion-a-orden.md).

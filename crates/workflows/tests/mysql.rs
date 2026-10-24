@@ -141,7 +141,7 @@ async fn mysql57_atomic_quote_order_conversion_permissions_retries_and_immutable
             .is_err()
     );
     // Force failure after the order/receipt insert to prove transaction rollback.
-    sqlx::query("CREATE TRIGGER synthetic_conversion_failure BEFORE INSERT ON cotizaciones_order_conversions FOR EACH ROW SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='synthetic rollback test'").execute(&pool).await.unwrap();
+    sqlx::raw_sql("CREATE TRIGGER synthetic_conversion_failure BEFORE INSERT ON cotizaciones_order_conversions FOR EACH ROW SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='synthetic rollback test'").execute(&pool).await.unwrap();
     assert!(
         convert_quote_order(
             &quotes,
@@ -155,7 +155,7 @@ async fn mysql57_atomic_quote_order_conversion_permissions_retries_and_immutable
         .await
         .is_err()
     );
-    sqlx::query("DROP TRIGGER synthetic_conversion_failure")
+    sqlx::raw_sql("DROP TRIGGER synthetic_conversion_failure")
         .execute(&pool)
         .await
         .unwrap();

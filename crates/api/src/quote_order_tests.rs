@@ -240,6 +240,69 @@ async fn mysql57_conversion_http_auth_csrf_origin_permissions_version_and_save()
     let retried: serde_json::Value =
         serde_json::from_slice(&to_bytes(retry.into_body(), 1024 * 1024).await.unwrap()).unwrap();
     assert_eq!(retried, order);
+
+    // A valid quote can exceed 1 MiB once products and approved terms are copied.
+    let mut large = source.data.clone();
+    large.order_number = "OC-HTTP-GRANDE".into();
+    large.items = vec![large.items[0].clone(); 200];
+    for row in &mut large.items {
+        row.description = "X".repeat(2800);
+    }
+    let large = quotes
+        .create(1, "synthetic-http-source-large-0001", large)
+        .await
+        .unwrap();
+    let large_prep = format!("/api/v1/cotizaciones/{}/order-preparation", large.id);
+    let response = app
+        .clone()
+        .oneshot(request(
+            "GET",
+            &large_prep,
+            Some("synthetic-admin"),
+            false,
+            "https://example.test",
+            "",
+            Some(large.version),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    let mut large_seed: serde_json::Value = serde_json::from_slice(
+        &to_bytes(response.into_body(), 3 * 1024 * 1024)
+            .await
+            .unwrap(),
+    )
+    .unwrap();
+    large_seed["data"]["id_destination"] = serde_json::json!(1);
+    let payload = serde_json::to_string(&large_seed["data"]).unwrap();
+    assert!(payload.len() > 1024 * 1024);
+    let large_save = format!("/api/v1/cotizaciones/{}/order", large.id);
+    let mut req = request(
+        "POST",
+        &large_save,
+        Some("synthetic-admin"),
+        true,
+        "https://example.test",
+        &payload,
+        Some(large.version),
+    );
+    req.headers_mut().insert(
+        "idempotency-key",
+        HeaderValue::from_static("synthetic-http-large-convert-0001"),
+    );
+    let response = app.clone().oneshot(req).await.unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    let converted: serde_json::Value = serde_json::from_slice(
+        &to_bytes(response.into_body(), 3 * 1024 * 1024)
+            .await
+            .unwrap(),
+    )
+    .unwrap();
+    assert_eq!(converted["data"]["products"].as_array().unwrap().len(), 200);
+    assert_eq!(
+        converted["calculation"]["totals"]["total"],
+        large.calculation.totals.total
+    );
     core.admin()
         .set_module_enabled(1, "ordenes_compra", false)
         .await
