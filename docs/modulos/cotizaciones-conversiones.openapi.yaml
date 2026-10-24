@@ -1,0 +1,102 @@
+openapi: 3.1.0
+info:
+  title: Bastion conversiones de cotización
+  version: 1.0.0
+  description: Contrato transaccional; ver cotizaciones-conversiones.md.
+security:
+  - session: []
+paths:
+  /api/v1/cotizaciones/{id}/order-conversion:
+    parameters: &source
+      - name: id
+        in: path
+        required: true
+        schema: {type: integer, minimum: 1}
+      - name: If-Match
+        in: header
+        required: true
+        schema: {type: string, pattern: '^"[1-9][0-9]*"$'}
+    get:
+      operationId: prepareQuoteOrderConversion
+      x-permission: cotizaciones/documentos/ver+editar,ordenes_compra/documentos/ver+editar
+      responses:
+        "200":
+          description: Revisión y motivo si no es posible conservar los importes.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [quote_version, reason]
+                properties:
+                  quote_version: {type: integer}
+                  reason: {type: [string, "null"]}
+        default: {$ref: "#/components/responses/Problem"}
+  /api/v1/cotizaciones/{id}/convert-order:
+    parameters: *source
+    post:
+      operationId: convertQuoteToOrder
+      x-permission: cotizaciones/documentos/ver+editar,ordenes_compra/documentos/ver+editar
+      parameters:
+        - $ref: "#/components/parameters/Key"
+        - $ref: "#/components/parameters/Csrf"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [n_orders, id_destination]
+              properties:
+                n_orders: {type: string, minLength: 1, maxLength: 50}
+                id_destination: {type: integer, minimum: 1}
+      responses:
+        "200":
+          description: Creación confirmada o resultado idempotente original.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Result"}
+        default: {$ref: "#/components/responses/Problem"}
+  /api/v1/cotizaciones/{id}/convert-invoice:
+    parameters: *source
+    post:
+      operationId: convertQuoteToInvoiceDraft
+      x-permission: cotizaciones/documentos/ver+editar,facturas/documentos/ver+editar
+      parameters:
+        - $ref: "#/components/parameters/Key"
+        - $ref: "#/components/parameters/Csrf"
+      responses:
+        "200":
+          description: Borrador nuevo o factura existente de esa cotización. Sin número fiscal.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Result"}
+        default: {$ref: "#/components/responses/Problem"}
+components:
+  securitySchemes:
+    session: {type: apiKey, in: cookie, name: __Host-bastion_session}
+  parameters:
+    Key:
+      name: Idempotency-Key
+      in: header
+      required: true
+      schema: {type: string, minLength: 16, maxLength: 128, pattern: "^[A-Za-z0-9_-]+$"}
+    Csrf:
+      name: X-CSRF-Token
+      in: header
+      required: true
+      schema: {type: string}
+  schemas:
+    Result:
+      type: object
+      required: [target_module, target_id, quote_id, quote_version, reused]
+      properties:
+        target_module: {type: string, enum: [facturas, ordenes_compra]}
+        target_id: {type: integer, minimum: 1}
+        quote_id: {type: integer, minimum: 1}
+        quote_version: {type: integer, minimum: 1}
+        reused: {type: boolean}
+  responses:
+    Problem:
+      description: "RFC 9457: 400 entrada incompatible/cabeceras, 401 sesión, 403 permisos/CSRF, 404 módulo desactivado/origen ausente, 409 clave con otro contenido, 412 revisión, 413 cuerpo, 429 cuota, 503 infraestructura."
+

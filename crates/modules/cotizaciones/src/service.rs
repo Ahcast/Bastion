@@ -19,6 +19,9 @@ pub use attachments::{
     QuoteAttachmentWrite,
 };
 
+#[path = "conversion.rs"]
+mod conversion;
+
 use crate::{
     QuoteCalculation, QuoteDraft, QuoteFilter, QuoteInput, QuotePage, QuoteStatus, QuoteSummary,
     calculate,

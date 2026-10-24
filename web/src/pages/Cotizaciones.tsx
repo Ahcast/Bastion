@@ -3,6 +3,8 @@ import type { ProcessQuoteSeed } from '../processQuote.js';
 import { ProcessQuoteNotice } from '../components/ProcessQuoteNotice.js';
 import { ApiError, message } from '../api.js';
 import { Dialog, Heading, Loading, Notice, Table, useCore, useLoad } from '../ui.js';
+import { QuoteConversionDialog } from '../components/QuoteConversionDialog.js';
+import type { ConversionModule, ConversionAttempt, OpenConverted } from '../conversions.js';
 import { QuoteActions } from '../components/QuoteActions.js';
 import { QuoteEmailComposer } from '../components/QuoteEmailComposer.js';
 import { QuoteClientPicker } from '../components/QuoteClientPicker.js';
@@ -15,24 +17,28 @@ import { useUnsavedChanges } from '../navigationGuard.js';
 import { newQuote, newQuoteItem, quoteStatuses } from '../quotes.js';
 import type { DiscountType, QuoteDraft, QuoteInput, QuoteItem, QuotePage, QuoteCalculation, QuoteStatus, QuoteSummary } from '../quotes.js';
 
-interface ProcessQuoteProps { processSeed?: ProcessQuoteSeed | null; clearProcessSeed?: () => void }
+interface ProcessQuoteProps { openConverted?: OpenConverted; processSeed?: ProcessQuoteSeed | null; clearProcessSeed?: () => void }
 
-export default function Cotizaciones({ processSeed, clearProcessSeed }: ProcessQuoteProps = {}) {
+export default function Cotizaciones({ processSeed, clearProcessSeed, openConverted }: ProcessQuoteProps = {}) {
   const { access } = useCore();
   if (!moduleCan(access, 'cotizaciones', 'documentos', 'ver')) return <Notice>No tienes acceso a Cotizaciones.</Notice>;
-  return <Workspace processSeed={processSeed} clearProcessSeed={clearProcessSeed} />;
+  return <Workspace processSeed={processSeed} clearProcessSeed={clearProcessSeed} openConverted={openConverted} />;
 }
 
-function Workspace({ processSeed, clearProcessSeed }: ProcessQuoteProps) {
+function Workspace({ processSeed, clearProcessSeed, openConverted }: ProcessQuoteProps) {
   const [seed, setSeed] = useState(processSeed);
   const { api, access, notify } = useCore();
   const [selected, setSelected] = useState<QuoteDraft | 'new' | null>(processSeed ? 'new' : null);
   const [search, setSearch] = useState(''), [query, setQuery] = useState(''), [page, setPage] = useState(1), [error, setError] = useState(''), [opening, setOpening] = useState(false);
   const [mode, setMode] = useState<'view' | 'edit'>(processSeed ? 'edit' : 'view'), [deleting, setDeleting] = useState<QuoteSummary | null>(null);
   const [email, setEmail] = useState<QuoteSummary | null>(null);
+  const [conversion, setConversion] = useState<{ summary: QuoteSummary; kind: ConversionModule } | null>(null);
+  const conversionAttempts = useRef(new Map<string, ConversionAttempt>());
   const cloneAttempt = useRef<{ id: number; version: number; key: string } | null>(null);
   const editable = moduleCan(access, 'cotizaciones', 'documentos', 'editar');
   const removable = moduleCan(access, 'cotizaciones', 'documentos', 'eliminar');
+  const targetAllowed = (module: ConversionModule) => editable && moduleCan(access, module, 'documentos', 'ver') && moduleCan(access, module, 'documentos', 'editar');
+  const targetReason = (module: ConversionModule) => !editable ? 'Sin permiso de edición de Cotizaciones' : !targetAllowed(module) ? 'Requiere el módulo destino activo y permisos de lectura y edición' : undefined;
   const documents = useLoad(signal => api.request<DocumentReadiness>('/api/v1/cotizaciones/document-readiness', { signal }));
   const result = useLoad(signal => api.request<QuotePage>(`/api/v1/cotizaciones?q=${encodeURIComponent(query)}&page=${page}&page_size=25`, { signal }), [query, page], true);
   const open = async (draft: QuoteSummary, nextMode: 'view' | 'edit') => {
@@ -76,8 +82,8 @@ function Workspace({ processSeed, clearProcessSeed }: ProcessQuoteProps) {
       { label: 'Ver', run: () => void open(draft, 'view') },
       { label: 'Editar', disabled: !editable, reason: !editable ? 'Sin permiso de edición' : undefined, run: () => void open(draft, 'edit') },
       { label: 'Marcar como enviado', disabled: !editable, run: () => void status(draft, 'Enviada') },
-      { label: 'Convertir a orden de compra', disabled: true, reason: 'Disponible al incorporar Órdenes de compra' },
-      { label: 'Convertir a factura', disabled: true, reason: 'Disponible al incorporar Facturas' },
+      { label: 'Convertir a orden de compra', disabled: !targetAllowed('ordenes_compra'), reason: targetReason('ordenes_compra'), run: () => setConversion({ summary: draft, kind: 'ordenes_compra' }) },
+      { label: 'Convertir a factura', disabled: !targetAllowed('facturas'), reason: targetReason('facturas'), run: () => setConversion({ summary: draft, kind: 'facturas' }) },
       { label: 'Aprobar', disabled: !editable, run: () => void status(draft, 'Aprobada') },
       { label: 'Clonar', disabled: !editable, run: () => void clone(draft) },
       { label: 'PDF', disabled: !documents.data?.pdf, reason: !documents.data?.pdf ? 'Configura Empresa y el servicio de documentos' : undefined, run: () => previewPdf(draft) },
@@ -85,6 +91,10 @@ function Workspace({ processSeed, clearProcessSeed }: ProcessQuoteProps) {
       { label: 'Eliminar', disabled: !removable, danger: true, run: () => setDeleting(draft) },
     ]} />])} /><div className="quote-pagination"><button disabled={page === 1 || opening} onClick={() => setPage(p => p - 1)}>Anterior</button><span>Página {page}</span><button disabled={!result.data.has_more || opening} onClick={() => setPage(p => p + 1)}>Siguiente</button></div></> : !result.error && <Loading />}
     </section>
+    {conversion && <QuoteConversionDialog summary={conversion.summary} kind={conversion.kind} attempts={conversionAttempts.current} close={() => setConversion(null)} converted={value => {
+      setConversion(null); result.reload(); notify(value.reused ? 'Se abrió la factura existente de esta cotización.' : 'Conversión guardada. Completa los costos del documento.');
+      openConverted?.(value.target_module,value.target_id);
+    }} />}
     {email && <QuoteEmailComposer summary={email} close={() => setEmail(null)} sent={result.reload} />}
     {deleting && <Dialog title={`Eliminar ${deleting.quote_number ?? 'cotización'}`} close={() => { if (!opening) setDeleting(null); }}><p>Esta acción elimina la cotización y no se puede deshacer.</p><Notice>{error}</Notice><div className="actions"><button disabled={opening} onClick={() => setDeleting(null)}>Cancelar</button><button disabled={opening} className="danger" onClick={async () => {
       setError(''); setOpening(true);

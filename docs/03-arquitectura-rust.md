@@ -103,3 +103,7 @@ Completar validación integral del esquema MySQL y las sesiones existentes, alma
 ## Órdenes de compra: primer corte local
 
 `crates/modules/ordenes_compra` es dueño de órdenes, cálculo y catálogo de destinos confirmado bajo Ajustes. Tiene migraciones/ledger propios y no escribe tablas de otros módulos. Clientes manuales son instantáneas hasta definir vinculación; conversiones quedan pendientes. Destinos es catálogo de dominio, no un almacén alternativo de settings. Ver `modulos/ordenes-de-compra-implementacion.md`.
+
+## Coordinación transaccional entre documentos
+
+El crate interno document-flows implementa los casos de uso que atraviesan Cotizaciones, Órdenes y Facturas. Los adaptadores HTTP no ejecutan reglas ni SQL de dominio. El coordinador solo escribe sus relaciones/recibos y llama a los contratos transaccionales públicos de cada propietario. Mantiene una transacción MySQL común, orden de bloqueos explícito y autorización de ambos módulos. Tiene ledger propio; no registra un módulo ni permisos nuevos. Ver modulos/cotizaciones-conversiones.md.

@@ -11,15 +11,15 @@ import { newInvoice, newInvoiceItem } from '../invoices.js';
 import type { InvoiceCalculation, InvoiceDraft, InvoiceInput, InvoiceItem, InvoicePage } from '../invoices.js';
 import type { DiscountType } from '../quotes.js';
 
-export default function Facturas() {
+export default function Facturas({ initialId }: { initialId?: number } = {}) {
   const { access } = useCore();
   if (!moduleCan(access, 'facturas', 'documentos', 'ver')) return <Notice>No tienes acceso a Facturas.</Notice>;
-  return <Workspace />;
+  return <Workspace initialId={initialId} />;
 }
 
-const stage = 'Primera etapa: borradores sin numeración fiscal. Emisión, pagos, documentos y conversiones están pendientes.';
+const stage = 'Primera etapa: borradores sin numeración fiscal. Emisión, pagos y documentos están pendientes. Admite borradores desde Cotizaciones.';
 
-function Workspace() {
+function Workspace({ initialId }: { initialId?: number }) {
   const { api, access } = useCore();
   const [selected, setSelected] = useState<InvoiceDraft | 'new' | null>(null), [mode, setMode] = useState<'view' | 'edit'>('view');
   const [search, setSearch] = useState(''), [query, setQuery] = useState(''), [page, setPage] = useState(1), [error, setError] = useState(''), [busy, setBusy] = useState(false);
@@ -31,12 +31,13 @@ function Workspace() {
     try { setSelected(await api.request<InvoiceDraft>(`/api/v1/facturas/${id}`)); setMode(next); }
     catch (reason) { setError(message(reason)); } finally { setBusy(false); }
   };
+  useEffect(() => { if (initialId) void open(initialId, 'edit'); }, [initialId, api]);
   if (selected) return <InvoiceEditor key={selected === 'new' ? 'new' : selected.id} initial={selected === 'new' ? null : selected} editable={editable && mode === 'edit'} edit={editable && mode === 'view' ? () => setMode('edit') : undefined} close={() => { setSelected(null); result.reload(); }} />;
   return <><Heading title="Facturas" description="Prepara borradores y revisa venta, inversión y saldo." action={editable && <button className="primary" disabled={busy} onClick={() => { setSelected('new'); setMode('edit'); }}>Nueva factura</button>} />
     <p className="quote-stage">{stage}</p>
     <section className="quote-list invoice-list" aria-labelledby="invoice-list-title"><div className="quote-list-heading"><h2 id="invoice-list-title">Listado de facturas</h2>{result.data && <span>{result.data.items.length} en esta página</span>}</div>
     <form className="quote-search" onSubmit={e => { e.preventDefault(); setQuery(search); setPage(1); }}><label><span className="quote-sr-only">Buscar cliente o referencia de orden</span><input placeholder="Buscar por cliente o referencia" maxLength={200} value={search} onChange={e => setSearch(e.target.value)} /></label><button disabled={busy}>Buscar</button></form>
-    <Notice>{error || result.error}</Notice>{result.error && <button onClick={result.reload}>Reintentar consulta</button>}
+    <Notice>{error || result.error}</Notice>{initialId && error && <button disabled={busy} onClick={() => void open(initialId, 'edit')}>Reintentar abrir documento convertido</button>}{result.error && <button onClick={result.reload}>Reintentar consulta</button>}
     {result.data ? <><Table columns={['Referencia interna', 'Cliente', 'Fecha', 'Ítems', 'Total (HNL)', 'Saldo (HNL)', 'Estado', 'Acciones']} rows={result.data.items.map(row => [<span className="quote-number">Borrador {row.id}</span>, <div className="quote-list-client">{row.client_name || 'Sin cliente'}{row.order_number && <small>{row.order_number}</small>}</div>, row.invoice_date, row.item_count, <span className="quote-money">{row.total}</span>, <span className="quote-money">{row.balance}</span>, <span className="quote-status" data-state={row.status}>{row.status}</span>, <InvoiceActions number={`borrador de factura ${row.id}`} busy={busy} actions={[
       { label: 'Ver', run: () => void open(row.id, 'view') },
       { label: 'Editar', disabled: !editable, reason: !editable ? 'Sin permiso de edición' : undefined, run: () => void open(row.id, 'edit') },
@@ -74,7 +75,7 @@ export function InvoiceEditor({ initial, editable, edit, close }: { initial: Inv
   const change = <K extends keyof InvoiceInput>(key: K, value: InvoiceInput[K]) => { setData(previous => ({ ...previous, [key]: value })); setDirty(true); };
   const item = <K extends keyof InvoiceItem>(index: number, key: K, value: InvoiceItem[K]) => change('items', data.items.map((row, i) => i === index ? { ...row, [key]: value } : row));
   return <><Heading title={saved ? `Borrador de factura · ${saved.id}` : 'Nueva factura'} description="Estado: Borrador · Moneda: HNL" action={<div className="actions">{edit && <button onClick={edit}>Editar</button>}<button disabled={busy} onClick={() => void navigate(close)}>Volver</button></div>} />
-    <h2 className="invoice-focus-heading" tabIndex={-1} ref={heading}>Editor de borrador de factura</h2><p className="quote-stage">{stage}</p><Notice>{error}</Notice>
+    <h2 className="invoice-focus-heading" tabIndex={-1} ref={heading}>Editor de borrador de factura</h2><p className="quote-stage">{stage}</p>{saved?.source_quote && <p className="quote-note">Origen: {saved.source_quote.number ?? ("Cotización " + saved.source_quote.id)} · revisión {saved.source_quote.version}</p>}<Notice>{error}</Notice>
     {conflict && <div role="status"><p>Tus cambios se conservan en pantalla. Abre la versión actual para revisarlos antes de guardar.</p><button disabled={busy} onClick={() => void navigate(() => {
       setBusy(true); setError('');
       void api.request<InvoiceDraft>(`/api/v1/facturas/${saved!.id}`).then(latest => { setSaved(latest); setData(latest.data); setDirty(false); setConflict(false); attempt.current = null; }).catch(reason => setError(message(reason))).finally(() => setBusy(false));

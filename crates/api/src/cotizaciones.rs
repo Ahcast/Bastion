@@ -39,6 +39,18 @@ pub(super) fn routes(state: ApiState) -> Router<ApiState> {
             axum::routing::patch(change_status),
         )
         .route("/api/v1/cotizaciones/{id}/clone", post(clone_quote))
+        .route(
+            "/api/v1/cotizaciones/{id}/order-conversion",
+            get(order_conversion),
+        )
+        .route(
+            "/api/v1/cotizaciones/{id}/convert-order",
+            post(convert_order),
+        )
+        .route(
+            "/api/v1/cotizaciones/{id}/convert-invoice",
+            post(convert_invoice),
+        )
         .layer(RequestBodyLimitLayer::new(GENERAL_REQUEST_BODY_LIMIT))
         .merge(attachments)
         .route_layer(middleware::from_fn_with_state(state, guard))
@@ -674,4 +686,357 @@ async fn remove_attachment(
         .await
         .map(|version| Json(serde_json::json!({"quote_version":version})))
         .map_err(ApiError)
+}
+
+async fn order_conversion(
+    State(state): State<ApiState>,
+    headers: axum::http::HeaderMap,
+    Path(id): Path<u64>,
+) -> Result<Json<bastion_document_flows::OrderPreview>, ApiError> {
+    let user = actor(&state, &headers).await?;
+    bastion_document_flows::ConversionService::new(&state.core)
+        .order_preview(user.id, id, expected_version(&headers)?)
+        .await
+        .map(Json)
+        .map_err(ApiError)
+}
+async fn convert_order(
+    State(state): State<ApiState>,
+    headers: axum::http::HeaderMap,
+    Path(id): Path<u64>,
+    Json(input): Json<bastion_document_flows::OrderConversionInput>,
+) -> Result<Json<bastion_document_flows::ConversionResult>, ApiError> {
+    let user = actor(&state, &headers).await?;
+    bastion_document_flows::ConversionService::new(&state.core)
+        .order(
+            user.id,
+            id,
+            expected_version(&headers)?,
+            single_header(&headers, "idempotency-key")?,
+            input,
+        )
+        .await
+        .map(Json)
+        .map_err(ApiError)
+}
+async fn convert_invoice(
+    State(state): State<ApiState>,
+    headers: axum::http::HeaderMap,
+    Path(id): Path<u64>,
+) -> Result<Json<bastion_document_flows::ConversionResult>, ApiError> {
+    let user = actor(&state, &headers).await?;
+    bastion_document_flows::ConversionService::new(&state.core)
+        .invoice(
+            user.id,
+            id,
+            expected_version(&headers)?,
+            single_header(&headers, "idempotency-key")?,
+        )
+        .await
+        .map(Json)
+        .map_err(ApiError)
+}
+
+#[cfg(test)]
+mod conversion_tests {
+    use super::*;
+    use axum::body::{Body, to_bytes};
+    use bastion_core::Database;
+    use bastion_cotizaciones::{QuoteInput, QuoteService};
+    use bastion_document_flows::ConversionService;
+    use bastion_facturas::InvoiceService;
+    use bastion_ordenes_compra::OrderService;
+    use sqlx::mysql::MySqlPoolOptions;
+    use tower::ServiceExt;
+    #[tokio::test]
+    async fn mysql57_conversion_http_checks_sessions_csrf_destination_permissions_and_versions() {
+        let Ok(url) = std::env::var("BASTION_CONVERSIONS_HTTP_TEST_URL") else {
+            return;
+        };
+        let pool = MySqlPoolOptions::new()
+            .max_connections(10)
+            .connect(&url)
+            .await
+            .unwrap();
+        let db = Database::from_test_pool(pool.clone());
+        db.migrate().await.unwrap();
+        QuoteService::migrate(&db).await.unwrap();
+        InvoiceService::migrate(&db).await.unwrap();
+        OrderService::migrate(&db).await.unwrap();
+        ConversionService::migrate(&db).await.unwrap();
+        sqlx::query(
+            "INSERT INTO persons (id,full_name) VALUES (1,'Conversion admin'),(2,'Quote editor')",
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+        sqlx::query("INSERT INTO roles (id,name) VALUES (2,'Quote editor')")
+            .execute(&pool)
+            .await
+            .unwrap();
+        sqlx::query("INSERT INTO users (id,person_id,role_id,email,status) VALUES (1,1,1,'admin@example.test','active'),(2,2,2,'editor@example.test','active')").execute(&pool).await.unwrap();
+        for capability in ["ver", "editar"] {
+            sqlx::query("INSERT INTO role_permissions (role_id,module_id,scope_hash,scope_key,capability) VALUES (2,'cotizaciones',UNHEX(SHA2('documentos',256)),'documentos',?)").bind(capability).execute(&pool).await.unwrap();
+        }
+        for (user, token) in [
+            (1_u64, "conversion-admin-session"),
+            (2, "conversion-editor-session"),
+        ] {
+            sqlx::query("INSERT INTO sessions (user_id,token_hash,csrf_hash,ip_address,started_at,last_activity_at,last_totp_at,expires_at) VALUES (?,UNHEX(SHA2(?,256)),UNHEX(SHA2('conversion-csrf',256)),'127.0.0.1',UTC_TIMESTAMP(6),UTC_TIMESTAMP(6),UTC_TIMESTAMP(6),UTC_TIMESTAMP(6)+INTERVAL 1 HOUR)").bind(user).bind(token).execute(&pool).await.unwrap();
+        }
+        let core = CoreService::new(db.clone(), "x".repeat(32), [1; 32]).unwrap();
+        let quotes = QuoteService::new(db.clone(), core.admin());
+        quotes.synchronize_release(true).await.unwrap();
+        InvoiceService::new(db.clone(), core.admin())
+            .synchronize_release(true)
+            .await
+            .unwrap();
+        OrderService::new(db, core.admin())
+            .synchronize_release(true)
+            .await
+            .unwrap();
+        for module in ["cotizaciones", "facturas", "ordenes_compra"] {
+            core.admin()
+                .set_module_enabled(1, module, true)
+                .await
+                .unwrap();
+        }
+        let input:QuoteInput=serde_json::from_value(serde_json::json!({"client_name":"Cliente HTTP","order_number":"","quote_date":"2026-10-23","valid_days":30,"notes":"","terms":"","discount_type":"amount","discount_value":"0","items":[{"description":"Producto","quantity":"1","unit_price":"100","discount_type":"amount","discount_value":"0","tax_type":"isv15"}]})).unwrap();
+        let q = quotes
+            .create(1, "conversion-http-source-01", input.clone())
+            .await
+            .unwrap();
+        let other = quotes
+            .create(1, "conversion-http-source-02", input)
+            .await
+            .unwrap();
+        let app = super::super::router(
+            core.clone(),
+            "https://example.test".into(),
+            Vec::new(),
+            "/unused".into(),
+        )
+        .unwrap();
+        let make = |method: &str,
+                    id: u64,
+                    action: &str,
+                    token: Option<&str>,
+                    csrf: bool,
+                    origin: &str,
+                    version: Option<&str>,
+                    key: Option<&str>,
+                    body: &str| {
+            let mut b = axum::http::Request::builder()
+                .method(method)
+                .uri(format!("/api/v1/cotizaciones/{id}/{action}"))
+                .header("origin", origin)
+                .header("content-type", "application/json");
+            if let Some(token) = token {
+                b = b.header(
+                    "cookie",
+                    format!("__Host-bastion_session={token}; __Host-bastion_csrf=conversion-csrf"),
+                );
+            }
+            if csrf {
+                b = b.header("x-csrf-token", "conversion-csrf");
+            }
+            if let Some(version) = version {
+                b = b.header("if-match", version);
+            }
+            if let Some(key) = key {
+                b = b.header("idempotency-key", key);
+            }
+            let mut r = b.body(Body::from(body.to_owned())).unwrap();
+            r.extensions_mut()
+                .insert(ConnectInfo("127.0.0.1:5020".parse::<SocketAddr>().unwrap()));
+            r
+        };
+        let admin = Some("conversion-admin-session");
+        let key = Some("conversion-http-invoice-01");
+        assert_eq!(
+            app.clone()
+                .oneshot(make(
+                    "GET",
+                    q.id,
+                    "order-conversion",
+                    None,
+                    false,
+                    "https://example.test",
+                    Some("\"1\""),
+                    None,
+                    ""
+                ))
+                .await
+                .unwrap()
+                .status(),
+            StatusCode::UNAUTHORIZED
+        );
+        for (csrf, origin) in [
+            (false, "https://example.test"),
+            (true, "https://evil.example"),
+        ] {
+            assert_eq!(
+                app.clone()
+                    .oneshot(make(
+                        "POST",
+                        q.id,
+                        "convert-invoice",
+                        admin,
+                        csrf,
+                        origin,
+                        Some("\"1\""),
+                        key,
+                        ""
+                    ))
+                    .await
+                    .unwrap()
+                    .status(),
+                StatusCode::FORBIDDEN
+            );
+        }
+        assert_eq!(
+            app.clone()
+                .oneshot(make(
+                    "POST",
+                    q.id,
+                    "convert-invoice",
+                    Some("conversion-editor-session"),
+                    true,
+                    "https://example.test",
+                    Some("\"1\""),
+                    key,
+                    ""
+                ))
+                .await
+                .unwrap()
+                .status(),
+            StatusCode::FORBIDDEN
+        );
+        for (version, key) in [(None, key), (Some("\"1\""), None)] {
+            assert_eq!(
+                app.clone()
+                    .oneshot(make(
+                        "POST",
+                        q.id,
+                        "convert-invoice",
+                        admin,
+                        true,
+                        "https://example.test",
+                        version,
+                        key,
+                        ""
+                    ))
+                    .await
+                    .unwrap()
+                    .status(),
+                StatusCode::BAD_REQUEST
+            );
+        }
+        let before: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM facturas_drafts")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        assert_eq!(before, 0);
+        let response = app
+            .clone()
+            .oneshot(make(
+                "POST",
+                q.id,
+                "convert-invoice",
+                admin,
+                true,
+                "https://example.test",
+                Some("\"1\""),
+                key,
+                "",
+            ))
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+        let value: serde_json::Value =
+            serde_json::from_slice(&to_bytes(response.into_body(), 16384).await.unwrap()).unwrap();
+        assert_eq!(value["target_module"], "facturas");
+        assert_eq!(value["quote_version"], 2);
+        assert_eq!(
+            app.clone()
+                .oneshot(make(
+                    "POST",
+                    q.id,
+                    "convert-invoice",
+                    admin,
+                    true,
+                    "https://example.test",
+                    Some("\"1\""),
+                    key,
+                    ""
+                ))
+                .await
+                .unwrap()
+                .status(),
+            StatusCode::OK
+        );
+        assert_eq!(
+            app.clone()
+                .oneshot(make(
+                    "POST",
+                    other.id,
+                    "convert-invoice",
+                    admin,
+                    true,
+                    "https://example.test",
+                    Some("\"99\""),
+                    Some("conversion-http-stale-01"),
+                    ""
+                ))
+                .await
+                .unwrap()
+                .status(),
+            StatusCode::PRECONDITION_FAILED
+        );
+        assert_eq!(
+            app.clone()
+                .oneshot(make(
+                    "POST",
+                    other.id,
+                    "convert-order",
+                    admin,
+                    true,
+                    "https://example.test",
+                    Some("\"1\""),
+                    Some("conversion-http-order-01"),
+                    "{\"n_orders\":\"ORDER-1\",\"id_destination\":999}"
+                ))
+                .await
+                .unwrap()
+                .status(),
+            StatusCode::BAD_REQUEST
+        );
+        assert_eq!(quotes.detail(1, other.id).await.unwrap().version, 1);
+        core.admin()
+            .set_module_enabled(1, "facturas", false)
+            .await
+            .unwrap();
+        assert_eq!(
+            app.oneshot(make(
+                "POST",
+                q.id,
+                "convert-invoice",
+                admin,
+                true,
+                "https://example.test",
+                Some("\"1\""),
+                key,
+                ""
+            ))
+            .await
+            .unwrap()
+            .status(),
+            StatusCode::NOT_FOUND
+        );
+        let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM facturas_drafts")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        assert_eq!(count, 1);
+    }
 }

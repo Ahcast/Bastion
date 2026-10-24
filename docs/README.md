@@ -41,6 +41,8 @@ El informe se obtuvo de una copia de frontend Angular compilado y backend Larave
 
 - 2026-10-23: el usuario solicita completar la numeración SAR. Se agregan rango autorizado, fecha límite, factura actual y texto SAR en Ajustes > Facturas y Core > Empresa y SAR, con configuración global única, administración exclusiva, estado calculado en Rust y control de edición simultánea. No emite ni consume numeración. Ver `17-empresa-sar.md`.
 
+- 2026-10-23: el usuario autoriza habilitar conversiones desde Cotizaciones. El servicio interno document-flows coordina transacciones entre los contratos propietarios de Cotizaciones, Órdenes y Facturas. No es un módulo de navegación. Factura única por origen y borrador a crédito 30 días según Legacy; Órdenes pide número/destino y rechaza incompatibilidades sin perder datos. Ver modulos/cotizaciones-conversiones.md.
+
 - 2026-10-23: Facturas desplegado en AWS/Bluehost desde `f6c5a1d` tras CI exitoso, respaldo privado y migración propia 1. Se verifican salud HTTPS, 35 archivos públicos y preservación de 43 tablas existentes. Disponible sin activar; ítems sin tracking ni comentarios. Ver `modulos/facturas-implementacion.md`.
 
 - 2026-10-23: corrección solicitada de Procesos → Cotización: una línea por ítem analizado de Scout con su cantidad, en lugar de filas originales que agrupan varios productos. No usar descripción ni items_fuente como línea genérica. Se conserva el aviso no bloqueante. El usuario indica continuar la publicación; ver `modulos/procesos-cotizacion.md`.
@@ -187,4 +189,5 @@ El informe se obtuvo de una copia de frontend Angular compilado y backend Larave
 
 - 2026-10-23: continúa Órdenes de compra con listado/filtros, editor y cálculo cotejado del Legacy. El usuario confirma agregar el catálogo de destinos en Ajustes > Órdenes de compra; alta/renombrado como ampliación autorizada, propiedad del dominio de Órdenes y permisos destinos/ver/editar. Registro ordenes_compra desactivado, migraciones propias, idempotencia, versiones y auditoría; cliente manual como instantánea. Archivos, proveedores, clonación, eliminación, conversiones y MCP siguen pendientes. Publicado en GitHub y desplegado en AWS/Bluehost desde 59a8057 con CI exitoso, respaldo y migración propia verificados; disponible sin activar. No se migran datos Legacy. Ver modulos/ordenes-de-compra-implementacion.md y su OpenAPI.
 - 2026-10-23: el usuario confirma que los ítems de Facturas no llevan tracking ni comentarios. Se retiran del editor y del contrato; los borradores anteriores siguen siendo legibles y estos campos se omiten al responder y guardar. Ver modulos/facturas-implementacion.md.
+
 

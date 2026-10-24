@@ -184,6 +184,7 @@ dependencies = [
  "bastion-clientes",
  "bastion-core",
  "bastion-cotizaciones",
+ "bastion-document-flows",
  "bastion-facturas",
  "bastion-ordenes-compra",
  "bastion-procesos",
@@ -258,6 +259,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "bastion-document-flows"
+version = "0.1.0"
+dependencies = [
+ "bastion-core",
+ "bastion-cotizaciones",
+ "bastion-facturas",
+ "bastion-ordenes-compra",
+ "serde",
+ "serde_json",
+ "sha2 0.10.9",
+ "sqlx",
+ "tokio",
+]
+
+[[package]]
 name = "bastion-facturas"
 version = "0.1.0"
 dependencies = [
@@ -281,6 +297,7 @@ name = "bastion-ordenes-compra"
 version = "0.1.0"
 dependencies = [
  "bastion-core",
+ "bastion-cotizaciones",
  "chrono",
  "serde",
  "serde_json",
@@ -316,6 +333,7 @@ dependencies = [
  "bastion-clientes",
  "bastion-core",
  "bastion-cotizaciones",
+ "bastion-document-flows",
  "bastion-facturas",
  "bastion-ordenes-compra",
  "bastion-procesos",

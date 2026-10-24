@@ -295,3 +295,19 @@ mod tests {
         assert!(parsed.validate().is_err());
     }
 }
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct QuoteOrigin {
+    pub id: u64,
+    pub number: Option<String>,
+    pub version: u64,
+}
+impl From<&QuoteDraft> for QuoteOrigin {
+    fn from(source: &QuoteDraft) -> Self {
+        Self {
+            id: source.id,
+            number: source.quote_number.clone(),
+            version: source.version,
+        }
+    }
+}

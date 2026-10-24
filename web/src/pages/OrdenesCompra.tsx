@@ -9,11 +9,11 @@ import type { Destination, OrderCalculation, OrderInput, OrderPage, OrderProduct
 
 const base = '/api/v1/ordenes-compra';
 const stage = 'Primera etapa: cliente manual, productos, gastos y destinos. Adjuntos, proveedores, clonación, eliminación y conversión a factura están pendientes.';
-export default function OrdenesCompra() {
+export default function OrdenesCompra({ initialId }: { initialId?: number } = {}) {
   const { access } = useCore();
-  return moduleCan(access, 'ordenes_compra', 'documentos', 'ver') ? <Workspace /> : <Notice>No tienes acceso a Órdenes de compra.</Notice>;
+  return moduleCan(access, 'ordenes_compra', 'documentos', 'ver') ? <Workspace initialId={initialId} /> : <Notice>No tienes acceso a Órdenes de compra.</Notice>;
 }
-function Workspace() {
+function Workspace({ initialId }: { initialId?: number }) {
   const { api, access } = useCore();
   const editable = moduleCan(access, 'ordenes_compra', 'documentos', 'editar');
   const [selected, setSelected] = useState<PurchaseOrder | 'new' | null>(null), [mode, setMode] = useState<'view' | 'edit'>('view');
@@ -21,6 +21,7 @@ function Workspace() {
   const [query, setQuery] = useState(''), [page, setPage] = useState(1), [error, setError] = useState(''), [busy, setBusy] = useState(false);
   const result = useLoad(signal => api.request<OrderPage>(`${base}?${query}&page=${page}&page_size=25`, { signal }), [query, page]);
   const open = async (id: number, next: 'view' | 'edit') => { setBusy(true); setError(''); try { setSelected(await api.request<PurchaseOrder>(`${base}/${id}`)); setMode(next); } catch (reason) { setError(message(reason)); } finally { setBusy(false); } };
+  useEffect(() => { if (initialId) void open(initialId, 'edit'); }, [initialId, api]);
   if (selected) return <OrderEditor key={selected === 'new' ? 'new' : selected.id} initial={selected === 'new' ? null : selected} editable={editable && mode === 'edit'} edit={editable && mode === 'view' ? () => setMode('edit') : undefined} close={() => { setSelected(null); result.reload(); }} />;
   return <><Heading title="Órdenes de compra" description="Sigue productos, venta, inversión y entrega de tus órdenes." action={editable && <button className="primary" disabled={busy} onClick={() => { setSelected('new'); setMode('edit'); }}>Nueva orden</button>} /><p className="quote-stage">{stage}</p>
     <form className="card order-filters" onSubmit={e => { e.preventDefault(); const params = new URLSearchParams(); if (search.trim()) params.set('search', search.trim()); if (status) params.set('status', status); if (min) params.set('min_total', min); if (max) params.set('max_total', max); setQuery(params.toString()); setPage(1); }}>
@@ -29,7 +30,7 @@ function Workspace() {
       <label>Valor mínimo (HNL)<input inputMode="decimal" pattern="[0-9]{1,12}([.][0-9]{1,4})?" maxLength={17} value={min} onChange={e => setMin(e.target.value)} /></label>
       <label>Valor máximo (HNL)<input inputMode="decimal" pattern="[0-9]{1,12}([.][0-9]{1,4})?" maxLength={17} value={max} onChange={e => setMax(e.target.value)} /></label>
       <div className="actions"><button disabled={busy}>Aplicar filtros</button><button type="button" disabled={busy} onClick={() => { setSearch(''); setStatus(''); setMin(''); setMax(''); setQuery(''); setPage(1); }}>Limpiar filtros</button></div>
-    </form><Notice>{error || result.error}</Notice>{result.error && <button onClick={result.reload}>Reintentar consulta</button>}
+    </form><Notice>{error || result.error}</Notice>{initialId && error && <button disabled={busy} onClick={() => void open(initialId, 'edit')}>Reintentar abrir documento convertido</button>}{result.error && <button onClick={result.reload}>Reintentar consulta</button>}
     {result.data ? <><Table columns={['Orden', 'Factura', 'Cliente', 'Fecha', 'Total (HNL)', 'Estado', 'Acciones']} rows={result.data.items.map(row => [row.n_orders, row.n_bill || '—', row.client_name, row.order_date, row.total, row.status, <QuoteActions number={row.n_orders} busy={busy} actions={[
       { label: 'Ver', run: () => void open(row.id, 'view') }, { label: 'Editar', disabled: !editable, reason: !editable ? 'Sin permiso de edición' : undefined, run: () => void open(row.id, 'edit') },
       { label: 'Documentos', disabled: true, reason: 'Adjuntos privados pendientes' }, { label: 'Convertir a factura', disabled: true, reason: 'Conversión entre módulos pendiente' },
@@ -57,7 +58,7 @@ export function OrderEditor({ initial, editable, edit, close }: { initial: Purch
   const change = <K extends keyof OrderInput>(key: K, value: OrderInput[K]) => { setData(previous => ({ ...previous, [key]: value })); setDirty(true); };
   const product = <K extends keyof OrderProduct>(index: number, key: K, value: OrderProduct[K]) => change('products', data.products.map((row, i) => i === index ? { ...row, [key]: value } : row));
   return <><Heading title={saved ? `Orden · ${saved.data.n_orders}` : 'Nueva orden de compra'} description={`Estado: ${calculation?.status ?? saved?.status ?? 'Pendiente'} · Moneda: HNL`} action={<div className="actions">{edit && <button onClick={edit}>Editar</button>}<button disabled={busy} onClick={() => void navigate(close)}>Volver</button></div>} />
-    <h2 className="order-focus-heading" tabIndex={-1} ref={heading}>Editor de orden de compra</h2><p className="quote-stage">{stage}</p><Notice>{error}</Notice>
+    <h2 className="order-focus-heading" tabIndex={-1} ref={heading}>Editor de orden de compra</h2><p className="quote-stage">{stage}</p>{saved?.source_quote && <p className="quote-note">Origen: {saved.source_quote.number ?? ("Cotización " + saved.source_quote.id)} · revisión {saved.source_quote.version}</p>}<Notice>{error}</Notice>
     {ambiguous && <p role="status">No se pudo confirmar la creación. Reintenta guardar los mismos datos para recuperar el resultado sin duplicar la orden.</p>}
     {conflict && <div role="status"><p>Tus cambios se conservan en pantalla. Abre la versión actual para revisarlos antes de guardar.</p><button disabled={busy} onClick={() => void navigate(() => { setBusy(true); setError(''); void api.request<PurchaseOrder>(`${base}/${saved!.id}`).then(latest => { setSaved(latest); setData(latest.data); setDirty(false); setConflict(false); }).catch(reason => setError(message(reason))).finally(() => setBusy(false)); })}>Abrir versión actual</button></div>}
     <Notice>{destinations.error}</Notice>{destinations.error && <button onClick={destinations.reload}>Reintentar destinos</button>}

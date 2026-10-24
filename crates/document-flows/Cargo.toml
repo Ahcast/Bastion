@@ -1,0 +1,19 @@
+[package]
+name = "bastion-document-flows"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+bastion-core = { path = "../core" }
+bastion-cotizaciones = { path = "../modules/cotizaciones" }
+bastion-facturas = { path = "../modules/facturas" }
+bastion-ordenes-compra = { path = "../modules/ordenes_compra" }
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+sqlx.workspace = true
+
+[dev-dependencies]
+bastion-core = { path = "../core", features = ["test-support"] }
+tokio.workspace = true
+

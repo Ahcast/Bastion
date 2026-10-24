@@ -65,3 +65,7 @@ Se verificaron los SHA-256 de los ZIP, paquetes y archivos antes de instalar. Ba
 La primera instalación se revirtió automáticamente al detectar diferencias en CHECKSUM TABLE. La inspección comprobó que esos checksums no eran repetibles en las tablas JSON y que los INSERT de negocio seguían idénticos al respaldo. Las diferencias reales eran el ledger nuevo y la limpieza de desafíos OTP vencidos al restaurar el servicio. El reintento conservó las tablas aditivas vacías verificadas y comparó hashes de datos lógicos y esquemas de todas las tablas existentes antes y después de migrate; la comparación fue correcta.
 
 Comprobación HTTPS: frontend BUILD del mismo commit y hashes de 21 recursos públicos correctos; API live/ready 200, Órdenes y Destinos anónimos 401. Se conservaron datos de negocio, activación de los módulos existentes y configuración de documentos. Órdenes queda incluido y permitido, **desactivado hasta su activación administrativa en Ajustes > Core > Módulos**; el catálogo de destinos comienza vacío. La validación operativa con usuarios, las funciones pendientes y la restauración integral de respaldos siguen abiertas.
+
+## Integración de conversiones — 2026-10-23
+
+Creación desde Cotizaciones implementada mediante document-flows, completando número y destino y conservando origen. Cantidades, descuentos, impuestos y redondeo incompatibles se rechazan explícitamente; la conversión a Facturas desde Órdenes sigue pendiente. Ver cotizaciones-conversiones.md.

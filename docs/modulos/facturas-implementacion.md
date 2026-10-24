@@ -63,3 +63,7 @@ CI valida Rust/MySQL 5.7 y 89 pruebas frontend; localmente pasan las cinco prueb
 
 Ajustes SAR incorporados por solicitud del usuario: rango autorizado, fecha límite, factura actual y texto SAR. Configuración única del Core, visible en Ajustes > Facturas y Core > Empresa y SAR para el Administrador. Estado calculado en servidor; edición con versión. Configurar no emite ni asigna números a borradores. Ver [detalle](../17-empresa-sar.md).
 
+
+## Integración de conversiones — 2026-10-23
+
+Conversión desde Cotizaciones implementada mediante document-flows: borrador a crédito 30 días, origen persistido, instantánea de cliente, mismos importes y factura única por origen. No habilita emisión fiscal ni conversión desde órdenes. Ver cotizaciones-conversiones.md.

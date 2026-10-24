@@ -3,7 +3,7 @@
 mod calculation;
 mod service;
 pub use calculation::{OrderCalculation, OrderTotals, calculate};
-pub use service::OrderService;
+pub use service::{OrderService, quote_order_input};
 
 use bastion_core::CoreError;
 use chrono::NaiveDate;
@@ -53,6 +53,8 @@ pub struct OrderInput {
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct PurchaseOrder {
+    #[serde(default)]
+    pub source_quote: Option<bastion_cotizaciones::QuoteOrigin>,
     pub id: u64,
     pub version: u64,
     pub status: String,

@@ -6,6 +6,10 @@ use bastion_core::{CoreAdmin, CoreError, Database};
 use sha2::{Digest, Sha256};
 use sqlx::{MySql, QueryBuilder, Row, Transaction};
 
+#[path = "conversion.rs"]
+mod conversion;
+pub use conversion::quote_order_input;
+
 #[derive(Clone)]
 pub struct OrderService {
     database: Database,
@@ -235,7 +239,9 @@ impl OrderService {
         )
         .await?;
         tx.commit().await?;
-        Ok(record(id, version, calculation))
+        let mut result = record(id, version, calculation);
+        result.source_quote = current.source_quote;
+        Ok(result)
     }
     pub async fn destinations(&self, actor: u64) -> Result<Vec<Destination>, CoreError> {
         let mut tx = self.begin_destinations(actor).await?;
@@ -344,6 +350,7 @@ impl OrderService {
 }
 fn record(id: u64, version: u64, calculation: OrderCalculation) -> PurchaseOrder {
     PurchaseOrder {
+        source_quote: None,
         id,
         version,
         status: calculation.status.clone(),
@@ -367,15 +374,21 @@ async fn validate_destination(
 }
 async fn load(tx: &mut Transaction<'_, MySql>, id: u64) -> Result<PurchaseOrder, CoreError> {
     let row =
-        sqlx::query("SELECT id,version,calculation_json FROM ordenes_orders WHERE id=? FOR UPDATE")
+        sqlx::query("SELECT id,version,calculation_json,source_quote_json FROM ordenes_orders WHERE id=? FOR UPDATE")
             .bind(id)
             .fetch_optional(&mut **tx)
             .await?
             .ok_or(CoreError::NotFound)?;
     let value: serde_json::Value = row.try_get("calculation_json")?;
-    Ok(record(
+    let mut order = record(
         row.try_get("id")?,
         row.try_get("version")?,
         serde_json::from_value(value).map_err(|_| CoreError::Invalid)?,
-    ))
+    );
+    let origin: Option<serde_json::Value> = row.try_get("source_quote_json")?;
+    order.source_quote = origin
+        .map(serde_json::from_value)
+        .transpose()
+        .map_err(|_| CoreError::Invalid)?;
+    Ok(order)
 }

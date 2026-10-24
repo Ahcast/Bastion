@@ -8,6 +8,7 @@ name = "bastion-server"
 path = "src/main.rs"
 
 [dependencies]
+bastion-document-flows = { path = "../../crates/document-flows" }
 axum.workspace = true
 bastion-api = { path = "../../crates/api" }
 bastion-core = { path = "../../crates/core" }

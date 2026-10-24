@@ -9,8 +9,8 @@ Decisiones del usuario, 22 de octubre de 2026: menú desplegable por cotización
 | Ver | Abre los datos sin habilitar edición. Puede pasar a Editar si tiene permiso. | ver |
 | Editar | Abre el editor de la revisión actual. Guardado con If-Match. | editar |
 | Marcar como enviado | Cambia a Enviada; no envía correo. Conserva ítems, contacto y cálculos. | editar |
-| Convertir a orden de compra | Deshabilitado por acuerdo. Legacy abre una nueva orden con quote_id para completar destino y número de orden. | editar, al implementar |
-| Convertir a factura | Deshabilitado por acuerdo. Legacy crea una factura relacionada y abre su detalle; evita duplicar una conversión previa. | editar, al implementar |
+| Convertir a orden de compra | Completa número/destino, crea una orden relacionada y marca Convertido en una transacción. Rechaza incompatibilidades sin perder importes. | ver/editar de origen y destino |
+| Convertir a factura | Crea o abre un borrador relacionado a crédito de 30 días, conserva importes y evita otra factura para el mismo origen. | ver/editar de origen y destino |
 | Aprobar | Cambia a Aprobada; no inventa una matriz de transiciones. | editar |
 | Clonar | Copia ítems, referencia, notas, términos, descuentos y vigencia. Limpia cliente; asigna nuevo número, contacto del actor, Borrador y fecha actual de Honduras. Abre la copia para editar. No modifica el original. | editar |
 | PDF | Genera y abre en otra pestaña del navegador el documento de la revisión seleccionada mediante Typst compartido, usando el cálculo guardado. Excluye notas privadas. | ver |
@@ -87,3 +87,5 @@ Verificación: pruebas de selección múltiple, revisiones encadenadas, reintent
 AWS y Bluehost se publicaron desde artifacts de ese commit con verificación de hashes ZIP, tar y archivos. Migración 0004 aplicada después de respaldo privado; se compararon los INSERT lógicos de las tablas de negocio y los metadatos anteriores de documentos durante la parada. Activación de módulos y configuración quedaron conservadas. HTTPS comprobó health 200, hashes de 22 assets y 401 sin sesión en listado/contenido de adjuntos.
 
 La revisión local del navegador usó únicamente archivos sintéticos: selección múltiple de PDF y texto, subida de ambos y apertura del PDF en otra pestaña con URL Blob, sin activar descarga. La herramienta de inspección no permite observar el contenido de una pestaña Blob; no se eludió esa restricción. No se crearon documentos sintéticos ni se enviaron correos en producción.
+
+La autorización posterior del 2026-10-23 habilita la integración de conversiones descrita en cotizaciones-conversiones.md y su OpenAPI. Sustituye la deshabilitación inicial por dependencias y permisos reales. Facturas sigue limitado a borradores sin emisión fiscal.

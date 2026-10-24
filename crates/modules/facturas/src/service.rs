@@ -7,6 +7,9 @@ use crate::{
     calculate,
 };
 
+#[path = "conversion.rs"]
+mod conversion;
+
 #[derive(Clone)]
 pub struct InvoiceService {
     database: Database,
@@ -184,6 +187,7 @@ impl InvoiceService {
             status: "Borrador".into(),
             currency: "HNL".into(),
             invoice_number: None,
+            source_quote: None,
             data: calculation.data.clone(),
             calculation,
         };
@@ -241,6 +245,7 @@ impl InvoiceService {
             status: "Borrador".into(),
             currency: "HNL".into(),
             invoice_number: None,
+            source_quote: current.source_quote,
             data: calculation.data.clone(),
             calculation,
         })
@@ -276,15 +281,20 @@ impl InvoiceService {
 }
 
 async fn load(tx: &mut Transaction<'_, MySql>, id: u64) -> Result<InvoiceDraft, CoreError> {
-    let row = sqlx::query("SELECT id,version,status,data_json,calculation_json FROM facturas_drafts WHERE id=? FOR UPDATE").bind(id).fetch_optional(&mut **tx).await?.ok_or(CoreError::NotFound)?;
+    let row = sqlx::query("SELECT id,version,status,data_json,calculation_json,source_quote_json FROM facturas_drafts WHERE id=? FOR UPDATE").bind(id).fetch_optional(&mut **tx).await?.ok_or(CoreError::NotFound)?;
     let data: serde_json::Value = row.try_get("data_json")?;
     let calculation: serde_json::Value = row.try_get("calculation_json")?;
+    let origin: Option<serde_json::Value> = row.try_get("source_quote_json")?;
     Ok(InvoiceDraft {
         id: row.try_get("id")?,
         version: row.try_get("version")?,
         status: row.try_get("status")?,
         currency: "HNL".into(),
         invoice_number: None,
+        source_quote: origin
+            .map(serde_json::from_value)
+            .transpose()
+            .map_err(|_| CoreError::Invalid)?,
         data: serde_json::from_value(data).map_err(|_| CoreError::Invalid)?,
         calculation: serde_json::from_value(calculation).map_err(|_| CoreError::Invalid)?,
     })
