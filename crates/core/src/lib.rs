@@ -22,4 +22,3 @@ pub use service::{
     BusinessMailAttachment, CoreError, CoreService, InvitationDispatch, LoginStart, ModuleAccess,
     ProfileInfo, SecurityEventInfo, SessionInfo, SmtpCredentialInfo, TrustedDeviceInfo,
 };
-

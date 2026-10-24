@@ -51,4 +51,3 @@ pub(super) async fn put(
         Err(error) => Err(ApiError(error)),
     }
 }
-

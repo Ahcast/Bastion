@@ -1351,4 +1351,3 @@ mod permission_tests {
         assert_eq!(sar_audits, 1);
     }
 }
-
