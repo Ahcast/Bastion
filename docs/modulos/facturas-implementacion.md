@@ -59,3 +59,7 @@ Por solicitud del usuario se instala el commit [`f6c5a1d`](https://github.com/Ah
 - Frontend instalado con respaldo privado y cambio atómico del HTML, conservando configuración pública, reglas del hosting y assets anteriores. Se verifican 35 archivos públicos por HTTPS y el fallback SPA de `/facturas`. Los ítems no llevan tracking ni comentarios.
 
 CI valida Rust/MySQL 5.7 y 89 pruebas frontend; localmente pasan las cinco pruebas de cálculo de Facturas y el build frontend. La comprobación del despliegue no crea documentos comerciales ni sustituye una prueba autenticada del módulo activo. Los pendientes de emisión, pagos y documentos derivados se mantienen.
+
+
+Ajustes SAR incorporados por solicitud del usuario: rango autorizado, fecha límite, factura actual y texto SAR. Configuración única del Core, visible en Ajustes > Facturas y Core > Empresa y SAR para el Administrador. Estado calculado en servidor; edición con versión. Configurar no emite ni asigna números a borradores. Ver [detalle](../17-empresa-sar.md).
+

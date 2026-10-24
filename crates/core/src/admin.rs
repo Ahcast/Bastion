@@ -773,6 +773,68 @@ impl CoreAdmin {
         sqlx::query_as::<_,SettingRecord>("SELECT module_id,scope_key,setting_key,schema_version,value_json,updated_at FROM settings WHERE module_id='core' AND scope_key='global' ORDER BY setting_key").fetch_all(&self.database.pool).await.map_err(Into::into)
     }
 
+    pub async fn get_sar_settings(
+        &self,
+        actor: u64,
+    ) -> Result<crate::SarSettingsRecord, CoreError> {
+        self.require_admin(actor).await?;
+        let value: Option<serde_json::Value> = sqlx::query_scalar("SELECT value_json FROM settings WHERE module_id='core' AND scope_key='global' AND setting_key='company.sar'")
+            .fetch_optional(&self.database.pool).await?;
+        crate::sar::sar_record(value)
+    }
+
+    pub async fn set_sar_settings(
+        &self,
+        actor: u64,
+        settings: crate::SarSettings,
+        expected_version: &str,
+    ) -> Result<crate::SarSettingsRecord, CoreError> {
+        self.require_admin(actor).await?;
+        let settings = settings.normalize()?;
+        if expected_version.len() != 64
+            || !expected_version
+                .bytes()
+                .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
+        {
+            return Err(CoreError::Invalid);
+        }
+        let mut tx = self.database.pool.begin().await?;
+        // Serialize first creation as well as later edits, without DDL or a
+        // second counter. This setting does not issue invoice numbers.
+        let core: Option<String> = sqlx::query_scalar(
+            "SELECT module_id FROM module_registry WHERE module_id='core' FOR UPDATE",
+        )
+        .fetch_optional(&mut *tx)
+        .await?;
+        if core.is_none() {
+            return Err(CoreError::Conflict);
+        }
+        let administrator: Option<u64> = sqlx::query_scalar("SELECT u.id FROM users u JOIN roles r ON r.id=u.role_id WHERE u.id=? AND u.status='active' AND r.system_key='system_administrator'")
+            .bind(actor).fetch_optional(&mut *tx).await?;
+        if administrator.is_none() {
+            return Err(CoreError::Forbidden);
+        }
+        let previous: Option<serde_json::Value> = sqlx::query_scalar("SELECT value_json FROM settings WHERE module_id='core' AND scope_key='global' AND setting_key='company.sar' FOR UPDATE")
+            .fetch_optional(&mut *tx).await?;
+        if crate::sar::sar_version(&previous)? != expected_version {
+            return Err(CoreError::PreconditionFailed);
+        }
+        let value = serde_json::to_value(settings).map_err(|_| CoreError::Invalid)?;
+        sqlx::query("INSERT INTO settings (lookup_hash,module_id,scope_key,setting_key,schema_version,value_json,updated_by) VALUES (?,'core','global','company.sar',1,?,?) ON DUPLICATE KEY UPDATE value_json=VALUES(value_json),updated_by=VALUES(updated_by)")
+            .bind(hash_key("core\0global\0company.sar")).bind(&value).bind(actor).execute(&mut *tx).await?;
+        Self::record_domain_event(
+            &mut tx,
+            actor,
+            "core",
+            "settings.sar.update",
+            "company.sar",
+            serde_json::json!({"schema_version":1}),
+        )
+        .await?;
+        tx.commit().await?;
+        crate::sar::sar_record(Some(value))
+    }
+
     pub async fn set_core_setting(
         &self,
         actor: u64,
@@ -1227,5 +1289,66 @@ mod permission_tests {
         .await
         .unwrap();
         assert_eq!(audits, 2);
+
+        // SAR remains administrator-only even for a custom role with Core grants.
+        admin
+            .update_role(
+                administrator,
+                role.id,
+                None,
+                None,
+                Some(vec![
+                    permission("core", "*", "ver"),
+                    permission("core", "*", "editar"),
+                ]),
+            )
+            .await
+            .unwrap();
+        let initial = admin.get_sar_settings(administrator).await.unwrap();
+        assert!(matches!(
+            admin.get_sar_settings(ordinary).await,
+            Err(CoreError::Forbidden)
+        ));
+        let sar = crate::SarSettings {
+            limit_range: "000-001-01-00000001 al 000-001-01-00000100".into(),
+            current_invoice: "000-001-01-00000090".into(),
+            limit_date: Some(chrono::NaiveDate::from_ymd_opt(2027, 1, 1).unwrap()),
+            sar_text: "Texto sintético".into(),
+        };
+        assert!(matches!(
+            admin
+                .set_sar_settings(ordinary, sar.clone(), &initial.version)
+                .await,
+            Err(CoreError::Forbidden)
+        ));
+        let saved = admin
+            .set_sar_settings(administrator, sar.clone(), &initial.version)
+            .await
+            .unwrap();
+        assert_eq!(saved.status.invoices_remaining, Some(10));
+        assert_ne!(saved.version, initial.version);
+        assert_eq!(
+            admin.get_sar_settings(administrator).await.unwrap().version,
+            saved.version
+        );
+        assert!(matches!(
+            admin
+                .set_sar_settings(administrator, sar, &initial.version)
+                .await,
+            Err(CoreError::PreconditionFailed)
+        ));
+        assert_eq!(
+            admin.get_sar_settings(administrator).await.unwrap().version,
+            saved.version
+        );
+        let sar_audits: i64 = sqlx::query_scalar(
+            "SELECT COUNT(*) FROM audit_events WHERE actor_id=? AND action='settings.sar.update'",
+        )
+        .bind(administrator)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(sar_audits, 1);
     }
 }
+

@@ -1,0 +1,67 @@
+openapi: 3.1.0
+info:
+  title: Bastion Core — Empresa/SAR
+  version: 0.1.0
+paths:
+  /api/v1/settings/sar:
+    get:
+      summary: Consultar configuración y estado SAR (Administrador del sistema)
+      responses:
+        '200':
+          description: Configuración, versión opaca y estado calculado en servidor
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Record'}
+        '401': {description: Sin sesión}
+        '403': {description: No es Administrador del sistema}
+    put:
+      summary: Guardar configuración global SAR con control de versión
+      description: Requiere sesión, origen y CSRF del Core. No asigna números ni emite facturas.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [settings, version]
+              properties:
+                settings: {$ref: '#/components/schemas/Settings'}
+                version: {type: string, pattern: '^[0-9a-f]{64}$'}
+      responses:
+        '200':
+          description: Configuración guardada y estado actualizado
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Record'}
+        '401': {description: Sin sesión}
+        '403': {description: Permisos o CSRF inválidos}
+        '412': {description: Configuración modificada desde su lectura; cambios conservados en el formulario}
+        '422': {description: Campos o versión inválidos}
+components:
+  schemas:
+    Settings:
+      type: object
+      additionalProperties: false
+      required: [limit_range, limit_date, current_invoice, sar_text]
+      properties:
+        limit_range: {type: string, maxLength: 255}
+        limit_date: {type: [string, 'null'], format: date}
+        current_invoice: {type: string, maxLength: 80}
+        sar_text: {type: string, maxLength: 3000}
+    Status:
+      type: object
+      required: [days_remaining, invoices_remaining, range_expired, date_expired]
+      properties:
+        days_remaining: {type: [integer, 'null']}
+        invoices_remaining: {type: [integer, 'null'], minimum: 0}
+        range_expired: {type: boolean}
+        date_expired: {type: boolean}
+    Record:
+      type: object
+      required: [settings, version, status]
+      properties:
+        settings: {$ref: '#/components/schemas/Settings'}
+        version: {type: string, pattern: '^[0-9a-f]{64}$'}
+        status: {$ref: '#/components/schemas/Status'}
+

@@ -1,3 +1,5 @@
+import SarSettings from './SarSettings.js';
+import { useNavigationGuard } from '../navigationGuard.js';
 import { lazy, Suspense, useState } from 'react';
 import { message } from '../api.js';
 import { Form, Heading, Loading, Notice, Table, useCore, useLoad } from '../ui.js';
@@ -20,8 +22,9 @@ export default function Settings({ section, select }: { section: SettingsSection
   return <section aria-label="Ajustes"><div className="settings-location"><span>Ajustes</span><span aria-hidden="true"> / </span><strong>{selected.label}</strong></div><SettingsNavigation access={access} section={selected.id} select={select} /><div key={selected.id}><Suspense fallback={<Loading />}>{selected.id === 'personas' ? <People /> : selected.id === 'usuarios' ? <Users /> : selected.id === 'roles' ? <Roles /> : selected.id === 'core' ? <CoreSettings /> : selected.id === 'clientes' ? <ClientSettings /> : selected.id === 'ordenes_compra' ? <OrderSettings /> : selected.id === 'cotizaciones' ? <QuoteSettings /> : selected.id === 'facturas' ? <InvoiceSettings /> : selected.id === 'procesos' ? <ProcessSettings /> : <Account />}</Suspense></div></section>;
 }
 function CoreSettings() {
+  const { navigate } = useNavigationGuard();
   const [tab, setTab] = useState('modules');
-  return <><Heading title="Ajustes del Core" description="Módulos, correo global, bitácora y reintentos." /><div className="row section-tabs" aria-label="Ajustes del Core">{[['modules', 'Módulos'], ['company', 'Empresa'], ['smtp', 'SMTP global'], ['audit', 'Bitácora'], ['mail', 'Envíos']].map(([id, title]) => <button key={id} aria-pressed={tab === id} onClick={() => setTab(id!)}>{title}</button>)}</div><section key={tab} className="card">{tab === 'modules' ? <Modules /> : tab === 'company' ? <Company /> : tab === 'smtp' ? <Smtp /> : tab === 'audit' ? <AuditLog /> : <MailOutbox />}</section></>;
+  return <><Heading title="Ajustes del Core" description="Empresa y SAR, módulos, correo global, bitácora y reintentos." /><div className="row section-tabs" aria-label="Ajustes del Core">{[['modules', 'Módulos'], ['company', 'Empresa y SAR'], ['smtp', 'SMTP global'], ['audit', 'Bitácora'], ['mail', 'Envíos']].map(([id, title]) => <button key={id} aria-pressed={tab === id} onClick={() => { if (id !== tab) void navigate(() => setTab(id!)); }}>{title}</button>)}</div><section key={tab} className="card">{tab === 'modules' ? <Modules /> : tab === 'company' ? <><Company /><SarSettings /></> : tab === 'smtp' ? <Smtp /> : tab === 'audit' ? <AuditLog /> : <MailOutbox />}</section></>;
 }
 function Modules() {
   const { api, notify, refreshAccess } = useCore(), result = useLoad(signal => api.request<Module[]>('/api/v1/settings/modules', { signal }));
@@ -50,4 +53,5 @@ function QuoteSettings() { return <section className="card"><h2>Cotizaciones</h2
 
 function ClientSettings() { return <section className="card"><h2>Clientes</h2><p>Catálogo de clientes y contactos con búsqueda, alta y edición.</p><p>Esta versión no tiene ajustes editables. Los ajustes propios del módulo siguen pendientes de definición.</p></section>; }
 
-function InvoiceSettings() { return <section className="card"><h2>Facturas</h2><p>Primera etapa: borradores con venta, inversión, gastos y saldo calculados por el servidor.</p><p>Numeración fiscal, emisión, pagos, PDF, nota de entrega, recibos y conversiones siguen pendientes. Empresa y numeración fiscal pertenecen al Core.</p><p>Los ajustes propios del módulo requieren definición; no hay campos editables en esta etapa.</p></section>; }
+function InvoiceSettings() { return <section className="card stack"><h2>Facturas</h2><p>Primera etapa: borradores con venta, inversión, gastos y saldo calculados por el servidor. Emisión, pagos, PDF, nota de entrega, recibos y conversiones siguen pendientes.</p><SarSettings /></section>; }
+

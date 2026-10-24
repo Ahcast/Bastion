@@ -5,6 +5,7 @@ mod config;
 mod dashboard;
 mod database;
 mod documents;
+mod sar;
 mod service;
 
 pub use admin::{
@@ -15,8 +16,10 @@ pub use config::{AppConfig, ConfigError, DatabaseConfig};
 pub use dashboard::{DashboardPeriod, DashboardPoint, DashboardQuery, DashboardWindow};
 pub use database::Database;
 pub use documents::{DocumentCompany, DocumentService};
+pub use sar::{SarSettings, SarSettingsRecord, SarStatus};
 pub use service::{
     AccessCatalog, AuthCookies, AuthenticatedUser, BootstrapBegin, BootstrapComplete, BusinessMail,
     BusinessMailAttachment, CoreError, CoreService, InvitationDispatch, LoginStart, ModuleAccess,
     ProfileInfo, SecurityEventInfo, SessionInfo, SmtpCredentialInfo, TrustedDeviceInfo,
 };
+

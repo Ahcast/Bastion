@@ -105,3 +105,7 @@ Quedan por definir los nombres de rutas/DTO del core y de cada módulo, paginaci
 ## Resúmenes para Inicio
 
 GET /api/v1/procesos/dashboard y GET /api/v1/cotizaciones/dashboard admiten period=month|year|all. Reutilizan autenticación, límites y permiso de lectura del módulo activo. Contratos, criterios de fecha y límites en [16-dashboard-modulos.md](16-dashboard-modulos.md).
+
+
+Numeración SAR: GET/PUT `/api/v1/settings/sar`, exclusivamente para el Administrador. Guardado atómico de cuatro campos con versión opaca y 412 ante edición obsoleta; estado calculado por Rust. Ver [contrato](empresa-sar.openapi.yaml) y [reglas](17-empresa-sar.md).
+

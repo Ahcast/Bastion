@@ -34,6 +34,7 @@ mod cotizaciones;
 mod facturas;
 mod ordenes_compra;
 mod procesos;
+mod sar;
 
 const GENERAL_REQUEST_BODY_LIMIT: usize = 1024 * 1024;
 
@@ -321,6 +322,7 @@ pub fn router(
             get(list_role_permissions),
         )
         .route("/api/v1/settings/core", get(get_core_settings))
+        .route("/api/v1/settings/sar", get(sar::get).put(sar::put))
         .route(
             "/api/v1/settings/core/{key}",
             axum::routing::put(set_core_setting),
@@ -1874,3 +1876,4 @@ mod tests {
         );
     }
 }
+
