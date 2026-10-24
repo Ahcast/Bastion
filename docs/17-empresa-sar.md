@@ -18,3 +18,10 @@ Se reutiliza `settings`, sin DDL ni migración: `core/global/company.sar`, esque
 
 El formulario conserva los cambios ante fallos y conflictos. Cancelar restaura la copia cargada; recargar o navegar con cambios exige confirmación y no guarda. El estado numérico mostrado procede del servidor. No se cargan ni modifican datos fiscales reales como parte de la verificación del despliegue.
 
+## Validación y despliegue — 2026-10-23
+
+Instalado en AWS y Bluehost desde [`a85bca73`](https://github.com/Ahcast/Bastion/commit/a85bca73bcb90ec0d4dee6b91c815661aa432b57), tras [Core checks exitoso](https://github.com/Ahcast/Bastion/actions/runs/40064993129): formato y compilación Rust, pruebas con MySQL 5.7, 94 pruebas frontend y paquetes de producción. La prueba MySQL comprueba exclusividad administrativa incluso con grants Core de un rol personalizado, persistencia, rechazo de versión obsoleta y auditoría sin duplicar la escritura rechazada. Las pruebas de UI cubren guardado conjunto, conflictos, cancelación/recarga y normalización con versión estable.
+
+Artifacts del mismo commit, ZIP/tar/archivos verificados por SHA-256, respaldo privado y despliegue con reversión. No hubo migraciones ni cambios de configuración del ambiente. Se verificó la conservación de datos comerciales, settings, documentos y activación de módulos. Salud HTTPS 200, ruta SAR sin sesión 401 y 35 archivos públicos verificados, incluido el bundle actual de Ajustes. El frontend conserva su origen API, cabeceras del hosting y assets anteriores.
+
+La revisión visual local usó datos sintéticos. No se inició una sesión administrativa real ni se guardó numeración de ejemplo en el ambiente desplegado: la configuración SAR sigue sin configurar para que el administrador ingrese los datos de la empresa. Esto no valida una autorización fiscal ni habilita emisión, correlativos o documentos pendientes.
