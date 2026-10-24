@@ -155,6 +155,10 @@ fn legacy_documents_keep_their_integer_quantity_and_calculation_rules() {
     let input: OrderInput = serde_json::from_value(json!({"n_orders":"OC","n_bill":"","order_date":"2026-10-23","received_date":null,"client_name":"Cliente","client_rtn":"","id_destination":1,"comments":"","products":[{"description":"Producto","cantidad":2,"sale_price":"50","purchase_price":"100","tracking":"","isv":true,"status":"Pendiente","coments":""}],"expenses":[]})).unwrap();
     let mut calculation = bastion_ordenes_compra::calculate(&input).unwrap();
     assert_eq!(calculation.totals.total, "230.00");
+    assert_eq!(
+        serde_json::to_value(&calculation).unwrap()["data"]["products"][0]["cantidad"],
+        json!(2)
+    );
     assert!(calculation.totals.commercial.is_none());
     calculation.data.products[0].cantidad = "1.25".into();
     assert!(bastion_ordenes_compra::calculate(&calculation.data).is_err());

@@ -25,6 +25,18 @@ fn quantity<'de, D: serde::Deserializer<'de>>(deserializer: D) -> Result<String,
         Quantity::Integer(n) => n.to_string(),
     })
 }
+
+// Keep the existing JSON integer contract for manual orders. Decimal quantities
+// are exact strings; no binary floating point enters the financial calculation.
+fn serialize_quantity<S: serde::Serializer>(value: &str, serializer: S) -> Result<S::Ok, S::Error> {
+    if let Ok(units) = calculation::decimal(value) {
+        if units % 10_000 == 0 && units <= 1_000_000 * 10_000 {
+            return serializer.serialize_u32((units / 10_000) as u32);
+        }
+    }
+    serializer.serialize_str(value)
+}
+
 use bastion_core::CoreError;
 
 use chrono::NaiveDate;
@@ -40,7 +52,7 @@ pub enum ProductStatus {
 #[serde(deny_unknown_fields)]
 pub struct OrderProduct {
     pub description: String,
-    #[serde(deserialize_with = "quantity")]
+    #[serde(deserialize_with = "quantity", serialize_with = "serialize_quantity")]
     pub cantidad: String,
     // Legacy names: sale_price is cost; purchase_price is selling price.
     pub sale_price: String,
