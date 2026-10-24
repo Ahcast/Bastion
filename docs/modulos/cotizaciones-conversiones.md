@@ -29,3 +29,15 @@ Los POST requieren If-Match e Idempotency-Key. Respuesta: target_module, target_
 
 Interfaz: conserva las diez acciones. Ambas conversiones se habilitan con módulo/permisos de origen y destino; se informa el motivo si falta acceso. Órdenes solicita cabecera en un diálogo responsive, informa incompatibilidades y catálogo vacío. Una respuesta ambigua conserva cuerpo/clave y permite reintentar la misma operación. La cotización solo cambia a Convertido tras confirmar el guardado.
 
+
+## Publicación verificada — 2026-10-23
+
+Código publicado en c1eda4b8b684e385888ef134082526deb0b91be0, después de [Core checks exitoso](https://github.com/Ahcast/Bastion/actions/runs/40065905688): formato/compilación Rust, integración con MySQL 5.7 en dos bases aisladas, Typst y 99 pruebas frontend, tipos/build. Se probaron permisos de ambos módulos, sesión/CSRF/origen, revisiones, rollback por destino inválido, concurrencia con claves diferentes, recuperación idempotente, importes complejos de factura, bloqueo de pérdidas en Órdenes, conservación de origen al editar y trazabilidad al eliminar la cotización.
+
+Compilación Rust local correcta; la ejecución autoritativa de backend se validó en CI Linux/MySQL. La revisión de navegador usó únicamente documentos y destinos sintéticos en localhost: menú habilitado, preparación y creación de ambos destinos, navegación al módulo correcto, origen visible y ausencia de errores de consola. Diálogo de Órdenes revisado a 390 px sin desbordamiento horizontal; conserva los mismos controles.
+
+AWS y Bluehost instalados desde artifacts de ese commit, verificando SHA-256 de ZIP, paquetes y archivos. Respaldo privado previo, comparación lógica de datos de las 47 tablas existentes y de las columnas anteriores de Facturas/Órdenes; cambios únicamente aditivos. Migraciones Facturas 2, Órdenes 2 y document-flows 1 aplicadas. Se conservaron configuración de documentos/SAR y activación administrativa de todos los módulos: ambos destinos ya estaban activos, por lo que no se modificó esa configuración.
+
+Verificación HTTPS: live/ready 200, hashes de 24 assets y consulta de preparación sin sesión 401; ambos comandos de conversión sin sesión/CSRF rechazados con 403. No se crearon documentos de prueba, enviaron correos ni consumieron números fiscales en producción.
+
+El catálogo real de destinos sigue vacío. La conversión a Órdenes está habilitada por permisos, pero requiere que el administrador registre los destinos reales en Ajustes antes de guardar; no se agregaron valores ficticios. Las incompatibilidades documentadas conservan su explicación y bloqueo. La conversión a Facturas crea borradores, no documentos emitidos.

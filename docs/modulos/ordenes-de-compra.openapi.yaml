@@ -134,3 +134,13 @@ components:
             properties:
               description: {type: string, maxLength: 255}
               amount: {$ref: '#/components/schemas/Money'}
+
+    QuoteOrigin:
+      type: [object, 'null']
+      readOnly: true
+      description: Campo source_quote de la respuesta de orden. Origen conservado al editar; null para altas manuales.
+      required: [id, number, version]
+      properties:
+        id: {type: integer}
+        number: {type: [string, 'null']}
+        version: {type: integer}

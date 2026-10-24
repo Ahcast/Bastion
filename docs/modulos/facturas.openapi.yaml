@@ -173,6 +173,15 @@ components:
       type: object
       required: [id, version, status, currency, invoice_number, data, calculation]
       properties:
+        source_quote:
+          type: [object, 'null']
+          readOnly: true
+          description: Origen conservado al editar; null para borradores manuales.
+          required: [id, number, version]
+          properties:
+            id: {type: integer}
+            number: {type: [string, 'null']}
+            version: {type: integer}
         id: {type: integer}
         version: {type: integer, minimum: 1}
         status: {type: string, const: Borrador}
