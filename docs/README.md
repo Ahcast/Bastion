@@ -37,6 +37,8 @@ El informe se obtuvo de una copia de frontend Angular compilado y backend Larave
 
 ## Registro de decisiones
 
+- 2026-10-24: Se confirma ejecución manual del pipeline completo de Scout desde Ajustes > Procesos a cualquier hora, en segundo plano, con autorización, auditoría y protección contra concurrencia. Ver [contrato](modulos/procesos-scout-manual.md).
+
 - 2026-10-23: Ajustes SAR desplegados en AWS/Bluehost desde `a85bca73` tras CI exitoso, respaldo y verificación HTTPS. Sin migraciones ni datos fiscales de ejemplo; configuración y módulos existentes conservados. Disponible para ingresar rango, fecha límite, factura actual y texto SAR en Ajustes de Facturas o Core > Empresa y SAR. Ver `17-empresa-sar.md`.
 
 - 2026-10-23: el usuario solicita completar la numeración SAR. Se agregan rango autorizado, fecha límite, factura actual y texto SAR en Ajustes > Facturas y Core > Empresa y SAR, con configuración global única, administración exclusiva, estado calculado en Rust y control de edición simultánea. No emite ni consume numeración. Ver `17-empresa-sar.md`.
