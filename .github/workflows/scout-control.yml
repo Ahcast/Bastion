@@ -1,0 +1,15 @@
+name: Scout control checks
+on:
+  push:
+    branches: [main]
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  private-controller:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - name: Verify private controller using synthetic executables only
+        run: python3 -m unittest discover -s deploy/tests -v

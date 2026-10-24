@@ -21,6 +21,10 @@ pub(super) fn routes(state: ApiState) -> Router<ApiState> {
         .route("/api/v1/procesos/dashboard", get(dashboard))
         .route("/api/v1/procesos/status", get(status))
         .route("/api/v1/procesos/scout-status", get(scout_status))
+        .route(
+            "/api/v1/procesos/scout-run",
+            get(scout_run_status).post(scout_run),
+        )
         .route("/api/v1/procesos/entities", get(entities))
         .route("/api/v1/procesos/rows", get(rows))
         .route("/api/v1/procesos/rows/{id}", get(detail))
@@ -54,6 +58,10 @@ async fn guarded_request(state: ApiState, request: Request, next: Next) -> Respo
     };
     let path = request.uri().path();
     let (scope, capability, expensive) = match path {
+        "/api/v1/procesos/scout-run" if request.method() == Method::POST => {
+            ("importacion", "editar", true)
+        }
+        "/api/v1/procesos/scout-run" => ("consulta", "ver", true),
         "/api/v1/procesos/refresh" => ("importacion", "editar", true),
         "/api/v1/procesos/export" => ("exportacion", "ver", true),
         "/api/v1/procesos/scout-status" => ("consulta", "ver", true),
@@ -74,7 +82,14 @@ async fn guarded_request(state: ApiState, request: Request, next: Next) -> Respo
         return ApiError(error).into_response();
     }
     let _permit = if expensive {
-        match state.procesos_jobs.clone().try_acquire_owned() {
+        match (if path == "/api/v1/procesos/scout-run" {
+            &state.scout_control_jobs
+        } else {
+            &state.procesos_jobs
+        })
+        .clone()
+        .try_acquire_owned()
+        {
             Ok(permit) => Some(permit),
             Err(_) => return ApiError(CoreError::Overloaded).into_response(),
         }
@@ -110,6 +125,38 @@ async fn dashboard(
         .await
         .map(Json)
         .map_err(ApiError)
+}
+
+async fn scout_run_status(
+    State(state): State<ApiState>,
+    _query: Query<ScoutStatusQuery>,
+) -> Result<Json<bastion_procesos::ScoutControlStatus>, ApiError> {
+    let control = state.scout_control.clone();
+    tokio::task::spawn_blocking(move || Json(control.status()))
+        .await
+        .map_err(|_| ApiError(CoreError::Overloaded))
+}
+
+async fn scout_run(
+    State(state): State<ApiState>,
+    headers: axum::http::HeaderMap,
+    Query(_query): Query<ScoutStatusQuery>,
+    Json(_body): Json<RefreshRequest>,
+) -> Result<(StatusCode, Json<bastion_procesos::ScoutControlStatus>), ApiError> {
+    let actor = actor(&state, &headers).await?;
+    let values: Vec<_> = headers.get_all("idempotency-key").iter().collect();
+    let key = if values.len() == 1 {
+        values[0].to_str().ok()
+    } else {
+        None
+    }
+    .ok_or(ApiError(CoreError::Invalid))?;
+    let result = state
+        .procesos
+        .request_scout_run(actor.id, key, state.scout_control.clone())
+        .await
+        .map_err(ApiError)?;
+    Ok((StatusCode::ACCEPTED, Json(result)))
 }
 
 async fn scout_status(

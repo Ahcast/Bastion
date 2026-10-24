@@ -5,6 +5,39 @@ info:
 security:
   - session: []
 paths:
+  /api/v1/procesos/scout-run:
+    get:
+      operationId: procesosScoutRunStatus
+      x-permission: procesos/consulta/ver
+      description: Estado del controlador local y última ejecución manual. No inicia procesos.
+      responses:
+        '200':
+          description: available, busy y job (id, status, started_at, finished_at); controlador ausente se informa como available=false.
+        default:
+          $ref: '#/components/responses/Problem'
+    post:
+      operationId: procesosScoutRun
+      x-permission: procesos/importacion/editar
+      description: Inicia exclusivamente main.py --manual en segundo plano, a cualquier hora. Requiere sesión, CSRF, módulo activo e Idempotency-Key ASCII de 16–128 caracteres. Sin comandos, rutas ni configuración en el cuerpo/query. 409 si ya corre un pipeline. No repite una solicitud confirmada con la misma clave por actor.
+      parameters:
+        - in: header
+          name: Idempotency-Key
+          required: true
+          schema: {type: string, minLength: 16, maxLength: 128}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {type: object, additionalProperties: false}
+      responses:
+        '202':
+          description: Solicitud aceptada o recibo recuperado; no implica que el pipeline haya terminado. Igual estructura que GET.
+        '409':
+          description: Ya existe una ejecución activa, manual o programada.
+        '503':
+          description: Controlador no configurado o temporalmente no disponible.
+        default:
+          $ref: '#/components/responses/Problem'
   /api/v1/procesos/scout-status:
     get:
       operationId: procesosScoutStatus

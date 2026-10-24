@@ -41,7 +41,7 @@ const { act } = await import('react');
 const { createRoot } = await import('react-dom/client');
 after(() => window.happyDOM.abort());
 const submit = async (container: HTMLElement) => { await act(async () => container.querySelector('form')!.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }))); };
-const click = async (text: string) => { const button = [...document.querySelectorAll('button')].find(b => b.textContent === text); assert.ok(button, text); await act(async () => button.click()); };
+const click = async (text: string) => { const button = [...document.querySelectorAll('button')].find(b => b.textContent?.replace(/^[＋+]\s*/, '').trim() === text); assert.ok(button, text); await act(async () => button.click()); };
 
 test('order conflicts retain changes and navigation asks before discarding', async () => {
   let writes = 0, closes = 0;

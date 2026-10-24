@@ -214,6 +214,31 @@ impl ProcessService {
         Ok(tx)
     }
 
+    pub async fn request_scout_run(
+        &self,
+        actor: u64,
+        key: &str,
+        control: crate::ScoutControl,
+    ) -> Result<crate::ScoutControlStatus, CoreError> {
+        if !crate::valid_scout_key(key) {
+            return Err(CoreError::Invalid);
+        }
+        let key = key.to_owned();
+        let mut tx = self.begin(actor, "importacion", "editar").await?;
+        audit(
+            &mut tx,
+            actor,
+            "scout.run_requested",
+            &key,
+            serde_json::json!({"trigger":"manual"}),
+        )
+        .await?;
+        tx.commit().await?;
+        tokio::task::spawn_blocking(move || control.start(actor, &key))
+            .await
+            .map_err(|_| CoreError::Overloaded)?
+    }
+
     pub async fn status(&self, actor: u64) -> Result<serde_json::Value, CoreError> {
         self.overview(actor, &ProcessFilter::default()).await
     }

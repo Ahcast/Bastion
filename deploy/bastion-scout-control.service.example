@@ -1,0 +1,27 @@
+[Unit]
+Description=Bastion Scout private manual pipeline controller
+After=network-online.target
+
+[Service]
+Type=simple
+# Use Scout's existing operational user; the backend belongs to group bastion.
+User=scout
+Group=bastion
+RuntimeDirectory=bastion-scout-control
+RuntimeDirectoryMode=0750
+StateDirectory=bastion-scout-control
+StateDirectoryMode=0700
+WorkingDirectory=/opt/bastion-scout
+EnvironmentFile=/etc/bastion-scout/ai.env
+ExecStart=/usr/bin/python3 /usr/local/libexec/bastion-scout-control.py --socket /run/bastion-scout-control/control.sock --python /opt/bastion-scout/.venv/bin/python --entry /opt/bastion-scout/main.py --config /etc/bastion-scout/config.json --data /var/lib/bastion-scout --state /var/lib/bastion-scout-control
+Restart=on-failure
+KillMode=control-group
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/var/lib/bastion-scout /var/lib/bastion-scout-control
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target

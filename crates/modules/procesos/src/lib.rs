@@ -1,6 +1,8 @@
 #![forbid(unsafe_code)]
 
+mod control;
 mod diagnostics;
+pub use control::{ScoutControl, ScoutControlStatus, ScoutJob, ScoutJobStatus, valid_scout_key};
 mod local;
 mod scout;
 mod service;

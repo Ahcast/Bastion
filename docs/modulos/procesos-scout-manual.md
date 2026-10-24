@@ -1,0 +1,15 @@
+# Ejecución manual de Scout desde Ajustes
+
+Decisión del 24 de octubre: botón Ejecutar pipeline completo en Ajustes > Procesos. El usuario confirma que puede ejecutarse a cualquier hora. Inicia main.py --manual (extracción, combinación y clasificación) en segundo plano, sin parámetros libres desde HTTP, y muestra su estado sin mantener la solicitud abierta. No ejecuta el pipeline al abrir Ajustes.
+
+POST /api/v1/procesos/scout-run con cuerpo vacío, sesión, CSRF, módulo activo, importacion/editar e Idempotency-Key. GET de la misma ruta requiere consulta/ver. Usa autorización y auditoría del Core; no agrega permisos. Una repetición de la misma clave recupera el trabajo original; una ejecución manual o programada activa impide otra. El usuario conserva acceso a los reportes por etapa. No se habilita desde el navegador una ruta, comando, modelo, configuración ni clave API.
+
+El adaptador Rust se comunica con un controlador local por socket Unix fijado por BASTION_SCOUT_CONTROL_SOCKET. Deshabilitado si no está configurado o el controlador no está disponible. El backend sigue sin poder escribir el código o los resultados de Scout y sin sudo ni ejecución de shell. El controlador ejecuta exclusivamente main.py --manual con el Python y configuración definidos por el operador; usa el usuario operativo de Scout y un socket 0660 compartido con Bastion. Conserva recibos idempotentes en SQLite privada y estado de ejecución, sin devolver logs, rutas o secretos. El bloqueo pipeline.lock de Scout protege también las ejecuciones programadas.
+
+Cada ejecución manual crea un ciclo distinto y fuerza la nueva ronda de extracción; el análisis conserva caché y solo procesa contenido pendiente/cambiado. El límite manual es 18 horas desde el inicio (igual a la ventana máxima programada); no modifica el horario de cron. Scout publica los mismos JSON y maestro.csv; la importación en Bastion conserva su flujo existente e independiente. Ejecutar el pipeline puede consumir la API IA configurada.
+
+Despliegue: publicar primero ambos repositorios y esperar CI. Instalar Scout con --manual y después el controlador systemd y socket privado; solo entonces habilitar el endpoint mediante variable del entorno. Las pruebas usan ejecutables y datos sintéticos, sin consultas al sitio, IA ni lanzamiento real en producción. Frontend Bluehost; backend/controlador AWS; MySQL Bluehost.
+
+## Verificación de desarrollo
+
+103 pruebas frontend, tipos y build correctos; 48 pruebas de Scout correctas, incluida ejecución manual fuera de horario y ciclos distintos sin sitio ni IA. Se actualiza una comparación del test existente de Órdenes para ignorar el signo decorativo + que ya muestra el botón, sin cambiar su comportamiento. El controlador requiere Linux: CI ejecuta sus pruebas de exclusión, recibos y fallos con ejecutables sintéticos. La comprobación Rust local no pudo enlazar la toolchain GNU/UCRT disponible; compilación, formato, pruebas Rust/MySQL y controlador se verifican en GitHub antes de instalar.

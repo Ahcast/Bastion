@@ -48,6 +48,8 @@ struct ApiState {
     ordenes_compra: bastion_ordenes_compra::OrderService,
     procesos_jobs: std::sync::Arc<tokio::sync::Semaphore>,
     scout_csv_path: std::path::PathBuf,
+    scout_control: bastion_procesos::ScoutControl,
+    scout_control_jobs: std::sync::Arc<tokio::sync::Semaphore>,
 }
 #[derive(Clone)]
 struct CsrfGuardState {
@@ -273,6 +275,8 @@ pub fn router(
         ordenes_compra: bastion_ordenes_compra::OrderService::new(core.database(), core.admin()),
         procesos_jobs: std::sync::Arc::new(tokio::sync::Semaphore::new(1)),
         scout_csv_path,
+        scout_control: bastion_procesos::ScoutControl::from_env()?,
+        scout_control_jobs: std::sync::Arc::new(tokio::sync::Semaphore::new(1)),
     };
     Ok(Router::new()
         .route("/health/live", get(liveness))
