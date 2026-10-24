@@ -6,6 +6,7 @@ edition.workspace = true
 [dependencies]
 axum.workspace = true
 bastion-core = { path = "../core" }
+bastion-workflows = { path = "../workflows" }
 bastion-clientes = { path = "../modules/clientes" }
 bastion-facturas = { path = "../modules/facturas" }
 bastion-ordenes-compra = { path = "../modules/ordenes_compra" }

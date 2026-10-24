@@ -1,9 +1,20 @@
 use super::*;
+#[path = "quote_order.rs"]
+mod quote_order;
 use bastion_cotizaciones::{
     QuoteDraft, QuoteEmailInput, QuoteFilter, QuoteInput, QuoteMailService, QuotePage, QuoteStatus,
 };
+use quote_order::{convert_order, prepare_order};
 
 pub(super) fn routes(state: ApiState) -> Router<ApiState> {
+    let conversions = Router::new()
+        .route(
+            "/api/v1/cotizaciones/{id}/order-preparation",
+            get(prepare_order),
+        )
+        .route("/api/v1/cotizaciones/{id}/order", post(convert_order))
+        .layer(axum::extract::DefaultBodyLimit::max(3 * 1024 * 1024))
+        .layer(RequestBodyLimitLayer::new(3 * 1024 * 1024));
     let attachments = Router::new()
         .route(
             "/api/v1/cotizaciones/{id}/attachments",
@@ -40,6 +51,7 @@ pub(super) fn routes(state: ApiState) -> Router<ApiState> {
         )
         .route("/api/v1/cotizaciones/{id}/clone", post(clone_quote))
         .layer(RequestBodyLimitLayer::new(GENERAL_REQUEST_BODY_LIMIT))
+        .merge(conversions)
         .merge(attachments)
         .route_layer(middleware::from_fn_with_state(state, guard))
 }

@@ -1,10 +1,13 @@
 use crate::{
     Destination, DestinationInput, OrderCalculation, OrderFilter, OrderInput, OrderPage,
-    OrderSummary, PurchaseOrder, calculate,
+    OrderSummary, PurchaseOrder, SourceQuote, calculate,
 };
 use bastion_core::{CoreAdmin, CoreError, Database};
 use sha2::{Digest, Sha256};
 use sqlx::{MySql, QueryBuilder, Row, Transaction};
+
+#[path = "conversion.rs"]
+mod conversion;
 
 #[derive(Clone)]
 pub struct OrderService {
@@ -174,6 +177,9 @@ impl OrderService {
         {
             return Err(CoreError::Invalid);
         }
+        if input.approved_quote.is_some() {
+            return Err(CoreError::Invalid);
+        }
         let mut tx = self.begin(actor, "documentos", "editar").await?;
         let calculation = calculate(&input)?;
         calculation.ensure_saveable()?;
@@ -219,6 +225,11 @@ impl OrderService {
         if current.version != expected {
             return Err(CoreError::PreconditionFailed);
         }
+        if serde_json::to_value(&current.data.approved_quote).map_err(|_| CoreError::Invalid)?
+            != serde_json::to_value(&input.approved_quote).map_err(|_| CoreError::Invalid)?
+        {
+            return Err(CoreError::Conflict);
+        }
         let calculation = calculate(&input)?;
         calculation.ensure_saveable()?;
         validate_destination(&mut tx, calculation.data.id_destination).await?;
@@ -235,7 +246,9 @@ impl OrderService {
         )
         .await?;
         tx.commit().await?;
-        Ok(record(id, version, calculation))
+        let mut order = record(id, version, calculation);
+        order.source_quote = current.source_quote;
+        Ok(order)
     }
     pub async fn destinations(&self, actor: u64) -> Result<Vec<Destination>, CoreError> {
         let mut tx = self.begin_destinations(actor).await?;
@@ -344,6 +357,7 @@ impl OrderService {
 }
 fn record(id: u64, version: u64, calculation: OrderCalculation) -> PurchaseOrder {
     PurchaseOrder {
+        source_quote: None,
         id,
         version,
         status: calculation.status.clone(),
@@ -367,15 +381,24 @@ async fn validate_destination(
 }
 async fn load(tx: &mut Transaction<'_, MySql>, id: u64) -> Result<PurchaseOrder, CoreError> {
     let row =
-        sqlx::query("SELECT id,version,calculation_json FROM ordenes_orders WHERE id=? FOR UPDATE")
+        sqlx::query("SELECT id,version,calculation_json,source_quote_id,source_quote_version,source_quote_number FROM ordenes_orders WHERE id=? FOR UPDATE")
             .bind(id)
             .fetch_optional(&mut **tx)
             .await?
             .ok_or(CoreError::NotFound)?;
     let value: serde_json::Value = row.try_get("calculation_json")?;
-    Ok(record(
+    let mut order = record(
         row.try_get("id")?,
         row.try_get("version")?,
         serde_json::from_value(value).map_err(|_| CoreError::Invalid)?,
-    ))
+    );
+    order.source_quote = match row.try_get::<Option<u64>, _>("source_quote_id")? {
+        Some(id) => Some(SourceQuote {
+            id,
+            version: row.try_get("source_quote_version")?,
+            quote_number: row.try_get("source_quote_number")?,
+        }),
+        None => None,
+    };
+    Ok(order)
 }

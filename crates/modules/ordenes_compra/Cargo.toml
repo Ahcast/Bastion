@@ -5,6 +5,7 @@ edition.workspace = true
 
 [dependencies]
 bastion-core = { path = "../../core" }
+bastion-cotizaciones = { path = "../cotizaciones" }
 chrono.workspace = true
 serde.workspace = true
 serde_json.workspace = true

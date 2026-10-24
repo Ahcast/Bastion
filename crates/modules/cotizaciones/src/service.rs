@@ -2,6 +2,9 @@ use bastion_core::{CoreAdmin, CoreError, Database};
 use sha2::{Digest, Sha256};
 use sqlx::{MySql, QueryBuilder, Transaction};
 
+#[path = "order_conversion.rs"]
+mod order_conversion;
+
 #[path = "dashboard.rs"]
 mod dashboard;
 
@@ -414,6 +417,15 @@ impl QuoteService {
         let current = load(&mut tx, id).await?;
         if current.version != expected {
             return Err(CoreError::PreconditionFailed);
+        }
+        let converted: Option<u64> = sqlx::query_scalar(
+            "SELECT order_id FROM cotizaciones_order_conversions WHERE quote_id=?",
+        )
+        .bind(id)
+        .fetch_optional(&mut *tx)
+        .await?;
+        if converted.is_some() {
+            return Err(CoreError::Conflict);
         }
         sqlx::query("INSERT INTO cotizaciones_document_deletions (object_key,available_at) SELECT object_key,UTC_TIMESTAMP(6) FROM cotizaciones_documents WHERE quote_id=? ON DUPLICATE KEY UPDATE available_at=VALUES(available_at)").bind(id).execute(&mut *tx).await?;
         sqlx::query("UPDATE cotizaciones_email_jobs SET delivery_status='cancelled',payload_ciphertext='',completed_at=UTC_TIMESTAMP(6) WHERE quote_id=? AND delivery_status IN ('pending','failed')").bind(id).execute(&mut *tx).await?;

@@ -1,8 +1,8 @@
 openapi: 3.1.0
 info:
   title: Bastion Órdenes de compra
-  version: 0.1.0
-  description: Primer corte local. Órdenes compartidas entre usuarios autorizados, cliente manual y destinos administrados en Ajustes. Sesión, CSRF y origen del Core; 120 solicitudes/minuto/actor, cuerpo 1 MiB, plazo 30 segundos. Sin adjuntos, proveedores, conversiones, clonación, borrado ni MCP.
+  version: 0.2.0
+  description: Primer corte local. Órdenes compartidas entre usuarios autorizados, cliente manual y destinos administrados en Ajustes. Sesión, CSRF y origen del Core; 120 solicitudes/minuto/actor, cuerpo 3 MiB, plazo 30 segundos. Conversión desde cotización aprobada definida en cotizacion-a-orden.openapi.yaml. Sin adjuntos, proveedores, conversión a factura, clonación, borrado ni MCP.
 security:
   - session: []
 paths:
@@ -100,6 +100,9 @@ components:
       additionalProperties: false
       required: [n_orders, n_bill, order_date, received_date, client_name, client_rtn, id_destination, comments, products, expenses]
       properties:
+        approved_quote:
+          $ref: "./cotizaciones.openapi.yaml#/components/schemas/Input"
+          description: Instantánea aprobada, solo creada por conversión; inmutable al editar. Crear manualmente con este campo se rechaza.
         n_orders: {type: string, maxLength: 50}
         n_bill: {type: string, maxLength: 120}
         order_date: {type: string, format: date}
@@ -116,8 +119,12 @@ components:
             additionalProperties: false
             required: [description, cantidad, sale_price, purchase_price, tracking, isv, status, coments]
             properties:
-              description: {type: string, maxLength: 2000}
-              cantidad: {type: integer, minimum: 0, maximum: 1000000}
+              description: {type: string, maxLength: 3000, description: Máximo 2000 en orden manual; 3000 en instantánea aprobada}
+              cantidad:
+                description: Cadena decimal exacta al responder; acepta entero JSON de clientes anteriores. Manual exige entero hasta 1000000. Conversión conserva cantidad aprobada.
+                oneOf:
+                  - {type: integer, minimum: 0, maximum: 1000000}
+                  - {$ref: "#/components/schemas/Money"}
               sale_price: {$ref: '#/components/schemas/Money'}
               purchase_price: {$ref: '#/components/schemas/Money'}
               tracking: {type: string, maxLength: 255}
@@ -134,3 +141,41 @@ components:
             properties:
               description: {type: string, maxLength: 255}
               amount: {$ref: '#/components/schemas/Money'}
+
+    SourceQuote:
+      type: object
+      required: [id, version, quote_number]
+      properties:
+        id: {type: integer, minimum: 1}
+        version: {type: integer, minimum: 1}
+        quote_number: {type: [string, 'null']}
+    Calculation:
+      type: object
+      required: [data, status, totals]
+      properties:
+        data: {$ref: '#/components/schemas/OrderInput'}
+        status: {enum: [Pendiente, Listo, Entregado]}
+        totals:
+          type: object
+          required: [subtotal, subtotal_exonerado, tax, total, products_investment, other_expenses, investment_total, profit]
+          properties:
+            subtotal: {type: string}
+            subtotal_exonerado: {type: string}
+            tax: {type: string}
+            total: {type: string}
+            products_investment: {type: string}
+            other_expenses: {type: string}
+            investment_total: {type: string}
+            profit: {type: string}
+            commercial: {$ref: './cotizaciones.openapi.yaml#/components/schemas/Totals'}
+    Order:
+      type: object
+      required: [id, version, status, currency, data, calculation]
+      properties:
+        id: {type: integer}
+        version: {type: integer}
+        status: {enum: [Pendiente, Listo, Entregado]}
+        currency: {const: HNL}
+        source_quote: {$ref: '#/components/schemas/SourceQuote'}
+        data: {$ref: '#/components/schemas/OrderInput'}
+        calculation: {$ref: '#/components/schemas/Calculation'}
