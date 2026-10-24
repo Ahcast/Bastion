@@ -22,3 +22,10 @@ Decisión confirmada el 2026-10-23: los módulos existentes alimentan el Inicio.
 5. Pruebas automatizadas: calendario y año bisiesto; MySQL 5.7 con permisos, desactivación, exclusión de vencidos, rango y suma decimal; frontend con permisos, selección, actualización, cancelación, errores parciales, texto seguro e importes grandes.
 
 No requiere migraciones ni modifica registros de negocio. Despliegue: backend AWS y frontend estático Bluehost del mismo commit verificado.
+## Publicación verificada · 2026-10-23
+
+- Primera publicación del dashboard en AWS y Bluehost: `e55b430ab8134771f1c734cd5ca8332450f06d98`, publicado directamente en `main`, sin ramas adicionales.
+- [GitHub Actions 39940822106](https://github.com/Ahcast/Bastion/actions/runs/39940822106): formato, compilación, 60 pruebas Rust (incluidas bases MySQL 5.7 aisladas), 63 pruebas frontend, build y auditoría de dependencias de producción aprobados.
+- Artifacts de backend y frontend verificados contra sus SHA-256, manifiestos y commit. Treinta archivos públicos contrastados por HTTPS con el manifiesto original; `assets/.htaccess` se comprueba en el despliegue y permanece protegido.
+- Backend con salud y disponibilidad en HTTP 200; ambas rutas de dashboard devuelven HTTP 401 sin sesión. Se conservan la configuración del proxy, las reglas de Bluehost y los respaldos privados para reversión. No requiere migraciones ni altera datos de negocio.
+- Diseño revisado con el paquete de CI a 320, 390 y 768 px y escritorio, usando datos sintéticos. El acceso público carga el formulario de inicio de sesión sin errores de consola. La revisión visual no utilizó ni sustituyó una sesión real del usuario en producción.
