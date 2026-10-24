@@ -61,7 +61,3 @@ El corte local incorpora migraciones propias con `migrate` y sincroniza disponib
 ## Facturas: incorporación verificada
 
 El 2026-10-23 se instalaron en AWS y Bluehost los artifacts verificados de `f6c5a1d` (workflow 40038962819), después de respaldo privado. Se aplicó la migración propia 1 y se comprobó que las 43 tablas existentes y la activación de los módulos previos se conservaron. Facturas queda disponible en el ambiente y desactivado hasta su activación administrativa. Salud HTTPS 200, acceso sin sesión 401 y 35 archivos públicos verificados. Ver `modulos/facturas-implementacion.md` para alcance y límites.
-
-## Activación operativa por Core
-
-El comando backend enable-module MODULE ACTOR_ID permite al operador aplicar una activación explícitamente autorizada con el entorno privado del backend. Llama al mismo CoreAdmin que Ajustes: comprueba actor activo/Administrador, disponibilidad de ambiente y registra auditoría. No expone un endpoint, no acepta credenciales desde frontend y no crea usuarios/sesiones. El operador debe identificar al administrador que autorizó la acción; nunca elegir un actor arbitrario para eludir permisos. Se usa tras verificar las migraciones y arrancar la versión nueva. El acceso al entorno privado permanece restringido al servicio/operador.

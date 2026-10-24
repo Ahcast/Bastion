@@ -39,7 +39,7 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
         tracing::info!("database migrations completed");
         return Ok(());
     }
-    if command != "serve" && command != "enable-module" {
+    if command != "serve" {
         return Err(std::io::Error::other("unknown command").into());
     }
     let config = AppConfig::from_env()?;
@@ -61,23 +61,6 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
     .with_public_app_origin(app_origin.clone())
     .with_local_scout_import(scout_config.enabled);
     core.check_ready().await?;
-    if command == "enable-module" {
-        // Operator-only maintenance command: same Core authorization and audit as Ajustes.
-        // Requires the private backend environment; it is never exposed over HTTP/MCP.
-        let args: Vec<String> = std::env::args().skip(2).collect();
-        if args.len() != 2 {
-            return Err(std::io::Error::other("usage: enable-module MODULE ACTOR_ID").into());
-        }
-        let actor = args[1].parse::<u64>()?;
-        if actor == 0 {
-            return Err(std::io::Error::other("actor must be positive").into());
-        }
-        core.admin()
-            .set_module_enabled(actor, &args[0], true)
-            .await?;
-        tracing::info!(module_id=%args[0],actor,"module enabled through Core");
-        return Ok(());
-    }
     bastion_procesos::ProcessService::new(core.database(), core.admin())
         .synchronize_release(config.procesos_allowed)
         .await?;
