@@ -14,7 +14,8 @@ pub(super) fn routes(state: ApiState) -> Router<ApiState> {
             axum::routing::put(update_destination),
         )
         .route("/api/v1/ordenes-compra/{id}", get(detail).put(replace))
-        .layer(RequestBodyLimitLayer::new(1024 * 1024))
+        .layer(axum::extract::DefaultBodyLimit::max(3 * 1024 * 1024))
+        .layer(RequestBodyLimitLayer::new(3 * 1024 * 1024))
         .route_layer(middleware::from_fn_with_state(state, guard))
 }
 
@@ -436,7 +437,7 @@ mod tests {
                 Some("synthetic-admin"),
                 true,
                 "https://example.test",
-                &"x".repeat(1024 * 1024 + 1),
+                &"x".repeat(3 * 1024 * 1024 + 1),
             ))
             .await
             .unwrap();

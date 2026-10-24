@@ -192,3 +192,15 @@ Comprobar cifras reales de Procesos y Cotizaciones, selección de área, rangos 
 - Activación/allowlist/migraciones, permisos ver/editar, CSRF, creación idempotente, edición con ETag/If-Match y auditoría transaccional se comprueban con datos sintéticos.
 - La UI protege cambios sin guardar, conserva datos ante fallos/conflictos y mantiene la clave al reintentar un alta ambigua. Ajustes indica los pendientes sin campos inventados.
 - No cerrar paridad, validación contable, emisión, pagos, documentos, migración Legacy, settings o MCP con este corte. Ver `modulos/facturas-implementacion.md`.
+
+## Conversión de cotización aprobada a orden
+
+- Preparar y cancelar no crean órdenes ni cambian estado/revisión.
+- Conservar condiciones y total de origen, incluidas fracciones, descuentos, ISV 18% y exoneraciones.
+- Exigir aprobación, destino, versión y permisos de ambos módulos; comprobar activación sin habilitar módulos automáticamente.
+- Guardar orden, relación de origen y estado Convertido en una transacción. Un fallo posterior al INSERT de la orden revierte también recibo y auditoría.
+- Reintentos concurrentes conservan una orden y el resultado original; clave reutilizada con otro cuerpo se rechaza.
+- La copia aprobada es inmutable; solo los datos operativos cambian. Una cotización con orden registrada conserva su origen y no se elimina.
+- Órdenes históricas mantienen su lectura y cálculo. Cotizaciones grandes dentro del contrato se convierten sin superar el límite por duplicar la instantánea.
+
+Ver [cotizacion-a-orden.md](modulos/cotizacion-a-orden.md). Los pendientes de conversión a factura, archivos, proveedores y MCP del corte anterior siguen abiertos.

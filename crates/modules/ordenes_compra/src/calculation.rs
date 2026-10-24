@@ -3,6 +3,10 @@ use bastion_core::CoreError;
 use chrono::Datelike;
 use serde::{Deserialize, Serialize};
 
+#[path = "commercial.rs"]
+mod approved;
+use approved::commercial;
+
 const SCALE: i128 = 10000;
 const MAX: i128 = 99999999999999; // cents, normalized totals must remain editable
 
@@ -16,6 +20,8 @@ pub struct OrderTotals {
     pub other_expenses: String,
     pub investment_total: String,
     pub profit: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub commercial: Option<bastion_cotizaciones::QuoteTotals>,
 }
 #[derive(Debug, Deserialize, Serialize)]
 pub struct OrderCalculation {
@@ -52,12 +58,16 @@ pub fn calculate(input: &OrderInput) -> Result<OrderCalculation, CoreError> {
     text(&mut data.client_name, 255)?;
     text(&mut data.client_rtn, 30)?;
     text(&mut data.comments, 3000)?;
+    if data.approved_quote.is_some() {
+        return commercial(data);
+    }
     let (mut subtotal, mut exempt, mut investment) = (0_i128, 0_i128, 0_i128);
     for row in &mut data.products {
         text(&mut row.description, 2000)?;
         text(&mut row.tracking, 255)?;
         text(&mut row.coments, 1000)?;
-        if row.cantidad > 1000000 {
+        let quantity = decimal(&row.cantidad)?;
+        if quantity % SCALE != 0 || quantity > 1_000_000 * SCALE {
             return Err(CoreError::Invalid);
         }
         let cost = decimal(&row.sale_price)?;
@@ -66,12 +76,12 @@ pub fn calculate(input: &OrderInput) -> Result<OrderCalculation, CoreError> {
         // as calculateOrderTotals in Legacy. No floating-point arithmetic.
         row.sale_price = unit(cost);
         row.purchase_price = unit(sale);
-        let line = sale * i128::from(row.cantidad);
+        let line = sale * (quantity / SCALE);
         subtotal += line;
         if !row.isv {
             exempt += line;
         }
-        investment += cost * i128::from(row.cantidad);
+        investment += cost * (quantity / SCALE);
     }
     let mut expenses = 0_i128;
     for expense in &mut data.expenses {
@@ -110,6 +120,7 @@ pub fn calculate(input: &OrderInput) -> Result<OrderCalculation, CoreError> {
             other_expenses: money(expenses)?,
             investment_total: money(investment_total)?,
             profit: money(total - investment_total)?,
+            commercial: None,
         },
     })
 }
@@ -202,7 +213,7 @@ mod tests {
             serde_json::to_value(c).unwrap()
         );
         value.products[0].isv = true;
-        value.products[0].cantidad = 1;
+        value.products[0].cantidad = "1".into();
         value.products[0].purchase_price = "0.0045".into();
         let c = calculate(&value).unwrap();
         assert_eq!(c.totals.subtotal, "0.00");
@@ -226,7 +237,7 @@ mod tests {
             assert!(calculate(&v).is_err(), "{invalid}");
         }
         let mut value = input();
-        value.products[0].cantidad = 1000001;
+        value.products[0].cantidad = "1000001".into();
         assert!(calculate(&value).is_err());
         value = input();
         value.products[0].purchase_price = "999999999999".into();

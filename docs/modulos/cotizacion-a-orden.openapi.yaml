@@ -1,0 +1,60 @@
+openapi: 3.1.0
+info:
+  title: Bastion conversión de cotización aprobada a orden
+  version: 0.1.0
+security:
+  - session: []
+paths:
+  /api/v1/cotizaciones/{id}/order-preparation:
+    get:
+      operationId: prepareQuoteOrder
+      description: Requiere cotización Aprobada y módulos habilitados. Solo prepara; no cambia documentos.
+      x-permissions: [cotizaciones/documentos/ver, cotizaciones/documentos/editar, ordenes_compra/documentos/editar]
+      parameters:
+        - {$ref: '#/components/parameters/Id'}
+        - {$ref: '#/components/parameters/IfMatch'}
+      responses:
+        '200':
+          description: Origen versionado y borrador comercial completo con destino vacío.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [source, data, calculation]
+                properties:
+                  source: {$ref: './ordenes-de-compra.openapi.yaml#/components/schemas/SourceQuote'}
+                  data: {$ref: './ordenes-de-compra.openapi.yaml#/components/schemas/OrderInput'}
+                  calculation: {$ref: './ordenes-de-compra.openapi.yaml#/components/schemas/Calculation'}
+        default: {$ref: '#/components/responses/Problem'}
+  /api/v1/cotizaciones/{id}/order:
+    post:
+      operationId: convertQuoteOrder
+      description: Guarda orden, origen y estado Convertido en una transacción. Una orden representa la aprobación; no divide documentos. Idempotencia por actor/clave/cuerpo/origen/revisión.
+      x-permissions: [cotizaciones/documentos/ver, cotizaciones/documentos/editar, ordenes_compra/documentos/editar]
+      parameters:
+        - {$ref: '#/components/parameters/Id'}
+        - {$ref: '#/components/parameters/IfMatch'}
+        - {name: Idempotency-Key, in: header, required: true, schema: {type: string, minLength: 16, maxLength: 128, pattern: '^[A-Za-z0-9_-]+$'}}
+        - {name: X-CSRF-Token, in: header, required: true, schema: {type: string}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: './ordenes-de-compra.openapi.yaml#/components/schemas/OrderInput'}
+      responses:
+        '200':
+          description: Orden guardada o respuesta original del reintento, con origen y revisión.
+          content:
+            application/json:
+              schema: {$ref: './ordenes-de-compra.openapi.yaml#/components/schemas/Order'}
+        '409': {description: Estado no aprobado, ya convertido, instantánea alterada o clave reutilizada para otro cuerpo.}
+        '412': {description: La cotización cambió. No se crea ninguna orden.}
+        default: {$ref: '#/components/responses/Problem'}
+components:
+  securitySchemes:
+    session: {type: apiKey, in: cookie, name: __Host-bastion_session}
+  parameters:
+    Id: {name: id, in: path, required: true, schema: {type: integer, minimum: 1}}
+    IfMatch: {name: If-Match, in: header, required: true, schema: {type: string, description: Revisión numérica entre comillas}}
+  responses:
+    Problem: {description: Problema HTTP estándar; 401/403 identidad o permiso, 404 módulo/documento no disponible, 400 entrada inválida, 429/503 límites.}

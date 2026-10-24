@@ -5,7 +5,7 @@ import { QuoteActions } from '../components/QuoteActions.js';
 import { useNavigationGuard, useUnsavedChanges } from '../navigationGuard.js';
 import { moduleCan } from '../types.js';
 import { newOrder, newProduct } from '../orders.js';
-import type { Destination, OrderCalculation, OrderInput, OrderPage, OrderProduct, PurchaseOrder } from '../orders.js';
+import type { Destination, OrderConversionSeed, OrderCalculation, OrderInput, OrderPage, OrderProduct, PurchaseOrder } from '../orders.js';
 
 const base = '/api/v1/ordenes-compra';
 const stage = 'Primera etapa: cliente manual, productos, gastos y destinos. Adjuntos, proveedores, clonación, eliminación y conversión a factura están pendientes.';
@@ -38,11 +38,11 @@ function Workspace() {
   </>;
 }
 
-export function OrderEditor({ initial, editable, edit, close }: { initial: PurchaseOrder | null; editable: boolean; edit?: () => void; close: () => void }) {
+export function OrderEditor({ initial, editable, edit, close, conversion }: { initial: PurchaseOrder | null; editable: boolean; edit?: () => void; close: () => void; conversion?: OrderConversionSeed }) {
   const { api, notify } = useCore(), { navigate } = useNavigationGuard();
-  const [saved, setSaved] = useState(initial), [data, setData] = useState<OrderInput>(() => initial?.data ?? newOrder());
-  const [dirty, setDirty] = useState(false), [busy, setBusy] = useState(false), [conflict, setConflict] = useState(false), [ambiguous, setAmbiguous] = useState(false), [error, setError] = useState('');
-  const [preview, setPreview] = useState<{ input: OrderInput; value: OrderCalculation } | null>(null), [calculationError, setCalculationError] = useState('');
+  const [saved, setSaved] = useState(initial), [data, setData] = useState<OrderInput>(() => initial?.data ?? conversion?.data ?? newOrder());
+  const [dirty, setDirty] = useState(Boolean(conversion)), [busy, setBusy] = useState(false), [conflict, setConflict] = useState(false), [ambiguous, setAmbiguous] = useState(false), [error, setError] = useState('');
+  const [preview, setPreview] = useState<{ input: OrderInput; value: OrderCalculation } | null>(conversion ? { input: conversion.data, value: conversion.calculation } : null), [calculationError, setCalculationError] = useState('');
   const destinations = useLoad(signal => api.request<Destination[]>(`${base}/destinations`, { signal }));
   const attempt = useRef<{ body: string; key: string } | null>(null), heading = useRef<HTMLHeadingElement>(null);
   useUnsavedChanges(dirty || ambiguous, busy);
@@ -57,9 +57,11 @@ export function OrderEditor({ initial, editable, edit, close }: { initial: Purch
   const change = <K extends keyof OrderInput>(key: K, value: OrderInput[K]) => { setData(previous => ({ ...previous, [key]: value })); setDirty(true); };
   const product = <K extends keyof OrderProduct>(index: number, key: K, value: OrderProduct[K]) => change('products', data.products.map((row, i) => i === index ? { ...row, [key]: value } : row));
   return <><Heading title={saved ? `Orden · ${saved.data.n_orders}` : 'Nueva orden de compra'} description={`Estado: ${calculation?.status ?? saved?.status ?? 'Pendiente'} · Moneda: HNL`} action={<div className="actions">{edit && <button onClick={edit}>Editar</button>}<button disabled={busy} onClick={() => void navigate(close)}>Volver</button></div>} />
+    {(saved?.source_quote ?? conversion?.source) && <p role="status">Origen: cotización {(saved?.source_quote ?? conversion?.source)?.quote_number ?? (saved?.source_quote ?? conversion?.source)?.id}. Se conservan las condiciones comerciales aprobadas. Completa número y destino; puedes actualizar los datos operativos.</p>}
     <h2 className="order-focus-heading" tabIndex={-1} ref={heading}>Editor de orden de compra</h2><p className="quote-stage">{stage}</p><Notice>{error}</Notice>
     {ambiguous && <p role="status">No se pudo confirmar la creación. Reintenta guardar los mismos datos para recuperar el resultado sin duplicar la orden.</p>}
-    {conflict && <div role="status"><p>Tus cambios se conservan en pantalla. Abre la versión actual para revisarlos antes de guardar.</p><button disabled={busy} onClick={() => void navigate(() => { setBusy(true); setError(''); void api.request<PurchaseOrder>(`${base}/${saved!.id}`).then(latest => { setSaved(latest); setData(latest.data); setDirty(false); setConflict(false); }).catch(reason => setError(message(reason))).finally(() => setBusy(false)); })}>Abrir versión actual</button></div>}
+    {conflict && !saved && <p role="status">La cotización cambió. Vuelve al listado y prepara la conversión desde su versión actual.</p>}
+    {conflict && saved && <div role="status"><p>Tus cambios se conservan en pantalla. Abre la versión actual para revisarlos antes de guardar.</p><button disabled={busy} onClick={() => void navigate(() => { setBusy(true); setError(''); void api.request<PurchaseOrder>(`${base}/${saved!.id}`).then(latest => { setSaved(latest); setData(latest.data); setDirty(false); setConflict(false); }).catch(reason => setError(message(reason))).finally(() => setBusy(false)); })}>Abrir versión actual</button></div>}
     <Notice>{destinations.error}</Notice>{destinations.error && <button onClick={destinations.reload}>Reintentar destinos</button>}
     {destinations.data?.length === 0 && <p role="status">Agrega un destino en Ajustes &gt; Órdenes de compra antes de guardar. Si no tienes permiso, solicítalo al administrador.</p>}
     <form className="stack order-editor" onSubmit={async e => {
@@ -68,37 +70,38 @@ export function OrderEditor({ initial, editable, edit, close }: { initial: Purch
       try {
         let updated: PurchaseOrder;
         if (saved) updated = await api.request<PurchaseOrder>(`${base}/${saved.id}`, { method: 'PUT', body: data, ifMatch: saved.version });
-        else { const body = JSON.stringify(data); if (!attempt.current) attempt.current = { body, key: crypto.randomUUID() }; else if (attempt.current.body !== body) throw new Error('Reintenta con los datos originales.'); updated = await api.request<PurchaseOrder>(base, { method: 'POST', body: data, idempotencyKey: attempt.current.key }); }
-        setSaved(updated); setData(updated.data); setDirty(false); setAmbiguous(false); attempt.current = null; notify('Orden de compra guardada.');
+        else { const body = JSON.stringify(data); if (!attempt.current) attempt.current = { body, key: crypto.randomUUID() }; else if (attempt.current.body !== body) throw new Error('Reintenta con los datos originales.'); updated = await api.request<PurchaseOrder>(conversion ? '/api/v1/cotizaciones/' + conversion.source.id + '/order' : base, { method: 'POST', body: data, idempotencyKey: attempt.current.key, ...(conversion ? { ifMatch: conversion.source.version } : {}) }); }
+        setSaved(updated); setData(updated.data); setDirty(false); setAmbiguous(false); attempt.current = null; notify(conversion && !saved ? 'Cotización convertida a orden de compra.' : 'Orden de compra guardada.');
       } catch (reason) { setError(message(reason)); if (reason instanceof ApiError && reason.status === 412) setConflict(true); if (!saved) { if (reason instanceof ApiError && reason.status < 500 && reason.status !== 408) { attempt.current = null; setAmbiguous(false); } else setAmbiguous(true); } }
       finally { setBusy(false); }
     }}><fieldset className="form-fields quote-form" disabled={busy || conflict || ambiguous || !editable}><legend>Datos de orden</legend><div className="quote-fields">
       <label>Número de orden<input required maxLength={50} value={data.n_orders} onChange={e => change('n_orders', e.target.value)} /></label>
-      <label>Cliente (manual)<input required maxLength={255} value={data.client_name} onChange={e => change('client_name', e.target.value)} /></label><label>RTN del cliente<input maxLength={30} value={data.client_rtn} onChange={e => change('client_rtn', e.target.value)} /></label>
+      <label>Cliente<input readOnly={Boolean(data.approved_quote)} required maxLength={255} value={data.client_name} onChange={e => change('client_name', e.target.value)} /></label><label>RTN del cliente<input readOnly={Boolean(data.approved_quote)} maxLength={30} value={data.client_rtn} onChange={e => change('client_rtn', e.target.value)} /></label>
       <label>Destino<select required value={data.id_destination ?? ''} onChange={e => change('id_destination', e.target.value ? Number(e.target.value) : null)}><option value="">Selecciona un destino</option>{destinations.data?.map(row => <option key={row.id} value={row.id}>{row.destination}</option>)}</select></label>
       <label>Fecha de orden<input required type="date" min="1000-01-01" max="9999-12-31" value={data.order_date} onChange={e => change('order_date', e.target.value)} /></label>
       <label>Fecha de entrega<input type="date" min="1000-01-01" max="9999-12-31" value={data.received_date ?? ''} onChange={e => change('received_date', e.target.value || null)} /></label>
       <label>Número de factura<input maxLength={120} value={data.n_bill} onChange={e => change('n_bill', e.target.value)} /><small>Una referencia de factura determina el estado Entregado. No emite una factura.</small></label>
-    </div><div className="row"><h2>Productos</h2><button type="button" disabled={data.products.length >= 200} onClick={() => change('products', [...data.products, newProduct()])}>Agregar producto</button></div>
-    {data.products.map((row, index) => <fieldset className="quote-item" key={index}><legend>Producto {index + 1}</legend><label>Descripción<textarea maxLength={2000} rows={2} value={row.description} onChange={e => product(index, 'description', e.target.value)} /></label><div className="quote-fields">
-      <label>Cantidad<input required type="number" min={0} max={1000000} step={1} value={row.cantidad} onChange={e => product(index, 'cantidad', Number(e.target.value))} /></label>
-      <Decimal label="Costo unitario (HNL)" value={row.sale_price} change={v => product(index, 'sale_price', v)} /><Decimal label="Precio de venta (HNL)" value={row.purchase_price} change={v => product(index, 'purchase_price', v)} />
+    </div><div className="row"><h2>Productos</h2><button type="button" disabled={Boolean(data.approved_quote) || data.products.length >= 200} onClick={() => change('products', [...data.products, newProduct()])}>Agregar producto</button></div>
+    {data.products.map((row, index) => <fieldset className="quote-item" key={index}><legend>Producto {index + 1}</legend><label>Descripción<textarea readOnly={Boolean(data.approved_quote)} maxLength={data.approved_quote ? 3000 : 2000} rows={2} value={row.description} onChange={e => product(index, 'description', e.target.value)} /></label><div className="quote-fields">
+      <label>Cantidad<input readOnly={Boolean(data.approved_quote)} required type="number" min={0} max={data.approved_quote ? undefined : 1000000} step={data.approved_quote ? "any" : 1} value={row.cantidad} onChange={e => product(index, 'cantidad', Number(e.target.value))} /></label>
+      <Decimal label="Costo unitario (HNL)" value={row.sale_price} change={v => product(index, 'sale_price', v)} /><Decimal readOnly={Boolean(data.approved_quote)} label="Precio de venta (HNL)" value={row.purchase_price} change={v => product(index, 'purchase_price', v)} />
       <label>Tracking<input maxLength={255} value={row.tracking} onChange={e => product(index, 'tracking', e.target.value)} /></label>
       <label>Estado del producto<select value={row.status} onChange={e => product(index, 'status', e.target.value as OrderProduct['status'])}><option>Pendiente</option><option>Comprado</option></select></label>
-      <label className="order-tax"><input type="checkbox" checked={row.isv} onChange={e => product(index, 'isv', e.target.checked)} />ISV 15%</label><label>Comentario del producto<textarea rows={2} maxLength={1000} value={row.coments} onChange={e => product(index, 'coments', e.target.value)} /></label>
-    </div><button type="button" className="danger" onClick={() => change('products', data.products.filter((_, i) => i !== index))}>Quitar producto</button></fieldset>)}
+      {data.approved_quote ? <p>Impuesto: {data.approved_quote.items[index]?.tax_type === 'isv18' ? 'ISV 18%' : data.approved_quote.items[index]?.tax_type === 'isv15' ? 'ISV 15%' : 'Exento'} · Descuento: {data.approved_quote.items[index]?.discount_value}{data.approved_quote.items[index]?.discount_type === 'percent' ? '%' : ' HNL'}</p> : <label className="order-tax"><input type="checkbox" checked={row.isv} onChange={e => product(index, 'isv', e.target.checked)} />ISV 15%</label>}<label>Comentario del producto<textarea rows={2} maxLength={1000} value={row.coments} onChange={e => product(index, 'coments', e.target.value)} /></label>
+    </div><button disabled={Boolean(data.approved_quote)} type="button" className="danger" onClick={() => change('products', data.products.filter((_, i) => i !== index))}>Quitar producto</button></fieldset>)}
     <div className="row"><h2>Gastos adicionales</h2><button type="button" disabled={data.expenses.length >= 200} onClick={() => change('expenses', [...data.expenses, { description: 'Gasto', amount: '0' }])}>Agregar gasto</button></div>
     {data.expenses.map((expense, index) => <fieldset className="quote-item" key={index}><legend>Gasto {index + 1}</legend><label>Descripción del gasto<input maxLength={255} value={expense.description} onChange={e => change('expenses', data.expenses.map((row, i) => i === index ? { ...row, description: e.target.value } : row))} /></label><Decimal label="Monto del gasto (HNL)" value={expense.amount} change={v => change('expenses', data.expenses.map((row, i) => i === index ? { ...row, amount: v } : row))} /><button type="button" className="danger" onClick={() => change('expenses', data.expenses.filter((_, i) => i !== index))}>Quitar gasto</button></fieldset>)}
     <label>Comentarios de la orden<textarea rows={3} maxLength={3000} value={data.comments} onChange={e => change('comments', e.target.value)} /></label>
     </fieldset>{editable && <button className="primary" type="submit" disabled={busy || conflict || !destinations.data?.length}>{busy ? 'Guardando…' : ambiguous ? 'Reintentar guardar' : 'Guardar orden'}</button>}</form>
+    {data.approved_quote && <section className="card"><h2>Condiciones aprobadas</h2><p>Referencia de la cotización: {data.approved_quote.order_number || 'Sin referencia'}</p><p>Descuento general: {data.approved_quote.discount_value}{data.approved_quote.discount_type === 'percent' ? '%' : ' HNL'}</p><p>{data.approved_quote.terms}</p>{[data.approved_quote.purchase_order_exempt_number, data.approved_quote.registration_certificate_number, data.approved_quote.sag_registration_number].filter(Boolean).map((value, index) => <p key={index}>Referencia de exoneración: {value}</p>)}</section>}
     <Notice>{calculationError}</Notice>{calculation ? <OrderSummaryTotals calculation={calculation} /> : !calculationError && <p role="status">Calculando totales…</p>}
   </>;
 }
 export function OrderSummaryTotals({ calculation: c }: { calculation: OrderCalculation }) {
-  const t = c.totals, entries = [['Subtotal de venta', t.subtotal], ['Subtotal exonerado', t.subtotal_exonerado], ['ISV 15%', t.tax], ['Total de venta', t.total], ['Inversión en productos', t.products_investment], ['Otros gastos', t.other_expenses], ['Inversión total', t.investment_total], ['Utilidad estimada', t.profit]];
+  const t = c.totals, entries = [['Subtotal de venta', t.subtotal], ['Subtotal exonerado', t.subtotal_exonerado], [t.commercial ? 'ISV total' : 'ISV 15%', t.tax], ...(t.commercial ? [['Descuentos y rebajas', t.commercial.descuentos_rebajas], ['ISV 15%', t.commercial.isv_15], ['ISV 18%', t.commercial.isv_18]] : []), ['Total de venta', t.total], ['Inversión en productos', t.products_investment], ['Otros gastos', t.other_expenses], ['Inversión total', t.investment_total], ['Utilidad estimada', t.profit]];
   return <section className="card quote-totals order-totals" aria-label="Totales de orden"><h2>Resumen</h2><p>HNL · {c.status}</p><dl>{entries.map(([label, value]) => <div key={label}><dt>{label}</dt><dd>L {value}</dd></div>)}</dl></section>;
 }
-function Decimal({ label, value, change }: { label: string; value: string; change: (value: string) => void }) { return <label>{label}<input required type="text" inputMode="decimal" maxLength={17} pattern="[0-9]{1,12}([.][0-9]{1,4})?" title="Número sin signo; hasta 4 decimales con punto." value={value} onChange={e => change(e.target.value)} /></label>; }
+function Decimal({ label, value, change, readOnly }: { label: string; value: string; change: (value: string) => void; readOnly?: boolean }) { return <label>{label}<input readOnly={readOnly} required type="text" inputMode="decimal" maxLength={17} pattern="[0-9]{1,12}([.][0-9]{1,4})?" title="Número sin signo; hasta 4 decimales con punto." value={value} onChange={e => change(e.target.value)} /></label>; }
 
 export function OrderSettings() {
   const { access } = useCore();

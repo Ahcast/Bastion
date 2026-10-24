@@ -102,4 +102,8 @@ Completar validación integral del esquema MySQL y las sesiones existentes, alma
 
 ## Órdenes de compra: primer corte local
 
-`crates/modules/ordenes_compra` es dueño de órdenes, cálculo y catálogo de destinos confirmado bajo Ajustes. Tiene migraciones/ledger propios y no escribe tablas de otros módulos. Clientes manuales son instantáneas hasta definir vinculación; conversiones quedan pendientes. Destinos es catálogo de dominio, no un almacén alternativo de settings. Ver `modulos/ordenes-de-compra-implementacion.md`.
+`crates/modules/ordenes_compra` es dueño de órdenes, cálculo y catálogo de destinos confirmado bajo Ajustes. Tiene migraciones/ledger propios y no escribe tablas de otros módulos. Clientes manuales son instantáneas hasta definir vinculación; la conversión desde Cotizaciones se compone mediante bastion-workflows. Destinos es catálogo de dominio, no un almacén alternativo de settings. Ver `modulos/ordenes-de-compra-implementacion.md`.
+
+## Composición de conversiones
+
+`crates/workflows` reúne coordinación entre módulos mediante sus interfaces públicas. No registra módulos, no posee tablas y no mueve reglas fiscales al Core. Cotización→orden compone puertos transaccionales de ambos dominios; conserva una instantánea comercial aprobada y la relación de origen. Ver [cotizacion-a-orden.md](modulos/cotizacion-a-orden.md).

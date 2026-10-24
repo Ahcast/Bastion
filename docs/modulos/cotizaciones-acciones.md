@@ -9,7 +9,7 @@ Decisiones del usuario, 22 de octubre de 2026: menú desplegable por cotización
 | Ver | Abre los datos sin habilitar edición. Puede pasar a Editar si tiene permiso. | ver |
 | Editar | Abre el editor de la revisión actual. Guardado con If-Match. | editar |
 | Marcar como enviado | Cambia a Enviada; no envía correo. Conserva ítems, contacto y cálculos. | editar |
-| Convertir a orden de compra | Deshabilitado por acuerdo. Legacy abre una nueva orden con quote_id para completar destino y número de orden. | editar, al implementar |
+| Convertir a orden de compra | Prepara orden desde Aprobada, conserva condiciones y total; completa número/destino y guarda atómicamente con origen. Ver cotizacion-a-orden.md. | editar en ambos módulos |
 | Convertir a factura | Deshabilitado por acuerdo. Legacy crea una factura relacionada y abre su detalle; evita duplicar una conversión previa. | editar, al implementar |
 | Aprobar | Cambia a Aprobada; no inventa una matriz de transiciones. | editar |
 | Clonar | Copia ítems, referencia, notas, términos, descuentos y vigencia. Limpia cliente; asigna nuevo número, contacto del actor, Borrador y fecha actual de Honduras. Abre la copia para editar. No modifica el original. | editar |
@@ -53,7 +53,7 @@ Límites técnicos del corte: PDF hasta 8 MiB, hasta 50 destinatarios distintos;
 
 Se agregan pruebas de interacción del menú, lectura frente a edición, estados sin recarga, versiones, permisos, clonación idempotente y confirmación de eliminación; pruebas de contenido/MIME de PDF y zona horaria; pruebas Rust/MySQL para estados, copia, permisos y auditoría, y generación real de plantilla con texto malicioso tratado como datos.
 
-Las conversiones siguen deshabilitadas por acuerdo. Selección de documentos externos, acciones masivas, interoperabilidad MCP y reconciliación contable siguen pendientes. No se presentan como terminados por añadir el menú. PDF y correo se habilitan al configurar Empresa, documentos privados y SMTP; sus errores de infraestructura no simulan resultados.
+La conversión a factura sigue pendiente. Cotización→orden se implementa según cotizacion-a-orden.md. Selección de documentos externos, acciones masivas, interoperabilidad MCP y reconciliación contable siguen pendientes. No se presentan como terminados por añadir el menú. PDF y correo se habilitan al configurar Empresa, documentos privados y SMTP; sus errores de infraestructura no simulan resultados.
 
 ## Publicación verificada - 2026-10-22
 

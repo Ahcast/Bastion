@@ -91,6 +91,8 @@ jobs:
       BASTION_PROCESOS_TEST_URL: mysql://root:bastion_ci_only@127.0.0.1:3306/bastion_test?ssl-mode=disabled
       BASTION_COTIZACIONES_TEST_URL: mysql://root:bastion_ci_only@127.0.0.1:3306/bastion_cotizaciones_test?ssl-mode=disabled
       BASTION_CLIENTES_TEST_URL: mysql://root:bastion_ci_only@127.0.0.1:3306/bastion_clientes_test?ssl-mode=disabled
+      BASTION_CONVERSION_HTTP_TEST_URL: mysql://root:bastion_ci_only@127.0.0.1:3306/bastion_conversion_http_test?ssl-mode=disabled
+      BASTION_CONVERSION_TEST_URL: mysql://root:bastion_ci_only@127.0.0.1:3306/bastion_conversion_test?ssl-mode=disabled
       BASTION_ORDENES_TEST_URL: mysql://root:bastion_ci_only@127.0.0.1:3306/bastion_ordenes_test?ssl-mode=disabled
       BASTION_ORDENES_HTTP_TEST_URL: mysql://root:bastion_ci_only@127.0.0.1:3306/bastion_ordenes_http_test?ssl-mode=disabled
       BASTION_CLIENTES_HTTP_TEST_URL: mysql://root:bastion_ci_only@127.0.0.1:3306/bastion_clientes_http_test?ssl-mode=disabled
@@ -130,6 +132,7 @@ jobs:
           docker exec ${{ job.services.mysql57.id }} mysql -uroot -pbastion_ci_only -e 'CREATE DATABASE bastion_facturas_http_test CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci'
           docker exec ${{ job.services.mysql57.id }} mysql -uroot -pbastion_ci_only -e 'CREATE DATABASE bastion_ordenes_test CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci'
           docker exec ${{ job.services.mysql57.id }} mysql -uroot -pbastion_ci_only -e 'CREATE DATABASE bastion_ordenes_http_test CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci'
+          docker exec ${{ job.services.mysql57.id }} mysql -uroot -pbastion_ci_only -e 'CREATE DATABASE bastion_conversion_test CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci; CREATE DATABASE bastion_conversion_http_test CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci'
           cargo test --workspace --locked
       - name: Verify private attachments with isolated databases and local storage transport
         env:

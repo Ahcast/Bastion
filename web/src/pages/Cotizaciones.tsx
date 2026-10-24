@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
+import { OrderEditor } from './OrdenesCompra.js';
+import type { OrderConversionSeed } from '../orders.js';
 import type { ProcessQuoteSeed } from '../processQuote.js';
 import { ProcessQuoteNotice } from '../components/ProcessQuoteNotice.js';
 import { ApiError, message } from '../api.js';
@@ -25,6 +27,7 @@ export default function Cotizaciones({ processSeed, clearProcessSeed }: ProcessQ
 
 function Workspace({ processSeed, clearProcessSeed }: ProcessQuoteProps) {
   const [seed, setSeed] = useState(processSeed);
+  const [orderSeed, setOrderSeed] = useState<OrderConversionSeed | null>(null);
   const { api, access, notify } = useCore();
   const [selected, setSelected] = useState<QuoteDraft | 'new' | null>(processSeed ? 'new' : null);
   const [search, setSearch] = useState(''), [query, setQuery] = useState(''), [page, setPage] = useState(1), [error, setError] = useState(''), [opening, setOpening] = useState(false);
@@ -32,6 +35,13 @@ function Workspace({ processSeed, clearProcessSeed }: ProcessQuoteProps) {
   const [email, setEmail] = useState<QuoteSummary | null>(null);
   const cloneAttempt = useRef<{ id: number; version: number; key: string } | null>(null);
   const editable = moduleCan(access, 'cotizaciones', 'documentos', 'editar');
+  const orderEditable = moduleCan(access, 'ordenes_compra', 'documentos', 'editar');
+  const prepareOrder = async (draft: QuoteSummary) => {
+    setOpening(true); setError('');
+    try { setOrderSeed(await api.request<OrderConversionSeed>('/api/v1/cotizaciones/' + draft.id + '/order-preparation', { ifMatch: draft.version })); }
+    catch (reason) { setError(message(reason)); if (reason instanceof ApiError && reason.status === 412) result.reload(); }
+    finally { setOpening(false); }
+  };
   const removable = moduleCan(access, 'cotizaciones', 'documentos', 'eliminar');
   const documents = useLoad(signal => api.request<DocumentReadiness>('/api/v1/cotizaciones/document-readiness', { signal }));
   const result = useLoad(signal => api.request<QuotePage>(`/api/v1/cotizaciones?q=${encodeURIComponent(query)}&page=${page}&page_size=25`, { signal }), [query, page], true);
@@ -65,6 +75,7 @@ function Workspace({ processSeed, clearProcessSeed }: ProcessQuoteProps) {
     void api.request<QuotePdf>(`/api/v1/cotizaciones/${draft.id}/pdf`, { ifMatch: draft.version }).then(value => viewer.show(value))
       .catch(reason => { viewer.close(); setError(message(reason)); }).finally(() => setOpening(false));
   };
+  if (orderSeed) return <OrderEditor initial={null} conversion={orderSeed} editable={editable && orderEditable} close={() => { setOrderSeed(null); result.reload(); }} />;
   if (selected) return <Editor key={selected === 'new' ? 'new' : selected.id} initial={selected === 'new' ? null : selected} seed={seed} editable={editable && mode === 'edit'} edit={editable && mode === 'view' ? () => setMode('edit') : undefined} close={() => { setSelected(null); setSeed(null); clearProcessSeed?.(); result.reload(); }} />;
   return <><Heading title="Cotizaciones" description="Prepara y consulta tus cotizaciones." action={editable && <button className="primary" onClick={() => { setMode('edit'); setSelected('new'); }}>Nueva cotización</button>} />
     {documents.data && !documents.data.pdf && <p className="quote-stage">PDF requiere la configuración de Empresa en Ajustes del Core y el servicio de documentos del servidor.</p>}
@@ -76,7 +87,7 @@ function Workspace({ processSeed, clearProcessSeed }: ProcessQuoteProps) {
       { label: 'Ver', run: () => void open(draft, 'view') },
       { label: 'Editar', disabled: !editable, reason: !editable ? 'Sin permiso de edición' : undefined, run: () => void open(draft, 'edit') },
       { label: 'Marcar como enviado', disabled: !editable, run: () => void status(draft, 'Enviada') },
-      { label: 'Convertir a orden de compra', disabled: true, reason: 'Disponible al incorporar Órdenes de compra' },
+      { label: 'Convertir a orden de compra', disabled: !editable || !orderEditable || draft.status !== 'Aprobada', reason: !editable || !orderEditable ? 'Requiere edición en Cotizaciones y Órdenes de compra' : draft.status !== 'Aprobada' ? 'Aprueba la cotización antes de convertirla' : undefined, run: () => void prepareOrder(draft) },
       { label: 'Convertir a factura', disabled: true, reason: 'Disponible al incorporar Facturas' },
       { label: 'Aprobar', disabled: !editable, run: () => void status(draft, 'Aprobada') },
       { label: 'Clonar', disabled: !editable, run: () => void clone(draft) },

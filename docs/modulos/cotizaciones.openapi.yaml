@@ -2,8 +2,7 @@ openapi: 3.1.0
 info:
   title: Bastion Cotizaciones
   version: 0.4.0
-  description: Cotizaciones, acciones por documento, PDF Typst y correo inmediato/programado. Conversiones deshabilitadas
-    por acuerdo hasta incorporar sus módulos. Ver cotizaciones-acciones.md.
+  description: Cotizaciones, PDF, adjuntos y correo. Conversión de cotización aprobada a orden definida en cotizacion-a-orden.openapi.yaml; conversión a factura pendiente. Ver cotizaciones-acciones.md.
 security:
   - session: []
 paths:

@@ -5,7 +5,40 @@ mod service;
 pub use calculation::{OrderCalculation, OrderTotals, calculate};
 pub use service::OrderService;
 
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct SourceQuote {
+    pub id: u64,
+    pub version: u64,
+    pub quote_number: Option<String>,
+}
+
+// Old persisted documents and clients use integer JSON quantities.
+fn quantity<'de, D: serde::Deserializer<'de>>(deserializer: D) -> Result<String, D::Error> {
+    #[derive(Deserialize)]
+    #[serde(untagged)]
+    enum Quantity {
+        Text(String),
+        Integer(u32),
+    }
+    Ok(match Quantity::deserialize(deserializer)? {
+        Quantity::Text(s) => s,
+        Quantity::Integer(n) => n.to_string(),
+    })
+}
+
+// Keep the existing JSON integer contract for manual orders. Decimal quantities
+// are exact strings; no binary floating point enters the financial calculation.
+fn serialize_quantity<S: serde::Serializer>(value: &str, serializer: S) -> Result<S::Ok, S::Error> {
+    if let Ok(units) = calculation::decimal(value) {
+        if units % 10_000 == 0 && units <= 1_000_000 * 10_000 {
+            return serializer.serialize_u32((units / 10_000) as u32);
+        }
+    }
+    serializer.serialize_str(value)
+}
+
 use bastion_core::CoreError;
+
 use chrono::NaiveDate;
 use serde::{Deserialize, Serialize};
 
@@ -19,7 +52,8 @@ pub enum ProductStatus {
 #[serde(deny_unknown_fields)]
 pub struct OrderProduct {
     pub description: String,
-    pub cantidad: u32,
+    #[serde(deserialize_with = "quantity", serialize_with = "serialize_quantity")]
+    pub cantidad: String,
     // Legacy names: sale_price is cost; purchase_price is selling price.
     pub sale_price: String,
     pub purchase_price: String,
@@ -39,6 +73,8 @@ pub struct OrderExpense {
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct OrderInput {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub approved_quote: Option<bastion_cotizaciones::QuoteInput>,
     pub n_orders: String,
     pub n_bill: String,
     pub order_date: NaiveDate,
@@ -53,6 +89,8 @@ pub struct OrderInput {
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct PurchaseOrder {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source_quote: Option<SourceQuote>,
     pub id: u64,
     pub version: u64,
     pub status: String,

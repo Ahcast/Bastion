@@ -187,6 +187,7 @@ dependencies = [
  "bastion-facturas",
  "bastion-ordenes-compra",
  "bastion-procesos",
+ "bastion-workflows",
  "chrono",
  "ipnet",
  "rand 0.8.8",
@@ -281,6 +282,7 @@ name = "bastion-ordenes-compra"
 version = "0.1.0"
 dependencies = [
  "bastion-core",
+ "bastion-cotizaciones",
  "chrono",
  "serde",
  "serde_json",
@@ -323,6 +325,21 @@ dependencies = [
  "tokio",
  "tracing",
  "tracing-subscriber",
+]
+
+[[package]]
+name = "bastion-workflows"
+version = "0.1.0"
+dependencies = [
+ "bastion-core",
+ "bastion-cotizaciones",
+ "bastion-ordenes-compra",
+ "chrono",
+ "serde",
+ "serde_json",
+ "sha2 0.10.9",
+ "sqlx",
+ "tokio",
 ]
 
 [[package]]
