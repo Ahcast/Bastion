@@ -37,4 +37,4 @@ Conciliar campos de gasto general y gasto en línea; reglas fiscales/base exenta
 
 ## Estado de implementación
 
-El primer corte cubre el registro general independiente y conserva explícitamente los pendientes de asociación y paridad. Ver [alcance y decisiones provisionales](gastos-implementacion.md) y [contrato HTTP](gastos.openapi.yaml). No está desplegado ni activado.
+El primer corte cubre el registro general independiente y conserva explícitamente los pendientes de asociación y paridad. Ver [alcance y decisiones provisionales](gastos-implementacion.md) y [contrato HTTP](gastos.openapi.yaml). El usuario autorizó completar la publicación y activarlo sólo para el Administrador del sistema; el cotejo y la migración 2 están documentados en el alcance de implementación.

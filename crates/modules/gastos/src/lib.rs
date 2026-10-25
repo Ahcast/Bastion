@@ -44,7 +44,7 @@ pub struct ExpenseFilter {
 impl ExpenseFilter {
     pub fn bounds(&self) -> Result<(u32, u32), CoreError> {
         let page = self.page.unwrap_or(1);
-        let size = self.page_size.unwrap_or(25);
+        let size = self.page_size.unwrap_or(20);
         if !(1..=10000).contains(&page)
             || !(1..=100).contains(&size)
             || self
@@ -65,11 +65,10 @@ impl ExpenseFilter {
     }
 
     pub(crate) fn search(&self) -> Option<&str> {
-        self.search.as_deref().map(str::trim).filter(|value| {
-            !value.is_empty()
-                && !value.eq_ignore_ascii_case("null")
-                && !value.eq_ignore_ascii_case("undefined")
-        })
+        self.search
+            .as_deref()
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
     }
 }
 
@@ -79,4 +78,14 @@ pub struct ExpensePage {
     pub page: u32,
     pub page_size: u32,
     pub has_more: bool,
+    pub summary: ExpenseSummary,
+}
+
+#[derive(Debug, Serialize, sqlx::FromRow)]
+pub struct ExpenseSummary {
+    pub count: u64,
+    pub taxable_amount: String,
+    pub exempt_amount: String,
+    pub isv_15: String,
+    pub total: String,
 }

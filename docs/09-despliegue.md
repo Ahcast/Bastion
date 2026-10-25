@@ -73,6 +73,6 @@ El release incluye la migración propia del módulo y el detector `file`/libmagi
 
 El 2026-10-24 se publicó el commit `14b1bf6` con `Core checks` y `Scout control checks` exitosos, y se desplegaron sus artifacts verificados en AWS/Bluehost. Se aplicó la migración `202610230001`, se respaldó la base y se cotejaron las 50 tablas previas; salud pública 200 y 36 hashes de assets correctos. Colaboración sigue fuera de `BASTION_ALLOWED_MODULES` y desactivado: el rol de Lightsail no puede enumerar versiones del prefijo S3. No activar hasta completar IAM y controles de bucket/proxy; no se probó S3 real.
 
-## Gastos: preparación local
+## Gastos: preparación de activación
 
-El primer corte añade migración propia y registro del módulo. Aún no está desplegado ni activado. Para incorporarlo, publicar el artifact, respaldar MySQL, ejecutar `migrate`, permitir `gastos` en `BASTION_ALLOWED_MODULES` y comprobar la migración; dejar la activación administrativa separada. No importar gastos Legacy ni enlaces de órdenes/facturas. Ver [alcance y límites](modulos/gastos-implementacion.md).
+El usuario autoriza activar el registro general sólo para el Administrador del sistema. El estado inicial comprobado por SSH ejecuta `ca383c7` en AWS/Bluehost, con migración 1 aplicada, readiness 200 y Gastos desactivado/fuera de allowlist. Las correcciones de paridad y edición añaden migración 2 (borrado lógico), cálculo previo y resumen filtrado. Esperar CI de ese commit, verificar el artifact, respaldar MySQL/frontend, aplicar `migrate`, agregar `gastos` a `BASTION_ALLOWED_MODULES` y publicar en ambos hosts. Activar mediante el Core sólo tras verificar; no conceder acceso a otros roles ni importar registros Legacy. Ver [alcance y evidencia](modulos/gastos-implementacion.md).

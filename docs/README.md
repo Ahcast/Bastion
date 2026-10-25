@@ -37,6 +37,8 @@ El informe se obtuvo de una copia de frontend Angular compilado y backend Larave
 
 ## Registro de decisiones
 
+- 2026-10-25: el usuario autoriza completar y activar el registro general de Gastos únicamente para el Administrador del sistema. El cotejo de ExpensesComponent/GastosController confirma HNL, factura de 50 caracteres, registro compartido, resumen filtrado, secuencia de redondeo y borrado lógico. Se corrigen edición y persistencia con migración 2, se añade cálculo previo en Rust y pruebas propias en MySQL 5.7 aislado. Publicación y activación se registrarán con evidencia del artifact aprobado; los pendientes de integración e histórico se conservan. Ver `modulos/gastos-implementacion.md`.
+
 - 2026-10-24: a solicitud del usuario inicia el primer corte local de Gastos: registro general, persistencia propia, API y pantalla. HNL, cálculo/redondeo, permisos y límites técnicos se identifican como decisiones provisionales; la asociación con órdenes/facturas, migración Legacy, MCP y paridad visual siguen pendientes. Ver `modulos/gastos-implementacion.md`.
 
 - 2026-10-24: Se confirma ejecución manual del pipeline completo de Scout desde Ajustes > Procesos a cualquier hora, en segundo plano, con autorización, auditoría y protección contra concurrencia. Ver [contrato](modulos/procesos-scout-manual.md).

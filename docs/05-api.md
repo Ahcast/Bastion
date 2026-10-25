@@ -117,4 +117,4 @@ Colaboración: `/api/v1/colaboracion` lista y crea archivos; admite selección m
 
 ## Gastos
 
-El primer corte expone `GET/POST /api/v1/gastos` y `GET/PUT/DELETE /api/v1/gastos/{id}` para el registro general. Usa permisos `gastos/registros/ver`, `editar` y `eliminar`; Rust valida y calcula ISV/total. Parámetros, DTO, idempotencia y `ETag`/`If-Match` constan en [OpenAPI](modulos/gastos.openapi.yaml). Asociación con órdenes/facturas y filtros por usuario/orden siguen pendientes.
+El registro general expone `GET/POST /api/v1/gastos` y `GET/PUT/DELETE /api/v1/gastos/{id}`, con borrado lógico y resumen filtrado. `POST /api/v1/gastos/calculo` calcula sin persistir y exige editar/CSRF. Usa permisos `gastos/registros/ver`, `editar` y `eliminar`; Rust valida y calcula ISV/total. Parámetros, DTO, idempotencia y `ETag`/`If-Match` constan en [OpenAPI](modulos/gastos.openapi.yaml). Asociación con órdenes/facturas y filtros por usuario/orden siguen pendientes.

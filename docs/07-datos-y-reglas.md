@@ -71,4 +71,4 @@ Colaboración conserva metadatos en MySQL y bytes en el bucket privado S3 del Co
 
 ## Gastos: persistencia del primer corte
 
-El primer corte guarda el registro general en `gastos_records`, `gastos_create_receipts` y `gastos_actor_limits`; no reutiliza JSON Legacy ni crea asociaciones a órdenes/facturas. HNL es el único valor habilitado por ser el único observado. La persistencia a centavos y el cálculo de ISV descritos en [la implementación](modulos/gastos-implementacion.md) son provisionales hasta verificar reglas y ejemplos contables.
+El primer corte guarda el registro general en `gastos_records`, `gastos_create_receipts` y `gastos_actor_limits`; no reutiliza JSON Legacy ni crea asociaciones a órdenes/facturas. HNL es el único valor habilitado por ser el único observado. El cotejo estático de GastosController confirma bases a centavos antes del ISV y total; queda pendiente la revisión contable de negocio. La migración 2 conserva los registros eliminados mediante deleted_at; consulta y resumen excluyen esos registros. Ver [implementación y evidencia](modulos/gastos-implementacion.md).

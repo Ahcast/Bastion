@@ -25,7 +25,7 @@ paths:
           schema: { type: integer, minimum: 1, maximum: 10000, default: 1 }
         - in: query
           name: page_size
-          schema: { type: integer, minimum: 1, maximum: 100, default: 25 }
+          schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
       responses:
         '200':
           description: Página de gastos; requiere gastos/registros/ver.
@@ -60,6 +60,29 @@ paths:
         '400': { description: Datos inválidos. }
         '403': { description: Permiso denegado o CSRF inválido. }
         '409': { description: Clave idempotente reutilizada con otro contenido. }
+  /api/v1/gastos/calculo:
+    post:
+      summary: Calcular bases, ISV y total sin guardar
+      description: Usa la misma normalización que crear/editar. Requiere sesión, editar y CSRF.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ExpenseInput' }
+      responses:
+        '200':
+          description: Cálculo sin persistencia.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, isv_15, total]
+                properties:
+                  data: { $ref: '#/components/schemas/ExpenseInput' }
+                  isv_15: { type: string }
+                  total: { type: string }
+        '400': { description: Datos inválidos. }
+        '403': { description: Permiso denegado o CSRF inválido. }
   /api/v1/gastos/{id}:
     parameters:
       - in: path
@@ -104,7 +127,7 @@ paths:
       summary: Eliminar gasto
       description: Requiere gastos/registros/eliminar y confirmación previa en la interfaz.
       responses:
-        '204': { description: Gasto eliminado y acción auditada. }
+        '204': { description: Gasto retirado del registro activo, conservado mediante deleted_at y acción auditada. }
         '403': { description: Permiso denegado o CSRF inválido. }
         '404': { description: Gasto o módulo inexistente/no disponible. }
 components:
@@ -115,12 +138,12 @@ components:
       required: [expense_date, invoice_number, provider, currency, taxable_amount, exempt_amount]
       properties:
         expense_date: { type: string, format: date }
-        invoice_number: { type: string, minLength: 1, maxLength: 120 }
+        invoice_number: { type: string, minLength: 1, maxLength: 50 }
         provider: { type: string, minLength: 1, maxLength: 255 }
         currency: { type: string, const: HNL }
         taxable_amount: { type: string, pattern: '^[0-9]{1,12}([.][0-9]{1,4})?$' }
         exempt_amount: { type: string, pattern: '^[0-9]{1,12}([.][0-9]{1,4})?$' }
-      description: Una base debe ser mayor que cero. Normalización y cálculo provisional constan en gastos-implementacion.md.
+      description: Una base debe ser mayor que cero. Normalización y cálculo cotejado constan en gastos-implementacion.md.
     Expense:
       type: object
       required: [id, version, expense_date, invoice_number, provider, currency, taxable_amount, exempt_amount, isv_15, total]
@@ -137,9 +160,21 @@ components:
         total: { type: string }
     ExpensePage:
       type: object
-      required: [items, page, page_size, has_more]
+      required: [items, page, page_size, has_more, summary]
       properties:
         items: { type: array, items: { $ref: '#/components/schemas/Expense' } }
         page: { type: integer }
         page_size: { type: integer }
         has_more: { type: boolean }
+
+        summary: { $ref: '#/components/schemas/ExpenseSummary' }
+    ExpenseSummary:
+      type: object
+      required: [count, taxable_amount, exempt_amount, isv_15, total]
+      description: Totales de todos los registros activos que cumplen los filtros, antes de paginar.
+      properties:
+        count: { type: integer, minimum: 0 }
+        taxable_amount: { type: string }
+        exempt_amount: { type: string }
+        isv_15: { type: string }
+        total: { type: string }

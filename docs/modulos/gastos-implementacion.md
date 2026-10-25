@@ -1,43 +1,39 @@
-# Gastos: primer corte local
+# Gastos: registro general y preparación de activación
 
-Fecha: 2026-10-24. Estado: implementación inicial en el repositorio; no desplegada ni activada.
+Fecha: 2026-10-25. El usuario autoriza completar el despliegue y activar este corte únicamente para el Administrador del sistema. La instalación y activación de las correcciones siguientes quedan pendientes del artifact aprobado por CI.
 
 ## Alcance
 
-Implementa `gastos` como módulo registrado, con migración propia, API HTTP y pantalla React. El registro general incluye listado/búsqueda, filtros de fecha, alta, consulta, edición y eliminación. El servidor normaliza importes, calcula ISV 15% y total, y vuelve a validar identidad, permiso, estado del módulo y campos en cada operación.
+Registro general independiente con listado, búsqueda, fechas inclusivas, paginación, resumen de los resultados filtrados, alta, consulta, edición y borrado lógico. API, interfaz y cálculo previo usan el mismo cálculo decimal del servidor. Identidad, CSRF, permisos, auditoría y activación son servicios del Core.
 
-La tabla presenta factura, fecha, proveedor, moneda, base gravada, base exenta, ISV 15%, total y acciones. El formulario conserva los campos técnicos de la ficha Legacy. La sección Gastos aparece bajo Ajustes sin campos editables confirmados.
+No se enlazan gastos con Órdenes/Facturas ni se importan datos Legacy. Reportes conectados, exportación y MCP permanecen fuera de este corte.
 
-Este corte no incorpora gastos de línea de Órdenes ni de Facturas, no los combina con el registro general y no cambia sus cálculos. También quedan fuera los filtros por usuario/orden descritos en el inventario API, exportación, MCP, importación/migración de datos Legacy, reportes conectados y equivalencia visual verificada.
+## Cotejo con CastilloIT
 
-## Reglas y decisiones técnicas provisionales
+Se revisó estáticamente la copia proporcionada en Downloads: `index.html` / `main-4ZA7RVJ2.js` enlazan `chunk-LIUI2WBL.js` (ExpensesComponent); backend `back/app/Http/Controllers/GastosController.php` y rutas `back/routes/api.php`. No se leyeron el manifiesto privado de gastos ni credenciales Legacy.
 
-Estas decisiones permiten revisar el flujo local; no se presentan como reglas Legacy confirmadas y deben cotejarse con la sesión activa, el controlador y el esquema MySQL original:
+- Formulario activo: fecha, factura y proveedor requeridos; HNL es la única moneda ofrecida; una de las bases debe ser positiva. El backend limita factura a 50 caracteres y proveedor a 255.
+- El backend redondea primero las bases a centavos, calcula ISV 15% sobre la base gravada normalizada y redondea el impuesto; suma ambas bases y el impuesto. Para importes no negativos, mitad hacia arriba. Bastion representa decimales exactamente y no replica errores binarios de float. Este cotejo acredita la secuencia del código; no cierra la revisión contable de negocio.
+- La consulta general no filtra por creador; busca factura/proveedor ignorando mayúsculas y acentos, aplica fechas inclusivas y resume todos los resultados antes de paginar. Página inicial 20, máximo 100. Bastion añade ID descendente para estabilizar fechas iguales y rechaza intervalos invertidos.
+- El borrado original asigna `deleted_at`, conserva los datos y los excluye de listado/edición. Bastion incorpora ese comportamiento mediante migración 2. No hay restauración ni purga confirmadas para este registro; no se añaden botones de ese tipo.
+- El resumen conserva cantidad, bases gravada/exenta, impuesto y total del conjunto filtrado, independiente de la página. El editor muestra la vista previa calculada en Rust.
 
-- Permisos: `gastos/registros/ver`, `gastos/registros/editar` para alta/edición y `gastos/registros/eliminar` para borrado. Todos los usuarios habilitados con `ver` consultan el registro compartido del módulo; el alcance Legacy por usuario/orden está pendiente.
-- Campos: fecha, número de factura, proveedor, moneda, base gravada y base exenta. Fecha, número y proveedor se requieren. Una de las dos bases debe ser mayor que cero; no se aceptan importes negativos.
-- Moneda: se acepta HNL, único valor observado en la ficha. No se ofrecen monedas adicionales hasta confirmar el catálogo.
-- Límites técnicos nuevos: factura 120 caracteres, proveedor 255; importes con hasta 12 dígitos enteros y 4 decimales; persistencia normalizada a centavos en `DECIMAL(14,2)`. Valores fuera del rango representable se rechazan.
-- Cálculo provisional: se redondean las bases ingresadas a centavos con mitad hacia arriba; ISV = 15% de la base gravada redondeado a centavos con mitad hacia arriba; total = base gravada + base exenta + ISV. El cálculo fiscal y su secuencia exacta de redondeo requieren verificación contable.
-- Listado: búsqueda literal de número de factura/proveedor, fechas inclusivas, orden por fecha descendente e ID descendente. Se rechaza un intervalo invertido. Página por defecto 25, máximo 100 y página máxima 10000.
-- Alta idempotente por actor y clave; reutilizar clave con contenido distinto devuelve conflicto. Edición usa `ETag`/`If-Match`; una versión obsoleta devuelve 412 y preserva cambios locales. El borrado físico requiere permiso separado, confirmación web y evento de auditoría; la bitácora conserva el evento según la política común.
-- Límite de cuerpo 16 KiB, cuota 120 solicitudes por actor/minuto y timeout de 30 segundos. Son topes técnicos de este corte, no límites observados del Legacy.
-- Persistencia nueva: `gastos_records`, `gastos_create_receipts` y `gastos_actor_limits`, con ledger `_gastos_migrations`. No se enlaza a identificadores Legacy.
+## Contrato técnico
 
-## API
+- Permisos explícitos del Core: `gastos/registros/ver`, `editar` y `eliminar`; alta/edición comparten editar y el borrado tiene permiso separado. Sólo el Administrador del sistema queda autorizado por la solicitud de activación; no se amplían otros roles.
+- Alta idempotente por actor y clave; reusar una clave con otro contenido devuelve 409. Edición con ETag/If-Match; versión obsoleta devuelve 412 y conserva el borrador. El formulario envía exclusivamente los seis campos de entrada.
+- Límites técnicos de Bastion: 12 dígitos enteros y 4 decimales de entrada; persistencia DECIMAL(14,2), rechazo de negativos y desbordamiento; factura 50, proveedor 255, búsqueda 200; página máxima 10000; cuerpo 16 KiB, 120 solicitudes por actor/minuto y timeout 30 s. Los límites operativos no se presentan como reglas observadas del Legacy.
+- Tablas `gastos_records`, `gastos_create_receipts`, `gastos_actor_limits`; ledger `_gastos_migrations`. Migración 1 crea el registro; migración 2 agrega `deleted_at` e índice para registros activos. El arranque verifica todas las versiones/checksums y la allowlist antes de declarar disponibilidad.
+- `GET/POST /api/v1/gastos`, `GET/PUT/DELETE /api/v1/gastos/{id}`. `POST /api/v1/gastos/calculo` es transporte técnico para el cálculo previo, sin guardar registros y con editar/CSRF. Ver [OpenAPI](gastos.openapi.yaml).
 
-`GET/POST /api/v1/gastos`; `GET/PUT/DELETE /api/v1/gastos/{id}`. El contrato completo está en [gastos.openapi.yaml](gastos.openapi.yaml). Todas las mutaciones usan la identidad/cookie, CSRF, CORS, autorización y auditoría compartidas del Core. Crear devuelve 201, ETag y Location; actualizar exige `If-Match`; borrar devuelve 204.
+## Verificación y publicación
 
-## Interfaz
+Las pruebas específicas abarcan normalización/mitades/rangos, migraciones exactas y bloqueo sin disponibilidad, concurrencia idempotente, conflictos de edición, filtros/summary, permisos separados, auditoría, borrado lógico y cuotas. HTTP verifica sesión, CSRF/origen, seis campos, cálculo sin persistencia, ETag y tamaño de cuerpo. CI usa bases MySQL 5.7 desechables dedicadas `bastion_gastos_test` y `bastion_gastos_http_test`.
 
-La navegación principal muestra Gastos si el usuario tiene `ver`; los controles de alta/edición/eliminación requieren sus permisos respectivos. La confirmación de borrado identifica la factura. El editor conserva datos ante error y conflicto, ofrece abrir la última versión, y advierte cambios sin guardar al salir. Las preferencias del módulo permanecen pendientes en Ajustes.
+La suite web local completa pasó: 113 pruebas, tipos y build. Incluye regresión del reenvío de campos calculados al editar, borrador conservado ante 412, permisos de lectura/escritura/borrado, confirmación y paginación. La prueba de Rust/MySQL y la publicación de estas correcciones requieren el workflow del commit correspondiente.
 
-## Pendientes de cierre
+Al comenzar esta activación se verificó por SSH que AWS/Bluehost ejecutaban `ca383c7`; esquema inicial aplicado, readiness 200, `gastos` fuera de allowlist y desactivado. Esto no implica que la migración 2 ni las correcciones estén ya publicadas. Respaldar, aplicar artifact de CI, migrar, permitir el ambiente y activar mediante el Core. Preservar la arquitectura Bluehost/AWS/MySQL.
 
-- Contrastar campos, valores de moneda, mensajes, fórmulas/redondeo, búsqueda y filtros con el Legacy activo y el esquema real.
-- Definir asociación y consistencia con gastos de Órdenes y Facturas, incluidos los filtros por usuario/orden.
-- Acordar si se conserva el borrado físico o se requiere papelera/retención, y completar los settings propios si corresponde.
-- Validar MySQL 5.7 en CI, permisos por rol, límites, visualmente en escritorio/móvil y flujo con sesión autenticada.
-- Definir despliegue/activación y plan de migración de registros Legacy.
+## Pendientes de alcance
 
-La implementación local no demuestra paridad completa, no está desplegada y no habilita automáticamente el módulo.
+Asociación a gastos de Órdenes/Facturas y reportes; migración y reconciliación del histórico Legacy; exportación/MCP; política futura de restauración/retención y equivalencia visual con una sesión Legacy real. No se declaran completados por la activación del registro general.

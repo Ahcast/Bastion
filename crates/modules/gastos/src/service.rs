@@ -1,4 +1,4 @@
-use crate::{Expense, ExpenseFilter, ExpenseInput, ExpensePage, calculate};
+use crate::{Expense, ExpenseFilter, ExpenseInput, ExpensePage, ExpenseSummary, calculate};
 use bastion_core::{CoreAdmin, CoreError, Database};
 use sha2::{Digest, Sha256};
 use sqlx::{MySql, QueryBuilder, Row, Transaction};
@@ -92,23 +92,18 @@ impl ExpenseService {
     pub async fn list(&self, actor: u64, filter: &ExpenseFilter) -> Result<ExpensePage, CoreError> {
         let (page, page_size) = filter.bounds()?;
         let mut tx = self.begin(actor, "ver").await?;
-        let mut query = QueryBuilder::<MySql>::new(
-            "SELECT id,version,CAST(expense_date AS CHAR) AS expense_date,invoice_number,provider,currency,CAST(taxable_amount AS CHAR) AS taxable_amount,CAST(exempt_amount AS CHAR) AS exempt_amount,CAST(isv_15 AS CHAR) AS isv_15,CAST(total AS CHAR) AS total FROM gastos_records WHERE 1=1",
+        let mut summary_query = filtered_query(
+            "SELECT COUNT(*) AS count,CAST(COALESCE(SUM(taxable_amount),0.00) AS CHAR) AS taxable_amount,CAST(COALESCE(SUM(exempt_amount),0.00) AS CHAR) AS exempt_amount,CAST(COALESCE(SUM(isv_15),0.00) AS CHAR) AS isv_15,CAST(COALESCE(SUM(total),0.00) AS CHAR) AS total FROM gastos_records WHERE deleted_at IS NULL",
+            filter,
         );
-        if let Some(term) = filter.search() {
-            query
-                .push(" AND (LOCATE(")
-                .push_bind(term)
-                .push(",invoice_number)>0 OR LOCATE(")
-                .push_bind(term)
-                .push(",provider)>0)");
-        }
-        if let Some(from) = filter.date_from {
-            query.push(" AND expense_date>=").push_bind(from);
-        }
-        if let Some(to) = filter.date_to {
-            query.push(" AND expense_date<=").push_bind(to);
-        }
+        let summary = summary_query
+            .build_query_as::<ExpenseSummary>()
+            .fetch_one(&mut *tx)
+            .await?;
+        let mut query = filtered_query(
+            "SELECT id,version,CAST(expense_date AS CHAR) AS expense_date,invoice_number,provider,currency,CAST(taxable_amount AS CHAR) AS taxable_amount,CAST(exempt_amount AS CHAR) AS exempt_amount,CAST(isv_15 AS CHAR) AS isv_15,CAST(total AS CHAR) AS total FROM gastos_records WHERE deleted_at IS NULL",
+            filter,
+        );
         query
             .push(" ORDER BY expense_date DESC,id DESC LIMIT ")
             .push_bind(page_size + 1)
@@ -127,7 +122,17 @@ impl ExpenseService {
             page,
             page_size,
             has_more,
+            summary,
         })
+    }
+
+    pub async fn preview(
+        &self,
+        actor: u64,
+        input: &ExpenseInput,
+    ) -> Result<crate::ExpenseCalculation, CoreError> {
+        self.check_access(actor, "editar").await?;
+        calculate(input)
     }
 
     pub async fn detail(&self, actor: u64, id: u64) -> Result<Expense, CoreError> {
@@ -232,8 +237,8 @@ impl ExpenseService {
 
     pub async fn delete(&self, actor: u64, id: u64) -> Result<(), CoreError> {
         let mut tx = self.begin(actor, "eliminar").await?;
-        let result = sqlx::query("DELETE FROM gastos_records WHERE id=?")
-            .bind(id)
+        let result = sqlx::query("UPDATE gastos_records SET deleted_at=UTC_TIMESTAMP(6),updated_at=UTC_TIMESTAMP(6),updated_by=?,version=version+1 WHERE id=? AND deleted_at IS NULL")
+            .bind(actor).bind(id)
             .execute(&mut *tx)
             .await?;
         if result.rows_affected() == 0 {
@@ -277,7 +282,26 @@ fn expense_from_row(row: &sqlx::mysql::MySqlRow) -> Result<Expense, sqlx::Error>
 }
 
 async fn load(tx: &mut Transaction<'_, MySql>, id: u64) -> Result<Expense, CoreError> {
-    let row = sqlx::query("SELECT id,version,CAST(expense_date AS CHAR) AS expense_date,invoice_number,provider,currency,CAST(taxable_amount AS CHAR) AS taxable_amount,CAST(exempt_amount AS CHAR) AS exempt_amount,CAST(isv_15 AS CHAR) AS isv_15,CAST(total AS CHAR) AS total FROM gastos_records WHERE id=? FOR UPDATE")
+    let row = sqlx::query("SELECT id,version,CAST(expense_date AS CHAR) AS expense_date,invoice_number,provider,currency,CAST(taxable_amount AS CHAR) AS taxable_amount,CAST(exempt_amount AS CHAR) AS exempt_amount,CAST(isv_15 AS CHAR) AS isv_15,CAST(total AS CHAR) AS total FROM gastos_records WHERE id=? AND deleted_at IS NULL FOR UPDATE")
         .bind(id).fetch_optional(&mut **tx).await?.ok_or(CoreError::NotFound)?;
     Ok(expense_from_row(&row)?)
+}
+
+fn filtered_query<'a>(prefix: &str, filter: &'a ExpenseFilter) -> QueryBuilder<'a, MySql> {
+    let mut query = QueryBuilder::<MySql>::new(prefix.to_owned());
+    if let Some(term) = filter.search() {
+        query
+            .push(" AND (LOCATE(")
+            .push_bind(term)
+            .push(",invoice_number)>0 OR LOCATE(")
+            .push_bind(term)
+            .push(",provider)>0)");
+    }
+    if let Some(from) = filter.date_from {
+        query.push(" AND expense_date>=").push_bind(from);
+    }
+    if let Some(to) = filter.date_to {
+        query.push(" AND expense_date<=").push_bind(to);
+    }
+    query
 }

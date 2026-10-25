@@ -212,6 +212,6 @@ Comprobar cifras reales de Procesos y Cotizaciones, selección de área, rangos 
 
 - Consultar/buscar/paginar y filtrar por fechas; crear, editar con `ETag`/`If-Match` y eliminar con permiso independiente y auditoría.
 - Calcular importes en el servidor, conservar cambios ante fallos/conflictos y reutilizar clave idempotente al reintentar una creación ambigua.
-- HNL, ISV 15%, redondeo a centavos, requeridos, rangos y cuotas son decisiones técnicas provisionales; cotejarlos con Legacy y contabilidad antes de cerrar paridad.
+- Cotejo estático: HNL ofrecido en UI, factura hasta 50, proveedor hasta 255, bases redondeadas antes del ISV 15%, resumen de todos los resultados filtrados y borrado lógico. Rangos/cuotas operativas son límites técnicos de Bastion; conservar la revisión contable pendiente.
 - No asociar registros con órdenes/facturas ni importar datos Legacy en este corte. Mantener el módulo desactivado hasta validar release, allowlist y migración.
-- MySQL 5.7, permisos por rol y flujo autenticado requieren validación; este primer corte no implementa MCP, exportación ni reportes conectados. Ver modulos/gastos-implementacion.md.
+- Ejecutar las pruebas dedicadas de MySQL 5.7/HTTP sobre bases aisladas; verificar sesión, CSRF, roles, idempotencia, conflictos, resumen, auditoría, conservación tras borrado y bloqueo al desactivar. Sólo el Administrador tendrá acceso en esta activación. MCP, exportación y reportes conectados siguen pendientes. Ver modulos/gastos-implementacion.md.
