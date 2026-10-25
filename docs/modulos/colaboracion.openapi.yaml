@@ -8,7 +8,7 @@ paths:
   /api/v1/colaboracion:
     get:
       operationId: listCollaborationFiles
-      description: Ver en carpeta empresa o persona. Sin scope devuelve solo carpetas autorizadas. Búsqueda literal en título, nombre y notas. 120 solicitudes por actor/minuto, plazo HTTP 120 s, dos operaciones concurrentes por proceso. Errores comunes 401/403/404/422/429/503 en application/problem+json; hereda CSRF y Origin exacto del Core para mutaciones.
+      description: Ver en carpeta empresa o persona. Sin scope devuelve solo carpetas autorizadas. Búsqueda literal en título, nombre y notas. 120 solicitudes por actor/minuto, plazo HTTP 120 s, dos operaciones concurrentes por proceso. Errores comunes 400/401/403/404/429/503 en application/problem+json; hereda CSRF y Origin exacto del Core para mutaciones.
       parameters:
         - {name: trash, in: query, schema: {type: boolean, default: false}}
         - {name: scope, in: query, schema: {type: string, enum: [empresa, persona]}}
@@ -19,7 +19,7 @@ paths:
       responses:
         '200': {description: 'items (File[]), page, page_size, has_more; orden id descendente'}
         '403': {description: Sin acceso a la carpeta solicitada}
-        '422': {description: Filtros inválidos}
+        '400': {description: Filtros inválidos}
     post:
       operationId: uploadCollaborationFile
       description: Editar sobre carpeta. Archivo hasta 50 MiB por defecto, configurable 1..100 MiB; JSON hasta 140 MiB. MIME real por libmagic, extensión y política. Idempotencia por actor/clave/contenido sin vencimiento; clave con contenido diferente, purgada o carga simultánea en curso produce 409. Un error confirmado de almacenamiento permite reintento con la misma clave. No reemplaza archivos.
@@ -44,7 +44,7 @@ paths:
         '201': {description: 'File; Location /api/v1/colaboracion/{id}/download'}
         '409': {description: Clave reutilizada o carga pendiente/eliminada}
         '413': {description: Cuerpo demasiado grande}
-        '422': {description: Entrada inválida}
+        '400': {description: Entrada inválida}
         '503': {description: Almacenamiento no configurado o no disponible}
   /api/v1/colaboracion/personas:
     get:
@@ -59,7 +59,7 @@ paths:
       parameters: [{$ref: '#/components/parameters/Id'}]
       responses:
         '200': {description: Contenido privado base64}
-        '422': {description: Tipo sin vista previa; usar descarga}
+        '400': {description: Tipo sin vista previa; usar descarga}
         '404': {description: Archivo inexistente o carpeta no autorizada}
   /api/v1/colaboracion/{id}/download:
     get:
@@ -87,7 +87,7 @@ paths:
       responses:
         '204': {description: Movido a papelera}
         '404': {description: Archivo inexistente o carpeta no autorizada}
-        '422': {description: Confirmación incorrecta}
+        '400': {description: Confirmación incorrecta}
   /api/v1/colaboracion/{id}/restore:
     post:
       operationId: restoreCollaborationFile
@@ -115,7 +115,7 @@ paths:
       responses:
         '204': {description: Borrado definitivo registrado; limpieza física pendiente/reintentable}
         '404': {description: Inexistente, fuera de papelera o carpeta no autorizada}
-        '422': {description: Confirmación incorrecta}
+        '400': {description: Confirmación incorrecta}
   /api/v1/colaboracion/settings:
     get:
       operationId: getCollaborationPolicy
@@ -137,7 +137,7 @@ paths:
       responses:
         '204': {description: Guardado}
         '403': {description: Sin permiso de edición de settings}
-        '422': {description: Límites/listas inválidos o formatos no soportados}
+        '400': {description: Límites/listas inválidos o formatos no soportados}
 components:
   parameters:
     Id: {name: id, in: path, required: true, schema: {type: integer, minimum: 1}}

@@ -406,7 +406,7 @@ mod tests {
                 .await
                 .unwrap()
                 .status(),
-            StatusCode::UNPROCESSABLE_ENTITY
+            StatusCode::BAD_REQUEST
         );
         core.admin()
             .set_module_enabled(1, "colaboracion", false)
