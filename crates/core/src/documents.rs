@@ -181,8 +181,7 @@ impl DocumentService {
         .map_err(|_| CoreError::Overloaded)?
     }
     pub async fn put(&self, key: String, bytes: Vec<u8>) -> Result<(), CoreError> {
-        self.put_with_limit(key, bytes, MAX_STORAGE_BYTES)
-            .await
+        self.put_with_limit(key, bytes, MAX_STORAGE_BYTES).await
     }
     pub async fn put_with_limit(
         &self,
