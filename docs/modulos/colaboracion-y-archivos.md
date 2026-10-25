@@ -2,7 +2,9 @@
 
 ## Propósito
 
-Compartir archivos comunes de empresa y organizar documentos ligados a personas.
+Funcionar como el Drive corporativo: compartir archivos comunes de la empresa y organizar documentos ligados a personas.
+
+Decisión del usuario del 2026-10-24: Colaboración tiene su propia carpeta lógica `colaboracion/` dentro del bucket privado S3 compartido del Core. Los archivos de empresa se guardan bajo `colaboracion/empresa/` y los de cada persona bajo `colaboracion/personas/{id}/`. No se crea un bucket separado; las carpetas de la interfaz son ámbitos de autorización de Colaboración y no rutas públicas ni permisos heredados de Personas.
 
 ## Campos y filtros
 
