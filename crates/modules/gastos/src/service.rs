@@ -93,7 +93,7 @@ impl ExpenseService {
         let (page, page_size) = filter.bounds()?;
         let mut tx = self.begin(actor, "ver").await?;
         let mut summary_query = filtered_query(
-            "SELECT COUNT(*) AS count,CAST(COALESCE(SUM(taxable_amount),0.00) AS CHAR) AS taxable_amount,CAST(COALESCE(SUM(exempt_amount),0.00) AS CHAR) AS exempt_amount,CAST(COALESCE(SUM(isv_15),0.00) AS CHAR) AS isv_15,CAST(COALESCE(SUM(total),0.00) AS CHAR) AS total FROM gastos_records WHERE deleted_at IS NULL",
+            "SELECT CAST(COUNT(*) AS UNSIGNED) AS count,CAST(COALESCE(SUM(taxable_amount),0.00) AS CHAR) AS taxable_amount,CAST(COALESCE(SUM(exempt_amount),0.00) AS CHAR) AS exempt_amount,CAST(COALESCE(SUM(isv_15),0.00) AS CHAR) AS isv_15,CAST(COALESCE(SUM(total),0.00) AS CHAR) AS total FROM gastos_records WHERE deleted_at IS NULL",
             filter,
         );
         let summary = summary_query

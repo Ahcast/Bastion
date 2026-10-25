@@ -351,7 +351,7 @@ mod tests {
         let value: serde_json::Value =
             serde_json::from_slice(&to_bytes(response.into_body(), 16384).await.unwrap()).unwrap();
         assert_eq!(value["total"], "135.02");
-        let count: u64 = sqlx::query_scalar("SELECT COUNT(*) FROM gastos_records")
+        let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM gastos_records")
             .fetch_one(&pool)
             .await
             .unwrap();
@@ -528,13 +528,13 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(response.status(), StatusCode::NOT_FOUND);
-        let retained: u64 =
+        let retained: i64 =
             sqlx::query_scalar("SELECT COUNT(*) FROM gastos_records WHERE deleted_at IS NOT NULL")
                 .fetch_one(&pool)
                 .await
                 .unwrap();
         assert_eq!(retained, 1);
-        let events: u64 =
+        let events: i64 =
             sqlx::query_scalar("SELECT COUNT(*) FROM audit_events WHERE module_id='gastos'")
                 .fetch_one(&pool)
                 .await
