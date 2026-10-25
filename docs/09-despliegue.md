@@ -69,3 +69,5 @@ El 2026-10-23 se instalaron en AWS y Bluehost los artifacts verificados de `f6c5
 ## Colaboración
 
 El release incluye la migración propia del módulo y el detector `file`/libmagic en la imagen. Antes de activarlo en AWS, verificar su migración, el IAM limitado a `colaboracion/*`, versionado/Object Lock del bucket, carga MIME y timeout del proxy. El módulo permanece desactivado hasta una comprobación administrativa. Pasos y límites en `modulos/colaboracion-implementacion.md`.
+
+El 2026-10-24 se publicó el commit `14b1bf6` con `Core checks` y `Scout control checks` exitosos, y se desplegaron sus artifacts verificados en AWS/Bluehost. Se aplicó la migración `202610230001`, se respaldó la base y se cotejaron las 50 tablas previas; salud pública 200 y 36 hashes de assets correctos. Colaboración sigue fuera de `BASTION_ALLOWED_MODULES` y desactivado: el rol de Lightsail no puede enumerar versiones del prefijo S3. No activar hasta completar IAM y controles de bucket/proxy; no se probó S3 real.

@@ -1,6 +1,6 @@
-# Colaboración: implementación local
+# Colaboración: implementación y operación
 
-Fecha: 2026-10-23. No implica publicación, migración productiva ni activación.
+Implementada y publicada desde `14b1bf67cd1df545df84ac0ea6ddd4dde18a1ece`. El módulo quedó instalado en AWS/Bluehost y migrado, pero continúa fuera de la allowlist y desactivado. Esto no acredita activación ni valida cargas contra el bucket real.
 
 ## Alcance y decisiones
 
@@ -48,3 +48,13 @@ Antes de activar: instalar `file`/libmagic (incluido en Dockerfile), comprobar A
 Pruebas incorporadas: validación de MIME/extensión, archivo/ruta/alcance, papelera/restauración/purga, settings, navegación y permisos visibles. `Core checks` ejecuta compilación y pruebas completas con MySQL 5.7 y bases aisladas; el job específico valida también transporte S3 sintético, reintentos, integridad y limpieza sin credenciales ni objetos reales. Una ejecución local sin esas bases omite las pruebas de integración y no equivale a validarlas.
 
 Fuentes técnicas: [OWASP File Upload Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/File_Upload_Cheat_Sheet.html), [formato CFB de Microsoft](https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-cfb/53989ce4-7b05-4f8d-829b-d08d6148375b).
+
+## Release verificado
+
+El 2026-10-24 se publicó `14b1bf6` en `main`. `Core checks` (workflow `40150644138`) y `Scout control checks` finalizaron correctamente. El artifact Linux y el frontend se verificaron contra los SHA-256 de GitHub, los checksums incluidos y el `BUILD.txt` antes de instalarlos.
+
+AWS aplicó la migración `202610230001`; se respaldó la base en ubicación privada y se cotejaron esquemas y filas lógicas de las 50 tablas preexistentes. El backend quedó en la nueva release, `/health/live` y `/health/ready` respondieron 200 y los demás módulos conservaron su estado. Bluehost publicó el `BUILD.txt` del mismo commit, pasó el fallback SPA y se comprobaron los hashes de 36 recursos públicos. La configuración del API y las reglas `.htaccess` se conservaron.
+
+Colaboración queda `included_in_release=1`, `environment_allowed=0` y `enabled=0`. La allowlist no se modificó. El rol AWS vigente denegó `ListBucketVersions` en `colaboracion/*`; tampoco fue posible consultar la configuración de versionado del bucket con ese rol. Antes de ofrecer el módulo, infraestructura debe conceder las acciones S3 mínimas acotadas al prefijo y verificar privacidad, versionado/Object Lock y timeout del proxy. Se confirmó acceso anónimo denegado en la API; no se probó carga ni purga contra el bucket real.
+
+La migración usó el operador temporal disponible en el host; las variables de migración solo existieron en ese proceso y no se guardaron en el entorno del servicio. Provisionar una identidad MySQL exclusiva para migraciones sigue siendo una mejora operativa pendiente antes de los siguientes cambios de esquema.
