@@ -237,7 +237,7 @@ async fn mysql57_expenses_activation_crud_filters_idempotency_audit_and_soft_del
         svc.delete(1, a.id).await,
         Err(CoreError::NotFound)
     ));
-    let retained:u64=sqlx::query_scalar("SELECT COUNT(*) FROM gastos_records WHERE id=? AND deleted_at IS NOT NULL AND total=240.00").bind(a.id).fetch_one(&pool).await.unwrap();
+    let retained: i64=sqlx::query_scalar("SELECT COUNT(*) FROM gastos_records WHERE id=? AND deleted_at IS NOT NULL AND total=240.00").bind(a.id).fetch_one(&pool).await.unwrap();
     assert_eq!(retained, 1);
     assert_eq!(
         svc.list(1, &ExpenseFilter::default())
@@ -247,7 +247,7 @@ async fn mysql57_expenses_activation_crud_filters_idempotency_audit_and_soft_del
             .count,
         2
     );
-    let events:Vec<(String,u64)>=sqlx::query_as("SELECT action,COUNT(*) FROM audit_events WHERE module_id='gastos' GROUP BY action ORDER BY action").fetch_all(&pool).await.unwrap();
+    let events:Vec<(String, i64)>=sqlx::query_as("SELECT action,COUNT(*) FROM audit_events WHERE module_id='gastos' GROUP BY action ORDER BY action").fetch_all(&pool).await.unwrap();
     assert_eq!(
         events,
         vec![
