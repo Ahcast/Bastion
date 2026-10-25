@@ -28,20 +28,11 @@ async fn guard(State(state): State<ApiState>, request: Request, next: Next) -> R
             .check_access(user.id, capability)
             .await
             .map_err(ApiError)?;
-        if let Err(error) = state.gastos.consume_request(user.id).await {
-            if matches!(error, CoreError::Overloaded) {
-                let mut response = problem(
-                    StatusCode::TOO_MANY_REQUESTS,
-                    "Too Many Requests",
-                    "Espera un minuto antes de volver a consultar Gastos.",
-                );
-                response
-                    .headers_mut()
-                    .insert("retry-after", HeaderValue::from_static("60"));
-                return Ok(response);
-            }
-            return Err(ApiError(error));
-        }
+        state
+            .gastos
+            .consume_request(user.id)
+            .await
+            .map_err(ApiError)?;
         Ok::<_, ApiError>(next.run(request).await)
     })
     .await

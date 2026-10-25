@@ -261,7 +261,7 @@ async fn mysql57_expenses_activation_crud_filters_idempotency_audit_and_soft_del
     }
     assert!(matches!(
         svc.consume_request(2).await,
-        Err(CoreError::Overloaded)
+        Err(CoreError::Locked)
     ));
     sqlx::query("UPDATE gastos_actor_limits SET window_start=UTC_TIMESTAMP(6)-INTERVAL 2 MINUTE WHERE actor_id=2").execute(&pool).await.unwrap();
     svc.consume_request(2).await.unwrap();
