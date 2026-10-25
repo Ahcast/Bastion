@@ -13,19 +13,21 @@ const { createRoot } = await import('react-dom/client');
 after(()=>window.happyDOM.abort());
 
 async function workspace(editable=true, initial: ScoutControlStatus={available:true,busy:false,job:null}) {
-  let fail=false, refreshes=0;
+  let fail=false, refreshes=0, hold=false;
+  let resolvePoll: ((response: Response) => void) | undefined;
   const calls: {method:string;key:string|null;body:unknown}[]=[];
   const api=new ApiClient('https://api.example.test',async (_url,options)=>{
     const method=options?.method??'GET';
     calls.push({method,key:new Headers(options?.headers).get('Idempotency-Key'),body:options?.body?JSON.parse(String(options.body)):null});
     if(method==='POST'&&fail){fail=false;return Response.json({detail:'Respuesta temporalmente no disponible'},{status:503});}
+    if(method==='GET'&&hold)return new Promise<Response>(resolve=>{resolvePoll=resolve;});
     return Response.json(method==='POST'?{available:true,busy:true,job:{id:'opaque',status:'running',started_at:'2026-10-24T20:00:00Z',finished_at:null}}:initial);
   });
   const container=document.createElement('div');document.body.append(container);const root=createRoot(container);
   await act(async()=>root.render(<CoreContext.Provider value={{api,access:{is_system_administrator:false,modules:[{module_id:'procesos',display_name:'Procesos'}],permissions:[{module_id:'procesos',scope_key:'consulta',capability:'ver'},...(editable?[{module_id:'procesos',scope_key:'importacion',capability:'editar'}]:[])]},notify:()=>{}}}><ScoutRunControl refreshReports={()=>{refreshes++;}}/></CoreContext.Provider>));
   const button=()=>container.querySelector('button')!;
   const click=async()=>{await act(async()=>{button().dispatchEvent(new MouseEvent('click',{bubbles:true}));});};
-  return {container,calls,button,click,refreshes:()=>refreshes,fail:()=>{fail=true;},dispose:async()=>{await act(async()=>root.unmount());container.remove();}};
+  return {container,calls,button,click,refreshes:()=>refreshes,fail:()=>{fail=true;},hold:()=>{hold=true;},respond:(value:ScoutControlStatus)=>{assert.ok(resolvePoll);resolvePoll(Response.json(value));resolvePoll=undefined;},dispose:async()=>{await act(async()=>root.unmount());container.remove();}};
 }
 
 test('opening settings only reads status and viewers cannot run Scout',async()=>{
@@ -46,4 +48,34 @@ test('busy automatic runs and unavailable controllers disable start; partial res
     const app=await workspace(true,status);try{assert.equal(app.button().disabled,true);assert.equal(app.calls.filter(c=>c.method==='POST').length,0);}finally{await app.dispose();}
   }
   const app=await workspace(true,{available:true,busy:false,job:{id:'test',status:'partial',started_at:'2026-10-24T20:00:00Z',finished_at:'2026-10-24T20:01:00Z'}});try{assert.ok(app.container.textContent?.includes('Completado parcialmente'));assert.equal(app.button().disabled,false);}finally{await app.dispose();}
+});
+
+test('background polling preserves the visible run and refreshes reports only on a real transition',async context=>{
+  let poll: (()=>void) | undefined;
+  const intervals:number[]=[];
+  context.mock.method(globalThis,'setInterval',(callback:()=>void,delay:number)=>{poll=callback;intervals.push(delay);return 1;});
+  context.mock.method(globalThis,'clearInterval',()=>{});
+  const running:ScoutControlStatus={available:true,busy:true,job:{id:'running-job',status:'running',started_at:'2026-10-24T20:00:00Z',finished_at:null}};
+  const app=await workspace(true,running);
+  try{
+    app.hold();const button=app.button(),visible=app.container.textContent;
+    assert.equal(intervals.at(-1),5000);
+    for(let index=0;index<3;index++){
+      await act(async()=>poll!());
+      assert.equal(app.container.textContent,visible);
+      assert.equal(app.button(),button);
+      assert.equal(button.disabled,true);
+      assert.equal(app.refreshes(),0);
+      assert.equal(intervals.filter(delay=>delay===5000).length,1);
+      await act(async()=>app.respond(running));
+      assert.equal(app.refreshes(),0);
+    }
+    await act(async()=>poll!());
+    await act(async()=>app.respond({...running,busy:false,job:{...running.job!,status:'succeeded',finished_at:'2026-10-24T20:05:00Z'}}));
+    assert.equal(app.refreshes(),1);
+    assert.ok(app.container.textContent?.includes('Completado'));
+    assert.equal(app.button(),button);
+    assert.equal(button.disabled,false);
+    assert.equal(intervals.at(-1),30_000);
+  }finally{await app.dispose();}
 });

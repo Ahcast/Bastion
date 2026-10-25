@@ -8,7 +8,7 @@ import '../styles/scout-status.css';
 
 export default function ProcessSettings() {
   const { api, access } = useCore(), view = moduleCan(access, 'procesos', 'consulta', 'ver');
-  const report = useLoad(signal => view ? api.request<ScoutDiagnostics>('/api/v1/procesos/scout-status', { signal }) : Promise.resolve(null), [view]);
+  const report = useLoad(signal => view ? api.request<ScoutDiagnostics>('/api/v1/procesos/scout-status', { signal }) : Promise.resolve(null), [view], true);
   useEffect(() => { if (!view) return; const timer = setInterval(report.reload, 60_000); return () => clearInterval(timer); }, [view]);
   if (!view) return <Notice>No tienes acceso a la información de Procesos.</Notice>;
   return <><Heading title="Ajustes de Procesos" description="Estado de Scout, su última ejecución y el análisis IA." action={<button onClick={report.reload}>Volver a consultar</button>} />

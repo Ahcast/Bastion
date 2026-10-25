@@ -13,7 +13,7 @@ const names = { running: 'En ejecución', succeeded: 'Completado', partial: 'Com
 export function ScoutRunControl({ refreshReports }: { refreshReports: () => void }) {
   const { api, access } = useCore();
   const canRun = moduleCan(access, 'procesos', 'importacion', 'editar');
-  const status = useLoad(signal => api.request<ScoutControlStatus>('/api/v1/procesos/scout-run', { signal }));
+  const status = useLoad(signal => api.request<ScoutControlStatus>('/api/v1/procesos/scout-run', { signal }), [], true);
   const [pending, setPending] = useState(false), [error, setError] = useState('');
   const attempt = useRef<string | null>(null), lock = useRef(false), previous = useRef<string | null>(null);
   const refresh = useRef(refreshReports); refresh.current = refreshReports;

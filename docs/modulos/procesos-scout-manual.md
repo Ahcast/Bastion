@@ -1,5 +1,7 @@
 # Ejecución manual de Scout desde Ajustes
 
+Corrección del 2026-10-24: las consultas periódicas conservan el estado y los reportes visibles mientras esperan respuesta. Una respuesta sin cambios no provoca una nueva consulta de reportes ni desmonta el panel; se conserva el intervalo de cinco segundos durante una ejecución y treinta segundos en reposo. La consulta de reportes de cada minuto y el botón Volver a consultar también conservan el contenido. Se prueba con respuestas demoradas y varios ciclos idénticos, seguido de un cambio real a completado.
+
 Decisión del 24 de octubre: botón Ejecutar pipeline completo en Ajustes > Procesos. El usuario confirma que puede ejecutarse a cualquier hora. Inicia main.py --manual (extracción, combinación y clasificación) en segundo plano, sin parámetros libres desde HTTP, y muestra su estado sin mantener la solicitud abierta. No ejecuta el pipeline al abrir Ajustes.
 
 POST /api/v1/procesos/scout-run con cuerpo vacío, sesión, CSRF, módulo activo, importacion/editar e Idempotency-Key. GET de la misma ruta requiere consulta/ver. Usa autorización y auditoría del Core; no agrega permisos. Una repetición de la misma clave recupera el trabajo original; una ejecución manual o programada activa impide otra. El usuario conserva acceso a los reportes por etapa. No se habilita desde el navegador una ruta, comando, modelo, configuración ni clave API.
