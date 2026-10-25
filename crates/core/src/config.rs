@@ -11,6 +11,7 @@ pub struct AppConfig {
     pub procesos_allowed: bool,
     pub cotizaciones_allowed: bool,
     pub clientes_allowed: bool,
+    pub proveedores_allowed: bool,
     pub facturas_allowed: bool,
     pub ordenes_compra_allowed: bool,
     pub colaboracion_allowed: bool,
@@ -151,6 +152,7 @@ impl AppConfig {
             procesos_allowed: allowed_modules.contains(&"procesos"),
             cotizaciones_allowed: allowed_modules.contains(&"cotizaciones"),
             clientes_allowed: allowed_modules.contains(&"clientes"),
+            proveedores_allowed: allowed_modules.contains(&"proveedores"),
             facturas_allowed: allowed_modules.contains(&"facturas"),
             ordenes_compra_allowed: allowed_modules.contains(&"ordenes_compra"),
             colaboracion_allowed: allowed_modules.contains(&"colaboracion"),
@@ -168,6 +170,7 @@ fn parse_allowed_modules(value: &str) -> Result<Vec<&'static str>, ConfigError> 
             "procesos" => "procesos",
             "cotizaciones" => "cotizaciones",
             "clientes" => "clientes",
+            "proveedores" => "proveedores",
             "facturas" => "facturas",
             "ordenes_compra" => "ordenes_compra",
             "colaboracion" => "colaboracion",
@@ -203,6 +206,10 @@ mod module_tests {
             vec!["cotizaciones"]
         );
         assert_eq!(parse_allowed_modules("clientes").unwrap(), vec!["clientes"]);
+        assert_eq!(
+            parse_allowed_modules("proveedores").unwrap(),
+            vec!["proveedores"]
+        );
         assert_eq!(parse_allowed_modules("facturas").unwrap(), vec!["facturas"]);
         assert_eq!(
             parse_allowed_modules("ordenes_compra").unwrap(),

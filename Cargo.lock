@@ -189,6 +189,7 @@ dependencies = [
  "bastion-facturas",
  "bastion-ordenes-compra",
  "bastion-procesos",
+ "bastion-proveedores",
  "chrono",
  "ipnet",
  "rand 0.8.8",
@@ -340,6 +341,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "bastion-proveedores"
+version = "0.1.0"
+dependencies = [
+ "bastion-core",
+ "serde",
+ "serde_json",
+ "sha2 0.10.9",
+ "sqlx",
+]
+
+[[package]]
 name = "bastion-server"
 version = "0.1.0"
 dependencies = [
@@ -353,6 +365,7 @@ dependencies = [
  "bastion-facturas",
  "bastion-ordenes-compra",
  "bastion-procesos",
+ "bastion-proveedores",
  "dotenvy",
  "tokio",
  "tracing",

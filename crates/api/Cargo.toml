@@ -8,6 +8,7 @@ bastion-document-flows = { path = "../document-flows" }
 axum.workspace = true
 bastion-core = { path = "../core" }
 bastion-clientes = { path = "../modules/clientes" }
+bastion-proveedores = { path = "../modules/proveedores" }
 bastion-colaboracion = { path = "../modules/colaboracion" }
 bastion-facturas = { path = "../modules/facturas" }
 bastion-ordenes-compra = { path = "../modules/ordenes_compra" }

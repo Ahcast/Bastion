@@ -39,6 +39,12 @@ API actual: consulta/listado, catálogo para selects, alta y edición de proveed
 
 Confirmar gestión de destinos, campos/validaciones completos, reglas de duplicados y permisos de mantenimiento.
 
+## Primer corte local — 2026-10-24
+
+`proveedores` se implementa como módulo independiente con listado, búsqueda, catálogo resumido, alta y edición. La pantalla sigue los patrones visuales recientes de Cotizaciones y conserva los siete campos confirmados. No incorpora borrado ni importa IDs/datos Legacy.
+
+Como decisiones técnicas nuevas pendientes de cotejo con Legacy, este corte usa los permisos `proveedores/catalogo/ver|editar`, búsqueda literal en los siete campos y orden por nombre/ID. Límites, idempotencia, versionado y contrato HTTP se documentan en [la ficha de implementación](proveedores-implementacion.md) y [OpenAPI](proveedores.openapi.yaml). No está desplegado ni activado.
+
 ## Decisión posterior (2026-10-23)
 
 El usuario confirma administrar destinos bajo Ajustes > Órdenes de compra. El catálogo nuevo pertenece al dominio ordenes_compra, con contrato propio para consulta y alta/renombrado autorizados. No se incluye el módulo Proveedores en esta entrega ni se reutilizan sus futuros IDs/tablas. La gestión nueva no se atribuye al Legacy. Ver ordenes-de-compra-implementacion.md.

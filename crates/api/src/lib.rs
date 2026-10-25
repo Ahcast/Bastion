@@ -36,6 +36,7 @@ mod facturas;
 mod ordenes_compra;
 mod procesos;
 mod sar;
+mod proveedores;
 
 const GENERAL_REQUEST_BODY_LIMIT: usize = 1024 * 1024;
 
@@ -45,6 +46,7 @@ struct ApiState {
     procesos: bastion_procesos::ProcessService,
     cotizaciones: bastion_cotizaciones::QuoteService,
     clientes: bastion_clientes::ClientService,
+    proveedores: bastion_proveedores::SupplierService,
     colaboracion: bastion_colaboracion::CollaborationService,
     facturas: bastion_facturas::InvoiceService,
     ordenes_compra: bastion_ordenes_compra::OrderService,
@@ -273,6 +275,7 @@ pub fn router(
         procesos: bastion_procesos::ProcessService::new(core.database(), core.admin()),
         cotizaciones: bastion_cotizaciones::QuoteService::new(core.database(), core.admin()),
         clientes: bastion_clientes::ClientService::new(core.database(), core.admin()),
+        proveedores: bastion_proveedores::SupplierService::new(core.database(), core.admin()),
         colaboracion: bastion_colaboracion::CollaborationService::new(
             core.database(),
             core.admin(),
@@ -376,6 +379,7 @@ pub fn router(
         .merge(procesos::routes(api_state.clone()))
         .merge(cotizaciones::routes(api_state.clone()))
         .merge(clientes::routes(api_state.clone()))
+        .merge(proveedores::routes(api_state.clone()))
         .merge(colaboracion::routes(api_state.clone()))
         .merge(facturas::routes(api_state.clone()))
         .merge(ordenes_compra::routes(api_state.clone()))

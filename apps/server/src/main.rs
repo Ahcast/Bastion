@@ -33,6 +33,7 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
         bastion_procesos::ProcessService::migrate(&migrator).await?;
         bastion_cotizaciones::QuoteService::migrate(&migrator).await?;
         bastion_clientes::ClientService::migrate(&migrator).await?;
+        bastion_proveedores::SupplierService::migrate(&migrator).await?;
         bastion_colaboracion::CollaborationService::migrate(&migrator).await?;
         bastion_facturas::InvoiceService::migrate(&migrator).await?;
         bastion_ordenes_compra::OrderService::migrate(&migrator).await?;
@@ -76,6 +77,9 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
     }
     bastion_clientes::ClientService::new(core.database(), core.admin())
         .synchronize_release(config.clientes_allowed)
+        .await?;
+    bastion_proveedores::SupplierService::new(core.database(), core.admin())
+        .synchronize_release(config.proveedores_allowed)
         .await?;
     let cleanup = core.admin();
     let collaboration =

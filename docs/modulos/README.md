@@ -25,3 +25,5 @@ Los campos y acciones observados se basan en frontend compilado, scripts y backe
 Decisión del 2026-10-23: el catálogo nuevo de destinos se administra bajo Ajustes > Órdenes de compra por confirmación del usuario y pertenece a `ordenes_compra`. La fila Proveedores y destinos conserva el inventario Legacy, no asigna la propiedad de la implementación nueva. Ver `ordenes-de-compra-implementacion.md`.
 
 Colaboración incorpora su primer corte con límites y retención confirmados por el usuario. Ver `colaboracion-implementacion.md`.
+
+Proveedores comienza su implementación independiente con el contrato de paridad y las decisiones nuevas pendientes de cotejo Legacy identificadas. Ver [detalle](proveedores-implementacion.md) y [OpenAPI](proveedores.openapi.yaml).

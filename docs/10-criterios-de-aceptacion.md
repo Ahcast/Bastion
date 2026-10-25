@@ -199,3 +199,11 @@ Comprobar cifras reales de Procesos y Cotizaciones, selección de área, rangos 
 - Rechaza MIME/extensiones no compatibles, ejecutables, scripts y contenido comprimido peligroso; aplica el máximo configurado antes de guardar en S3 privado.
 - Papelera conserva el plazo ya asignado, restaura antes del vencimiento y purga vencidos o confirmados incluyendo versiones S3, con auditoría e idempotencia.
 - Módulo disponible solo con release, allowlist y migración exacta; se activa administrativamente después de validar bucket/IAM y cuerpo/timeout del proxy.
+
+## Proveedores: primer corte
+
+- Consultar, buscar, paginar y abrir proveedor individual con permiso vigente; la búsqueda y el orden iniciales siguen identificados como decisiones pendientes de cotejo Legacy.
+- Crear con clave idempotente y editar con versión/ETag sin perder datos ante conflicto; registrar actor y resultado en la bitácora del Core.
+- Mostrar los siete campos confirmados, exigir solo nombre según el contrato inicial y presentar sus longitudes como límites técnicos nuevos, no como paridad Legacy confirmada.
+- Adaptar la vista a los tokens y patrones recientes de Cotizaciones en escritorio y móvil; navegación y Ajustes respetan el permiso `ver`, las mutaciones requieren `editar`.
+- La migración pertenece al módulo; no importar ni fusionar datos Legacy. Disponibilidad requiere release, allowlist y migración; activación administrativa queda separada.

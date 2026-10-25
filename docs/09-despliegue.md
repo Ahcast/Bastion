@@ -50,6 +50,10 @@ Respaldar antes de migrar y ensayar restauración. El comando `check-db` verific
 
 SMTP usa configuración global autorizada y credenciales personales cifradas. TLS es obligatorio; resolver y fijar IPs públicas válidas, rechazar destinos internos/reservados y restringir egreso según la política del Core. PDFs y adjuntos privados requieren almacenamiento privado, autorización por descarga y respaldo; no se publican junto al frontend.
 
+## Proveedores: primer corte
+
+El release incorpora la migración propia y registra Proveedores con el Core. Antes de desplegar, esperar el artifact exitoso de CI y respaldar MySQL. Aplicar `migrate`, comprobar el ledger y la tabla nueva y mantener el módulo desactivado hasta que el Administrador lo habilite. `BASTION_ALLOWED_MODULES` debe incluir `proveedores` para permitir disponibilidad administrativa; la publicación por sí sola no lo activa. No importar proveedores Legacy. Ver [alcance y decisiones](modulos/proveedores-implementacion.md).
+
 ## Estado y verificaciones pendientes
 
 El ambiente de pruebas tiene frontend, backend HTTPS y conectividad MySQL TLS comprobados. Esto no constituye aprobación de producción ni cierra los criterios funcionales. Faltan pruebas integrales con usuarios, funciones pendientes del Core, configuración y validación de Cloudflare, privilegios mínimos de MySQL, separación de ambientes, almacenamiento privado, restauraciones, observabilidad, límites y objetivos operativos. Mantener cada pendiente explícito y no crear datos o estadísticas ficticias para aparentar implementación.

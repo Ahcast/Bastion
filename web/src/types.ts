@@ -13,7 +13,7 @@ export interface Module { module_id: string; display_name: string; included_in_r
 export interface Audit { id: number; created_at: string; actor_name: string | null; module_id: string; action: string; target_type: string; target_id: string | number | null; result: string }
 export interface Mail { id: number; created_at: string; kind: string; recipient_email: string; delivery_status: string; attempts: number; last_error_code: string | null }
 export interface Setting { setting_key: string; value_json: unknown }
-export type Page = 'inicio' | 'ajustes' | 'procesos' | 'cotizaciones' | 'clientes' | 'ordenes_compra' | 'facturas' | 'colaboracion';
+export type Page = 'inicio' | 'ajustes' | 'procesos' | 'cotizaciones' | 'clientes' | 'proveedores' | 'ordenes_compra' | 'facturas' | 'colaboracion';
 export function moduleCan(access: Access | null, module: string, scope: string, capability: string): boolean {
   return Boolean(access?.modules.some(m => m.module_id === module) && (access.is_system_administrator || access.permissions.some(p => p.module_id === module && p.capability === capability && (p.scope_key === scope || p.scope_key === '*'))));
 }
