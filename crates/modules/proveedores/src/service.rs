@@ -83,12 +83,11 @@ impl SupplierService {
             .bind(actor)
             .execute(&mut *tx)
             .await?;
-        let count: u32 = sqlx::query_scalar(
-            "SELECT requests FROM proveedores_actor_limits WHERE actor_id=?",
-        )
-        .bind(actor)
-        .fetch_one(&mut *tx)
-        .await?;
+        let count: u32 =
+            sqlx::query_scalar("SELECT requests FROM proveedores_actor_limits WHERE actor_id=?")
+                .bind(actor)
+                .fetch_one(&mut *tx)
+                .await?;
         tx.commit().await?;
         if count > 120 {
             return Err(CoreError::Locked);
@@ -165,7 +164,8 @@ impl SupplierService {
         {
             return Err(CoreError::Invalid);
         }
-        let request_hash = Sha256::digest(serde_json::to_vec(&input).map_err(|_| CoreError::Invalid)?).to_vec();
+        let request_hash =
+            Sha256::digest(serde_json::to_vec(&input).map_err(|_| CoreError::Invalid)?).to_vec();
         let key_hash = Sha256::digest(key.as_bytes()).to_vec();
         let mut tx = self.begin(actor, "editar").await?;
         let previous: Option<(Vec<u8>, serde_json::Value)> = sqlx::query_as(
@@ -269,15 +269,26 @@ impl SupplierService {
 
 fn list_query(fields: &str, filter: &SupplierFilter) -> Result<QueryBuilder<MySql>, CoreError> {
     let (page, size) = filter.bounds()?;
-    let mut query = QueryBuilder::new(format!("SELECT {fields} FROM proveedores_records s WHERE 1=1"));
+    let mut query = QueryBuilder::new(format!(
+        "SELECT {fields} FROM proveedores_records s WHERE 1=1"
+    ));
     if let Some(term) = filter.search() {
-        query.push(" AND (LOCATE(").push_bind(term).push(",s.supplier_name)>0 OR LOCATE(")
-            .push_bind(term).push(",s.user_contact)>0 OR LOCATE(")
-            .push_bind(term).push(",s.email)>0 OR LOCATE(")
-            .push_bind(term).push(",s.rtn)>0 OR LOCATE(")
-            .push_bind(term).push(",s.phone_number)>0 OR LOCATE(")
-            .push_bind(term).push(",s.mobile_number)>0 OR LOCATE(")
-            .push_bind(term).push(",s.direction)>0)");
+        query
+            .push(" AND (LOCATE(")
+            .push_bind(term)
+            .push(",s.supplier_name)>0 OR LOCATE(")
+            .push_bind(term)
+            .push(",s.user_contact)>0 OR LOCATE(")
+            .push_bind(term)
+            .push(",s.email)>0 OR LOCATE(")
+            .push_bind(term)
+            .push(",s.rtn)>0 OR LOCATE(")
+            .push_bind(term)
+            .push(",s.phone_number)>0 OR LOCATE(")
+            .push_bind(term)
+            .push(",s.mobile_number)>0 OR LOCATE(")
+            .push_bind(term)
+            .push(",s.direction)>0)");
     }
     query
         .push(" ORDER BY s.supplier_name,s.id LIMIT ")

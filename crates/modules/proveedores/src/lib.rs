@@ -83,7 +83,10 @@ impl SupplierFilter {
         let size = self.page_size.unwrap_or(25);
         if !(1..=10000).contains(&page)
             || !(1..=100).contains(&size)
-            || self.search.as_ref().is_some_and(|value| value.chars().count() > 200)
+            || self
+                .search
+                .as_ref()
+                .is_some_and(|value| value.chars().count() > 200)
         {
             return Err(CoreError::Invalid);
         }
