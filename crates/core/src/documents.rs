@@ -11,6 +11,7 @@ use std::{
 };
 
 const MAX_DOCUMENT_BYTES: u64 = 8 * 1024 * 1024;
+const MAX_STORAGE_BYTES: usize = 20 * 1024 * 1024;
 pub const MAX_PRIVATE_FILE_BYTES: usize = 100 * 1024 * 1024;
 static PDF_SLOTS: tokio::sync::Semaphore = tokio::sync::Semaphore::const_new(2);
 static STORAGE_SLOTS: tokio::sync::Semaphore = tokio::sync::Semaphore::const_new(4);
@@ -180,7 +181,7 @@ impl DocumentService {
         .map_err(|_| CoreError::Overloaded)?
     }
     pub async fn put(&self, key: String, bytes: Vec<u8>) -> Result<(), CoreError> {
-        self.put_with_limit(key, bytes, MAX_DOCUMENT_BYTES as usize)
+        self.put_with_limit(key, bytes, MAX_STORAGE_BYTES)
             .await
     }
     pub async fn put_with_limit(
@@ -218,7 +219,7 @@ impl DocumentService {
         .map_err(|_| CoreError::Overloaded)?
     }
     pub async fn get(&self, key: String) -> Result<Vec<u8>, CoreError> {
-        self.get_with_limit(key, MAX_DOCUMENT_BYTES as usize).await
+        self.get_with_limit(key, MAX_STORAGE_BYTES).await
     }
     pub async fn get_with_limit(&self, key: String, limit: usize) -> Result<Vec<u8>, CoreError> {
         if limit > MAX_PRIVATE_FILE_BYTES {
