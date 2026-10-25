@@ -46,6 +46,46 @@ pub struct ScoutRun {
     pub retry_stages: Vec<&'static str>,
     pub metrics: BTreeMap<&'static str, u64>,
     pub error_reported: bool,
+    pub extraction: Option<ScoutExtraction>,
+}
+
+#[derive(Serialize)]
+pub struct ScoutIssue {
+    pub code: &'static str,
+    pub http_status: Option<u16>,
+}
+
+#[derive(Serialize)]
+pub struct ScoutIssueCount {
+    pub issue: ScoutIssue,
+    pub count: u64,
+}
+
+#[derive(Serialize)]
+pub struct ScoutPhase {
+    pub phase: &'static str,
+    pub status: &'static str,
+    pub next_retry: Option<DateTime<Utc>>,
+    pub issue: Option<ScoutIssue>,
+}
+
+#[derive(Serialize)]
+pub struct ScoutAttempt {
+    pub last_attempted_page: Option<u64>,
+    pub last_saved_page: Option<u64>,
+    pub last_failed_page: Option<u64>,
+    pub last_failure: Option<ScoutIssue>,
+    pub metrics: BTreeMap<&'static str, u64>,
+}
+
+#[derive(Serialize)]
+pub struct ScoutExtraction {
+    pub next_page: Option<u64>,
+    pub discovery_complete: Option<bool>,
+    pub failure: Option<ScoutIssue>,
+    pub phases: Vec<ScoutPhase>,
+    pub invocation: Option<ScoutAttempt>,
+    pub detail_issues: Vec<ScoutIssueCount>,
 }
 
 impl ScoutDiagnostics {
@@ -188,6 +228,74 @@ mod tests {
     }
 
     #[test]
+    fn extraction_projects_resume_page_failure_and_separate_invocation_counts() {
+        let files = Files::new();
+        files.write("scout", serde_json::json!({"reason":"fases_pendientes","pages":5,"extracted":501,
+            "next_page":6,"discovery_complete":false,"error":"presupuesto_descubrimiento",
+            "phases":{"discovery":{"status":"pausado","next_retry":"2026-10-25T06:00:00Z","error":"presupuesto_descubrimiento"},"extraction":{"status":"pendiente"}},
+            "invocation":{"last_attempted_page":6,"last_saved_page":5,"last_failed_page":6,"last_error":"HonduCompras HTTP 500; PRIVATE_EXCEPTION","extracted":9,"failed":2,"incomplete":0},
+            "detail_errors":{"PRIVATE_URL_1":"Detalle sin campos obligatorios o contenido útil; grilla=vacia","PRIVATE_URL_2":"HonduCompras HTTP 500","PRIVATE_URL_3":"SECRET"}}));
+        let reports = files.read();
+        let run = reports.reports[1].run.as_ref().unwrap();
+        assert_eq!(run.reason, Some("fases_pendientes"));
+        assert_eq!(run.metrics["extracted"], 501);
+        let detail = run.extraction.as_ref().unwrap();
+        assert_eq!(detail.next_page, Some(6));
+        assert_eq!(detail.failure.as_ref().unwrap().code, "discovery_budget");
+        assert_eq!(detail.phases[0].status, "pausado");
+        assert!(detail.phases[0].next_retry.is_some());
+        let attempt = detail.invocation.as_ref().unwrap();
+        assert_eq!(attempt.last_saved_page, Some(5));
+        assert_eq!(attempt.last_failed_page, Some(6));
+        assert_eq!(
+            attempt.last_failure.as_ref().unwrap().http_status,
+            Some(500)
+        );
+        assert_eq!(attempt.metrics["extracted"], 9);
+        assert_eq!(attempt.metrics["incomplete"], 0);
+        assert_eq!(detail.detail_issues.len(), 3);
+        let text = serde_json::to_string(&reports).unwrap();
+        assert!(!text.contains("PRIVATE"));
+        assert!(!text.contains("SECRET"));
+    }
+
+    #[test]
+    fn old_extraction_reports_do_not_invent_invocation_metrics_or_error_pages() {
+        let files = Files::new();
+        files.write("scout", serde_json::json!({"pages":5,"extracted":501,"next_page":6,"error":"presupuesto_descubrimiento"}));
+        let reports = files.read();
+        let detail = reports.reports[1]
+            .run
+            .as_ref()
+            .unwrap()
+            .extraction
+            .as_ref()
+            .unwrap();
+        assert!(detail.invocation.is_none());
+        assert_eq!(detail.next_page, Some(6));
+        assert_eq!(detail.failure.as_ref().unwrap().code, "discovery_budget");
+        files.write("scout", serde_json::json!({"invocation":{"last_saved_page":-1,"extracted":"SECRET"},"phases":{"discovery":{"status":"SECRET","next_retry":"not-date","error":"SECRET"}}}));
+        let reports = files.read();
+        let detail = reports.reports[1]
+            .run
+            .as_ref()
+            .unwrap()
+            .extraction
+            .as_ref()
+            .unwrap();
+        assert!(
+            detail
+                .invocation
+                .as_ref()
+                .unwrap()
+                .last_saved_page
+                .is_none()
+        );
+        assert!(detail.invocation.as_ref().unwrap().metrics.is_empty());
+        assert!(!serde_json::to_string(&reports).unwrap().contains("SECRET"));
+    }
+
+    #[test]
     fn oversize_files_and_symlinks_are_not_reports() {
         let files = Files::new();
         std::fs::write(files.0.join("main.json"), vec![b' '; 32 * 1024 + 1]).unwrap();
@@ -244,6 +352,9 @@ fn state(value: &str) -> &'static str {
 
 fn reason(value: &str) -> &'static str {
     match value {
+        "fases_pendientes" => "fases_pendientes",
+        "heuristica_10_vencidos" => "heuristica_10_vencidos",
+        "heuristica_10_vencidos_auditada" => "heuristica_10_vencidos_auditada",
         "ciclo_diario_completo" => "ciclo_diario_completo",
         "etapas_pendientes" => "etapas_pendientes",
         "recuperacion_anterior_pendiente" => "recuperacion_anterior_pendiente",
@@ -261,6 +372,138 @@ fn reason(value: &str) -> &'static str {
         "analisis_pendiente" => "analisis_pendiente",
         "error_clasificacion" => "error_clasificacion",
         _ => "other",
+    }
+}
+
+// Project known diagnostics only. Free-form exceptions, URLs and private paths stay in Scout.
+fn issue(value: Option<&Value>) -> Option<ScoutIssue> {
+    let text = value
+        .and_then(Value::as_str)
+        .filter(|text| !text.is_empty())?;
+    let text = text.to_lowercase();
+    let http_status = text.split_once("http ").and_then(|(_, tail)| {
+        let token = tail
+            .split_whitespace()
+            .next()?
+            .trim_matches(|c: char| !c.is_ascii_digit());
+        if token.len() != 3 {
+            return None;
+        }
+        token
+            .parse::<u16>()
+            .ok()
+            .filter(|n| (400..=599).contains(n))
+    });
+    let code = if http_status.is_some() {
+        "http"
+    } else if text == "presupuesto_descubrimiento" {
+        "discovery_budget"
+    } else if text == "limite_horario_o_presupuesto_invocacion" {
+        "invocation_budget"
+    } else if text.contains("timeout") || text.contains("timed out") {
+        "timeout"
+    } else if text.contains("connectionerror")
+        || text.contains("connecterror")
+        || text.contains("no respondió")
+    {
+        "connection"
+    } else if text.contains("no contiene la tabla de resultados")
+        || text.contains("tabla sin enlaces")
+        || text.contains("formulario asp.net")
+    {
+        "invalid_listing"
+    } else if text.contains("no contiene el detalle del proceso") {
+        "invalid_detail"
+    } else if text.contains("detalle sin campos obligatorios") {
+        "incomplete_detail"
+    } else if text.contains("paginación repetida") || text.contains("no avanzó de página") {
+        "repeated_page"
+    } else if text == "fallos consecutivos de detalles" {
+        "consecutive_details"
+    } else {
+        "unrecognized"
+    };
+    Some(ScoutIssue { code, http_status })
+}
+
+fn extraction(value: &Value) -> ScoutExtraction {
+    let page =
+        |object: &Value, key: &str| object.get(key).and_then(Value::as_u64).filter(|n| *n > 0);
+    let phases = ["discovery", "extraction"]
+        .into_iter()
+        .filter_map(|phase| {
+            let data = value.get("phases")?.get(phase)?.as_object()?;
+            let status = match data.get("status").and_then(Value::as_str) {
+                Some("completo") => "completo",
+                Some("pausado") => "pausado",
+                Some("pendiente") => "pendiente",
+                _ => "desconocido",
+            };
+            Some(ScoutPhase {
+                phase,
+                status,
+                next_retry: data
+                    .get("next_retry")
+                    .and_then(Value::as_str)
+                    .and_then(|text| DateTime::parse_from_rfc3339(text).ok())
+                    .map(|date| date.with_timezone(&Utc)),
+                issue: issue(data.get("error")),
+            })
+        })
+        .collect();
+    let invocation = value
+        .get("invocation")
+        .filter(|data| data.is_object())
+        .map(|data| {
+            let mut metrics = BTreeMap::new();
+            for key in [
+                "pages_read",
+                "details_attempted",
+                "extracted",
+                "incomplete",
+                "expired",
+                "failed",
+                "interrupted",
+            ] {
+                if let Some(number) = data.get(key).and_then(Value::as_u64) {
+                    metrics.insert(key, number);
+                }
+            }
+            ScoutAttempt {
+                last_attempted_page: page(data, "last_attempted_page"),
+                last_saved_page: page(data, "last_saved_page"),
+                last_failed_page: page(data, "last_failed_page"),
+                last_failure: issue(data.get("last_error")),
+                metrics,
+            }
+        });
+    let mut groups = BTreeMap::new();
+    if let Some(errors) = value.get("detail_errors").and_then(Value::as_object) {
+        for error in errors.values().filter_map(|data| issue(Some(data))) {
+            *groups
+                .entry((error.code, error.http_status))
+                .or_insert(0u64) += 1;
+        }
+    }
+    ScoutExtraction {
+        next_page: page(value, "next_page").or_else(|| {
+            value
+                .get("phases")
+                .and_then(|data| data.get("discovery"))
+                .and_then(|data| page(data, "next_page"))
+        }),
+        discovery_complete: value.get("discovery_complete").and_then(Value::as_bool),
+        failure: issue(value.get("error"))
+            .or_else(|| issue(value.get("stop_reason")).filter(|item| item.code != "unrecognized")),
+        phases,
+        invocation,
+        detail_issues: groups
+            .into_iter()
+            .map(|((code, http_status), count)| ScoutIssueCount {
+                issue: ScoutIssue { code, http_status },
+                count,
+            })
+            .collect(),
     }
 }
 
@@ -385,5 +628,6 @@ fn project(value: &Value, stage: &'static str) -> Result<ScoutRun, LocalDelivery
         retry_stages,
         metrics,
         error_reported,
+        extraction: (stage == "scout").then(|| extraction(value)),
     })
 }

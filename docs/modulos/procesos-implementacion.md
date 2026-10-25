@@ -70,7 +70,27 @@ Se proyectan campos conocidos: ciclo, estado reportado, inicio, fin, duración c
 
 Reportes ausentes, sin lectura, inválidos o cambiantes se indican por separado. Una etapa de otro ciclo se identifica como tal; si no hay manifiesto principal válido no se atribuye pertenencia al ciclo actual. No se infiere la salud del proceso del sistema operativo a partir de un estado `ejecutando` persistido. Es el último estado escrito, no un monitor del servicio. `output_ready` es la entrega informada por Scout; la importación conserva su validación separada de CSV/huella.
 
-No se devuelve JSON crudo, mensajes de excepción, listas de URLs, rutas locales ni configuración; los motivos se reducen a códigos conocidos y las incidencias a presencia/contadores. Los retiros del maestro son operaciones de Scout y no cambian la conservación del histórico de Bastion. Esta información no requiere una migración nueva.
+No se devuelve JSON crudo, mensajes de excepción, listas de URLs, rutas locales ni configuración; los motivos e incidencias se proyectan como códigos conocidos, estados y contadores. Los retiros del maestro son operaciones de Scout y no cambian la conservación del histórico de Bastion. Esta información no requiere una migración nueva.
+
+## Detalle de extracción solicitado el 24 de octubre
+
+`scout-status` proyecta para la etapa Scout el progreso del listado, página de continuación,
+fases y próximo reintento, motivo concreto de pausa, página y tipo del último fallo de listado,
+y agrupación de los fallos de detalles pendientes. Los motivos son códigos conocidos y HTTP
+400–599; no se publican excepciones libres, URLs, rutas, cabeceras ni configuración.
+Los motivos de fases pendientes y cobertura heurística tienen textos propios.
+
+`extraction.invocation` separa las descargas de detalles del último intento de los acumulados
+de la ronda: vigentes completos, incompletos, vencidos, fallidos, interrumpidos e intentados,
+y lecturas de páginas (incluye relecturas). Incluye detalles actuales e históricos; la caché
+no cuenta como descarga. Scout reinicia esos contadores en cada invocación y registra las
+páginas efectivamente solicitadas/guardadas, sin cambiar CSV, horario ni reglas de extracción.
+Los reportes anteriores muestran los acumulados y dejan explícito que el desglose por intento
+no fue informado. No se deduce una página fallida de un contador de páginas.
+
+Se conservan los permisos, límites de lectura, comprobación de ciclo y actualización en
+segundo plano. Las pruebas distinguen recuperación de ronda e intento, respuestas HTTP,
+presupuesto agotado, datos antiguos y contenido sensible o malformado. No requiere migraciones.
 
 ## Pendientes que no deben resolverse por inferencia
 

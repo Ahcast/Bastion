@@ -7,7 +7,10 @@ mod local;
 mod scout;
 mod service;
 
-pub use diagnostics::{ReportAvailability, ScoutDiagnostics, ScoutReport, ScoutRun};
+pub use diagnostics::{
+    ReportAvailability, ScoutAttempt, ScoutDiagnostics, ScoutExtraction, ScoutIssue,
+    ScoutIssueCount, ScoutPhase, ScoutReport, ScoutRun,
+};
 pub use local::{DEFAULT_SCOUT_CSV, LocalDeliveryError, ReadyDelivery};
 pub use scout::{FIELDS, MAX_CSV_BYTES, MAX_ROWS, SCOUT_FIELDS, ScoutRow, parse_csv};
 pub use service::{

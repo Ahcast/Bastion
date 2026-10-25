@@ -274,6 +274,74 @@ components:
                         additionalProperties: {type: integer, minimum: 0}
                         description: Solo contadores conocidos por etapa y input_tokens/output_tokens de usage; campos ausentes no se sustituyen por cero.
                       error_reported: {type: boolean}
+                      extraction:
+                        oneOf:
+                          - type: 'null'
+                          - $ref: '#/components/schemas/ScoutExtraction'
+    ScoutIssue:
+      type: object
+      required: [code, http_status]
+      properties:
+        code: {type: string, enum: [http, discovery_budget, invocation_budget, timeout, connection, invalid_listing, invalid_detail, incomplete_detail, repeated_page, consecutive_details, unrecognized]}
+        http_status: {type: [integer, 'null'], minimum: 400, maximum: 599}
+    ScoutExtraction:
+      type: object
+      description: Detalle permitido de extracción, sin excepciones libres ni URLs. Los acumulados de ronda permanecen en run.metrics.
+      required: [next_page, discovery_complete, failure, phases, invocation, detail_issues]
+      properties:
+        next_page: {type: [integer, 'null'], minimum: 1}
+        discovery_complete: {type: [boolean, 'null']}
+        failure:
+          oneOf:
+            - type: 'null'
+            - $ref: '#/components/schemas/ScoutIssue'
+        phases:
+          type: array
+          maxItems: 2
+          items:
+            type: object
+            required: [phase, status, next_retry, issue]
+            properties:
+              phase: {type: string, enum: [discovery, extraction]}
+              status: {type: string, enum: [completo, pausado, pendiente, desconocido]}
+              next_retry: {type: [string, 'null'], format: date-time}
+              issue:
+                oneOf:
+                  - type: 'null'
+                  - $ref: '#/components/schemas/ScoutIssue'
+        invocation:
+          oneOf:
+            - type: 'null'
+            - type: object
+              description: Métricas de esta invocación; incluye detalles actuales e históricos. No se inventan contadores ausentes en reportes anteriores.
+              required: [last_attempted_page, last_saved_page, last_failed_page, last_failure, metrics]
+              properties:
+                last_attempted_page: {type: [integer, 'null'], minimum: 1}
+                last_saved_page: {type: [integer, 'null'], minimum: 1}
+                last_failed_page: {type: [integer, 'null'], minimum: 1}
+                last_failure:
+                  oneOf:
+                    - type: 'null'
+                    - $ref: '#/components/schemas/ScoutIssue'
+                metrics:
+                  type: object
+                  additionalProperties: false
+                  properties:
+                    pages_read: {type: integer, minimum: 0, description: Incluye relecturas de páginas.}
+                    details_attempted: {type: integer, minimum: 0}
+                    extracted: {type: integer, minimum: 0, description: Vigentes completos descargados y guardados en este intento.}
+                    incomplete: {type: integer, minimum: 0}
+                    expired: {type: integer, minimum: 0}
+                    failed: {type: integer, minimum: 0}
+                    interrupted: {type: integer, minimum: 0}
+        detail_issues:
+          type: array
+          items:
+            type: object
+            required: [issue, count]
+            properties:
+              issue: {$ref: '#/components/schemas/ScoutIssue'}
+              count: {type: integer, minimum: 1}
     Status:
       type: object
       required: [total, last_import_at, as_of, timezone, due, weekly]
