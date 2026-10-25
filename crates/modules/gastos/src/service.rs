@@ -287,7 +287,7 @@ async fn load(tx: &mut Transaction<'_, MySql>, id: u64) -> Result<Expense, CoreE
     Ok(expense_from_row(&row)?)
 }
 
-fn filtered_query<'a>(prefix: &str, filter: &'a ExpenseFilter) -> QueryBuilder<'a, MySql> {
+fn filtered_query(prefix: &str, filter: &ExpenseFilter) -> QueryBuilder<MySql> {
     let mut query = QueryBuilder::<MySql>::new(prefix.to_owned());
     if let Some(term) = filter.search() {
         query
