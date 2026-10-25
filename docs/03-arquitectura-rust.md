@@ -91,6 +91,8 @@ Registrar solicitudes, módulo/caso de uso, latencia, errores y actor autenticad
 
 Los requisitos verificables están en `08-seguridad-y-permisos.md`; sus límites y configuración de infraestructura están en `09-despliegue.md`.
 
+Colaboración usa el crate `crates/modules/colaboracion`; el Core autoriza las carpetas, ejecuta S3 privado y registra settings/auditoría. La política de módulos del ambiente y su migración gobiernan su disponibilidad.
+
 ## Decisiones técnicas pendientes
 
 Completar validación integral del esquema MySQL y las sesiones existentes, almacenamiento compartido para cuotas si se ejecutan varias instancias, configuración técnica de activación por ambiente, integración de Typst y gestión de plantillas/fuentes, y librería/versión de transporte MCP. El frontend React + TypeScript + Vite ya está decidido. Confirmar la ruta de actualización de MySQL antes de producción.

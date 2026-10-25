@@ -1,0 +1,180 @@
+openapi: 3.1.0
+info:
+  title: Bastion Colaboración
+  version: 0.1.0
+security:
+  - session: []
+paths:
+  /api/v1/colaboracion:
+    get:
+      operationId: listCollaborationFiles
+      description: Ver en carpeta empresa o persona. Sin scope devuelve solo carpetas autorizadas. Búsqueda literal en título, nombre y notas. 120 solicitudes por actor/minuto, plazo HTTP 120 s, dos operaciones concurrentes por proceso. Errores comunes 401/403/404/422/429/503 en application/problem+json; hereda CSRF y Origin exacto del Core para mutaciones.
+      parameters:
+        - {name: trash, in: query, schema: {type: boolean, default: false}}
+        - {name: scope, in: query, schema: {type: string, enum: [empresa, persona]}}
+        - {name: id_persona, in: query, schema: {type: integer, minimum: 1}}
+        - {name: search, in: query, schema: {type: string, maxLength: 200}}
+        - {name: page, in: query, schema: {type: integer, minimum: 1, maximum: 10000, default: 1}}
+        - {name: page_size, in: query, schema: {type: integer, minimum: 1, maximum: 100, default: 25}}
+      responses:
+        '200': {description: 'items (File[]), page, page_size, has_more; orden id descendente'}
+        '403': {description: Sin acceso a la carpeta solicitada}
+        '422': {description: Filtros inválidos}
+    post:
+      operationId: uploadCollaborationFile
+      description: Editar sobre carpeta. Archivo hasta 50 MiB por defecto, configurable 1..100 MiB; JSON hasta 140 MiB. MIME real por libmagic, extensión y política. Idempotencia por actor/clave/contenido sin vencimiento; clave con contenido diferente, purgada o carga simultánea en curso produce 409. Un error confirmado de almacenamiento permite reintento con la misma clave. No reemplaza archivos.
+      parameters:
+        - {name: Idempotency-Key, in: header, required: true, schema: {type: string, minLength: 16, maxLength: 100}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [scope, title, filename, content_base64]
+              properties:
+                scope: {type: string, enum: [empresa, persona]}
+                id_persona: {type: [integer, 'null'], minimum: 1}
+                title: {type: string, minLength: 1, maxLength: 255}
+                notes: {type: string, maxLength: 4000, default: ''}
+                filename: {type: string, minLength: 1, maxLength: 255}
+                content_base64: {type: string, maxLength: 139810136}
+      responses:
+        '201': {description: 'File; Location /api/v1/colaboracion/{id}/download'}
+        '409': {description: Clave reutilizada o carga pendiente/eliminada}
+        '413': {description: Cuerpo demasiado grande}
+        '422': {description: Entrada inválida}
+        '503': {description: Almacenamiento no configurado o no disponible}
+  /api/v1/colaboracion/personas:
+    get:
+      operationId: collaborationPeople
+      description: Selector paginado del Core, solo id y nombre; exige ver/editar sobre cada carpeta o comodín. q hasta 200 caracteres; page 1..10000, page_size 1..100 (25 por defecto). No concede administración de Personas.
+      responses:
+        '200': {description: 'items ({id,full_name}[]), page, page_size, has_more'}
+  /api/v1/colaboracion/{id}/preview:
+    get:
+      operationId: previewCollaborationFile
+      description: Ver sobre carpeta de registro vigente; JSON filename, mime, content_base64. PDF, PNG, JPEG, GIF, WebP, BMP y texto UTF-8 inerte. Nunca sirve HTML/SVG activo. Hasta 100 MiB para archivos existentes, 4 operaciones S3 compartidas, espera 1 s, transferencias grandes hasta 90 s. La papelera no admite descarga ni preview.
+      parameters: [{$ref: '#/components/parameters/Id'}]
+      responses:
+        '200': {description: Contenido privado base64}
+        '422': {description: Tipo sin vista previa; usar descarga}
+        '404': {description: Archivo inexistente o carpeta no autorizada}
+  /api/v1/colaboracion/{id}/download:
+    get:
+      operationId: downloadCollaborationFile
+      description: Ver sobre la carpeta del registro. JSON filename, mime application/octet-stream, content_base64. Mismos límites de almacenamiento que preview; sin URL pública ni clave S3.
+      parameters: [{$ref: '#/components/parameters/Id'}]
+      responses:
+        '200': {description: Contenido privado base64}
+        '404': {description: Archivo inexistente o carpeta no autorizada}
+  /api/v1/colaboracion/{id}:
+    delete:
+      operationId: deleteCollaborationFile
+      description: Eliminar sobre carpeta; confirm_id debe coincidir con id. Mueve a papelera y registra retención efectiva (30 días por defecto). Mantiene el objeto privado hasta restauración o purga. Sin caducidad automática de archivos vigentes.
+      parameters: [{$ref: '#/components/parameters/Id'}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [confirm_id]
+              properties:
+                confirm_id: {type: integer, minimum: 1}
+      responses:
+        '204': {description: Movido a papelera}
+        '404': {description: Archivo inexistente o carpeta no autorizada}
+        '422': {description: Confirmación incorrecta}
+  /api/v1/colaboracion/{id}/restore:
+    post:
+      operationId: restoreCollaborationFile
+      description: Eliminar sobre carpeta original. Restaura solo papelera con retención vigente; no mueve de carpeta.
+      parameters: [{$ref: '#/components/parameters/Id'}]
+      responses:
+        '204': {description: Restaurado}
+        '404': {description: Inexistente, fuera de papelera o carpeta no autorizada}
+        '409': {description: Retención vencida}
+  /api/v1/colaboracion/{id}/purge:
+    post:
+      operationId: purgeCollaborationFile
+      description: Eliminar sobre carpeta y confirm_id igual a id. Solo papelera. Encola borrado definitivo de todas las versiones/marcadores del objeto exacto y auditoría. Reintenta fallos sin marcar eliminado. El worker purga además retención vencida.
+      parameters: [{$ref: '#/components/parameters/Id'}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [confirm_id]
+              properties:
+                confirm_id: {type: integer, minimum: 1}
+      responses:
+        '204': {description: Borrado definitivo registrado; limpieza física pendiente/reintentable}
+        '404': {description: Inexistente, fuera de papelera o carpeta no autorizada}
+        '422': {description: Confirmación incorrecta}
+  /api/v1/colaboracion/settings:
+    get:
+      operationId: getCollaborationPolicy
+      description: Ver en alguna carpeta del módulo habilitado. Política efectiva de empresa sin secretos.
+      responses:
+        '200':
+          description: Política efectiva
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/FilePolicy'}
+    put:
+      operationId: saveCollaborationPolicy
+      description: Editar en alcance settings. Persistencia y auditoría del Core, schema 1, alcance empresa. Aplica a nuevas cargas/nuevos plazos de papelera sin alterar plazos registrados.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/FilePolicy'}
+      responses:
+        '204': {description: Guardado}
+        '403': {description: Sin permiso de edición de settings}
+        '422': {description: Límites/listas inválidos o formatos no soportados}
+components:
+  parameters:
+    Id: {name: id, in: path, required: true, schema: {type: integer, minimum: 1}}
+  securitySchemes:
+    session: {type: apiKey, in: cookie, name: __Host-bastion_session}
+  schemas:
+    File:
+      type: object
+      required: [id, scope, title, notes, filename, size_bytes, created_at]
+      properties:
+        id: {type: integer}
+        scope: {type: string, enum: [empresa, persona]}
+        id_persona: {type: [integer, 'null']}
+        title: {type: string}
+        notes: {type: string}
+        filename: {type: string}
+        size_bytes: {type: integer}
+        created_at: {type: string, format: date-time}
+        mime: {type: string}
+        trashed_at: {type: [string, 'null'], format: date-time}
+        purge_after: {type: [string, 'null'], format: date-time}
+    FilePolicy:
+      type: object
+      additionalProperties: false
+      required: [max_file_mb, trash_retention_days, allowed_extensions, blocked_extensions]
+      properties:
+        max_file_mb: {type: integer, minimum: 1, maximum: 100, default: 50}
+        trash_retention_days: {type: integer, minimum: 1, maximum: 365, default: 30}
+        allowed_extensions:
+          type: array
+          minItems: 1
+          maxItems: 40
+          uniqueItems: true
+          items: {type: string, enum: [pdf, doc, docx, xls, xlsx, ppt, pptx, odt, ods, odp, txt, csv, rtf, png, jpg, jpeg, gif, webp, bmp, tif, tiff, zip]}
+        blocked_extensions:
+          type: array
+          maxItems: 100
+          uniqueItems: true
+          description: Restricciones adicionales; bloqueo base de ejecutables/scripts/macros siempre vigente.
+          items: {type: string, minLength: 1, maxLength: 20, pattern: '^[a-z0-9]+$'}

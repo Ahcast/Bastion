@@ -11,7 +11,7 @@ use std::{
 };
 
 const MAX_DOCUMENT_BYTES: u64 = 8 * 1024 * 1024;
-const MAX_STORAGE_BYTES: u64 = 20 * 1024 * 1024;
+pub const MAX_PRIVATE_FILE_BYTES: usize = 100 * 1024 * 1024;
 static PDF_SLOTS: tokio::sync::Semaphore = tokio::sync::Semaphore::const_new(2);
 static STORAGE_SLOTS: tokio::sync::Semaphore = tokio::sync::Semaphore::const_new(4);
 
@@ -54,6 +54,18 @@ pub struct DocumentService {
     region: String,
 }
 impl DocumentService {
+    #[cfg(feature = "test-support")]
+    pub fn synthetic_storage(aws: PathBuf, work: PathBuf) -> Self {
+        Self {
+            enabled: true,
+            typst: PathBuf::new(),
+            aws,
+            work,
+            branding: None,
+            bucket: "synthetic-private-bucket".into(),
+            region: "us-east-1".into(),
+        }
+    }
     pub fn object_suffix() -> String {
         let mut random = [0u8; 24];
         rand::rngs::OsRng.fill_bytes(&mut random);
@@ -88,9 +100,10 @@ impl DocumentService {
             .unwrap_or_default()
     }
     pub fn configured(&self) -> bool {
+        self.storage_configured() && self.typst.is_absolute() && self.typst.is_file()
+    }
+    pub fn storage_configured(&self) -> bool {
         self.enabled
-            && self.typst.is_absolute()
-            && self.typst.is_file()
             && self.aws.is_absolute()
             && self.aws.is_file()
             && !self.bucket.is_empty()
@@ -167,9 +180,18 @@ impl DocumentService {
         .map_err(|_| CoreError::Overloaded)?
     }
     pub async fn put(&self, key: String, bytes: Vec<u8>) -> Result<(), CoreError> {
+        self.put_with_limit(key, bytes, MAX_DOCUMENT_BYTES as usize)
+            .await
+    }
+    pub async fn put_with_limit(
+        &self,
+        key: String,
+        bytes: Vec<u8>,
+        limit: usize,
+    ) -> Result<(), CoreError> {
         validate_key(&key)?;
         let permit = storage_permit().await?;
-        if bytes.len() as u64 > MAX_STORAGE_BYTES {
+        if limit > MAX_PRIVATE_FILE_BYTES || bytes.len() > limit {
             return Err(CoreError::Invalid);
         }
         let this = self.clone();
@@ -183,12 +205,25 @@ impl DocumentService {
                 .arg("--body")
                 .arg(file)
                 .args(["--server-side-encryption", "AES256"]);
-            run(command, Duration::from_secs(20))
+            run(
+                command,
+                Duration::from_secs(if limit > MAX_DOCUMENT_BYTES as usize {
+                    90
+                } else {
+                    20
+                }),
+            )
         })
         .await
         .map_err(|_| CoreError::Overloaded)?
     }
     pub async fn get(&self, key: String) -> Result<Vec<u8>, CoreError> {
+        self.get_with_limit(key, MAX_DOCUMENT_BYTES as usize).await
+    }
+    pub async fn get_with_limit(&self, key: String, limit: usize) -> Result<Vec<u8>, CoreError> {
+        if limit > MAX_PRIVATE_FILE_BYTES {
+            return Err(CoreError::Invalid);
+        }
         validate_key(&key)?;
         let permit = storage_permit().await?;
         let this = self.clone();
@@ -198,8 +233,15 @@ impl DocumentService {
             let file = dir.0.join("object");
             let mut command = this.storage_command("get-object", &key)?;
             command.arg(&file);
-            run(command, Duration::from_secs(20))?;
-            bounded_read_limit(&file, MAX_STORAGE_BYTES)
+            run(
+                command,
+                Duration::from_secs(if limit > MAX_DOCUMENT_BYTES as usize {
+                    90
+                } else {
+                    20
+                }),
+            )?;
+            bounded_read_limit(&file, limit as u64)
         })
         .await
         .map_err(|_| CoreError::Overloaded)?
@@ -218,8 +260,122 @@ impl DocumentService {
         .await
         .map_err(|_| CoreError::Overloaded)?
     }
+    /// Permanent removal including object versions and delete markers. Each
+    /// bounded batch only touches the exact authorized key, never its prefix.
+    pub async fn remove_all_versions(&self, key: String) -> Result<(), CoreError> {
+        validate_key(&key)?;
+        let permit = storage_permit().await?;
+        let this = self.clone();
+        tokio::task::spawn_blocking(move || {
+            let _permit = permit;
+            let dir = this.directory()?;
+            let path = dir.0.join("versions.json");
+            let mut list = this.storage_command("list-object-versions", &key)?;
+            list.args(["--max-keys", "20", "--no-paginate", "--output", "json"]);
+            run_output(
+                list,
+                Duration::from_secs(20),
+                Some(fs::File::create(&path).map_err(|_| CoreError::Overloaded)?),
+            )?;
+            let value: serde_json::Value =
+                serde_json::from_slice(&bounded_read_limit(&path, 64 * 1024)?)
+                    .map_err(|_| CoreError::Overloaded)?;
+            if !value.is_object() || value["IsTruncated"].as_bool().is_none() {
+                return Err(CoreError::Overloaded);
+            }
+            let started = Instant::now();
+            let mut removed = false;
+            for group in ["Versions", "DeleteMarkers"] {
+                if value.get(group).is_some_and(|entries| !entries.is_array()) {
+                    return Err(CoreError::Overloaded);
+                }
+                if let Some(entries) = value[group].as_array() {
+                    if entries.len() > 20 {
+                        return Err(CoreError::Overloaded);
+                    }
+                    for entry in entries {
+                        if entry["Key"].as_str() != Some(key.as_str()) {
+                            continue;
+                        }
+                        let version = entry["VersionId"]
+                            .as_str()
+                            .filter(|v| !v.is_empty() && v.len() < 2048)
+                            .ok_or(CoreError::Overloaded)?;
+                        if started.elapsed() > Duration::from_secs(40) {
+                            return Err(CoreError::Overloaded);
+                        }
+                        let mut remove = this.storage_command("delete-object", &key)?;
+                        remove.arg(format!("--version-id={version}"));
+                        run(remove, Duration::from_secs(20))?;
+                        removed = true;
+                    }
+                }
+            }
+            if removed && value["IsTruncated"].as_bool() == Some(true) {
+                return Err(CoreError::Overloaded);
+            }
+            Ok(())
+        })
+        .await
+        .map_err(|_| CoreError::Overloaded)?
+    }
+    /// Detect content using the server's libmagic database, never a browser MIME.
+    pub async fn detect_mime(&self, bytes: Vec<u8>) -> Result<String, CoreError> {
+        if bytes.is_empty() || bytes.len() > MAX_PRIVATE_FILE_BYTES {
+            return Err(CoreError::Invalid);
+        }
+        let permit = storage_permit().await?;
+        let this = self.clone();
+        tokio::task::spawn_blocking(move || {
+            let _permit = permit;
+            let bin = std::env::var_os("BASTION_FILE_BIN")
+                .map(PathBuf::from)
+                .unwrap_or_else(|| PathBuf::from("/usr/bin/file"));
+            if !bin.is_absolute() || !bin.is_file() {
+                return Err(CoreError::Overloaded);
+            }
+            let dir = this.directory()?;
+            let path = dir.0.join("mime-input");
+            fs::write(&path, bytes).map_err(|_| CoreError::Overloaded)?;
+            let output_path = dir.0.join("mime-output");
+            let output = fs::File::create(&output_path).map_err(|_| CoreError::Overloaded)?;
+            let mut command = Command::new(bin);
+            command
+                .env_clear()
+                .args(["--brief", "--mime-type", "--"])
+                .arg(path)
+                .stdout(output);
+            // run() suppresses output; use a dedicated bounded subprocess below.
+            command.stdin(Stdio::null()).stderr(Stdio::null());
+            let mut child = command.spawn().map_err(|_| CoreError::Overloaded)?;
+            let started = Instant::now();
+            loop {
+                match child.try_wait() {
+                    Ok(Some(status)) if status.success() => break,
+                    Ok(None) if started.elapsed() < Duration::from_secs(5) => {
+                        std::thread::sleep(Duration::from_millis(25))
+                    }
+                    _ => {
+                        let _ = child.kill();
+                        let _ = child.wait();
+                        return Err(CoreError::Overloaded);
+                    }
+                }
+            }
+            let raw = bounded_read_limit(&output_path, 200)?;
+            let mime = String::from_utf8(raw).map_err(|_| CoreError::Invalid)?;
+            let mime = mime.trim();
+            if !mime.contains('/') || mime.chars().any(char::is_whitespace) {
+                return Err(CoreError::Invalid);
+            }
+            Ok(mime.to_owned())
+        })
+        .await
+        .map_err(|_| CoreError::Overloaded)?
+    }
     fn storage_command(&self, operation: &str, key: &str) -> Result<Command, CoreError> {
-        if !self.aws.is_absolute()
+        if !self.enabled
+            || !self.aws.is_absolute()
             || !self.aws.is_file()
             || self.bucket.is_empty()
             || self.region.is_empty()
@@ -249,7 +405,11 @@ impl DocumentService {
             operation,
             "--bucket",
             &self.bucket,
-            "--key",
+            if operation == "list-object-versions" {
+                "--prefix"
+            } else {
+                "--key"
+            },
             key,
             "--region",
             &self.region,
@@ -306,10 +466,17 @@ fn bounded_read_limit(path: &Path, limit: u64) -> Result<Vec<u8>, CoreError> {
     }
     Ok(bytes)
 }
-fn run(mut command: Command, timeout: Duration) -> Result<(), CoreError> {
+fn run(command: Command, timeout: Duration) -> Result<(), CoreError> {
+    run_output(command, timeout, None)
+}
+fn run_output(
+    mut command: Command,
+    timeout: Duration,
+    output: Option<fs::File>,
+) -> Result<(), CoreError> {
     command
         .stdin(Stdio::null())
-        .stdout(Stdio::null())
+        .stdout(output.map(Stdio::from).unwrap_or_else(Stdio::null))
         .stderr(Stdio::null());
     let mut child = command.spawn().map_err(|_| CoreError::Overloaded)?;
     let started = Instant::now();
@@ -334,7 +501,7 @@ fn run(mut command: Command, timeout: Duration) -> Result<(), CoreError> {
     }
 }
 pub(crate) fn validate_key(key: &str) -> Result<(), CoreError> {
-    if !key.starts_with("cotizaciones/")
+    if !(key.starts_with("cotizaciones/") || key.starts_with("colaboracion/"))
         || key.len() > 250
         || key
             .split('/')
@@ -354,12 +521,15 @@ mod tests {
     #[test]
     fn storage_paths_never_escape_the_module_prefix() {
         assert!(validate_key("cotizaciones/12/3/document-v1.pdf").is_ok());
+        assert!(validate_key("colaboracion/empresa/abc-123").is_ok());
+        assert!(validate_key("colaboracion/personas/12/abc-123").is_ok());
         for value in [
             "/cotizaciones/12.pdf",
             "cotizaciones/../secret",
             "cotizaciones//12",
             "cotizaciones/./12",
             "core/12",
+            "colaboracion/../secret",
             "cotizaciones/12?acl=public-read",
             "cotizaciones/12\\secret",
         ] {

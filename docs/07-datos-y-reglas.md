@@ -66,3 +66,5 @@ Esquema completo MySQL, versión de mantenimiento exacta de Bluehost, estados v�
 ## Órdenes: precisión y catálogo nuevo
 
 El corte local conserva `sale_price` como costo y `purchase_price` como venta, según el controlador Legacy. Usa enteros escalados para agregar bases antes de redondear; ISV 15%, gastos a centavos e inversión/total persistidos atómicamente. No presupone validación contable ni IDs Legacy. Destinos tiene identificadores nuevos y pertenece a Órdenes por confirmación del usuario del 2026-10-23; no se importa catálogo real. Ver `modulos/ordenes-de-compra-implementacion.md`.
+
+Colaboración conserva metadatos en MySQL y bytes en el bucket privado S3 del Core. `trashed_at` y `purge_after` fijan la retención; la limpieza elimina versiones del objeto exacto y deja recibo mínimo auditable.

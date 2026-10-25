@@ -192,3 +192,10 @@ Comprobar cifras reales de Procesos y Cotizaciones, selección de área, rangos 
 - Activación/allowlist/migraciones, permisos ver/editar, CSRF, creación idempotente, edición con ETag/If-Match y auditoría transaccional se comprueban con datos sintéticos.
 - La UI protege cambios sin guardar, conserva datos ante fallos/conflictos y mantiene la clave al reintentar un alta ambigua. Ajustes indica los pendientes sin campos inventados.
 - No cerrar paridad, validación contable, emisión, pagos, documentos, migración Legacy, settings o MCP con este corte. Ver `modulos/facturas-implementacion.md`.
+
+## Colaboración y archivos
+
+- Solo lista o modifica archivos de empresa/personas dentro de alcances autorizados por el Core; rutas por ID no revelan carpetas ajenas.
+- Rechaza MIME/extensiones no compatibles, ejecutables, scripts y contenido comprimido peligroso; aplica el máximo configurado antes de guardar en S3 privado.
+- Papelera conserva el plazo ya asignado, restaura antes del vencimiento y purga vencidos o confirmados incluyendo versiones S3, con auditoría e idempotencia.
+- Módulo disponible solo con release, allowlist y migración exacta; se activa administrativamente después de validar bucket/IAM y cuerpo/timeout del proxy.

@@ -182,6 +182,7 @@ dependencies = [
  "axum",
  "base64 0.22.1",
  "bastion-clientes",
+ "bastion-colaboracion",
  "bastion-core",
  "bastion-cotizaciones",
  "bastion-document-flows",
@@ -214,6 +215,20 @@ dependencies = [
  "sqlx",
  "tokio",
  "unicode-normalization",
+]
+
+[[package]]
+name = "bastion-colaboracion"
+version = "0.1.0"
+dependencies = [
+ "base64 0.22.1",
+ "bastion-core",
+ "chrono",
+ "serde",
+ "serde_json",
+ "sha2 0.10.9",
+ "sqlx",
+ "tokio",
 ]
 
 [[package]]
@@ -331,6 +346,7 @@ dependencies = [
  "axum",
  "bastion-api",
  "bastion-clientes",
+ "bastion-colaboracion",
  "bastion-core",
  "bastion-cotizaciones",
  "bastion-document-flows",

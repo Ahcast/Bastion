@@ -7,7 +7,7 @@ RUN cargo build --release --locked --package bastion-server
 
 FROM debian:bookworm-slim AS runtime
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends ca-certificates \
+    && apt-get install -y --no-install-recommends ca-certificates file \
     && rm -rf /var/lib/apt/lists/* \
     && groupadd --system --gid 10001 bastion \
     && useradd --system --uid 10001 --gid 10001 --no-create-home bastion

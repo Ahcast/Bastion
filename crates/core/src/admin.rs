@@ -45,6 +45,130 @@ pub struct PersonRecord {
 }
 
 #[derive(Debug, Serialize, FromRow)]
+pub struct PersonLabel {
+    pub id: u64,
+    pub full_name: String,
+}
+
+impl CoreAdmin {
+    /// Resource authorization on a domain transaction's connection. Avoids
+    /// acquiring another pool connection while holding domain locks.
+    pub async fn authorize_in_transaction(
+        &self,
+        tx: &mut sqlx::Transaction<'_, MySql>,
+        actor: u64,
+        module: &str,
+        scope: &str,
+        capability: &str,
+    ) -> Result<(), CoreError> {
+        if !matches!(capability, "ver" | "editar" | "eliminar") {
+            return Err(CoreError::Forbidden);
+        }
+        let found:Option<u64>=sqlx::query_scalar("SELECT u.id FROM users u JOIN roles r ON r.id=u.role_id WHERE u.id=? AND u.status='active' AND (r.system_key='system_administrator' OR EXISTS (SELECT 1 FROM role_permissions rp WHERE rp.role_id=u.role_id AND rp.module_id=? AND rp.capability=? AND (rp.scope_key=? OR rp.scope_key='*'))) LIMIT 1")
+            .bind(actor).bind(module).bind(capability).bind(scope).fetch_optional(&mut **tx).await?;
+        found.map(|_| ()).ok_or(CoreError::Forbidden)
+    }
+    /// Internal module settings storage. Domain services validate their schema
+    /// and access before calling; Core owns persistence and the audit write.
+    pub async fn load_module_setting(
+        &self,
+        module: &str,
+        key: &str,
+    ) -> Result<Option<serde_json::Value>, CoreError> {
+        sqlx::query_scalar("SELECT value_json FROM settings WHERE module_id=? AND scope_key='empresa' AND setting_key=?")
+            .bind(module).bind(key).fetch_optional(self.database.pool()).await.map_err(Into::into)
+    }
+    pub async fn save_module_setting(
+        &self,
+        tx: &mut sqlx::Transaction<'_, MySql>,
+        actor: u64,
+        module: &str,
+        key: &str,
+        value: serde_json::Value,
+    ) -> Result<(), CoreError> {
+        self.authorize_in_transaction(tx, actor, module, "settings", "editar")
+            .await?;
+        sqlx::query("INSERT INTO settings (lookup_hash,module_id,scope_key,setting_key,schema_version,value_json,updated_by) VALUES (?,?,'empresa',?,1,?,?) ON DUPLICATE KEY UPDATE value_json=VALUES(value_json),updated_by=VALUES(updated_by)")
+            .bind(hash_key(&format!("{module}|empresa|{key}"))).bind(module).bind(key).bind(value).bind(actor).execute(&mut **tx).await?;
+        Self::record_domain_event(
+            tx,
+            actor,
+            module,
+            "settings.update",
+            key,
+            serde_json::json!({"schema_version":1}),
+        )
+        .await
+    }
+
+    /// Effective resource scopes for bounded domain listings. Authorization
+    /// semantics stay in Core; modules only filter their own resource keys.
+    pub async fn allowed_module_scopes(
+        &self,
+        actor: u64,
+        module: &str,
+        capability: &str,
+    ) -> Result<Vec<String>, CoreError> {
+        if !matches!(capability, "ver" | "editar" | "eliminar") {
+            return Err(CoreError::Forbidden);
+        }
+        if self.require_admin(actor).await.is_ok() {
+            return Ok(vec!["*".into()]);
+        }
+        let scopes:Vec<String>=sqlx::query_scalar("SELECT rp.scope_key FROM role_permissions rp JOIN users u ON u.role_id=rp.role_id WHERE u.id=? AND u.status='active' AND rp.module_id=? AND rp.capability=? ORDER BY rp.scope_key")
+            .bind(actor).bind(module).bind(capability).fetch_all(self.database.pool()).await?;
+        if scopes.is_empty() {
+            return Err(CoreError::Forbidden);
+        }
+        Ok(scopes)
+    }
+
+    /// Fixed system event for a previously committed private-object removal.
+    pub async fn record_document_cleanup(
+        tx: &mut sqlx::Transaction<'_, MySql>,
+        module: &str,
+        target: &str,
+        reason: &str,
+    ) -> Result<(), CoreError> {
+        if !matches!(reason, "retention" | "explicit" | "abandoned_upload") {
+            return Err(CoreError::Invalid);
+        }
+        sqlx::query("INSERT INTO audit_events (actor_id,module_id,action,target_type,target_id,result,details_json,created_at) VALUES (NULL,?,'file.storage_removed','domain_record',?,'success',?,UTC_TIMESTAMP(6))")
+            .bind(module).bind(target).bind(serde_json::json!({"reason":reason})).execute(&mut **tx).await?;
+        Ok(())
+    }
+
+    /// Internal domain lookup, after the calling module authorizes its folder.
+    pub async fn require_person_record(&self, id: u64) -> Result<(), CoreError> {
+        let found: Option<u64> = sqlx::query_scalar("SELECT id FROM persons WHERE id=?")
+            .bind(id)
+            .fetch_optional(self.database.pool())
+            .await?;
+        found.map(|_| ()).ok_or(CoreError::NotFound)
+    }
+
+    /// Minimal selector contract for person-scoped module folders. Does not
+    /// expose identity documents or grant Core/personas administration.
+    pub async fn module_person_labels(
+        &self,
+        actor: u64,
+        module: &str,
+        search: &str,
+        page: u32,
+        size: u32,
+    ) -> Result<Vec<PersonLabel>, CoreError> {
+        if search.chars().count() > 200
+            || !(1..=10000).contains(&page)
+            || !(1..=100).contains(&size)
+        {
+            return Err(CoreError::Invalid);
+        }
+        sqlx::query_as("SELECT p.id,p.full_name FROM persons p WHERE LOCATE(?,p.full_name)>0 AND EXISTS (SELECT 1 FROM users u JOIN roles r ON r.id=u.role_id WHERE u.id=? AND u.status='active' AND (r.system_key='system_administrator' OR EXISTS (SELECT 1 FROM role_permissions rp WHERE rp.role_id=u.role_id AND rp.module_id=? AND rp.capability IN ('ver','editar') AND (rp.scope_key='*' OR rp.scope_key=CONCAT('persona:',p.id))))) ORDER BY p.full_name,p.id LIMIT ? OFFSET ?")
+            .bind(search.trim()).bind(actor).bind(module).bind(size+1).bind(u64::from(page-1)*u64::from(size)).fetch_all(self.database.pool()).await.map_err(Into::into)
+    }
+}
+
+#[derive(Debug, Serialize, FromRow)]
 pub struct RoleRecord {
     pub id: u64,
     pub name: String,

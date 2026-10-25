@@ -1,3 +1,4 @@
+import CollaborationSettings from './CollaborationSettings.js';
 import SarSettings from './SarSettings.js';
 import { useNavigationGuard } from '../navigationGuard.js';
 import { lazy, Suspense, useState } from 'react';
@@ -19,7 +20,7 @@ const OrderSettings = lazy(() => import('./OrdenesCompra.js').then(module => ({ 
 export default function Settings({ section, select }: { section: SettingsSection; select: (section: SettingsSection) => void }) {
   const { access } = useCore();
   const selected = settingsSections(access).find(entry => entry.id === section) ?? { id: 'cuenta', label: 'Mi cuenta' };
-  return <section aria-label="Ajustes"><div className="settings-location"><span>Ajustes</span><span aria-hidden="true"> / </span><strong>{selected.label}</strong></div><SettingsNavigation access={access} section={selected.id} select={select} /><div key={selected.id}><Suspense fallback={<Loading />}>{selected.id === 'personas' ? <People /> : selected.id === 'usuarios' ? <Users /> : selected.id === 'roles' ? <Roles /> : selected.id === 'core' ? <CoreSettings /> : selected.id === 'clientes' ? <ClientSettings /> : selected.id === 'ordenes_compra' ? <OrderSettings /> : selected.id === 'cotizaciones' ? <QuoteSettings /> : selected.id === 'facturas' ? <InvoiceSettings /> : selected.id === 'procesos' ? <ProcessSettings /> : <Account />}</Suspense></div></section>;
+  return <section aria-label="Ajustes"><div className="settings-location"><span>Ajustes</span><span aria-hidden="true"> / </span><strong>{selected.label}</strong></div><SettingsNavigation access={access} section={selected.id} select={select} /><div key={selected.id}><Suspense fallback={<Loading />}>{selected.id === 'colaboracion' ? <CollaborationSettings /> : selected.id === 'personas' ? <People /> : selected.id === 'usuarios' ? <Users /> : selected.id === 'roles' ? <Roles /> : selected.id === 'core' ? <CoreSettings /> : selected.id === 'clientes' ? <ClientSettings /> : selected.id === 'ordenes_compra' ? <OrderSettings /> : selected.id === 'cotizaciones' ? <QuoteSettings /> : selected.id === 'facturas' ? <InvoiceSettings /> : selected.id === 'procesos' ? <ProcessSettings /> : <Account />}</Suspense></div></section>;
 }
 function CoreSettings() {
   const { navigate } = useNavigationGuard();

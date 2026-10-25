@@ -33,6 +33,7 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
         bastion_procesos::ProcessService::migrate(&migrator).await?;
         bastion_cotizaciones::QuoteService::migrate(&migrator).await?;
         bastion_clientes::ClientService::migrate(&migrator).await?;
+        bastion_colaboracion::CollaborationService::migrate(&migrator).await?;
         bastion_facturas::InvoiceService::migrate(&migrator).await?;
         bastion_ordenes_compra::OrderService::migrate(&migrator).await?;
         bastion_document_flows::ConversionService::migrate(&migrator).await?;
@@ -76,10 +77,25 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
     bastion_clientes::ClientService::new(core.database(), core.admin())
         .synchronize_release(config.clientes_allowed)
         .await?;
+    let cleanup = core.admin();
+    let collaboration =
+        bastion_colaboracion::CollaborationService::new(core.database(), core.admin());
+    let collaboration_ready = collaboration
+        .synchronize_release(config.colaboracion_allowed)
+        .await?;
+    if collaboration_ready {
+        tokio::spawn(async move {
+            loop {
+                if collaboration.clean_one().await.is_err() {
+                    tracing::error!("collaboration private file cleanup failed");
+                }
+                tokio::time::sleep(std::time::Duration::from_secs(10)).await;
+            }
+        });
+    }
     bastion_facturas::InvoiceService::new(core.database(), core.admin())
         .synchronize_release(config.facturas_allowed)
         .await?;
-    let cleanup = core.admin();
     bastion_ordenes_compra::OrderService::new(core.database(), core.admin())
         .synchronize_release(config.ordenes_compra_allowed)
         .await?;

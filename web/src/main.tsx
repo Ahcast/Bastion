@@ -9,6 +9,7 @@ import './styles/dashboard.css';
 import './styles/cotizaciones.css';
 import './styles/facturas.css';
 import './styles/ordenes.css';
+import './styles/colaboracion.css';
 declare global { interface Window { BASTION_API_BASE?: string } }
 class ErrorBoundary extends Component<{ children: ReactNode }, { failed: boolean }> {
   state = { failed: false };

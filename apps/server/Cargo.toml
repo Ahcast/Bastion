@@ -13,6 +13,7 @@ axum.workspace = true
 bastion-api = { path = "../../crates/api" }
 bastion-core = { path = "../../crates/core" }
 bastion-clientes = { path = "../../crates/modules/clientes" }
+bastion-colaboracion = { path = "../../crates/modules/colaboracion" }
 bastion-facturas = { path = "../../crates/modules/facturas" }
 bastion-ordenes-compra = { path = "../../crates/modules/ordenes_compra" }
 bastion-cotizaciones = { path = "../../crates/modules/cotizaciones" }

@@ -30,6 +30,7 @@ use tower_http::{
 use url::Url;
 
 mod clientes;
+mod colaboracion;
 mod cotizaciones;
 mod facturas;
 mod ordenes_compra;
@@ -44,6 +45,7 @@ struct ApiState {
     procesos: bastion_procesos::ProcessService,
     cotizaciones: bastion_cotizaciones::QuoteService,
     clientes: bastion_clientes::ClientService,
+    colaboracion: bastion_colaboracion::CollaborationService,
     facturas: bastion_facturas::InvoiceService,
     ordenes_compra: bastion_ordenes_compra::OrderService,
     procesos_jobs: std::sync::Arc<tokio::sync::Semaphore>,
@@ -271,6 +273,10 @@ pub fn router(
         procesos: bastion_procesos::ProcessService::new(core.database(), core.admin()),
         cotizaciones: bastion_cotizaciones::QuoteService::new(core.database(), core.admin()),
         clientes: bastion_clientes::ClientService::new(core.database(), core.admin()),
+        colaboracion: bastion_colaboracion::CollaborationService::new(
+            core.database(),
+            core.admin(),
+        ),
         facturas: bastion_facturas::InvoiceService::new(core.database(), core.admin()),
         ordenes_compra: bastion_ordenes_compra::OrderService::new(core.database(), core.admin()),
         procesos_jobs: std::sync::Arc::new(tokio::sync::Semaphore::new(1)),
@@ -370,6 +376,7 @@ pub fn router(
         .merge(procesos::routes(api_state.clone()))
         .merge(cotizaciones::routes(api_state.clone()))
         .merge(clientes::routes(api_state.clone()))
+        .merge(colaboracion::routes(api_state.clone()))
         .merge(facturas::routes(api_state.clone()))
         .merge(ordenes_compra::routes(api_state.clone()))
         .fallback(not_found)

@@ -22,7 +22,7 @@ Actualizar; Empresa/Personas (abrir carpetas); Filtrar; Limpiar; seleccionar arc
 
 ## Settings bajo Ajustes
 
-No hay settings del módulo confirmados. Sección en Ajustes: sí. Retención, tamaños/tipos y categorías requieren decisión explícita; no presumirlos.
+Decisión del usuario del 2026-10-23: 50 MB por archivo, ofimática + imágenes + ZIP, bloqueo de ejecutables/scripts y validación del MIME real. Papelera con retención de 30 días, restauración, purga automática y borrado definitivo confirmado/auditado. Configuración en Ajustes > Colaboración, almacenada por el Core con alcance empresa. Límites y listas editables, conservando el bloqueo base. Ver [implementación](colaboracion-implementacion.md).
 
 ## API, datos y permisos
 
@@ -30,4 +30,8 @@ API actual: listar, subir, previsualizar, descargar y eliminar. Metadatos del ar
 
 ## Pendientes
 
-Ubicación física definitiva (Bluehost/AWS), límites de tamaño/tipo, antivirus, retención, versionado, papelera/restauración y permisos heredados de persona.
+Antivirus y análisis profundo de contenido, cuotas corporativas totales, migración Legacy y comprobación visual autenticada. S3 privado está acordado globalmente: se reutiliza el bucket del Core, organizado por empresa/personas. No se heredan permisos de administración de Personas; cada carpeta comprueba el permiso propio de Colaboración.
+
+## Implementación local
+
+Crate `bastion-colaboracion`, API versionada, pantalla React y sección editable de Ajustes. Permisos `ver`, `editar` y `eliminar`, con alcances `empresa`, `persona:{id}`, `settings` o `*`. Restaurar usa `eliminar`, conforme a esta ficha. Disponible sin activar después de aplicar su migración y allowlist. MCP continúa sin exponerse hasta completar el contrato de seguridad común. Ver [OpenAPI](colaboracion.openapi.yaml) y [estado verificable](colaboracion-implementacion.md).

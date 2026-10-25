@@ -23,3 +23,5 @@ Cada ficha tiene una sección de settings que aparecerá en Ajustes. Cuando no e
 Los campos y acciones observados se basan en frontend compilado, scripts y backend estático. La verificación visual con una sesión autenticada está pendiente. Ver `../01-aplicacion-actual-y-paridad.md` para el inventario fuente completo.
 
 Decisión del 2026-10-23: el catálogo nuevo de destinos se administra bajo Ajustes > Órdenes de compra por confirmación del usuario y pertenece a `ordenes_compra`. La fila Proveedores y destinos conserva el inventario Legacy, no asigna la propiedad de la implementación nueva. Ver `ordenes-de-compra-implementacion.md`.
+
+Colaboración incorpora su primer corte con límites y retención confirmados por el usuario. Ver `colaboracion-implementacion.md`.

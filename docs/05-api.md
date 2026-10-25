@@ -109,3 +109,5 @@ GET /api/v1/procesos/dashboard y GET /api/v1/cotizaciones/dashboard admiten peri
 
 Numeración SAR: GET/PUT `/api/v1/settings/sar`, exclusivamente para el Administrador. Guardado atómico de cuatro campos con versión opaca y 412 ante edición obsoleta; estado calculado por Rust. Ver [contrato](empresa-sar.openapi.yaml) y [reglas](17-empresa-sar.md).
 
+Colaboración: `/api/v1/colaboracion` lista y crea archivos; admite selección mínima de Personas, policy en `/settings`, preview, descarga, papelera, restauración y purga confirmada. Usa sesión, CSRF, autorización por carpeta y auditoría comunes. Ver [OpenAPI](modulos/colaboracion.openapi.yaml).
+

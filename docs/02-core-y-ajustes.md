@@ -147,3 +147,5 @@ Procesos y Cotizaciones alimentan el panel con datos reales, controles Mes/Año/
 
 Empresa/SAR: el formulario de numeración ya permite guardar los cuatro campos observados, desde Facturas o Core > Empresa y SAR, con la misma configuración global y permisos administrativos. Ver [contrato y límites](17-empresa-sar.md). Logo y emisión continúan pendientes.
 
+Colaboración reutiliza el registro de módulos, permisos, almacenamiento privado, settings y auditoría del Core. Su política de adjuntos se guarda como setting de empresa validado por el módulo.
+

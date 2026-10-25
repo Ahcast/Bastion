@@ -9,13 +9,13 @@ mod sar;
 mod service;
 
 pub use admin::{
-    AuditRecord, CoreAdmin, DomainActor, MailOutboxRecord, ModuleRecord, PersonInput, PersonRecord,
-    RolePermissionInput, RoleRecord, SettingRecord, UserRecord,
+    AuditRecord, CoreAdmin, DomainActor, MailOutboxRecord, ModuleRecord, PersonInput, PersonLabel,
+    PersonRecord, RolePermissionInput, RoleRecord, SettingRecord, UserRecord,
 };
 pub use config::{AppConfig, ConfigError, DatabaseConfig};
 pub use dashboard::{DashboardPeriod, DashboardPoint, DashboardQuery, DashboardWindow};
 pub use database::Database;
-pub use documents::{DocumentCompany, DocumentService};
+pub use documents::{DocumentCompany, DocumentService, MAX_PRIVATE_FILE_BYTES};
 pub use sar::{SarSettings, SarSettingsRecord, SarStatus};
 pub use service::{
     AccessCatalog, AuthCookies, AuthenticatedUser, BootstrapBegin, BootstrapComplete, BusinessMail,

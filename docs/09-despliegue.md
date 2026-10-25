@@ -61,3 +61,7 @@ El corte local incorpora migraciones propias con `migrate` y sincroniza disponib
 ## Facturas: incorporación verificada
 
 El 2026-10-23 se instalaron en AWS y Bluehost los artifacts verificados de `f6c5a1d` (workflow 40038962819), después de respaldo privado. Se aplicó la migración propia 1 y se comprobó que las 43 tablas existentes y la activación de los módulos previos se conservaron. Facturas queda disponible en el ambiente y desactivado hasta su activación administrativa. Salud HTTPS 200, acceso sin sesión 401 y 35 archivos públicos verificados. Ver `modulos/facturas-implementacion.md` para alcance y límites.
+
+## Colaboración
+
+El release incluye la migración propia del módulo y el detector `file`/libmagic en la imagen. Antes de activarlo en AWS, verificar su migración, el IAM limitado a `colaboracion/*`, versionado/Object Lock del bucket, carga MIME y timeout del proxy. El módulo permanece desactivado hasta una comprobación administrativa. Pasos y límites en `modulos/colaboracion-implementacion.md`.
