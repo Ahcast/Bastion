@@ -1,6 +1,6 @@
-# Proveedores: primer corte local
+# Proveedores: primer corte publicado
 
-Fecha: 2026-10-24. Estado: implementación inicial en el repositorio; no desplegada ni activada.
+Fecha: 2026-10-24. Estado: publicado en GitHub, AWS y Bluehost desde `2ef93c5`. El módulo está disponible en el ambiente y desactivado; la paridad completa con Legacy sigue pendiente.
 
 ## Alcance
 
@@ -27,11 +27,15 @@ La página aplica los lineamientos recientes de Cotizaciones mediante tokens y t
 
 Se muestra sección propia en Ajustes que declara que no hay ajustes editables en este corte; no se inventan parámetros.
 
+## Publicación y estado
+
+El workflow `40151489770` pasó con éxito. AWS ejecuta `2ef93c5a81590d0f1b4cb577b1731845372a4f91`, readiness responde 200 y se aplicó la migración propia 1. Se creó un respaldo privado antes de migrar; se conservaron las 53 tablas previas y la activación de los demás módulos. Las cuatro tablas nuevas quedaron vacías. `proveedores` está en `BASTION_ALLOWED_MODULES` con `included_in_release=1`, `environment_allowed=1` y `enabled=0`. Bluehost publica 40 archivos verificados, preservó `config.js` y `.htaccess`, mantuvo los assets anteriores y creó un respaldo privado. No se importaron datos Legacy.
+
 ## Pendientes de cierre
 
 - Revisar formulario y tabla con sesión Legacy autenticada para confirmar longitudes, validación de correo y el orden/cobertura de búsqueda.
 - Confirmar reglas de duplicados y permisos de mantenimiento antes de considerarlos cerrados.
 - Validar visualmente en escritorio, tableta y móvil; verificar el API contra MySQL 5.7 en ambiente aislado.
-- Acordar cuándo Proveedores se incorpora a un release, se migra (si corresponde) y se activa en cada ambiente.
+- Decidir la activación administrativa tras validar la ficha Legacy y configurar los permisos requeridos.
 
-La implementación local por sí sola no demuestra equivalencia completa ni autoriza publicación o activación.
+La publicación y migración no demuestran equivalencia funcional completa con Legacy. El módulo sigue desactivado hasta una decisión administrativa.
