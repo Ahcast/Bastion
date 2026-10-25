@@ -68,3 +68,7 @@ Esquema completo MySQL, versión de mantenimiento exacta de Bluehost, estados v�
 El corte local conserva `sale_price` como costo y `purchase_price` como venta, según el controlador Legacy. Usa enteros escalados para agregar bases antes de redondear; ISV 15%, gastos a centavos e inversión/total persistidos atómicamente. No presupone validación contable ni IDs Legacy. Destinos tiene identificadores nuevos y pertenece a Órdenes por confirmación del usuario del 2026-10-23; no se importa catálogo real. Ver `modulos/ordenes-de-compra-implementacion.md`.
 
 Colaboración conserva metadatos en MySQL y bytes en el bucket privado S3 del Core. `trashed_at` y `purge_after` fijan la retención; la limpieza elimina versiones del objeto exacto y deja recibo mínimo auditable.
+
+## Gastos: persistencia del primer corte
+
+El primer corte guarda el registro general en `gastos_records`, `gastos_create_receipts` y `gastos_actor_limits`; no reutiliza JSON Legacy ni crea asociaciones a órdenes/facturas. HNL es el único valor habilitado por ser el único observado. La persistencia a centavos y el cálculo de ISV descritos en [la implementación](modulos/gastos-implementacion.md) son provisionales hasta verificar reglas y ejemplos contables.

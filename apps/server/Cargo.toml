@@ -17,6 +17,7 @@ bastion-proveedores = { path = "../../crates/modules/proveedores" }
 bastion-colaboracion = { path = "../../crates/modules/colaboracion" }
 bastion-facturas = { path = "../../crates/modules/facturas" }
 bastion-ordenes-compra = { path = "../../crates/modules/ordenes_compra" }
+bastion-gastos = { path = "../../crates/modules/gastos" }
 bastion-cotizaciones = { path = "../../crates/modules/cotizaciones" }
 bastion-procesos = { path = "../../crates/modules/procesos" }
 dotenvy.workspace = true

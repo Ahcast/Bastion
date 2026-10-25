@@ -1,0 +1,12 @@
+[package]
+name = "bastion-gastos"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+bastion-core = { path = "../../core" }
+chrono.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+sqlx.workspace = true

@@ -207,3 +207,11 @@ Comprobar cifras reales de Procesos y Cotizaciones, selección de área, rangos 
 - Mostrar los siete campos confirmados, exigir solo nombre según el contrato inicial y presentar sus longitudes como límites técnicos nuevos, no como paridad Legacy confirmada.
 - Adaptar la vista a los tokens y patrones recientes de Cotizaciones en escritorio y móvil; navegación y Ajustes respetan el permiso `ver`, las mutaciones requieren `editar`.
 - La migración pertenece al módulo; no importar ni fusionar datos Legacy. Disponibilidad requiere release, allowlist y migración; activación administrativa queda separada.
+
+## Gastos: primer corte del registro general
+
+- Consultar/buscar/paginar y filtrar por fechas; crear, editar con `ETag`/`If-Match` y eliminar con permiso independiente y auditoría.
+- Calcular importes en el servidor, conservar cambios ante fallos/conflictos y reutilizar clave idempotente al reintentar una creación ambigua.
+- HNL, ISV 15%, redondeo a centavos, requeridos, rangos y cuotas son decisiones técnicas provisionales; cotejarlos con Legacy y contabilidad antes de cerrar paridad.
+- No asociar registros con órdenes/facturas ni importar datos Legacy en este corte. Mantener el módulo desactivado hasta validar release, allowlist y migración.
+- MySQL 5.7, permisos por rol y flujo autenticado requieren validación; este primer corte no implementa MCP, exportación ni reportes conectados. Ver modulos/gastos-implementacion.md.

@@ -187,6 +187,7 @@ dependencies = [
  "bastion-cotizaciones",
  "bastion-document-flows",
  "bastion-facturas",
+ "bastion-gastos",
  "bastion-ordenes-compra",
  "bastion-procesos",
  "bastion-proveedores",
@@ -305,6 +306,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "bastion-gastos"
+version = "0.1.0"
+dependencies = [
+ "bastion-core",
+ "chrono",
+ "serde",
+ "serde_json",
+ "sha2 0.10.9",
+ "sqlx",
+]
+
+[[package]]
 name = "bastion-mcp"
 version = "0.1.0"
 
@@ -363,6 +376,7 @@ dependencies = [
  "bastion-cotizaciones",
  "bastion-document-flows",
  "bastion-facturas",
+ "bastion-gastos",
  "bastion-ordenes-compra",
  "bastion-procesos",
  "bastion-proveedores",

@@ -12,6 +12,7 @@ bastion-proveedores = { path = "../modules/proveedores" }
 bastion-colaboracion = { path = "../modules/colaboracion" }
 bastion-facturas = { path = "../modules/facturas" }
 bastion-ordenes-compra = { path = "../modules/ordenes_compra" }
+bastion-gastos = { path = "../modules/gastos" }
 bastion-cotizaciones = { path = "../modules/cotizaciones" }
 bastion-procesos = { path = "../modules/procesos" }
 base64.workspace = true

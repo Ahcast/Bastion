@@ -34,3 +34,7 @@ API actual: CRUD de gastos, filtros por periodo/orden/usuario y almacenamiento J
 ## Pendientes
 
 Conciliar campos de gasto general y gasto en línea; reglas fiscales/base exenta; moneda; asociación a entidad; auditoría/retención.
+
+## Estado de implementación
+
+El primer corte cubre el registro general independiente y conserva explícitamente los pendientes de asociación y paridad. Ver [alcance y decisiones provisionales](gastos-implementacion.md) y [contrato HTTP](gastos.openapi.yaml). No está desplegado ni activado.

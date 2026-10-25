@@ -115,3 +115,6 @@ Numeración SAR: GET/PUT `/api/v1/settings/sar`, exclusivamente para el Administ
 
 Colaboración: `/api/v1/colaboracion` lista y crea archivos; admite selección mínima de Personas, policy en `/settings`, preview, descarga, papelera, restauración y purga confirmada. Usa sesión, CSRF, autorización por carpeta y auditoría comunes. Ver [OpenAPI](modulos/colaboracion.openapi.yaml).
 
+## Gastos
+
+El primer corte expone `GET/POST /api/v1/gastos` y `GET/PUT/DELETE /api/v1/gastos/{id}` para el registro general. Usa permisos `gastos/registros/ver`, `editar` y `eliminar`; Rust valida y calcula ISV/total. Parámetros, DTO, idempotencia y `ETag`/`If-Match` constan en [OpenAPI](modulos/gastos.openapi.yaml). Asociación con órdenes/facturas y filtros por usuario/orden siguen pendientes.
