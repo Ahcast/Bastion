@@ -1,6 +1,3 @@
-Warning: truncated output (original token count: 15160)
-Total output lines: 1893
-
 #![forbid(unsafe_code)]
 
 use std::{
@@ -756,7 +753,440 @@ async fn save_smtp_credentials(
     State(state): State<ApiState>,
     headers: axum::http::HeaderMap,
     Json(body): Json<SmtpCredentialRequest>,
-) -> Result<Json<bastion_core::Smt…3160 tokens truncated…s_deref(),
+) -> Result<Json<bastion_core::SmtpCredentialInfo>, ApiError> {
+    let session = cookie_value(&headers, "__Host-bastion_session")
+        .ok_or(ApiError(CoreError::Unauthorized))?;
+    state
+        .core
+        .save_smtp_credentials(&session, &body.smtp_email, body.smtp_password.as_deref())
+        .await
+        .map(Json)
+        .map_err(ApiError)
+}
+
+async fn begin_invitation_activation(
+    State(state): State<ApiState>,
+    Json(body): Json<InvitationAcceptRequest>,
+) -> Result<Json<bastion_core::BootstrapBegin>, ApiError> {
+    state
+        .core
+        .begin_invitation_activation(&body.token, &body.password)
+        .await
+        .map(Json)
+        .map_err(ApiError)
+}
+
+async fn complete_invitation_activation(
+    State(state): State<ApiState>,
+    Json(body): Json<BootstrapCompleteRequest>,
+) -> Result<Json<bastion_core::BootstrapComplete>, ApiError> {
+    state
+        .core
+        .complete_invitation_activation(&body.setup_token, &body.code)
+        .await
+        .map(Json)
+        .map_err(ApiError)
+}
+
+async fn request_password_reset(
+    State(state): State<ApiState>,
+    Extension(client_ip): Extension<ClientIp>,
+    Json(body): Json<PasswordResetRequest>,
+) -> Result<(StatusCode, Json<serde_json::Value>), ApiError> {
+    state
+        .core
+        .request_password_reset(&body.email, &client_ip.0)
+        .await
+        .map_err(ApiError)?;
+    Ok((
+        StatusCode::ACCEPTED,
+        Json(serde_json::json!({"status":"if_account_exists_email_will_be_sent"})),
+    ))
+}
+
+async fn complete_password_reset(
+    State(state): State<ApiState>,
+    Extension(client_ip): Extension<ClientIp>,
+    Json(body): Json<PasswordResetCompleteRequest>,
+) -> Result<Response, ApiError> {
+    state
+        .core
+        .complete_password_reset(&body.token, &body.new_password, &client_ip.0)
+        .await
+        .map_err(ApiError)?;
+    Ok(StatusCode::NO_CONTENT.into_response())
+}
+
+async fn reauth_totp(
+    State(state): State<ApiState>,
+    headers: axum::http::HeaderMap,
+    Extension(client_ip): Extension<ClientIp>,
+    Json(body): Json<TotpRequest>,
+) -> Result<StatusCode, ApiError> {
+    let session = cookie_value(&headers, "__Host-bastion_session")
+        .ok_or(ApiError(CoreError::Unauthorized))?;
+    let agent = headers
+        .get("user-agent")
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("");
+    state
+        .core
+        .verify_session_totp(&session, &body.code, &client_ip.0, agent)
+        .await
+        .map_err(ApiError)?;
+    Ok(StatusCode::NO_CONTENT)
+}
+
+async fn logout(
+    State(state): State<ApiState>,
+    headers: axum::http::HeaderMap,
+) -> Result<Response, ApiError> {
+    let session = cookie_value(&headers, "__Host-bastion_session").unwrap_or_default();
+    state.core.logout(&session).await.map_err(ApiError)?;
+    let mut response = StatusCode::NO_CONTENT.into_response();
+    for name in ["__Host-bastion_session", "__Host-bastion_challenge"] {
+        set_cookie(
+            &mut response,
+            name,
+            "",
+            "Path=/; Secure; HttpOnly; SameSite=Lax",
+            Some(0),
+        );
+    }
+    Ok(response)
+}
+
+async fn actor(
+    state: &ApiState,
+    headers: &axum::http::HeaderMap,
+) -> Result<bastion_core::AuthenticatedUser, ApiError> {
+    let token =
+        cookie_value(headers, "__Host-bastion_session").ok_or(ApiError(CoreError::Unauthorized))?;
+    state.core.current_user(&token).await.map_err(ApiError)
+}
+
+fn page(query: &ListQuery) -> (u32, u32) {
+    (query.page.unwrap_or(1), query.page_size.unwrap_or(25))
+}
+fn person_input(body: PersonRequest) -> bastion_core::PersonInput {
+    bastion_core::PersonInput {
+        full_name: body.full_name,
+        dni: body.dni,
+        country_code: body.country_code,
+        gender: body.gender,
+    }
+}
+
+async fn list_persons(
+    State(state): State<ApiState>,
+    headers: axum::http::HeaderMap,
+    Query(query): Query<ListQuery>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    let actor = actor(&state, &headers).await?;
+    let (page, size) = page(&query);
+    let items = state
+        .core
+        .admin()
+        .list_persons(actor.id, query.q.as_deref(), page, size)
+        .await
+        .map_err(ApiError)?;
+    Ok(Json(
+        serde_json::json!({"items":items,"page":page.max(1),"page_size":size.clamp(1,100)}),
+    ))
+}
+
+async fn create_person(
+    State(state): State<ApiState>,
+    headers: axum::http::HeaderMap,
+    Json(body): Json<PersonRequest>,
+) -> Result<Response, ApiError> {
+    let actor = actor(&state, &headers).await?;
+    let item = state
+        .core
+        .admin()
+        .create_person(actor.id, person_input(body))
+        .await
+        .map_err(ApiError)?;
+    let mut response = Json(item).into_response();
+    *response.status_mut() = StatusCode::CREATED;
+    Ok(response)
+}
+
+async fn update_person(
+    State(state): State<ApiState>,
+    headers: axum::http::HeaderMap,
+    Path(id): Path<u64>,
+    Json(body): Json<PersonRequest>,
+) -> Result<Json<bastion_core::PersonRecord>, ApiError> {
+    let actor = actor(&state, &headers).await?;
+    state
+        .core
+        .admin()
+        .update_person(actor.id, id, person_input(body))
+        .await
+        .map(Json)
+        .map_err(ApiError)
+}
+
+async fn delete_person(
+    State(state): State<ApiState>,
+    headers: axum::http::HeaderMap,
+    Path(id): Path<u64>,
+) -> Result<StatusCode, ApiError> {
+    let actor = actor(&state, &headers).await?;
+    state
+        .core
+        .admin()
+        .delete_person(actor.id, id)
+        .await
+        .map_err(ApiError)?;
+    Ok(StatusCode::NO_CONTENT)
+}
+
+async fn list_users(
+    State(state): State<ApiState>,
+    headers: axum::http::HeaderMap,
+    Query(query): Query<ListQuery>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    let actor = actor(&state, &headers).await?;
+    let (page, size) = page(&query);
+    let items = state
+        .core
+        .admin()
+        .list_users(actor.id, query.q.as_deref(), page, size)
+        .await
+        .map_err(ApiError)?;
+    Ok(Json(
+        serde_json::json!({"items":items,"page":page.max(1),"page_size":size.clamp(1,100)}),
+    ))
+}
+
+async fn create_user(
+    State(state): State<ApiState>,
+    headers: axum::http::HeaderMap,
+    Json(body): Json<CreateUserRequest>,
+) -> Result<Response, ApiError> {
+    let actor = actor(&state, &headers).await?;
+    let item = state
+        .core
+        .create_user_with_invitation(actor.id, body.person_id, body.role_id, &body.email)
+        .await
+        .map_err(ApiError)?;
+    let mut response = Json(item).into_response();
+    *response.status_mut() = StatusCode::CREATED;
+    Ok(response)
+}
+
+async fn resend_invitation(
+    State(state): State<ApiState>,
+    headers: axum::http::HeaderMap,
+    Path(id): Path<u64>,
+) -> Result<StatusCode, ApiError> {
+    let actor = actor(&state, &headers).await?;
+    state
+        .core
+        .dispatch_invitation(actor.id, id)
+        .await
+        .map_err(ApiError)?;
+    Ok(StatusCode::ACCEPTED)
+}
+
+async fn update_user(
+    State(state): State<ApiState>,
+    headers: axum::http::HeaderMap,
+    Path(id): Path<u64>,
+    Json(body): Json<UpdateUserRequest>,
+) -> Result<Json<bastion_core::UserRecord>, ApiError> {
+    let actor = actor(&state, &headers).await?;
+    state
+        .core
+        .admin()
+        .update_user(actor.id, id, body.person_id, body.role_id, body.enabled)
+        .await
+        .map(Json)
+        .map_err(ApiError)
+}
+
+async fn list_roles(
+    State(state): State<ApiState>,
+    headers: axum::http::HeaderMap,
+) -> Result<Json<Vec<bastion_core::RoleRecord>>, ApiError> {
+    let actor = actor(&state, &headers).await?;
+    state
+        .core
+        .admin()
+        .list_roles(actor.id)
+        .await
+        .map(Json)
+        .map_err(ApiError)
+}
+
+async fn list_role_permissions(
+    State(state): State<ApiState>,
+    headers: axum::http::HeaderMap,
+    Path(id): Path<u64>,
+) -> Result<Json<Vec<bastion_core::RolePermissionInput>>, ApiError> {
+    let actor = actor(&state, &headers).await?;
+    state
+        .core
+        .admin()
+        .list_role_permissions(actor.id, id)
+        .await
+        .map(Json)
+        .map_err(ApiError)
+}
+
+async fn create_role(
+    State(state): State<ApiState>,
+    headers: axum::http::HeaderMap,
+    Json(body): Json<CreateRoleRequest>,
+) -> Result<Response, ApiError> {
+    let actor = actor(&state, &headers).await?;
+    let role = state
+        .core
+        .admin()
+        .create_role(actor.id, &body.name, body.description.as_deref())
+        .await
+        .map_err(ApiError)?;
+    let mut response = Json(role).into_response();
+    *response.status_mut() = StatusCode::CREATED;
+    Ok(response)
+}
+
+async fn update_role(
+    State(state): State<ApiState>,
+    headers: axum::http::HeaderMap,
+    Path(id): Path<u64>,
+    Json(body): Json<UpdateRoleRequest>,
+) -> Result<Json<bastion_core::RoleRecord>, ApiError> {
+    let actor = actor(&state, &headers).await?;
+    let permissions = body.permissions.map(|items| {
+        items
+            .into_iter()
+            .map(|p| bastion_core::RolePermissionInput {
+                module_id: p.module_id,
+                scope_key: p.scope_key,
+                capability: p.capability,
+            })
+            .collect()
+    });
+    state
+        .core
+        .admin()
+        .update_role(
+            actor.id,
+            id,
+            body.name.as_deref(),
+            body.description.as_deref().map(Some),
+            permissions,
+        )
+        .await
+        .map(Json)
+        .map_err(ApiError)
+}
+
+async fn delete_role(
+    State(state): State<ApiState>,
+    headers: axum::http::HeaderMap,
+    Path(id): Path<u64>,
+) -> Result<StatusCode, ApiError> {
+    let actor = actor(&state, &headers).await?;
+    state
+        .core
+        .admin()
+        .delete_role(actor.id, id)
+        .await
+        .map_err(ApiError)?;
+    Ok(StatusCode::NO_CONTENT)
+}
+
+async fn list_modules(
+    State(state): State<ApiState>,
+    headers: axum::http::HeaderMap,
+) -> Result<Json<Vec<bastion_core::ModuleRecord>>, ApiError> {
+    let actor = actor(&state, &headers).await?;
+    state
+        .core
+        .admin()
+        .list_modules(actor.id)
+        .await
+        .map(Json)
+        .map_err(ApiError)
+}
+
+async fn toggle_module(
+    State(state): State<ApiState>,
+    headers: axum::http::HeaderMap,
+    Path(module_id): Path<String>,
+    Json(body): Json<ModuleToggleRequest>,
+) -> Result<StatusCode, ApiError> {
+    let actor = actor(&state, &headers).await?;
+    state
+        .core
+        .admin()
+        .set_module_enabled(actor.id, &module_id, body.enabled)
+        .await
+        .map_err(ApiError)?;
+    Ok(StatusCode::NO_CONTENT)
+}
+
+async fn get_core_settings(
+    State(state): State<ApiState>,
+    headers: axum::http::HeaderMap,
+) -> Result<Json<Vec<bastion_core::SettingRecord>>, ApiError> {
+    let actor = actor(&state, &headers).await?;
+    state
+        .core
+        .admin()
+        .get_core_settings(actor.id)
+        .await
+        .map(Json)
+        .map_err(ApiError)
+}
+
+async fn set_core_setting(
+    State(state): State<ApiState>,
+    headers: axum::http::HeaderMap,
+    Path(key): Path<String>,
+    Json(body): Json<CoreSettingRequest>,
+) -> Result<StatusCode, ApiError> {
+    let actor = actor(&state, &headers).await?;
+    state
+        .core
+        .admin()
+        .set_core_setting(actor.id, &key, body.value)
+        .await
+        .map_err(ApiError)?;
+    Ok(StatusCode::NO_CONTENT)
+}
+
+async fn list_audit(
+    State(state): State<ApiState>,
+    headers: axum::http::HeaderMap,
+    Query(query): Query<AuditQuery>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    let actor = actor(&state, &headers).await?;
+    let from = query
+        .from
+        .map(parse_datetime)
+        .transpose()
+        .map_err(|_| ApiError(CoreError::Invalid))?;
+    let to = query
+        .to
+        .map(parse_datetime)
+        .transpose()
+        .map_err(|_| ApiError(CoreError::Invalid))?;
+    let page = query.page.unwrap_or(1);
+    let size = query.page_size.unwrap_or(25);
+    let items = state
+        .core
+        .admin()
+        .list_audit(
+            actor.id,
+            from,
+            to,
+            query.module.as_deref(),
+            query.action.as_deref(),
             query.result.as_deref(),
             page,
             size,
