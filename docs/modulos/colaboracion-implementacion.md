@@ -1,6 +1,6 @@
 # Colaboración: implementación y operación
 
-Implementada y publicada desde `14b1bf67cd1df545df84ac0ea6ddd4dde18a1ece`. El módulo quedó instalado en AWS/Bluehost y migrado, pero continúa fuera de la allowlist y desactivado. Esto no acredita activación ni valida cargas contra el bucket real.
+Implementada y publicada desde `14b1bf67cd1df545df84ac0ea6ddd4dde18a1ece`. El 2026-10-26 quedó permitida y activada operativamente sobre la release existente `a7757d3` de AWS/Bluehost, después de comprobar S3 real. No se sustituyeron los artifacts de los módulos publicados posteriormente. Ver la evidencia de activación al final; la prueba integral con una sesión administrativa sigue pendiente.
 
 ## Alcance y decisiones
 
@@ -55,6 +55,20 @@ El 2026-10-24 se publicó `14b1bf6` en `main`. `Core checks` (workflow `40150644
 
 AWS aplicó la migración `202610230001`; se respaldó la base en ubicación privada y se cotejaron esquemas y filas lógicas de las 50 tablas preexistentes. El backend quedó en la nueva release, `/health/live` y `/health/ready` respondieron 200 y los demás módulos conservaron su estado. Bluehost publicó el `BUILD.txt` del mismo commit, pasó el fallback SPA y se comprobaron los hashes de 36 recursos públicos. La configuración del API y las reglas `.htaccess` se conservaron.
 
-Colaboración queda `included_in_release=1`, `environment_allowed=0` y `enabled=0`. La allowlist no se modificó. El rol AWS vigente denegó `ListBucketVersions` en `colaboracion/*`; tampoco fue posible consultar la configuración de versionado del bucket con ese rol. Antes de ofrecer el módulo, infraestructura debe conceder las acciones S3 mínimas acotadas al prefijo y verificar privacidad, versionado/Object Lock y timeout del proxy. Se confirmó acceso anónimo denegado en la API; no se probó carga ni purga contra el bucket real.
+En el corte del 2026-10-24, Colaboración quedó `included_in_release=1`, `environment_allowed=0` y `enabled=0`. La allowlist no se modificó. La identidad AWS del servicio denegó `ListBucketVersions` en `colaboracion/*`; tampoco fue posible consultar la configuración de versionado del bucket con esa identidad. Antes de ofrecer el módulo, infraestructura debe conceder las acciones S3 mínimas acotadas al prefijo y verificar privacidad, versionado/Object Lock y timeout del proxy. Se confirmó acceso anónimo denegado en la API; no se probó carga ni purga contra el bucket real.
 
 La migración usó el operador temporal disponible en el host; las variables de migración solo existieron en ese proceso y no se guardaron en el entorno del servicio. Provisionar una identidad MySQL exclusiva para migraciones sigue siendo una mejora operativa pendiente antes de los siguientes cambios de esquema.
+
+## Activación operativa del 2026-10-26
+
+Tras la confirmación del usuario de que actualizó la política S3 existente para los documentos de Cotizaciones, se comprobó la identidad IAM real del proceso restringido del backend (usuario, no rol de instancia). Se reutilizaron sus credenciales y el bucket compartido. No se modificaron políticas IAM ni credenciales durante esta activación.
+
+La prueba bajo el usuario y el espacio de montajes del servicio creó un único objeto sintético bajo `colaboracion/empresa/`, escribió dos versiones, recuperó el contenido con integridad comprobada y verificó cifrado AES256 y rechazo anónimo HTTP 403. Tras crear un marcador de borrado, se enumeraron las dos versiones y el marcador, se eliminaron por su ID y se comprobó el listado vacío. El objeto de prueba y sus versiones se limpiaron completamente, sin crear registros de negocio. Esta prueba acredita el acceso operativo al prefijo y el versionado observado de ese objeto; la identidad de ejecución continúa sin permisos para consultar globalmente versionado, bloqueo público y Object Lock del bucket.
+
+Se mantuvo la release vigente `a7757d38a077d51909c514102121a7e9be00d906`, cuyos binarios instalados se verificaron contra su manifiesto. Con bloqueo exclusivo de despliegue se respaldaron privadamente la configuración y las 61 tablas existentes; el dump completo y su SHA-256 quedaron registrados. Se añadió únicamente `colaboracion` a `BASTION_ALLOWED_MODULES` y se reinició el backend. El arranque validó la migración instalada `202610230001`; no se ejecutaron migraciones ni se cambió el esquema.
+
+Por petición expresa del usuario se activó el registro de Colaboración mediante una operación administrativa de despliegue. El evento `core / module.deploy_activation` usa actor nulo para identificar la operación del sistema, sin atribuir una sesión a un usuario. El estado final es `included_in_release=1`, `environment_allowed=1`, `enabled=1`. Se comprobaron los estados de los otros ocho módulos y los registros de Colaboración antes y después: se conservaron. No se concedieron permisos a roles ni se alteraron cuentas o sesiones.
+
+Bluehost ya servía el frontend de `a7757d3`; no se volvió a instalar una release anterior. Se verificaron por HTTPS cuatro recursos del manifiesto (incluido el chunk de Colaboración), `BUILD.txt`, el origen público de API y el fallback de `/colaboracion`. Después del reinicio, `/health/live` y `/health/ready` respondieron 200 y las rutas de Colaboración/settings mantuvieron 401 sin sesión.
+
+Pendiente: prueba integral desde UI/API con una sesión administrativa existente, incluida carga máxima de 50 MiB a través del proxy, restauración y purga por el worker. La prueba directa S3 y los checks anteriores de CI no sustituyen esa comprobación. La inspección de Caddy no mostró una restricción de cuerpo adicional; se conserva el límite de 140 MiB y el timeout de 120 segundos del adaptador API.
