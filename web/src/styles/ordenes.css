@@ -32,6 +32,7 @@
 .order-expense legend{font:11px var(--mono);color:var(--muted);padding-top:12px}
 .order-expense:last-child{border-bottom:0}
 .order-expense .quote-remove{font-size:12px;min-height:40px}
+.order-expense-add::before{content:'+';font-size:18px;margin-right:6px}
 .order-focus-heading{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
 .order-totals dt,.order-totals dd{min-width:0;overflow-wrap:anywhere}
 @media(max-width:1280px){.order-general-fields{grid-template-columns:repeat(3,minmax(0,1fr))}.order-filters{grid-template-columns:repeat(2,minmax(0,1fr))}.order-filters .actions{grid-column:1/-1}}
