@@ -124,3 +124,8 @@ Se verificó el respaldo privado y se ensayó su restauración íntegra en 63 ta
 La comparación comprobó que sólo se corrigió profit en la orden existente; no había borradores de factura ni recibos anteriores que corregir. Se conservaron precios, impuestos, inversión, versiones, origen, permisos, configuración y estados de todos los módulos. Se usó la credencial MySQL autorizada sólo para migrate; MYSQL_MIGRATOR_* no quedó en el archivo de entorno ni en el proceso del servicio.
 
 Frontend: 44 archivos verificados en disco y 42 recursos por HTTPS, conservando config.js, ambos .htaccess y assets previos. SPA y readiness respondieron 200; Órdenes, documentos, disponibilidad de archivos, Facturas y Reportes sin sesión respondieron 401. Los artifacts y respaldos conservan reversión privada. La prueba integral de interfaz autenticada en producción queda pendiente; los flujos de dominio, HTTP, permisos, archivos y migraciones pasaron CI con MySQL 5.7.
+
+
+## Licitaciones: backend desplegado en AWS
+
+El 2026-10-27 se instaló el backend de 0d951d5 con CI aprobado, artefacto verificado, respaldo privado y restauración ensayada de las 69 tablas previas. Migraciones de Licitaciones 1 y Colaboración 202610270001; total de 77 tablas y conservación de datos y estados de los demás módulos. Licitaciones queda disponible y desactivado (1/1/0). Readiness HTTPS 200 y rutas privadas anónimas 401. El frontend Bluehost no se publicó en esta operación. Ver [evidencia, recuperación y pendientes](modulos/licitaciones-despliegue.md).
