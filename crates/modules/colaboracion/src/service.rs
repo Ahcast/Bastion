@@ -349,6 +349,69 @@ impl CollaborationService {
             content_base64: STANDARD.encode(bytes),
         })
     }
+    pub async fn file_snapshot(
+        &self,
+        actor: u64,
+        id: u64,
+        max_bytes: usize,
+    ) -> Result<crate::AuthorizedFileSnapshot, CoreError> {
+        if max_bytes == 0 || max_bytes > crate::MAX_FILE_BYTES {
+            return Err(CoreError::Invalid);
+        }
+        let mut tx = self.begin().await?;
+        let record = load(&mut tx, id).await?;
+        self.authorize_record(&mut tx, actor, &record, "ver")
+            .await?;
+        if record.size_bytes > max_bytes as u64 {
+            return Err(CoreError::Invalid);
+        }
+        let (key, hash): (String, Vec<u8>) =
+            sqlx::query_as("SELECT object_key,content_hash FROM colaboracion_files WHERE id=?")
+                .bind(id)
+                .fetch_one(&mut *tx)
+                .await?;
+        tx.commit().await?;
+        let bytes = self.storage.get_with_limit(key, max_bytes).await?;
+        if bytes.len() as u64 != record.size_bytes
+            || Sha256::digest(&bytes).as_slice() != hash.as_slice()
+        {
+            return Err(CoreError::Overloaded);
+        }
+        let mut tx = self.begin().await?;
+        self.validate_file_snapshot_in_transaction(&mut tx, actor, id, &hash)
+            .await?;
+        audit(&mut tx, Some(actor), "file.snapshot", id).await?;
+        tx.commit().await?;
+        Ok(crate::AuthorizedFileSnapshot {
+            id,
+            filename: record.filename,
+            sha256: hash,
+            bytes,
+        })
+    }
+    pub async fn validate_file_snapshot_in_transaction(
+        &self,
+        tx: &mut Transaction<'_, MySql>,
+        actor: u64,
+        id: u64,
+        hash: &[u8],
+    ) -> Result<(), CoreError> {
+        let enabled:Option<bool>=sqlx::query_scalar("SELECT (included_in_release AND environment_allowed AND enabled) FROM module_registry WHERE module_id='colaboracion' FOR UPDATE").fetch_optional(&mut **tx).await?;
+        if enabled != Some(true) {
+            return Err(CoreError::NotFound);
+        }
+        let record = load(tx, id).await?;
+        self.authorize_record(tx, actor, &record, "ver").await?;
+        let current: Vec<u8> =
+            sqlx::query_scalar("SELECT content_hash FROM colaboracion_files WHERE id=?")
+                .bind(id)
+                .fetch_one(&mut **tx)
+                .await?;
+        if current != hash {
+            return Err(CoreError::Conflict);
+        }
+        Ok(())
+    }
     async fn authorize_record(
         &self,
         tx: &mut Transaction<'_, MySql>,

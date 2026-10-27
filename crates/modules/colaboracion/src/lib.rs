@@ -16,6 +16,14 @@ use serde::{Deserialize, Serialize};
 
 pub const MAX_FILE_BYTES: usize = bastion_core::MAX_PRIVATE_FILE_BYTES;
 
+/// Internal owner port: authorized bytes and provenance, never an object key.
+pub struct AuthorizedFileSnapshot {
+    pub id: u64,
+    pub filename: String,
+    pub sha256: Vec<u8>,
+    pub bytes: Vec<u8>,
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct UploadInput {

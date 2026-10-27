@@ -35,6 +35,8 @@ mod cotizaciones;
 mod facturas;
 mod gastos;
 mod licitaciones;
+#[cfg(test)]
+mod licitaciones_files_tests;
 mod ordenes_compra;
 mod procesos;
 mod proveedores;

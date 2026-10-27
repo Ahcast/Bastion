@@ -17,7 +17,7 @@ export default function FormLibrary() {
     <DocumentSection title="Formularios publicados" metadata={result.data ? `${result.data.items.length} en esta página` : undefined} list>
     <Notice>{result.error}</Notice>
     {result.data ? <><Table columns={['Formulario', 'Bloque', 'Revisión', 'Variables', 'Acción']} rows={result.data.items.map(form => [form.definition.title, sectionLabels[form.definition.section], form.revision, form.definition.variables.length, access.is_system_administrator ? <button onClick={() => setEditing(form)}>Nueva revisión</button> : 'Publicado'])} /><DocumentPagination page={page} hasMore={result.data.has_more} change={setPage} /></> : !result.error && <Loading />}
-    <p className="document-note">Esta biblioteca define la captura de datos. La incorporación de archivos y las plantillas para PDF se añadirán en la siguiente etapa.</p>
+    <p className="document-note">Esta biblioteca define la captura de datos. Los PDF e imágenes se incorporan dentro del expediente; las plantillas para generar el PDF final siguen pendientes.</p>
     </DocumentSection>
     {editing && <SchemaEditor initial={editing === 'new' ? null : editing} close={() => setEditing(null)} saved={() => { setEditing(null); result.reload(); notify('Esquema aprobado y publicado.'); }} />}
   </div>;

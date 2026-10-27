@@ -1,21 +1,30 @@
 use crate::*;
 use bastion_colaboracion::{CollaborationService, PublishedForm};
-use bastion_core::{CoreAdmin, CoreError, Database};
+use bastion_core::{CoreAdmin, CoreError, Database, DocumentService};
 use sha2::{Digest, Sha256};
 use sqlx::{MySql, Transaction};
 
 #[derive(Clone)]
 pub struct TenderService {
-    database: Database,
-    admin: CoreAdmin,
-    library: CollaborationService,
+    pub(crate) database: Database,
+    pub(crate) admin: CoreAdmin,
+    pub(crate) library: CollaborationService,
+    pub(crate) storage: DocumentService,
 }
 impl TenderService {
     pub fn new(database: Database, admin: CoreAdmin) -> Self {
+        Self::with_storage(database, admin, DocumentService::from_environment())
+    }
+    pub fn with_storage(database: Database, admin: CoreAdmin, storage: DocumentService) -> Self {
         Self {
-            library: CollaborationService::new(database.clone(), admin.clone()),
+            library: CollaborationService::with_storage(
+                database.clone(),
+                admin.clone(),
+                storage.clone(),
+            ),
             database,
             admin,
+            storage,
         }
     }
     pub async fn migrate(database: &Database) -> Result<(), CoreError> {
@@ -26,7 +35,7 @@ impl TenderService {
             .await
             .map_err(CoreError::Migration)
     }
-    pub async fn synchronize_release(&self, allowed: bool) -> Result<(), CoreError> {
+    pub async fn synchronize_release(&self, allowed: bool) -> Result<bool, CoreError> {
         let exists:i64=sqlx::query_scalar("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema=DATABASE() AND table_name='_licitaciones_migrations'").fetch_one(self.database.pool()).await?;
         let ready = if exists > 0 {
             let applied: Vec<(i64, bool, Vec<u8>)> =
@@ -45,9 +54,9 @@ impl TenderService {
         };
         sqlx::query("INSERT INTO module_registry (module_id,display_name,included_in_release,environment_allowed,enabled) VALUES ('licitaciones','Licitaciones',1,?,0) ON DUPLICATE KEY UPDATE included_in_release=1,environment_allowed=VALUES(environment_allowed)")
             .bind(allowed && ready).execute(self.database.pool()).await?;
-        Ok(())
+        Ok(ready)
     }
-    async fn begin(
+    pub(crate) async fn begin(
         &self,
         actor: u64,
         capability: &str,
@@ -140,7 +149,10 @@ impl TenderService {
             return Ok(current);
         }
         sqlx::query("UPDATE licitaciones_expedientes SET name=? WHERE id=?")
-            .bind(name).bind(id).execute(&mut *tx).await?;
+            .bind(name)
+            .bind(id)
+            .execute(&mut *tx)
+            .await?;
         bump(&mut tx, actor, id, expected).await?;
         let result = load(&mut tx, id).await?;
         event(&mut tx, actor, "expedient.rename", id, result.version).await?;
@@ -232,6 +244,7 @@ impl TenderService {
         let current = load(&mut tx, id).await?;
         editable(&current, expected)?;
         bump(&mut tx, actor, id, expected).await?;
+        crate::attachments::enqueue_expedient_deletion(&mut tx, id).await?;
         sqlx::query("UPDATE licitaciones_expedientes SET deleted_at=UTC_TIMESTAMP(6) WHERE id=?")
             .bind(id)
             .execute(&mut *tx)
@@ -241,7 +254,7 @@ impl TenderService {
         Ok(())
     }
 }
-fn key_hash(key: &str) -> Result<Vec<u8>, CoreError> {
+pub(crate) fn key_hash(key: &str) -> Result<Vec<u8>, CoreError> {
     if !(16..=128).contains(&key.len())
         || !key
             .bytes()
@@ -251,7 +264,7 @@ fn key_hash(key: &str) -> Result<Vec<u8>, CoreError> {
     }
     Ok(Sha256::digest(key.as_bytes()).to_vec())
 }
-fn editable(e: &Expedient, version: u64) -> Result<(), CoreError> {
+pub(crate) fn editable(e: &Expedient, version: u64) -> Result<(), CoreError> {
     if e.version != version {
         return Err(CoreError::PreconditionFailed);
     }
@@ -260,7 +273,7 @@ fn editable(e: &Expedient, version: u64) -> Result<(), CoreError> {
     }
     Ok(())
 }
-async fn bump(
+pub(crate) async fn bump(
     tx: &mut Transaction<'_, MySql>,
     actor: u64,
     id: u64,
@@ -271,7 +284,7 @@ async fn bump(
         .bind(next).bind(actor).bind(id).bind(expected).execute(&mut **tx).await?;
     Ok(())
 }
-async fn load(tx: &mut Transaction<'_, MySql>, id: u64) -> Result<Expedient, CoreError> {
+pub(crate) async fn load(tx: &mut Transaction<'_, MySql>, id: u64) -> Result<Expedient, CoreError> {
     let e:ExpedientSummary=sqlx::query_as("SELECT id,name,version,state FROM licitaciones_expedientes WHERE id=? AND deleted_at IS NULL FOR UPDATE")
         .bind(id).fetch_optional(&mut **tx).await?.ok_or(CoreError::NotFound)?;
     let rows:Vec<(u64,serde_json::Value,serde_json::Value)>=sqlx::query_as("SELECT id,source_json,values_json FROM licitaciones_formularios WHERE expediente_id=? ORDER BY id")
@@ -341,7 +354,7 @@ async fn save_receipt(
         .bind(actor).bind(key).bind(hash).bind(result.id).bind(serde_json::to_value(result).map_err(|_|CoreError::Invalid)?).execute(&mut **tx).await?;
     Ok(())
 }
-async fn event(
+pub(crate) async fn event(
     tx: &mut Transaction<'_, MySql>,
     actor: u64,
     action: &str,

@@ -193,10 +193,129 @@ paths:
         '403': { description: Un rol personalizado no publica aunque tenga editar o comodín }
         '409': { description: Clave reutilizada con otro cuerpo }
         '412': { description: Revisión anterior cambió }
+  /api/v1/licitaciones/{id}/archivos:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    get:
+      summary: Metadatos privados de archivos legales/técnicos; requiere ver
+      responses:
+        '200':
+          description: Archivos, versión y bytes retenidos incluidos los objetos pendientes de limpieza
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AttachmentList' }
+    post:
+      summary: Subir PDF o imagen desde PC; requiere editar y Borrador
+      parameters:
+        - $ref: '#/components/parameters/Version'
+        - $ref: '#/components/parameters/Idempotency'
+        - $ref: '#/components/parameters/Csrf'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [section, filename, content_base64]
+              properties:
+                section: { $ref: '#/components/schemas/AttachmentSection' }
+                filename: { type: string, minLength: 1, maxLength: 255 }
+                content_base64: { type: string, maxLength: 26666668, description: Máximo real de 20000000 bytes; extensión y MIME se validan en servidor. }
+      responses:
+        '200': { $ref: '#/components/responses/FileWrite' }
+        '400': { description: Tipo, tamaño o presupuesto de expediente inválido }
+        '409': { description: Clave reutilizada con otro archivo o estado distinto de Borrador }
+        '412': { description: Versión obsoleta }
+        '413': { description: Cuerpo mayor de 27000000 bytes }
+        '503': { description: Almacenamiento no disponible o concurrencia agotada; el objeto reservado se recupera por limpieza }
+  /api/v1/licitaciones/{id}/archivos/desde-colaboracion:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    post:
+      summary: Copia independiente de PDF/imagen autorizada de Colaboración activa
+      parameters:
+        - $ref: '#/components/parameters/Version'
+        - $ref: '#/components/parameters/Idempotency'
+        - $ref: '#/components/parameters/Csrf'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [section, source_id]
+              properties:
+                section: { $ref: '#/components/schemas/AttachmentSection' }
+                source_id: { type: integer, minimum: 1 }
+      responses:
+        '200': { $ref: '#/components/responses/FileWrite' }
+        '404': { description: Origen no disponible o sin acceso }
+        '412': { description: Versión obsoleta }
+  /api/v1/licitaciones/{id}/archivos/{attachment}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+      - $ref: '#/components/parameters/AttachmentId'
+    delete:
+      summary: Quitar copia de Borrador; requiere eliminar y no modifica el origen
+      parameters:
+        - $ref: '#/components/parameters/Version'
+        - $ref: '#/components/parameters/Csrf'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [confirm_id]
+              properties:
+                confirm_id: { type: string, pattern: '^[a-f0-9]{48}$' }
+      responses:
+        '200': { $ref: '#/components/responses/FileWrite' }
+        '409': { description: Fuera de Borrador }
+        '412': { description: Versión obsoleta }
+  /api/v1/licitaciones/{id}/archivos/{attachment}/preview:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+      - $ref: '#/components/parameters/AttachmentId'
+    get:
+      summary: Leer copia privada con MIME verificado; requiere ver
+      responses:
+        '200': { $ref: '#/components/responses/FileContent' }
+        '404': { description: No pertenece al expediente, eliminado o sin acceso }
+  /api/v1/licitaciones/{id}/archivos/{attachment}/download:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+      - $ref: '#/components/parameters/AttachmentId'
+    get:
+      summary: Descargar bytes originales privados como octet-stream; requiere ver
+      responses:
+        '200': { $ref: '#/components/responses/FileContent' }
+        '404': { description: No pertenece al expediente, eliminado o sin acceso }
 components:
+  responses:
+    FileWrite:
+      description: Expediente vigente con ETag fuerte; reintentar no duplica el archivo
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Expedient' }
+    FileContent:
+      description: Archivo privado autorizado y validado por hash y tamaño
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [filename, mime, content_base64]
+            properties:
+              filename: { type: string }
+              mime: { type: string }
+              content_base64: { type: string }
   securitySchemes:
     session: { type: apiKey, in: cookie, name: __Host-bastion_session }
   parameters:
+    AttachmentId: { name: attachment, in: path, required: true, schema: { type: string, pattern: '^[a-f0-9]{48}$' } }
     Id: { name: id, in: path, required: true, schema: { type: integer, minimum: 1 } }
     Page: { name: page, in: query, schema: { type: integer, minimum: 1, maximum: 10000, default: 1 } }
     PageSize: { name: page_size, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 25 } }
@@ -204,6 +323,27 @@ components:
     Idempotency: { name: Idempotency-Key, in: header, required: true, schema: { type: string, pattern: '^[A-Za-z0-9_-]{16,128}$' } }
     Csrf: { name: X-CSRF-Token, in: header, required: true, schema: { type: string } }
   schemas:
+    AttachmentSection: { type: string, enum: [legal, tecnica] }
+    Attachment:
+      type: object
+      required: [id, section, filename, mime, byte_size, sha256, source_id, source_sha256, created_at]
+      properties:
+        id: { type: string, pattern: '^[a-f0-9]{48}$' }
+        section: { $ref: '#/components/schemas/AttachmentSection' }
+        filename: { type: string }
+        mime: { type: string }
+        byte_size: { type: integer, minimum: 1, maximum: 20000000 }
+        sha256: { type: string }
+        source_id: { type: [integer, 'null'] }
+        source_sha256: { type: [string, 'null'] }
+        created_at: { type: string }
+    AttachmentList:
+      type: object
+      required: [items, expedient_version, retained_bytes]
+      properties:
+        items: { type: array, maxItems: 1000, items: { $ref: '#/components/schemas/Attachment' } }
+        expedient_version: { type: integer }
+        retained_bytes: { type: integer }
     FormDefinition:
       type: object
       additionalProperties: false

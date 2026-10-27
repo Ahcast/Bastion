@@ -504,7 +504,8 @@ pub(crate) fn validate_key(key: &str) -> Result<(), CoreError> {
     if !(key.starts_with("cotizaciones/")
         || key.starts_with("colaboracion/")
         || key.starts_with("ordenes_compra/")
-        || key.starts_with("facturas/"))
+        || key.starts_with("facturas/")
+        || key.starts_with("licitaciones/"))
         || key.len() > 250
         || key
             .split('/')
@@ -526,6 +527,8 @@ mod tests {
         assert!(validate_key("cotizaciones/12/3/document-v1.pdf").is_ok());
         assert!(validate_key("ordenes_compra/12/products/abc").is_ok());
         assert!(validate_key("facturas/12/3/invoice-v1.pdf").is_ok());
+        assert!(validate_key("licitaciones/12/files/abc-123").is_ok());
+        assert!(validate_key("licitaciones/../secret").is_err());
         assert!(validate_key("facturas/../secret").is_err());
         assert!(validate_key("ordenes_compra/../secret").is_err());
         assert!(validate_key("colaboracion/empresa/abc-123").is_ok());

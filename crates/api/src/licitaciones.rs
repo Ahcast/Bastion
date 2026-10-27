@@ -6,14 +6,168 @@ use bastion_licitaciones::{
 pub(super) fn routes(state: ApiState) -> Router<ApiState> {
     Router::new()
         .route("/api/v1/licitaciones", get(list).post(create))
-        .route("/api/v1/licitaciones/{id}", get(detail).patch(rename).delete(remove))
+        .route(
+            "/api/v1/licitaciones/{id}",
+            get(detail).patch(rename).delete(remove),
+        )
         .route("/api/v1/licitaciones/{id}/formularios", post(copy_form))
         .route(
             "/api/v1/licitaciones/{id}/formularios/{copy_id}/valores",
             axum::routing::put(values),
         )
         .layer(RequestBodyLimitLayer::new(256 * 1024))
-        .route_layer(middleware::from_fn_with_state(state, guard))
+        .route_layer(middleware::from_fn_with_state(state.clone(), guard))
+        .merge(file_routes(state))
+}
+fn file_routes(state: ApiState) -> Router<ApiState> {
+    Router::new()
+        .route(
+            "/api/v1/licitaciones/{id}/archivos",
+            get(files).post(upload_file),
+        )
+        .route(
+            "/api/v1/licitaciones/{id}/archivos/desde-colaboracion",
+            post(copy_file),
+        )
+        .route(
+            "/api/v1/licitaciones/{id}/archivos/{attachment}/preview",
+            get(preview_file),
+        )
+        .route(
+            "/api/v1/licitaciones/{id}/archivos/{attachment}/download",
+            get(download_file),
+        )
+        .route(
+            "/api/v1/licitaciones/{id}/archivos/{attachment}",
+            axum::routing::delete(remove_file),
+        )
+        .layer(axum::extract::DefaultBodyLimit::max(27_000_000))
+        .layer(RequestBodyLimitLayer::new(27_000_000))
+        .route_layer(middleware::from_fn_with_state(state, file_guard))
+}
+static FILE_SLOTS: tokio::sync::Semaphore = tokio::sync::Semaphore::const_new(2);
+async fn file_guard(State(state): State<ApiState>, request: Request, next: Next) -> Response {
+    match tokio::time::timeout(Duration::from_secs(180), async {
+        let user = actor(&state, request.headers()).await?;
+        let capability = match *request.method() {
+            Method::GET | Method::HEAD => "ver",
+            Method::DELETE => "eliminar",
+            _ => "editar",
+        };
+        state
+            .licitaciones
+            .check_access(user.id, capability)
+            .await
+            .map_err(ApiError)?;
+        state
+            .licitaciones
+            .consume_request(user.id)
+            .await
+            .map_err(ApiError)?;
+        let _permit = FILE_SLOTS
+            .try_acquire()
+            .map_err(|_| ApiError(CoreError::Overloaded))?;
+        Ok::<_, ApiError>(next.run(request).await)
+    })
+    .await
+    {
+        Ok(Ok(response)) => response,
+        Ok(Err(e)) => e.into_response(),
+        Err(_) => ApiError(CoreError::Overloaded).into_response(),
+    }
+}
+async fn files(
+    State(state): State<ApiState>,
+    headers: axum::http::HeaderMap,
+    Path(id): Path<u64>,
+) -> Result<Json<bastion_licitaciones::AttachmentList>, ApiError> {
+    let user = actor(&state, &headers).await?;
+    state
+        .licitaciones
+        .attachments(user.id, id)
+        .await
+        .map(Json)
+        .map_err(ApiError)
+}
+async fn upload_file(
+    State(state): State<ApiState>,
+    headers: axum::http::HeaderMap,
+    Path(id): Path<u64>,
+    Json(input): Json<bastion_licitaciones::AttachmentUpload>,
+) -> Result<Response, ApiError> {
+    let user = actor(&state, &headers).await?;
+    state
+        .licitaciones
+        .upload_attachment(
+            user.id,
+            id,
+            expected(&headers)?,
+            single_header(&headers, "idempotency-key")?,
+            input,
+        )
+        .await
+        .map(response)
+        .map_err(ApiError)
+}
+async fn copy_file(
+    State(state): State<ApiState>,
+    headers: axum::http::HeaderMap,
+    Path(id): Path<u64>,
+    Json(input): Json<bastion_licitaciones::AttachmentCopy>,
+) -> Result<Response, ApiError> {
+    let user = actor(&state, &headers).await?;
+    state
+        .licitaciones
+        .copy_attachment(
+            user.id,
+            id,
+            expected(&headers)?,
+            single_header(&headers, "idempotency-key")?,
+            input,
+        )
+        .await
+        .map(response)
+        .map_err(ApiError)
+}
+async fn preview_file(
+    State(state): State<ApiState>,
+    headers: axum::http::HeaderMap,
+    Path((id, file)): Path<(u64, String)>,
+) -> Result<Json<bastion_licitaciones::AttachmentContent>, ApiError> {
+    let user = actor(&state, &headers).await?;
+    state
+        .licitaciones
+        .read_attachment(user.id, id, &file, true)
+        .await
+        .map(Json)
+        .map_err(ApiError)
+}
+async fn download_file(
+    State(state): State<ApiState>,
+    headers: axum::http::HeaderMap,
+    Path((id, file)): Path<(u64, String)>,
+) -> Result<Json<bastion_licitaciones::AttachmentContent>, ApiError> {
+    let user = actor(&state, &headers).await?;
+    state
+        .licitaciones
+        .read_attachment(user.id, id, &file, false)
+        .await
+        .map(Json)
+        .map_err(ApiError)
+}
+async fn remove_file(
+    State(state): State<ApiState>,
+    headers: axum::http::HeaderMap,
+    Path((id, file)): Path<(u64, String)>,
+    Json(input): Json<bastion_licitaciones::AttachmentDelete>,
+) -> Result<Response, ApiError> {
+    let user = actor(&state, &headers).await?;
+    state
+        .licitaciones
+        .remove_attachment(user.id, id, &file, expected(&headers)?, &input.confirm_id)
+        .await
+        .map(response)
+        .map_err(ApiError)
 }
 async fn guard(State(state): State<ApiState>, request: Request, next: Next) -> Response {
     match tokio::time::timeout(Duration::from_secs(30), async {
@@ -95,8 +249,12 @@ async fn rename(
     Json(input): Json<NameInput>,
 ) -> Result<Response, ApiError> {
     let user = actor(&state, &headers).await?;
-    state.licitaciones.rename(user.id, id, expected(&headers)?, input)
-        .await.map(response).map_err(ApiError)
+    state
+        .licitaciones
+        .rename(user.id, id, expected(&headers)?, input)
+        .await
+        .map(response)
+        .map_err(ApiError)
 }
 async fn copy_form(
     State(state): State<ApiState>,
@@ -433,21 +591,68 @@ mod tests {
                 .status(),
             StatusCode::CREATED
         );
-        let renamed = app.clone().oneshot(request(
-            "PATCH", &path, Some("synthetic-tender-admin"), true,
-            "https://example.test", r#"{"name":"  Oferta HTTP  "}"#.into(), "\"1\""
-        )).await.unwrap();
+        let renamed = app
+            .clone()
+            .oneshot(request(
+                "PATCH",
+                &path,
+                Some("synthetic-tender-admin"),
+                true,
+                "https://example.test",
+                r#"{"name":"  Oferta HTTP  "}"#.into(),
+                "\"1\"",
+            ))
+            .await
+            .unwrap();
         assert_eq!(renamed.status(), StatusCode::OK);
         assert_eq!(renamed.headers()["etag"], "\"2\"");
-        let renamed:serde_json::Value=serde_json::from_slice(&to_bytes(renamed.into_body(),256*1024).await.unwrap()).unwrap();
-        assert_eq!(renamed["name"],"Oferta HTTP"); assert_eq!(renamed["id"],id);
-        for (token,body,version,status) in [
-            ("synthetic-tender-reader",r#"{"name":"No autorizado"}"#,"\"2\"",StatusCode::FORBIDDEN),
-            ("synthetic-tender-admin",r#"{"name":"Obsoleto"}"#,"\"1\"",StatusCode::PRECONDITION_FAILED),
-            ("synthetic-tender-admin",r#"{"name":"   "}"#,"\"2\"",StatusCode::BAD_REQUEST),
-            ("synthetic-tender-admin",r#"{"name":"Otro","state":"enviada"}"#,"\"2\"",StatusCode::UNPROCESSABLE_ENTITY),
+        let renamed: serde_json::Value =
+            serde_json::from_slice(&to_bytes(renamed.into_body(), 256 * 1024).await.unwrap())
+                .unwrap();
+        assert_eq!(renamed["name"], "Oferta HTTP");
+        assert_eq!(renamed["id"], id);
+        for (token, body, version, status) in [
+            (
+                "synthetic-tender-reader",
+                r#"{"name":"No autorizado"}"#,
+                "\"2\"",
+                StatusCode::FORBIDDEN,
+            ),
+            (
+                "synthetic-tender-admin",
+                r#"{"name":"Obsoleto"}"#,
+                "\"1\"",
+                StatusCode::PRECONDITION_FAILED,
+            ),
+            (
+                "synthetic-tender-admin",
+                r#"{"name":"   "}"#,
+                "\"2\"",
+                StatusCode::BAD_REQUEST,
+            ),
+            (
+                "synthetic-tender-admin",
+                r#"{"name":"Otro","state":"enviada"}"#,
+                "\"2\"",
+                StatusCode::UNPROCESSABLE_ENTITY,
+            ),
         ] {
-            assert_eq!(app.clone().oneshot(request("PATCH",&path,Some(token),true,"https://example.test",body.into(),version)).await.unwrap().status(),status);
+            assert_eq!(
+                app.clone()
+                    .oneshot(request(
+                        "PATCH",
+                        &path,
+                        Some(token),
+                        true,
+                        "https://example.test",
+                        body.into(),
+                        version
+                    ))
+                    .await
+                    .unwrap()
+                    .status(),
+                status
+            );
         }
         assert_eq!(
             app.clone()

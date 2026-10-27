@@ -1,6 +1,11 @@
 #![forbid(unsafe_code)]
 
+mod attachments;
 mod service;
+pub use attachments::{
+    Attachment, AttachmentContent, AttachmentCopy, AttachmentDelete, AttachmentList,
+    AttachmentSection, AttachmentUpload,
+};
 use bastion_colaboracion::{FormValues, PublishedForm};
 use bastion_core::CoreError;
 use serde::{Deserialize, Serialize};
@@ -116,13 +121,35 @@ mod tests {
     use super::*;
     #[test]
     fn editable_names_are_inert_bounded_and_compatible_with_old_receipts() {
-        assert_eq!(NameInput { name: "  Oferta de equipos  ".into() }.normalize().unwrap(), "Oferta de equipos");
-        assert!(NameInput { name: "é".repeat(255) }.normalize().is_ok());
-        for name in ["".to_string(), "   ".into(), "x".repeat(256), "a\nb".into(), "a\0b".into()] {
+        assert_eq!(
+            NameInput {
+                name: "  Oferta de equipos  ".into()
+            }
+            .normalize()
+            .unwrap(),
+            "Oferta de equipos"
+        );
+        assert!(
+            NameInput {
+                name: "é".repeat(255)
+            }
+            .normalize()
+            .is_ok()
+        );
+        for name in [
+            "".to_string(),
+            "   ".into(),
+            "x".repeat(256),
+            "a\nb".into(),
+            "a\0b".into(),
+        ] {
             assert!(NameInput { name }.normalize().is_err());
         }
-        assert!(serde_json::from_str::<NameInput>(r#"{"name":"Oferta","state":"enviada"}"#).is_err());
-        let old: Expedient = serde_json::from_str(r#"{"id":1,"version":1,"state":"borrador","forms":[]}"#).unwrap();
+        assert!(
+            serde_json::from_str::<NameInput>(r#"{"name":"Oferta","state":"enviada"}"#).is_err()
+        );
+        let old: Expedient =
+            serde_json::from_str(r#"{"id":1,"version":1,"state":"borrador","forms":[]}"#).unwrap();
         assert!(old.name.is_empty());
     }
     #[test]

@@ -7,6 +7,13 @@
 .document-record strong{font-weight:500}
 .document-record small{display:block;margin-top:3px;color:var(--muted)}
 .document-name{max-width:680px;margin-bottom:24px}
+.tender-files{margin-bottom:28px;min-width:0}
+.tender-files h3,.document-subheading{font-size:15px;font-weight:600;margin:0}
+.document-subheading{padding-top:16px;margin-bottom:16px;border-top:1px solid var(--line)}
+.tender-upload-list{list-style:none;padding:0;margin:0;min-width:0}
+.tender-upload-list li{display:flex;justify-content:space-between;gap:12px;border-bottom:1px solid var(--line);padding:10px 0;font-size:13px;overflow-wrap:anywhere}
+.tender-upload-list li>span{min-width:0}
+.tender-upload-list small{display:block;font-size:11px;color:var(--muted);margin-top:3px}
 .document-section{min-width:0;border-top:2px solid var(--ink)}
 .document-section-heading{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;padding-top:12px;margin-bottom:16px}
 .document-section-heading h2{font-size:17px;line-height:1.4;font-weight:600;margin:0}

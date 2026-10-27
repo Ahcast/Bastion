@@ -181,6 +181,19 @@ jobs:
           docker exec ${{ job.services.mysql57.id }} mysql -uroot -pbastion_ci_only -e 'CREATE DATABASE bastion_invoice_actions_test CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci'
           chmod +x crates/modules/cotizaciones/tests/fixtures/private_storage.py
           cargo test --locked --package bastion-facturas --test actions
+      - name: Verify tender files with MySQL 5.7 and isolated private storage
+        env:
+          BASTION_DOCUMENTS_ENABLED: 'true'
+          BASTION_AWS_CLI: ${{ github.workspace }}/crates/modules/licitaciones/tests/fixtures/private_storage.py
+          BASTION_DOCUMENTS_BUCKET: bastion-synthetic-tender-files-test
+          BASTION_DOCUMENTS_REGION: synthetic-region
+          BASTION_TENDER_FILES_TEST_URL: mysql://root:bastion_ci_only@127.0.0.1:3306/bastion_tender_files_test?ssl-mode=disabled
+          BASTION_TENDER_FILES_HTTP_TEST_URL: mysql://root:bastion_ci_only@127.0.0.1:3306/bastion_tender_files_http_test?ssl-mode=disabled
+        run: |
+          docker exec ${{ job.services.mysql57.id }} mysql -uroot -pbastion_ci_only -e 'CREATE DATABASE bastion_tender_files_test CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci; CREATE DATABASE bastion_tender_files_http_test CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci'
+          chmod +x crates/modules/licitaciones/tests/fixtures/private_storage.py
+          cargo test --locked --package bastion-licitaciones --test attachments
+          cargo test --locked --package bastion-api mysql57_tender_files_http
       - name: Build Lightsail executable
         run: cargo build --release --locked --package bastion-server --target x86_64-unknown-linux-gnu
       - name: Verify executable starts

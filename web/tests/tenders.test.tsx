@@ -46,6 +46,7 @@ test('expedients start empty; values preserve drafts on 412 and navigation asks 
   const api = new ApiClient('https://example.test', async (url, init = {}) => {
     const path = new URL(String(url)).pathname;
     calls.push({ path, init });
+    if (path.endsWith('/archivos')) return Response.json({ items: [], expedient_version: 2, retained_bytes: 0 });
     if (init.method === 'PUT') return stale ? Response.json({ title: 'Precondition Failed', detail: 'Cambió la versión.' }, { status: 412 }) : Response.json({ ...record, version: 3 });
     if (init.method === 'POST') { created = true; assert.deepEqual(JSON.parse(String(init.body)), {}); assert.ok(new Headers(init.headers).get('idempotency-key')); return Response.json({ ...record, forms: [] }); }
     if (path === '/api/v1/licitaciones') return Response.json({ items: [{ id: 7, version: 2, state: 'borrador' }], page: 1, page_size: 25, has_more: false });

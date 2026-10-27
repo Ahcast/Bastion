@@ -36,6 +36,7 @@ Esta tabla conserva la revisión de partida anterior a implementar. El estado ac
 ## Decisiones confirmadas el 2026-10-27
 
 - Posteriormente al primer despliegue, el usuario autoriza un nombre editable para cada expediente. Es independiente del ID y no incorpora los demás campos propuestos inicialmente. Ver [nombre editable](licitaciones-nombre.md).
+- El usuario autoriza seleccionar PDF/imágenes de Colaboración o subirlos desde su PC en Documentación legal y Especificaciones técnicas para que formen parte del expediente. Son copias privadas independientes; ver [contrato de archivos](licitaciones-archivos.md).
 
 - El usuario solicita infraestructura sin campos de expediente/lotes/ítems prefijados ni formularios/archivos iniciales. Los agregará según se necesiten. El primer corte usa sólo ID y metadatos técnicos de expediente; los datos de negocio se capturan desde los esquemas publicados individualmente en biblioteca.
 

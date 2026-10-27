@@ -118,9 +118,20 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
     bastion_reportes::ReportService::new(core.database(), core.admin())
         .synchronize_release(config.reportes_allowed)
         .await?;
-    bastion_licitaciones::TenderService::new(core.database(), core.admin())
+    let tender_files = bastion_licitaciones::TenderService::new(core.database(), core.admin());
+    let tender_files_ready = tender_files
         .synchronize_release(config.licitaciones_allowed)
         .await?;
+    if tender_files_ready {
+        tokio::spawn(async move {
+            loop {
+                if tender_files.clean_one_attachment().await.is_err() {
+                    tracing::error!("tender private file cleanup failed");
+                }
+                tokio::time::sleep(std::time::Duration::from_secs(10)).await;
+            }
+        });
+    }
     cleanup.cleanup_retention().await?;
     tokio::spawn(async move {
         loop {
