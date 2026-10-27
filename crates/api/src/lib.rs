@@ -37,6 +37,7 @@ mod gastos;
 mod ordenes_compra;
 mod procesos;
 mod proveedores;
+mod reportes;
 mod sar;
 
 const GENERAL_REQUEST_BODY_LIMIT: usize = 1024 * 1024;
@@ -52,6 +53,8 @@ struct ApiState {
     facturas: bastion_facturas::InvoiceService,
     ordenes_compra: bastion_ordenes_compra::OrderService,
     gastos: bastion_gastos::ExpenseService,
+    reportes: bastion_reportes::ReportService,
+    report_jobs: std::sync::Arc<tokio::sync::Semaphore>,
     procesos_jobs: std::sync::Arc<tokio::sync::Semaphore>,
     scout_csv_path: std::path::PathBuf,
     scout_control: bastion_procesos::ScoutControl,
@@ -269,6 +272,7 @@ pub fn router(
         .expose_headers([
             HeaderName::from_static("etag"),
             HeaderName::from_static("x-request-id"),
+            HeaderName::from_static("content-disposition"),
         ])
         .allow_credentials(true)
         .max_age(Duration::from_secs(600));
@@ -285,6 +289,8 @@ pub fn router(
         facturas: bastion_facturas::InvoiceService::new(core.database(), core.admin()),
         ordenes_compra: bastion_ordenes_compra::OrderService::new(core.database(), core.admin()),
         gastos: bastion_gastos::ExpenseService::new(core.database(), core.admin()),
+        reportes: bastion_reportes::ReportService::new(core.database(), core.admin()),
+        report_jobs: std::sync::Arc::new(tokio::sync::Semaphore::new(2)),
         procesos_jobs: std::sync::Arc::new(tokio::sync::Semaphore::new(1)),
         scout_csv_path,
         scout_control: bastion_procesos::ScoutControl::from_env()?,
@@ -387,6 +393,7 @@ pub fn router(
         .merge(facturas::routes(api_state.clone()))
         .merge(ordenes_compra::routes(api_state.clone()))
         .merge(gastos::routes(api_state.clone()))
+        .merge(reportes::routes(api_state.clone()))
         .fallback(not_found)
         .with_state(api_state)
         .layer(middleware::from_fn(problem_details))

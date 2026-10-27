@@ -27,3 +27,5 @@ Decisión del 2026-10-23: el catálogo nuevo de destinos se administra bajo Ajus
 Colaboración incorpora su primer corte con límites y retención confirmados por el usuario. Ver `colaboracion-implementacion.md`.
 
 Proveedores comienza su implementación independiente con el contrato de paridad y las decisiones nuevas pendientes de cotejo Legacy identificadas. Ver [detalle](proveedores-implementacion.md) y [OpenAPI](proveedores.openapi.yaml).
+
+Reportes consulta los tres dominios mediante sus servicios y publica exportaciones Excel. Ver [implementación](reportes-implementacion.md) y [OpenAPI](reportes.openapi.yaml); los límites propuestos conservan su cotejo pendiente.

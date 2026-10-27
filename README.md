@@ -58,3 +58,7 @@ The first administrator flow is `GET /api/v1/bootstrap/status`, `POST /api/v1/bo
 The frontend remains on Bluehost, the backend/API/MCP target remains AWS, and MySQL remains on Bluehost. Keep the MySQL runtime user limited to required data operations and use a separate migration credential. Configure the AWS egress address and Bluehost allowlist, verify the MySQL certificate and hostname, and inject all secrets from the deployment secret store.
 
 This API foundation is not a production approval. SMTP delivery, invitation and password-recovery mail, trusted-proxy handling, and the static frontend have partial implementations that still require compilation and integration tests. OAuth client consent, MCP Streamable HTTP/tools, and AWS KMS envelope-key rotation are not complete. These components must be implemented and tested before the Core is considered complete.
+
+## Reportes
+
+Consultas de órdenes, borradores de factura y gastos con fechas, búsqueda, resúmenes, paginación y Excel. Requiere permisos de Reportes y del dominio fuente. Alcance, límites propuestos y pendientes en [la implementación](docs/modulos/reportes-implementacion.md).

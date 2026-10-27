@@ -1,0 +1,181 @@
+openapi: 3.1.0
+info:
+  title: Bastion Reportes API
+  version: 1.0.0
+servers:
+  - url: https://api.example.invalid
+paths:
+  /api/v1/reportes/ordenes:
+    get:
+      summary: Reporte de órdenes de compra
+      description: Requiere reportes/ordenes/ver y ordenes_compra/documentos/ver.
+      parameters:
+        - {$ref: '#/components/parameters/DateFrom'}
+        - {$ref: '#/components/parameters/DateTo'}
+        - {$ref: '#/components/parameters/Search'}
+        - name: status
+          in: query
+          schema: {type: string, enum: [Pendiente, Listo, Entregado]}
+        - {$ref: '#/components/parameters/Page'}
+        - {$ref: '#/components/parameters/PageSize'}
+      responses:
+        '200':
+          description: Agregados y órdenes del período
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/OrderReport'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/Unavailable'}
+  /api/v1/reportes/facturas:
+    get:
+      summary: Reporte de borradores de factura
+      description: Requiere reportes/facturas/ver y facturas/documentos/ver. Los pagos no están habilitados en esta etapa.
+      parameters:
+        - {$ref: '#/components/parameters/DateFrom'}
+        - {$ref: '#/components/parameters/DateTo'}
+        - {$ref: '#/components/parameters/Search'}
+        - name: status
+          in: query
+          description: El único estado disponible en esta etapa es Borrador.
+          schema: {type: string, enum: [Borrador]}
+        - {$ref: '#/components/parameters/Page'}
+        - {$ref: '#/components/parameters/PageSize'}
+      responses:
+        '200':
+          description: Agregados y borradores del período
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/InvoiceReport'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/Unavailable'}
+  /api/v1/reportes/gastos:
+    get:
+      summary: Reporte de gastos
+      description: Requiere reportes/gastos/ver y gastos/registros/ver. Los totales se agrupan por moneda.
+      parameters:
+        - {$ref: '#/components/parameters/DateFrom'}
+        - {$ref: '#/components/parameters/DateTo'}
+        - {$ref: '#/components/parameters/Search'}
+        - {$ref: '#/components/parameters/Page'}
+        - {$ref: '#/components/parameters/PageSize'}
+      responses:
+        '200':
+          description: Agregados y gastos del período
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ExpenseReport'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/Unavailable'}
+  /api/v1/reportes/ordenes/export:
+    get:
+      summary: Exportar reporte de órdenes a Excel
+      parameters:
+        - {$ref: '#/components/parameters/DateFrom'}
+        - {$ref: '#/components/parameters/DateTo'}
+        - {$ref: '#/components/parameters/Search'}
+        - name: status
+          in: query
+          schema: {type: string, enum: [Pendiente, Listo, Entregado]}
+      responses:
+        '200': {$ref: '#/components/responses/Excel'}
+        '413': {$ref: '#/components/responses/ExportLimit'}
+  /api/v1/reportes/facturas/export:
+    get:
+      summary: Exportar reporte de facturas a Excel
+      parameters:
+        - {$ref: '#/components/parameters/DateFrom'}
+        - {$ref: '#/components/parameters/DateTo'}
+        - {$ref: '#/components/parameters/Search'}
+        - name: status
+          in: query
+          schema: {type: string, enum: [Borrador]}
+      responses:
+        '200': {$ref: '#/components/responses/Excel'}
+        '413': {$ref: '#/components/responses/ExportLimit'}
+  /api/v1/reportes/gastos/export:
+    get:
+      summary: Exportar reporte de gastos a Excel
+      parameters:
+        - {$ref: '#/components/parameters/DateFrom'}
+        - {$ref: '#/components/parameters/DateTo'}
+        - {$ref: '#/components/parameters/Search'}
+      responses:
+        '200': {$ref: '#/components/responses/Excel'}
+        '413': {$ref: '#/components/responses/ExportLimit'}
+components:
+  parameters:
+    DateFrom:
+      name: date_from
+      in: query
+      required: true
+      schema: {type: string, format: date}
+    DateTo:
+      name: date_to
+      in: query
+      required: true
+      schema: {type: string, format: date}
+    Search:
+      name: search
+      in: query
+      schema: {type: string, maxLength: 200}
+    Page:
+      name: page
+      in: query
+      schema: {type: integer, minimum: 1, maximum: 10000, default: 1}
+    PageSize:
+      name: page_size
+      in: query
+      schema: {type: integer, minimum: 1, maximum: 1000, default: 25}
+  responses:
+    Forbidden:
+      description: Falta el permiso del módulo Reportes o del dominio fuente.
+    Unavailable:
+      description: El módulo Reportes o su dominio fuente no está disponible.
+    Excel:
+      description: Libro SpreadsheetML 2003 compatible con Excel; hasta 1,000 filas.
+      headers:
+        Content-Disposition:
+          schema: {type: string}
+      content:
+        application/vnd.ms-excel:
+          schema: {type: string, format: binary}
+    ExportLimit:
+      description: El período supera el límite de 1,000 filas; reduzca el rango.
+      content:
+        application/problem+json:
+          schema: {$ref: '#/components/schemas/Problem'}
+  schemas:
+    OrderReport:
+      type: object
+      required: [items, totals, page, page_size, has_more]
+      properties:
+        items: {type: array, items: {type: object, properties: {id: {type: integer}, n_orders: {type: string}, n_bill: {type: string}, client_name: {type: string}, order_date: {type: string, format: date}, status: {type: string}, subtotal: {type: string}, isv: {type: string}, total: {type: string}, products_investment: {type: string}, other_expenses: {type: string}, investment_total: {type: string}, profit: {type: string}}}}
+        totals: {type: object, properties: {records: {type: integer}, subtotal: {type: string}, isv: {type: string}, total: {type: string}, products_investment: {type: string}, other_expenses: {type: string}, investment_total: {type: string}, profit: {type: string}}}
+        page: {type: integer}
+        page_size: {type: integer}
+        has_more: {type: boolean}
+    InvoiceReport:
+      type: object
+      required: [items, totals, page, page_size, has_more]
+      properties:
+        items: {type: array, items: {type: object, properties: {id: {type: integer}, client_name: {type: string}, order_number: {type: string}, invoice_date: {type: string, format: date}, status: {type: string}, total: {type: string}, paid_total: {type: string}, balance: {type: string}}}}
+        totals: {type: object, properties: {records: {type: integer}, total: {type: string}, paid_total: {type: string}, balance: {type: string}}}
+        page: {type: integer}
+        page_size: {type: integer}
+        has_more: {type: boolean}
+    ExpenseReport:
+      type: object
+      required: [items, totals, page, page_size, has_more]
+      properties:
+        items: {type: array, items: {type: object, properties: {id: {type: integer}, invoice_number: {type: string}, expense_date: {type: string, format: date}, provider: {type: string}, currency: {type: string}, taxable_amount: {type: string}, exempt_amount: {type: string}, isv_15: {type: string}, total: {type: string}}}}
+        totals: {type: array, items: {type: object, properties: {currency: {type: string}, records: {type: integer}, taxable_amount: {type: string}, exempt_amount: {type: string}, isv_15: {type: string}, total: {type: string}}}}
+        page: {type: integer}
+        page_size: {type: integer}
+        has_more: {type: boolean}
+    Problem:
+      type: object
+      properties:
+        type: {type: string}
+        title: {type: string}
+        status: {type: integer}
+        detail: {type: string}

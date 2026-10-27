@@ -176,7 +176,7 @@ Esquema SQL completo y límites MySQL para los campos; versión de mantenimiento
 
 ## Inicio conectado a módulos
 
-Comprobar cifras reales de Procesos y Cotizaciones, selección de área, rangos en Honduras, importes decimales exactos, exclusión de procesos vencidos, ausencia de solicitudes sin permiso, bloqueo del módulo desactivado, cero frente a error parcial y uso en celular. Casos completos en [16-dashboard-modulos.md](16-dashboard-modulos.md).
+Comprobar cifras reales de Procesos, Cotizaciones, Órdenes, Facturas y Gastos, selección de área, rangos en Honduras, importes decimales exactos, exclusión de procesos vencidos, totales de Gastos separados por moneda, ausencia de solicitudes sin permiso, bloqueo del módulo desactivado, cero frente a error parcial y uso en celular. Casos completos en [16-dashboard-modulos.md](16-dashboard-modulos.md).
 
 ## Órdenes de compra: corte inicial
 
@@ -215,3 +215,11 @@ Comprobar cifras reales de Procesos y Cotizaciones, selección de área, rangos 
 - Cotejo estático: HNL ofrecido en UI, factura hasta 50, proveedor hasta 255, bases redondeadas antes del ISV 15%, resumen de todos los resultados filtrados y borrado lógico. Rangos/cuotas operativas son límites técnicos de Bastion; conservar la revisión contable pendiente.
 - No asociar registros con órdenes/facturas ni importar datos Legacy en este corte. Mantener el módulo desactivado hasta validar release, allowlist y migración.
 - Ejecutar las pruebas dedicadas de MySQL 5.7/HTTP sobre bases aisladas; verificar sesión, CSRF, roles, idempotencia, conflictos, resumen, auditoría, conservación tras borrado y bloqueo al desactivar. Sólo el Administrador tendrá acceso en esta activación. MCP, exportación y reportes conectados siguen pendientes. Ver modulos/gastos-implementacion.md.
+
+## Reportes: primer corte
+
+- Exigir tanto lectura de Reportes por dominio como lectura vigente del módulo fuente; comprobar disponibilidad en servidor.
+- Aplicar fechas inclusivas, búsqueda literal y estado de órdenes; paginar el detalle conservando totales de todos los resultados filtrados.
+- Excluir gastos borrados y separar monedas; conservar los importes como decimales y señalar que Facturas reporta borradores.
+- Exportar resumen y detalle en Excel sin fórmulas aportadas por usuarios; rechazar el exceso de filas y auditar consultas/exportaciones.
+- Verificar permisos, agregados MySQL 5.7, paginación, fechas, borrado lógico, exportación y cuotas en base aislada. Los topes operativos siguen identificados como propuestas pendientes de cotejo Legacy.

@@ -6,7 +6,7 @@ pub use calculation::{OrderCalculation, OrderTotals, calculate};
 pub use service::{OrderService, quote_order_input};
 
 use bastion_core::CoreError;
-use chrono::NaiveDate;
+use chrono::{Datelike, NaiveDate};
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, Eq)]
@@ -136,4 +136,82 @@ pub struct Destination {
 #[serde(deny_unknown_fields)]
 pub struct DestinationInput {
     pub destination: String,
+}
+
+#[derive(Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct OrderReportFilter {
+    pub date_from: chrono::NaiveDate,
+    pub date_to: chrono::NaiveDate,
+    pub search: Option<String>,
+    pub status: Option<String>,
+    pub page: Option<u32>,
+    pub page_size: Option<u32>,
+}
+
+impl OrderReportFilter {
+    pub fn bounds(&self) -> Result<(u32, u32), CoreError> {
+        let page = self.page.unwrap_or(1);
+        let page_size = self.page_size.unwrap_or(25);
+        if !(1000..=9999).contains(&self.date_from.year())
+            || !(1000..=9999).contains(&self.date_to.year())
+            || self.date_from > self.date_to
+            || self
+                .date_to
+                .signed_duration_since(self.date_from)
+                .num_days()
+                > 365
+            || self
+                .search
+                .as_ref()
+                .is_some_and(|value| value.chars().count() > 200)
+            || !(1..=10000).contains(&page)
+            || !(1..=1000).contains(&page_size)
+            || self
+                .status
+                .as_deref()
+                .is_some_and(|status| !["Pendiente", "Listo", "Entregado"].contains(&status))
+        {
+            return Err(CoreError::Invalid);
+        }
+        Ok((page, page_size))
+    }
+}
+
+#[derive(Debug, Serialize, sqlx::FromRow)]
+pub struct OrderReportRow {
+    pub id: u64,
+    pub n_orders: String,
+    pub n_bill: String,
+    pub client_name: String,
+    pub order_date: String,
+    pub status: String,
+    pub subtotal: String,
+    pub isv: String,
+    pub total: String,
+    pub products_investment: String,
+    pub other_expenses: String,
+    pub investment_total: String,
+    pub profit: String,
+}
+
+#[derive(Debug, Serialize, sqlx::FromRow)]
+pub struct OrderReportTotals {
+    pub records: u64,
+    pub subtotal: String,
+    pub isv: String,
+    pub total: String,
+    pub products_investment: String,
+    pub other_expenses: String,
+    pub investment_total: String,
+    pub profit: String,
+}
+
+#[derive(Debug, Serialize)]
+pub struct OrderReport {
+    pub items: Vec<OrderReportRow>,
+    pub totals: OrderReportTotals,
+    pub page: u32,
+    pub page_size: u32,
+    pub has_more: bool,
 }

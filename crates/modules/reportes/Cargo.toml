@@ -1,0 +1,10 @@
+[package]
+name = "bastion-reportes"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+bastion-core = { path = "../../core" }
+serde.workspace = true
+serde_json.workspace = true
+sqlx.workspace = true

@@ -1,4 +1,5 @@
 use crate::{Expense, ExpenseFilter, ExpenseInput, ExpensePage, ExpenseSummary, calculate};
+use crate::{ExpenseCurrencyTotals, ExpenseReport, ExpenseReportFilter, ExpenseReportRow};
 use bastion_core::{CoreAdmin, CoreError, Database};
 use sha2::{Digest, Sha256};
 use sqlx::{MySql, QueryBuilder, Row, Transaction};
@@ -133,6 +134,69 @@ impl ExpenseService {
     ) -> Result<crate::ExpenseCalculation, CoreError> {
         self.check_access(actor, "editar").await?;
         calculate(input)
+    }
+
+    pub async fn report(
+        &self,
+        actor: u64,
+        filter: &ExpenseReportFilter,
+    ) -> Result<ExpenseReport, CoreError> {
+        let (page, page_size) = filter.bounds()?;
+        let mut tx = self.begin(actor, "ver").await?;
+        let mut totals_query = QueryBuilder::<MySql>::new(
+            "SELECT currency,CAST(COUNT(*) AS UNSIGNED) AS records,CAST(COALESCE(SUM(taxable_amount),0) AS CHAR) AS taxable_amount,CAST(COALESCE(SUM(exempt_amount),0) AS CHAR) AS exempt_amount,CAST(COALESCE(SUM(isv_15),0) AS CHAR) AS isv_15,CAST(COALESCE(SUM(total),0) AS CHAR) AS total FROM gastos_records WHERE deleted_at IS NULL AND expense_date>=",
+        );
+        totals_query
+            .push_bind(filter.date_from)
+            .push(" AND expense_date<=")
+            .push_bind(filter.date_to);
+        if let Some(term) = filter.search() {
+            totals_query
+                .push(" AND (LOCATE(")
+                .push_bind(term)
+                .push(",invoice_number)>0 OR LOCATE(")
+                .push_bind(term)
+                .push(",provider)>0)");
+        }
+        let totals: Vec<ExpenseCurrencyTotals> = totals_query
+            .push(" GROUP BY currency ORDER BY currency")
+            .build_query_as()
+            .fetch_all(&mut *tx)
+            .await?;
+        let mut items_query = QueryBuilder::<MySql>::new(
+            "SELECT id,invoice_number,CAST(expense_date AS CHAR) AS expense_date,provider,currency,CAST(taxable_amount AS CHAR) AS taxable_amount,CAST(exempt_amount AS CHAR) AS exempt_amount,CAST(isv_15 AS CHAR) AS isv_15,CAST(total AS CHAR) AS total FROM gastos_records WHERE deleted_at IS NULL AND expense_date>=",
+        );
+        items_query
+            .push_bind(filter.date_from)
+            .push(" AND expense_date<=")
+            .push_bind(filter.date_to);
+        if let Some(term) = filter.search() {
+            items_query
+                .push(" AND (LOCATE(")
+                .push_bind(term)
+                .push(",invoice_number)>0 OR LOCATE(")
+                .push_bind(term)
+                .push(",provider)>0)");
+        }
+        let items: Vec<ExpenseReportRow> = items_query
+            .push(" ORDER BY expense_date DESC,id DESC LIMIT ")
+            .push_bind(page_size + 1)
+            .push(" OFFSET ")
+            .push_bind((page - 1) * page_size)
+            .build_query_as()
+            .fetch_all(&mut *tx)
+            .await?;
+        let mut items = items;
+        let has_more = items.len() > page_size as usize;
+        items.truncate(page_size as usize);
+        tx.commit().await?;
+        Ok(ExpenseReport {
+            items,
+            totals,
+            page,
+            page_size,
+            has_more,
+        })
     }
 
     pub async fn detail(&self, actor: u64, id: u64) -> Result<Expense, CoreError> {

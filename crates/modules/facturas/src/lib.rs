@@ -7,7 +7,7 @@ pub use calculation::{InvoiceCalculation, calculate};
 pub use service::InvoiceService;
 
 use bastion_core::CoreError;
-use chrono::NaiveDate;
+use chrono::{Datelike, NaiveDate};
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Copy, Debug, Deserialize, Serialize)]
@@ -125,4 +125,73 @@ pub struct InvoiceSummary {
     pub status: String,
     pub total: String,
     pub balance: String,
+}
+
+#[derive(Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct InvoiceReportFilter {
+    pub date_from: NaiveDate,
+    pub date_to: NaiveDate,
+    pub search: Option<String>,
+    pub status: Option<String>,
+    pub page: Option<u32>,
+    pub page_size: Option<u32>,
+}
+
+impl InvoiceReportFilter {
+    pub fn bounds(&self) -> Result<(u32, u32), CoreError> {
+        let page = self.page.unwrap_or(1);
+        let page_size = self.page_size.unwrap_or(25);
+        if !(1000..=9999).contains(&self.date_from.year())
+            || !(1000..=9999).contains(&self.date_to.year())
+            || self.date_from > self.date_to
+            || self
+                .date_to
+                .signed_duration_since(self.date_from)
+                .num_days()
+                > 365
+            || self
+                .search
+                .as_ref()
+                .is_some_and(|value| value.chars().count() > 200)
+            || !(1..=10000).contains(&page)
+            || !(1..=1000).contains(&page_size)
+            || self
+                .status
+                .as_deref()
+                .is_some_and(|status| status != "Borrador")
+        {
+            return Err(CoreError::Invalid);
+        }
+        Ok((page, page_size))
+    }
+}
+
+#[derive(Debug, Serialize, sqlx::FromRow)]
+pub struct InvoiceReportRow {
+    pub id: u64,
+    pub client_name: String,
+    pub order_number: String,
+    pub invoice_date: String,
+    pub status: String,
+    pub total: String,
+    pub paid_total: String,
+    pub balance: String,
+}
+
+#[derive(Debug, Serialize, sqlx::FromRow)]
+pub struct InvoiceReportTotals {
+    pub records: u64,
+    pub total: String,
+    pub paid_total: String,
+    pub balance: String,
+}
+
+#[derive(Debug, Serialize)]
+pub struct InvoiceReport {
+    pub items: Vec<InvoiceReportRow>,
+    pub totals: InvoiceReportTotals,
+    pub page: u32,
+    pub page_size: u32,
+    pub has_more: bool,
 }

@@ -21,3 +21,4 @@ try { const api = new ApiClient(apiOrigin(window.BASTION_API_BASE)); root.render
 catch (error) { root.render(<ConfigurationError error={error} />); }
 import './styles/clientes.css';
 import './styles/gastos.css';
+import './styles/reportes.css';

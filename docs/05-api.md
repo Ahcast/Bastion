@@ -118,3 +118,7 @@ Colaboración: `/api/v1/colaboracion` lista y crea archivos; admite selección m
 ## Gastos
 
 El registro general expone `GET/POST /api/v1/gastos` y `GET/PUT/DELETE /api/v1/gastos/{id}`, con borrado lógico y resumen filtrado. `POST /api/v1/gastos/calculo` calcula sin persistir y exige editar/CSRF. Usa permisos `gastos/registros/ver`, `editar` y `eliminar`; Rust valida y calcula ISV/total. Parámetros, DTO, idempotencia y `ETag`/`If-Match` constan en [OpenAPI](modulos/gastos.openapi.yaml). Asociación con órdenes/facturas y filtros por usuario/orden siguen pendientes.
+
+## Reportes
+
+`GET /api/v1/reportes/{ordenes|facturas|gastos}` consulta los registros y agregados del período; `GET .../export` genera un libro SpreadsheetML 2003 con resumen y detalle. Requiere `reportes/{dominio}/ver` y lectura del módulo fuente. Gastos excluye registros borrados. DTO, filtros, respuestas y límites propuestos en [OpenAPI](modulos/reportes.openapi.yaml). MCP permanece pospuesto conforme a `06-mcp.md`.

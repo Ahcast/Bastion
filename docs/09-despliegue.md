@@ -91,3 +91,7 @@ El 2026-10-26 se permitió y activó Colaboración sobre la release vigente `a77
 ## Mantenimiento del repositorio antes de publicar
 
 Sincronizar las referencias de `origin/main` antes de implementar o preparar un release. Revisar divergencias y equivalencia de commits con `git cherry`; conservar un respaldo recuperable del historial y de los archivos locales antes de reconciliar. Las copias antiguas de módulos ya publicados se comparan con su historial para incorporar sólo los cambios nuevos sobre la versión vigente. Los respaldos operativos quedan fuera de Git y no se suben con el código.
+
+## Reportes: preparación
+
+El módulo añade su migración de cuota y consultas dentro de Órdenes, Facturas y Gastos. Para desplegar, usar artifacts del mismo commit con CI exitoso, respaldar MySQL y frontend, ejecutar `migrate` con la identidad de migración autorizada, agregar `reportes` a `BASTION_ALLOWED_MODULES` y verificar salud y estados. La activación administrativa y los permisos por dominio se revisan por separado. Mantener frontend en Bluehost y backend en AWS. Ver [alcance y estado](modulos/reportes-implementacion.md).

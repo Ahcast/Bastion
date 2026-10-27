@@ -2,6 +2,7 @@ use crate::{
     Destination, DestinationInput, OrderCalculation, OrderFilter, OrderInput, OrderPage,
     OrderSummary, PurchaseOrder, calculate,
 };
+use crate::{OrderReport, OrderReportFilter, OrderReportRow, OrderReportTotals};
 use bastion_core::{CoreAdmin, CoreError, Database};
 use sha2::{Digest, Sha256};
 use sqlx::{MySql, QueryBuilder, Row, Transaction};
@@ -149,6 +150,85 @@ impl OrderService {
             has_more,
         })
     }
+    pub async fn report(
+        &self,
+        actor: u64,
+        filter: &OrderReportFilter,
+    ) -> Result<OrderReport, CoreError> {
+        let (page, page_size) = filter.bounds()?;
+        let mut tx = self.begin(actor, "documentos", "ver").await?;
+        let mut totals_query = QueryBuilder::<MySql>::new(
+            "SELECT CAST(COUNT(*) AS UNSIGNED) AS records,CAST(COALESCE(SUM(CAST(JSON_UNQUOTE(JSON_EXTRACT(calculation_json,'$.totals.subtotal')) AS DECIMAL(30,2))),0) AS CHAR) AS subtotal,CAST(COALESCE(SUM(CAST(JSON_UNQUOTE(JSON_EXTRACT(calculation_json,'$.totals.tax')) AS DECIMAL(30,2))),0) AS CHAR) AS isv,CAST(COALESCE(SUM(CAST(JSON_UNQUOTE(JSON_EXTRACT(calculation_json,'$.totals.total')) AS DECIMAL(30,2))),0) AS CHAR) AS total,CAST(COALESCE(SUM(CAST(JSON_UNQUOTE(JSON_EXTRACT(calculation_json,'$.totals.products_investment')) AS DECIMAL(30,2))),0) AS CHAR) AS products_investment,CAST(COALESCE(SUM(CAST(JSON_UNQUOTE(JSON_EXTRACT(calculation_json,'$.totals.other_expenses')) AS DECIMAL(30,2))),0) AS CHAR) AS other_expenses,CAST(COALESCE(SUM(CAST(JSON_UNQUOTE(JSON_EXTRACT(calculation_json,'$.totals.investment_total')) AS DECIMAL(30,2))),0) AS CHAR) AS investment_total,CAST(COALESCE(SUM(CAST(JSON_UNQUOTE(JSON_EXTRACT(calculation_json,'$.totals.profit')) AS DECIMAL(30,2))),0) AS CHAR) AS profit FROM ordenes_orders WHERE order_date>=",
+        );
+        totals_query
+            .push_bind(filter.date_from)
+            .push(" AND order_date<=")
+            .push_bind(filter.date_to);
+        if let Some(term) = filter
+            .search
+            .as_deref()
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+        {
+            totals_query
+                .push(" AND (LOCATE(")
+                .push_bind(term)
+                .push(",n_orders)>0 OR LOCATE(")
+                .push_bind(term)
+                .push(",n_bill)>0 OR LOCATE(")
+                .push_bind(term)
+                .push(",client_name)>0)");
+        }
+        if let Some(status) = &filter.status {
+            totals_query.push(" AND status=").push_bind(status);
+        }
+        let totals: OrderReportTotals = totals_query.build_query_as().fetch_one(&mut *tx).await?;
+
+        let mut rows_query = QueryBuilder::<MySql>::new(
+            "SELECT id,n_orders,n_bill,client_name,CAST(order_date AS CHAR) AS order_date,status,JSON_UNQUOTE(JSON_EXTRACT(calculation_json,'$.totals.subtotal')) AS subtotal,JSON_UNQUOTE(JSON_EXTRACT(calculation_json,'$.totals.tax')) AS isv,JSON_UNQUOTE(JSON_EXTRACT(calculation_json,'$.totals.total')) AS total,JSON_UNQUOTE(JSON_EXTRACT(calculation_json,'$.totals.products_investment')) AS products_investment,JSON_UNQUOTE(JSON_EXTRACT(calculation_json,'$.totals.other_expenses')) AS other_expenses,JSON_UNQUOTE(JSON_EXTRACT(calculation_json,'$.totals.investment_total')) AS investment_total,JSON_UNQUOTE(JSON_EXTRACT(calculation_json,'$.totals.profit')) AS profit FROM ordenes_orders WHERE order_date>=",
+        );
+        rows_query
+            .push_bind(filter.date_from)
+            .push(" AND order_date<=")
+            .push_bind(filter.date_to);
+        if let Some(term) = filter
+            .search
+            .as_deref()
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+        {
+            rows_query
+                .push(" AND (LOCATE(")
+                .push_bind(term)
+                .push(",n_orders)>0 OR LOCATE(")
+                .push_bind(term)
+                .push(",n_bill)>0 OR LOCATE(")
+                .push_bind(term)
+                .push(",client_name)>0)");
+        }
+        if let Some(status) = &filter.status {
+            rows_query.push(" AND status=").push_bind(status);
+        }
+        let mut items: Vec<OrderReportRow> = rows_query
+            .push(" ORDER BY order_date DESC,id DESC LIMIT ")
+            .push_bind(page_size + 1)
+            .push(" OFFSET ")
+            .push_bind((page - 1) * page_size)
+            .build_query_as()
+            .fetch_all(&mut *tx)
+            .await?;
+        let has_more = items.len() > page_size as usize;
+        items.truncate(page_size as usize);
+        tx.commit().await?;
+        Ok(OrderReport {
+            items,
+            totals,
+            page,
+            page_size,
+            has_more,
+        })
+    }
+
     pub async fn detail(&self, actor: u64, id: u64) -> Result<PurchaseOrder, CoreError> {
         let mut tx = self.begin(actor, "documentos", "ver").await?;
         let order = load(&mut tx, id).await?;

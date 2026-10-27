@@ -47,6 +47,23 @@ export class ApiClient {
     }
     return data as T;
   }
+  async download(path: string): Promise<Blob> {
+    let response: Response;
+    try {
+      const transport = this.transport;
+      response = await transport(this.base + path, { method: 'GET', credentials: 'include', cache: 'no-store' });
+    } catch {
+      throw new Error('No se pudo conectar a la API; comprueba la conexión y vuelve a intentarlo.');
+    }
+    if (!response.ok) {
+      const data: unknown = await response.json().catch(() => null);
+      const title = record(data) && typeof data.title === 'string' ? data.title : '';
+      if (response.status === 401) this.hooks.unauthorized?.();
+      if (response.status === 428) this.hooks.reauthenticate?.();
+      throw new ApiError(response.status, title, record(data) && typeof data.detail === 'string' ? data.detail : 'La descarga no se pudo completar.');
+    }
+    return response.blob();
+  }
 }
 export function apiOrigin(value: unknown): string {
   if (typeof value !== 'string') throw new Error('Configura el origen público del API en config.js.');

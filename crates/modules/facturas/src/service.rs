@@ -1,3 +1,4 @@
+use crate::{InvoiceReport, InvoiceReportFilter, InvoiceReportRow, InvoiceReportTotals};
 use bastion_core::{CoreAdmin, CoreError, Database};
 use sha2::{Digest, Sha256};
 use sqlx::{MySql, QueryBuilder, Row, Transaction};
@@ -120,6 +121,81 @@ impl InvoiceService {
         tx.commit().await?;
         Ok(InvoicePage {
             items,
+            page,
+            page_size,
+            has_more,
+        })
+    }
+
+    pub async fn report(
+        &self,
+        actor: u64,
+        filter: &InvoiceReportFilter,
+    ) -> Result<InvoiceReport, CoreError> {
+        let (page, page_size) = filter.bounds()?;
+        let mut tx = self.begin(actor, "ver").await?;
+        let mut totals_query = QueryBuilder::<MySql>::new(
+            "SELECT CAST(COUNT(*) AS UNSIGNED) AS records,CAST(COALESCE(SUM(CAST(JSON_UNQUOTE(JSON_EXTRACT(calculation_json,'$.totals.total')) AS DECIMAL(30,2))),0) AS CHAR) AS total,CAST(COALESCE(SUM(CAST(JSON_UNQUOTE(JSON_EXTRACT(calculation_json,'$.paid_total')) AS DECIMAL(30,2))),0) AS CHAR) AS paid_total,CAST(COALESCE(SUM(CAST(JSON_UNQUOTE(JSON_EXTRACT(calculation_json,'$.balance')) AS DECIMAL(30,2))),0) AS CHAR) AS balance FROM facturas_drafts WHERE invoice_date>=",
+        );
+        totals_query
+            .push_bind(filter.date_from)
+            .push(" AND invoice_date<=")
+            .push_bind(filter.date_to);
+        if let Some(term) = filter
+            .search
+            .as_deref()
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+        {
+            totals_query
+                .push(" AND (LOCATE(")
+                .push_bind(term)
+                .push(",client_name)>0 OR LOCATE(")
+                .push_bind(term)
+                .push(",order_number)>0)");
+        }
+        if let Some(status) = &filter.status {
+            totals_query.push(" AND status=").push_bind(status);
+        }
+        let totals: InvoiceReportTotals = totals_query.build_query_as().fetch_one(&mut *tx).await?;
+
+        let mut rows_query = QueryBuilder::<MySql>::new(
+            "SELECT id,client_name,order_number,CAST(invoice_date AS CHAR) AS invoice_date,status,JSON_UNQUOTE(JSON_EXTRACT(calculation_json,'$.totals.total')) AS total,JSON_UNQUOTE(JSON_EXTRACT(calculation_json,'$.paid_total')) AS paid_total,JSON_UNQUOTE(JSON_EXTRACT(calculation_json,'$.balance')) AS balance FROM facturas_drafts WHERE invoice_date>=",
+        );
+        rows_query
+            .push_bind(filter.date_from)
+            .push(" AND invoice_date<=")
+            .push_bind(filter.date_to);
+        if let Some(term) = filter
+            .search
+            .as_deref()
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+        {
+            rows_query
+                .push(" AND (LOCATE(")
+                .push_bind(term)
+                .push(",client_name)>0 OR LOCATE(")
+                .push_bind(term)
+                .push(",order_number)>0)");
+        }
+        if let Some(status) = &filter.status {
+            rows_query.push(" AND status=").push_bind(status);
+        }
+        let mut items: Vec<InvoiceReportRow> = rows_query
+            .push(" ORDER BY invoice_date DESC,id DESC LIMIT ")
+            .push_bind(page_size + 1)
+            .push(" OFFSET ")
+            .push_bind((page - 1) * page_size)
+            .build_query_as()
+            .fetch_all(&mut *tx)
+            .await?;
+        let has_more = items.len() > page_size as usize;
+        items.truncate(page_size as usize);
+        tx.commit().await?;
+        Ok(InvoiceReport {
+            items,
+            totals,
             page,
             page_size,
             has_more,

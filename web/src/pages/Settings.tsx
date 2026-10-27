@@ -22,7 +22,7 @@ const ExpenseSettings = lazy(() => import('./Gastos.js').then(module => ({ defau
 export default function Settings({ section, select }: { section: SettingsSection; select: (section: SettingsSection) => void }) {
   const { access } = useCore();
   const selected = settingsSections(access).find(entry => entry.id === section) ?? { id: 'cuenta', label: 'Mi cuenta' };
-  return <section aria-label="Ajustes"><div className="settings-location"><span>Ajustes</span><span aria-hidden="true"> / </span><strong>{selected.label}</strong></div><SettingsNavigation access={access} section={selected.id} select={select} /><div key={selected.id}><Suspense fallback={<Loading />}>{selected.id === 'colaboracion' ? <CollaborationSettings /> : selected.id === 'personas' ? <People /> : selected.id === 'usuarios' ? <Users /> : selected.id === 'roles' ? <Roles /> : selected.id === 'core' ? <CoreSettings /> : selected.id === 'clientes' ? <ClientSettings /> : selected.id === 'proveedores' ? <SupplierSettings /> : selected.id === 'ordenes_compra' ? <OrderSettings /> : selected.id === 'cotizaciones' ? <QuoteSettings /> : selected.id === 'facturas' ? <InvoiceSettings /> : selected.id === 'gastos' ? <ExpenseSettings /> : selected.id === 'procesos' ? <ProcessSettings /> : <Account />}</Suspense></div></section>;
+  return <section aria-label="Ajustes"><div className="settings-location"><span>Ajustes</span><span aria-hidden="true"> / </span><strong>{selected.label}</strong></div><SettingsNavigation access={access} section={selected.id} select={select} /><div key={selected.id}><Suspense fallback={<Loading />}>{selected.id === 'colaboracion' ? <CollaborationSettings /> : selected.id === 'personas' ? <People /> : selected.id === 'usuarios' ? <Users /> : selected.id === 'roles' ? <Roles /> : selected.id === 'core' ? <CoreSettings /> : selected.id === 'clientes' ? <ClientSettings /> : selected.id === 'proveedores' ? <SupplierSettings /> : selected.id === 'ordenes_compra' ? <OrderSettings /> : selected.id === 'cotizaciones' ? <QuoteSettings /> : selected.id === 'facturas' ? <InvoiceSettings /> : selected.id === 'gastos' ? <ExpenseSettings /> : selected.id === 'reportes' ? <ReportSettings /> : selected.id === 'procesos' ? <ProcessSettings /> : <Account />}</Suspense></div></section>;
 }
 function CoreSettings() {
   const { navigate } = useNavigationGuard();
@@ -58,3 +58,5 @@ function ClientSettings() { return <section className="card"><h2>Clientes</h2><p
 
 function InvoiceSettings() { return <section className="card stack"><h2>Facturas</h2><p>Primera etapa: borradores con venta, inversión, gastos y saldo calculados por el servidor. Emisión, pagos, PDF, nota de entrega, recibos y conversiones siguen pendientes.</p><SarSettings /></section>; }
 
+
+function ReportSettings() { return <section className="card"><h2>Reportes</h2><p>El módulo no tiene ajustes propios documentados. Los permisos de lectura se asignan por cada dominio en Roles y permisos.</p></section>; }
