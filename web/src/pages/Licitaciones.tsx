@@ -3,6 +3,7 @@ import { ApiError, message } from '../api.js';
 import { moduleCan } from '../types.js';
 import { Dialog, Heading, Loading, Notice, Table, useCore, useLoad } from '../ui.js';
 import { useNavigationGuard, useUnsavedChanges } from '../navigationGuard.js';
+import { DocumentSection, DocumentPagination } from '../components/DocumentWorkspace.js';
 import { fieldValue, missingLabels, sectionLabels } from '../tenders.js';
 import type { Expedient, ExpedientSummary, FormCopy, FormSection, FormValues, PublishedForm, TenderPage } from '../tenders.js';
 
@@ -10,20 +11,22 @@ export default function Licitaciones() {
   const { access } = useCore();
   const [id, setId] = useState<number | null>(null);
   if (!moduleCan(access, 'licitaciones', 'expedientes', 'ver')) return <Notice>No tienes acceso a Licitaciones.</Notice>;
-  return id === null ? <ExpedientList open={setId} /> : <ExpedientWorkspace key={id} id={id} back={() => setId(null)} />;
+  return <div className="document-workspace">{id === null ? <ExpedientList open={setId} /> : <ExpedientWorkspace key={id} id={id} back={() => setId(null)} />}</div>;
 }
 function ExpedientList({ open }: { open: (id: number) => void }) {
   const { api, access } = useCore();
   const [page, setPage] = useState(1), [busy, setBusy] = useState(false), [error, setError] = useState('');
   const attempt = useRef<string | null>(null);
   const result = useLoad(signal => api.request<TenderPage<ExpedientSummary>>(`/api/v1/licitaciones?page=${page}`, { signal }), [page]);
-  return <><Heading title="Licitaciones" description="Expedientes independientes. Sus datos se incorporan mediante los formularios que publiques en la biblioteca." action={moduleCan(access, 'licitaciones', 'expedientes', 'editar') && <button className="primary" disabled={busy} onClick={async () => {
+  return <><Heading title="Licitaciones" description="Prepara y consulta tus expedientes con los formularios de la biblioteca." action={moduleCan(access, 'licitaciones', 'expedientes', 'editar') && <button className="primary" disabled={busy} onClick={async () => {
     if (busy) return; setBusy(true); setError(''); attempt.current ??= crypto.randomUUID();
     try { const record = await api.request<Expedient>('/api/v1/licitaciones', { method: 'POST', body: {}, idempotencyKey: attempt.current }); attempt.current = null; open(record.id); }
     catch (reason) { setError(message(reason)); } finally { setBusy(false); }
   }}>{busy ? 'Creando…' : 'Nuevo expediente'}</button>} />
+    <DocumentSection title="Listado de expedientes" metadata={result.data ? `${result.data.items.length} en esta página` : undefined} list>
     <Notice>{error || result.error}</Notice>
-    {result.data ? <><Table columns={['Expediente', 'Estado', 'Versión', 'Acción']} rows={result.data.items.map(e => [`#${e.id}`, e.state === 'borrador' ? 'Borrador' : e.state, e.version, <button onClick={() => open(e.id)}>Abrir expediente</button>])} /><div className="row"><button disabled={page === 1} onClick={() => setPage(p => p - 1)}>Anterior</button><span>Página {page}</span><button disabled={!result.data.has_more} onClick={() => setPage(p => p + 1)}>Siguiente</button></div></> : !result.error && <Loading />}
+    {result.data ? <><Table columns={['Expediente', 'Estado', 'Versión', 'Acción']} rows={result.data.items.map(e => [<span className="document-id">#{e.id}</span>, <span className="document-state">{e.state === 'borrador' ? 'Borrador' : e.state}</span>, <span className="document-id">{e.version}</span>, <button onClick={() => open(e.id)}>Abrir expediente</button>])} /><DocumentPagination page={page} hasMore={result.data.has_more} change={setPage} busy={busy} /></> : !result.error && <Loading />}
+    </DocumentSection>
   </>;
 }
 type Tab = 'resumen' | 'variables' | FormSection | 'pdf';
@@ -37,15 +40,15 @@ function ExpedientWorkspace({ id, back }: { id: number; back: () => void }) {
   const selectedCopy = record?.forms.find(c => c.id === copyId);
   return <><Heading title={`Expediente #${id}`} description="Cada formulario conserva la revisión de biblioteca con la que fue incorporado." action={<button onClick={() => { void navigate(back); }}>Volver al listado</button>} />
     <Notice>{result.error}</Notice>{!record && !result.error && <Loading />}
-    {record && <><div className="row section-tabs" aria-label="Secciones del expediente">{tabs.map(entry => <button key={entry.id} aria-pressed={tab === entry.id} onClick={() => { void navigate(() => { setCopyId(null); setTab(entry.id); }); }}>{entry.label}</button>)}</div>
-      <div className="row"><span>{record.state === 'borrador' ? 'Borrador' : record.state} · Versión {record.version}</span><button onClick={() => { void navigate(result.reload); }}>Actualizar expediente</button></div>
-      {tab === 'resumen' ? <section className="card stack"><h2>Contenido del expediente</h2><p>{record.forms.length} formularios incorporados. {record.forms.reduce((n, c) => n + c.missing_required.length, 0)} valores obligatorios pendientes.</p><p>El expediente comienza vacío. Los campos se declaran al incorporar cada formulario en Colaboración → Biblioteca de formularios.</p><p>Lotes, ítems, archivos, generación PDF y adjudicación están pendientes de las siguientes etapas.</p>{moduleCan(access, 'licitaciones', 'expedientes', 'eliminar') && record.state === 'borrador' && <button className="danger" onClick={() => setDeleting(true)}>Eliminar borrador</button>}</section>
-        : tab === 'pdf' ? <section className="card"><h2>PDF final</h2><p>La generación, el índice automático, el foliado y el historial se incorporarán al completar la infraestructura documental. Todavía no hay un PDF generado.</p></section>
-        : <section className="card stack"><div className="row"><h2>{tabs.find(t => t.id === tab)?.label}</h2>{editable && tab !== 'variables' && moduleCan(access, 'colaboracion', 'empresa', 'ver') && <button onClick={() => { void navigate(() => { setCopyId(null); setCopying(true); }); }}>Incorporar formulario</button>}</div>
+    {record && <><div className="row section-tabs document-tabs" aria-label="Secciones del expediente">{tabs.map(entry => <button key={entry.id} aria-pressed={tab === entry.id} onClick={() => { void navigate(() => { setCopyId(null); setTab(entry.id); }); }}>{entry.label}</button>)}</div>
+      <div className="document-details"><span className="document-metadata">{record.state === 'borrador' ? 'Borrador' : record.state} · Versión {record.version}</span><button onClick={() => { void navigate(result.reload); }}>Actualizar expediente</button></div>
+      {tab === 'resumen' ? <DocumentSection title="Contenido del expediente"><div className="stack"><p>{record.forms.length} formularios incorporados. {record.forms.reduce((n, c) => n + c.missing_required.length, 0)} valores obligatorios pendientes.</p><p>El expediente comienza vacío. Los campos se declaran al incorporar cada formulario en Colaboración → Biblioteca de formularios.</p><p>Lotes, ítems, archivos, generación PDF y adjudicación están pendientes de las siguientes etapas.</p>{moduleCan(access, 'licitaciones', 'expedientes', 'eliminar') && record.state === 'borrador' && <button className="danger" onClick={() => setDeleting(true)}>Eliminar borrador</button>}</div></DocumentSection>
+        : tab === 'pdf' ? <DocumentSection title="PDF final"><p>La generación, el índice automático, el foliado y el historial se incorporarán al completar la infraestructura documental. Todavía no hay un PDF generado.</p></DocumentSection>
+        : <DocumentSection title={tabs.find(t => t.id === tab)?.label ?? "Formularios"} list action={editable && tab !== 'variables' && moduleCan(access, 'colaboracion', 'empresa', 'ver') && <button onClick={() => { void navigate(() => { setCopyId(null); setCopying(true); }); }}>Incorporar formulario</button>}>
           {!moduleCan(access, 'colaboracion', 'empresa', 'ver') && tab !== 'variables' && <p className="muted">Para incorporar nuevos formularios necesitas acceso a Colaboración. Las copias existentes siguen disponibles.</p>}
           <Table columns={['Formulario', 'Revisión de origen', 'Obligatorios pendientes', 'Acción']} rows={record.forms.filter(c => tab === 'variables' || c.source.definition.section === tab).map(c => [c.source.definition.title, c.source.revision, c.missing_required.length, <button onClick={() => { void navigate(() => setCopyId(c.id)); }}>Abrir valores</button>])} />
           {selectedCopy && <ValuesEditor key={`${selectedCopy.id}:${record.version}`} copy={selectedCopy} record={record} editable={Boolean(editable)} saved={value => { result.setData(value); notify('Valores guardados.'); }} reload={() => { void navigate(result.reload); }} />}
-        </section>}
+        </DocumentSection>}
       {copying && (tab === 'legal' || tab === 'economica' || tab === 'tecnica') && <CopyPicker record={record} section={tab} close={() => setCopying(false)} saved={value => { result.setData(value); setCopying(false); notify('Copia independiente incorporada.'); }} />}
       {deleting && <DeleteExpedient record={record} close={() => setDeleting(false)} deleted={back} />}
     </>}
@@ -57,17 +60,17 @@ function ValuesEditor({ copy, record, editable, saved, reload }: { copy: FormCop
   const [busy, setBusy] = useState(false), [error, setError] = useState(''), [conflict, setConflict] = useState(false);
   const baseline = useRef(JSON.stringify(values));
   useUnsavedChanges(JSON.stringify(values) !== baseline.current, busy);
-  return <form className="stack" onSubmit={async event => {
+  return <form className="stack document-values" onSubmit={async event => {
     event.preventDefault(); if (busy || !editable) return; setBusy(true); setError(''); setConflict(false);
     try { const updated = await api.request<Expedient>(`/api/v1/licitaciones/${record.id}/formularios/${copy.id}/valores`, { method: 'PUT', body: { values }, ifMatch: record.version }); baseline.current = JSON.stringify(values); saved(updated); }
     catch (reason) { setError(message(reason)); setConflict(reason instanceof ApiError && reason.status === 412); } finally { setBusy(false); }
   }}><h3>{copy.source.definition.title}</h3><Notice>{error}</Notice>{conflict && <button type="button" onClick={reload}>Cargar versión actual</button>}
-    {copy.missing_required.length > 0 && <p role="status">Pendientes: {missingLabels(copy).join(', ')}. Puedes guardar avances.</p>}
-    <fieldset disabled={busy || !editable} className="form-fields">{copy.source.definition.variables.map(v => <label key={v.key}>{v.label}{v.required ? ' · obligatorio' : ''}
+    {copy.missing_required.length > 0 && <p className="document-note" role="status">Pendientes: {missingLabels(copy).join(', ')}. Puedes guardar avances.</p>}
+    <fieldset disabled={busy || !editable} className="document-fields">{copy.source.definition.variables.map(v => <label className={v.kind === "text" ? "document-wide" : undefined} key={v.key}>{v.label}{v.required ? ' · obligatorio' : ''}
       {v.kind === 'boolean' ? <select value={values[v.key] === undefined ? '' : String(values[v.key])} onChange={e => setValues(current => ({ ...current, [v.key]: fieldValue(v.kind, e.target.value) }))}><option value="">Sin completar</option><option value="true">Sí</option><option value="false">No</option></select>
         : v.kind === 'text' ? <textarea value={String(values[v.key] ?? '')} maxLength={4000} onChange={e => setValues(current => ({ ...current, [v.key]: e.target.value }))} />
           : <input type={v.kind === 'date' ? 'date' : 'text'} inputMode={v.kind === 'decimal' ? 'decimal' : v.kind === 'integer' ? 'numeric' : undefined} maxLength={v.kind === 'decimal' ? 44 : 31} value={String(values[v.key] ?? '')} onChange={e => setValues(current => ({ ...current, [v.key]: e.target.value }))} />}
-    </label>)}{!copy.source.definition.variables.length && <p>Este formulario no declara variables de captura.</p>}{editable && <button className="primary" type="submit">{busy ? 'Guardando…' : 'Guardar valores'}</button>}</fieldset>
+    </label>)}{!copy.source.definition.variables.length && <p>Este formulario no declara variables de captura.</p>}{editable && <div className="document-wide document-save"><button className="primary" type="submit">{busy ? 'Guardando…' : 'Guardar valores'}</button></div>}</fieldset>
   </form>;
 }
 function CopyPicker({ record, section, close, saved }: { record: Expedient; section: FormSection; close: () => void; saved: (e: Expedient) => void }) {
@@ -81,7 +84,7 @@ function CopyPicker({ record, section, close, saved }: { record: Expedient; sect
       if (attempt.current?.id !== form.id || attempt.current.revision !== form.revision) attempt.current = { id: form.id, revision: form.revision, key: crypto.randomUUID() };
       try { saved(await api.request<Expedient>(`/api/v1/licitaciones/${record.id}/formularios`, { method: 'POST', body: { source_id: form.id, revision: form.revision }, ifMatch: record.version, idempotencyKey: attempt.current.key })); }
       catch (reason) { setError(message(reason)); } finally { setBusy(false); }
-    }}>Incorporar</button>])} /><div className="row"><button disabled={busy || page === 1} onClick={() => setPage(p => p - 1)}>Anterior</button><span>Página {page}</span><button disabled={busy || !result.data.has_more} onClick={() => setPage(p => p + 1)}>Siguiente</button></div></> : !result.error && <Loading />}
+    }}>Incorporar</button>])} /><DocumentPagination page={page} hasMore={result.data.has_more} change={setPage} busy={busy} /></> : !result.error && <Loading />}
   </Dialog>;
 }
 function DeleteExpedient({ record, close, deleted }: { record: Expedient; close: () => void; deleted: () => void }) {

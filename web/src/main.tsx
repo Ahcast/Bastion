@@ -7,6 +7,7 @@ import { ApiClient, apiOrigin } from './api.js';
 import './styles/panel.css';
 import './styles/dashboard.css';
 import './styles/cotizaciones.css';
+import './styles/document-workspace.css';
 import './styles/facturas.css';
 import './styles/ordenes.css';
 import './styles/colaboracion.css';

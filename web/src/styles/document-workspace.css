@@ -1,0 +1,56 @@
+/* Concreto: shared Core tokens and the section/list rhythm of Cotizaciones. */
+.document-workspace{min-width:0;display:grid;gap:24px}
+.document-workspace>.pagehead{margin-bottom:0}
+.document-section{min-width:0;border-top:2px solid var(--ink)}
+.document-section-heading{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;padding-top:12px;margin-bottom:16px}
+.document-section-heading h2{font-size:17px;line-height:1.4;font-weight:600;margin:0}
+.document-section-heading>button{font-size:13px;padding:7px 11px}
+.document-metadata{font:11px/1.5 var(--mono);color:var(--muted)}
+.document-list .table-wrap{border:0;border-top:1px solid var(--ink);background:var(--panel)}
+.document-list .core-table{min-width:0;width:100%}
+.document-list th{background:transparent;font:500 10px/1.5 var(--mono);padding:10px 12px;border-bottom:1px solid var(--ink);color:var(--muted)}
+.document-list td{padding:13px 12px;font-size:14px;vertical-align:middle;border-bottom:1px solid var(--line)}
+.document-list tr:hover td{background:var(--accent-dim)}
+.document-list td:last-child button{padding:6px 9px;font-size:12px;background:transparent}
+.document-id{font:500 12px/1.6 var(--mono);overflow-wrap:anywhere}
+.document-state{display:inline-flex;align-items:center;gap:6px;font-size:12px}
+.document-state::before{content:'';width:6px;height:6px;background:var(--muted);flex:none}
+.document-pagination{display:flex;align-items:center;justify-content:flex-end;gap:12px;margin-top:16px}
+.document-pagination button{background:transparent;padding:6px 10px;font-size:12px}
+.document-pagination span{font:11px var(--mono);color:var(--muted)}
+.document-details{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;padding:12px 0;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+.document-details button{background:transparent;font-size:12px;padding:6px 10px}
+.document-tabs{gap:8px;margin:0;align-items:stretch}
+.document-tabs button{background:transparent;font-size:12px}
+.document-section p{font-size:14px;line-height:1.6;overflow-wrap:anywhere}
+.document-note{font-size:12px!important;line-height:1.5!important;color:var(--muted);margin:12px 0}
+.document-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;border:0;padding:0;margin:0;min-width:0;align-items:start}
+.document-fields>label{min-width:0;font-size:12px}
+.document-fields input,.document-fields select,.document-fields textarea{font-size:14px;font-weight:400;padding:9px 10px;min-width:0;max-width:100%}
+.document-fields textarea{min-height:96px;resize:vertical}
+.document-fields small{font-size:11px;font-weight:400;overflow-wrap:anywhere}
+.document-fields .document-wide,.document-fields>button,.document-fields>p,.document-fields>fieldset{grid-column:1/-1}
+.document-fields>button{justify-self:start}
+.document-variable{min-width:0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;padding:14px 0 0;margin:0;border:0;border-top:1px solid var(--line)}
+.document-variable legend{padding:0 8px 0 0;font:500 11px/1.6 var(--mono);color:var(--muted)}
+.document-variable>button{justify-self:start;font-size:12px;background:transparent}
+.document-section .stack>.danger{justify-self:start}
+.document-check{display:flex!important;align-items:flex-start;gap:10px;font-size:13px!important;line-height:1.5}
+.document-check input{width:18px;height:18px;flex:none;margin:1px 0 0;accent-color:var(--ink)}
+.document-save{padding-top:16px;margin-top:8px;border-top:1px solid var(--line);display:flex;justify-content:flex-end}
+.document-values{margin-top:24px;min-width:0;border-top:1px solid var(--line);padding-top:16px}
+.document-values h3{margin:0 0 16px;font-size:16px;overflow-wrap:anywhere}
+@media(max-width:760px){.document-fields,.document-variable{grid-template-columns:minmax(0,1fr)}}
+@media(max-width:640px){
+ .document-workspace{gap:20px}
+ .document-section-heading{margin-bottom:14px}
+ .document-section-heading h2{font-size:15px}
+ .document-metadata{font-size:10px}
+ .document-list .core-table td{padding:9px 12px;align-items:center}
+ .document-pagination{justify-content:space-between;gap:8px}
+ .document-details{align-items:flex-start}
+ .document-tabs{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}
+ .document-tabs button{min-width:0;white-space:normal;overflow-wrap:anywhere;padding:9px}
+ .document-fields input,.document-fields select,.document-fields textarea{font-size:16px}
+ .document-save button{width:100%}
+}
