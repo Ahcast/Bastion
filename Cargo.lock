@@ -280,6 +280,7 @@ dependencies = [
 name = "bastion-document-flows"
 version = "0.1.0"
 dependencies = [
+ "base64 0.22.1",
  "bastion-core",
  "bastion-cotizaciones",
  "bastion-facturas",
@@ -298,6 +299,7 @@ dependencies = [
  "bastion-clientes",
  "bastion-core",
  "bastion-cotizaciones",
+ "bastion-ordenes-compra",
  "chrono",
  "serde",
  "serde_json",
@@ -327,6 +329,7 @@ version = "0.1.0"
 name = "bastion-ordenes-compra"
 version = "0.1.0"
 dependencies = [
+ "base64 0.22.1",
  "bastion-core",
  "bastion-cotizaciones",
  "chrono",

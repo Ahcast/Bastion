@@ -210,3 +210,13 @@ components:
         page: {type: integer}
         page_size: {type: integer}
         has_more: {type: boolean}
+
+    OrderOrigin:
+      type: [object, "null"]
+      readOnly: true
+      description: source_order de la respuesta de borrador; instantánea de la orden origen conservada al editar.
+      required: [id, version, number]
+      properties:
+        id: {type: integer, minimum: 1}
+        version: {type: integer, minimum: 1}
+        number: {type: string}

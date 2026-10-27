@@ -69,8 +69,17 @@ pub struct InvoiceInput {
     pub expenses: Vec<InvoiceExpense>,
 }
 
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct OrderOrigin {
+    pub id: u64,
+    pub version: u64,
+    pub number: String,
+}
+
 #[derive(Debug, Deserialize, Serialize)]
 pub struct InvoiceDraft {
+    #[serde(default)]
+    pub source_order: Option<OrderOrigin>,
     #[serde(default)]
     pub source_quote: Option<bastion_cotizaciones::QuoteOrigin>,
     pub id: u64,

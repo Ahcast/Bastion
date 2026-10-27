@@ -147,6 +147,17 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
             }
         });
     }
+    if config.ordenes_compra_allowed {
+        let orders = bastion_ordenes_compra::OrderService::new(core.database(), core.admin());
+        tokio::spawn(async move {
+            loop {
+                if orders.clean_one_document().await.is_err() {
+                    tracing::error!("order document cleanup failed");
+                }
+                tokio::time::sleep(std::time::Duration::from_secs(10)).await;
+            }
+        });
+    }
     let app = router(core, app_origin, config.trusted_proxy_cidrs, scout_csv_path)?;
     let listener = TcpListener::bind(config.listen_addr).await?;
     let local_addr: SocketAddr = listener.local_addr()?;

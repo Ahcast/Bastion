@@ -3,6 +3,10 @@
 mod calculation;
 mod service;
 pub use calculation::{OrderCalculation, OrderTotals, calculate};
+pub use service::{
+    MAX_DOCUMENT_BYTES, OrderDocument, OrderDocumentContent, OrderDocumentInput,
+    OrderDocumentWrite, OrderDocuments,
+};
 pub use service::{OrderService, quote_order_input};
 
 use bastion_core::CoreError;
@@ -18,6 +22,8 @@ pub enum ProductStatus {
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct OrderProduct {
+    #[serde(default)]
+    pub line_id: String,
     pub description: String,
     pub cantidad: u32,
     // Legacy names: sale_price is cost; purchase_price is selling price.

@@ -501,7 +501,9 @@ fn run_output(
     }
 }
 pub(crate) fn validate_key(key: &str) -> Result<(), CoreError> {
-    if !(key.starts_with("cotizaciones/") || key.starts_with("colaboracion/"))
+    if !(key.starts_with("cotizaciones/")
+        || key.starts_with("colaboracion/")
+        || key.starts_with("ordenes_compra/"))
         || key.len() > 250
         || key
             .split('/')
@@ -521,6 +523,8 @@ mod tests {
     #[test]
     fn storage_paths_never_escape_the_module_prefix() {
         assert!(validate_key("cotizaciones/12/3/document-v1.pdf").is_ok());
+        assert!(validate_key("ordenes_compra/12/products/abc").is_ok());
+        assert!(validate_key("ordenes_compra/../secret").is_err());
         assert!(validate_key("colaboracion/empresa/abc-123").is_ok());
         assert!(validate_key("colaboracion/personas/12/abc-123").is_ok());
         for value in [

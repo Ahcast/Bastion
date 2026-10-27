@@ -31,6 +31,7 @@ pub fn quote_order_input(source: &QuoteDraft) -> Result<OrderInput, &'static str
             return Err("Órdenes todavía no admite ISV del 18%; no se cambiará el impuesto.");
         }
         products.push(OrderProduct {
+            line_id: String::new(),
             description: row.description.clone(),
             cantidad: (quantity / 10000) as u32,
             sale_price: "0".into(),
@@ -96,7 +97,8 @@ impl OrderService {
         let mut input = quote_order_input(source).map_err(|_| CoreError::Invalid)?;
         input.n_orders = n_orders.to_owned();
         input.id_destination = Some(destination);
-        let calculation = calculate(&input)?;
+        let mut calculation = calculate(&input)?;
+        super::actions::fresh_lines(&mut calculation.data);
         calculation.ensure_saveable()?;
         validate_destination(tx, calculation.data.id_destination).await?;
         let origin = QuoteOrigin::from(source);

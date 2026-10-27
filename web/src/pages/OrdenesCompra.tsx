@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { ApiError, message } from '../api.js';
 import { Form, Heading, Loading, Notice, Table, useCore, useLoad } from '../ui.js';
+import { OrderDocuments } from '../components/OrderDocuments.js';
 import { QuoteActions } from '../components/QuoteActions.js';
 import { Decimal } from '../components/QuoteItems.js';
 import { useNavigationGuard, useUnsavedChanges } from '../navigationGuard.js';
@@ -9,20 +10,46 @@ import { newOrder, newProduct } from '../orders.js';
 import type { Destination, OrderCalculation, OrderInput, OrderPage, OrderProduct, PurchaseOrder } from '../orders.js';
 
 const base = '/api/v1/ordenes-compra';
-const stage = 'Primera etapa: cliente manual, productos, gastos y destinos. Adjuntos, proveedores, clonación, eliminación y conversión a factura están pendientes.';
-export default function OrdenesCompra({ initialId }: { initialId?: number } = {}) {
+const stage = 'Primera etapa: cliente manual, productos, gastos y destinos. Documentos privados por producto, clonación y conversión a borrador de factura disponibles. Proveedores y eliminación de órdenes pendientes.';
+export default function OrdenesCompra({ initialId,openInvoice }: { initialId?: number;openInvoice?:(id:number)=>void } = {}) {
   const { access } = useCore();
-  return moduleCan(access, 'ordenes_compra', 'documentos', 'ver') ? <Workspace initialId={initialId} /> : <Notice>No tienes acceso a Órdenes de compra.</Notice>;
+  return moduleCan(access, 'ordenes_compra', 'documentos', 'ver') ? <Workspace initialId={initialId} openInvoice={openInvoice} /> : <Notice>No tienes acceso a Órdenes de compra.</Notice>;
 }
-function Workspace({ initialId }: { initialId?: number }) {
+function Workspace({ initialId,openInvoice }: { initialId?: number;openInvoice?:(id:number)=>void }) {
   const { api, access } = useCore();
   const editable = moduleCan(access, 'ordenes_compra', 'documentos', 'editar');
+  const invoiceEditable=moduleCan(access,'facturas','documentos','editar')&&moduleCan(access,'facturas','documentos','ver');
+  const [documentsId,setDocumentsId]=useState<number|null>(null);
+  const attempts=useRef(new Map<string,{key:string;version:number}>()),running=useRef(false);
+  const [uncertain,setUncertain]=useState(false);
+  const action=async(id:number,version:number,kind:'clone'|'convert/invoice')=>{
+    if(running.current)return;running.current=true;setBusy(true);setError('');
+    const label=kind+':'+id;
+    let attempt=attempts.current.get(label);
+    if(!attempt){attempt={key:crypto.randomUUID(),version};attempts.current.set(label,attempt);}
+    try{
+      if(kind==='clone'){
+        const clone=await api.request<PurchaseOrder>(base+'/'+id+'/clone',{method:'POST',ifMatch:attempt.version,idempotencyKey:attempt.key});
+        setSelected(clone);setMode('edit');
+      }else{
+        const result=await api.request<{target_id:number}>(base+'/'+id+'/convert/invoice',{method:'POST',ifMatch:attempt.version,idempotencyKey:attempt.key});
+        openInvoice?.(result.target_id);
+      }
+      attempts.current.delete(label);setUncertain(false);result.reload();
+    }catch(reason){
+      setError(kind==='convert/invoice'&&reason instanceof ApiError&&reason.status===400?'No se pudo convertir. Revisa que la orden tenga productos, ventas y costos con hasta dos decimales, y totales compatibles con Facturas.':message(reason));
+      if(reason instanceof ApiError&&reason.status<500&&reason.status!==408){attempts.current.delete(label);setUncertain(false);if(reason.status===412)result.reload();}
+      else setUncertain(true);
+    }finally{running.current=false;setBusy(false);}
+  };
   const [selected, setSelected] = useState<PurchaseOrder | 'new' | null>(null), [mode, setMode] = useState<'view' | 'edit'>('view');
   const [search, setSearch] = useState(''), [status, setStatus] = useState(''), [min, setMin] = useState(''), [max, setMax] = useState('');
   const [query, setQuery] = useState(''), [page, setPage] = useState(1), [error, setError] = useState(''), [busy, setBusy] = useState(false);
+  useUnsavedChanges(uncertain,busy);
   const result = useLoad(signal => api.request<OrderPage>(`${base}?${query}&page=${page}&page_size=25`, { signal }), [query, page]);
   const open = async (id: number, next: 'view' | 'edit') => { setBusy(true); setError(''); try { setSelected(await api.request<PurchaseOrder>(`${base}/${id}`)); setMode(next); } catch (reason) { setError(message(reason)); } finally { setBusy(false); } };
   useEffect(() => { if (initialId) void open(initialId, 'edit'); }, [initialId, api]);
+  if(documentsId!==null)return <OrderDocuments id={documentsId} close={()=>{setDocumentsId(null);result.reload();}}/>;
   if (selected) return <OrderEditor key={selected === 'new' ? 'new' : selected.id} initial={selected === 'new' ? null : selected} editable={editable && mode === 'edit'} edit={editable && mode === 'view' ? () => setMode('edit') : undefined} close={() => { setSelected(null); result.reload(); }} />;
   return <><Heading title="Órdenes de compra" description="Sigue productos, venta, inversión y entrega de tus órdenes." action={editable && <button className="primary" disabled={busy} onClick={() => { setSelected('new'); setMode('edit'); }}>Nueva orden</button>} /><p className="quote-stage">{stage}</p>
     <section className="quote-list order-list" aria-labelledby="order-list-title"><div className="quote-list-heading"><h2 id="order-list-title">Listado de órdenes</h2>{result.data && <span>{result.data.items.length} en esta página</span>}</div>
@@ -32,11 +59,11 @@ function Workspace({ initialId }: { initialId?: number }) {
       <label>Valor mínimo (HNL)<input inputMode="decimal" pattern="[0-9]{1,12}([.][0-9]{1,4})?" maxLength={17} value={min} onChange={e => setMin(e.target.value)} /></label>
       <label>Valor máximo (HNL)<input inputMode="decimal" pattern="[0-9]{1,12}([.][0-9]{1,4})?" maxLength={17} value={max} onChange={e => setMax(e.target.value)} /></label>
       <div className="actions"><button disabled={busy}>Aplicar filtros</button><button type="button" disabled={busy} onClick={() => { setSearch(''); setStatus(''); setMin(''); setMax(''); setQuery(''); setPage(1); }}>Limpiar filtros</button></div>
-    </form><Notice>{error || result.error}</Notice>{initialId && error && <button disabled={busy} onClick={() => void open(initialId, 'edit')}>Reintentar abrir documento convertido</button>}{result.error && <button onClick={result.reload}>Reintentar consulta</button>}
+    </form><Notice>{error || result.error}</Notice>{uncertain&&<p role="status">No se pudo confirmar la operación. Repite la misma acción para recuperar su resultado sin duplicados.</p>}{initialId && error && <button disabled={busy} onClick={() => void open(initialId, 'edit')}>Reintentar abrir documento convertido</button>}{result.error && <button onClick={result.reload}>Reintentar consulta</button>}
     {result.data ? <><Table columns={['Orden', 'Factura', 'Cliente', 'Fecha', 'Total (HNL)', 'Estado', 'Acciones']} rows={result.data.items.map(row => [<span className="quote-number">{row.n_orders}</span>, <span className="quote-number">{row.n_bill || '—'}</span>, <div className="quote-list-client">{row.client_name || 'Sin cliente'}</div>, row.order_date, <span className="quote-money">{row.total}</span>, <span className="quote-status" data-state={row.status}>{row.status}</span>, <QuoteActions number={row.n_orders} busy={busy} actions={[
       { label: 'Ver', run: () => void open(row.id, 'view') }, { label: 'Editar', disabled: !editable, reason: !editable ? 'Sin permiso de edición' : undefined, run: () => void open(row.id, 'edit') },
-      { label: 'Documentos', disabled: true, reason: 'Adjuntos privados pendientes' }, { label: 'Convertir a factura', disabled: true, reason: 'Conversión entre módulos pendiente' },
-      { label: 'Clonar', disabled: true, reason: 'Clonación pendiente' }, { label: 'Eliminar', disabled: true, danger: true, reason: moduleCan(access, 'ordenes_compra', 'documentos', 'eliminar') ? 'Borrado y documentos pendientes' : 'Sin permiso de eliminación' },
+      { label: 'Documentos', run:()=>setDocumentsId(row.id) }, { label: 'Convertir a factura', disabled:!editable||!invoiceEditable, reason:!editable||!invoiceEditable?'Requiere ver y editar en Órdenes y Facturas':undefined, run:()=>{if(window.confirm('¿Crear o abrir el borrador de factura vinculado a esta orden?'))void action(row.id,row.version,'convert/invoice');} },
+      { label: 'Clonar', disabled:!editable,reason:!editable?'Sin permiso de edición':undefined,run:()=>void action(row.id,row.version,'clone') }, { label: 'Eliminar', disabled: true, danger: true, reason: moduleCan(access, 'ordenes_compra', 'documentos', 'eliminar') ? 'Eliminación de órdenes pendiente' : 'Sin permiso de eliminación' },
     ]} />])} /><nav className="quote-pagination" aria-label="Paginación de órdenes"><button disabled={busy || page === 1} onClick={() => setPage(p => p - 1)}>Anterior</button><span role="status">Página {page}</span><button disabled={busy || !result.data.has_more} onClick={() => setPage(p => p + 1)}>Siguiente</button></nav></> : !result.error && <Loading />}
     </section>
   </>;
@@ -74,7 +101,7 @@ export function OrderEditor({ initial, editable, edit, close }: { initial: Purch
         if (saved) updated = await api.request<PurchaseOrder>(`${base}/${saved.id}`, { method: 'PUT', body: data, ifMatch: saved.version });
         else { const body = JSON.stringify(data); if (!attempt.current) attempt.current = { body, key: crypto.randomUUID() }; else if (attempt.current.body !== body) throw new Error('Reintenta con los datos originales.'); updated = await api.request<PurchaseOrder>(base, { method: 'POST', body: data, idempotencyKey: attempt.current.key }); }
         setSaved(updated); setData(updated.data); setDirty(false); setAmbiguous(false); attempt.current = null; notify('Orden de compra guardada.');
-      } catch (reason) { setError(message(reason)); if (reason instanceof ApiError && reason.status === 412) setConflict(true); if (!saved) { if (reason instanceof ApiError && reason.status < 500 && reason.status !== 408) { attempt.current = null; setAmbiguous(false); } else setAmbiguous(true); } }
+      } catch (reason) { setError(reason instanceof ApiError && reason.status === 409 ? 'Retira el archivo del producto antes de quitar su línea; tus cambios se conservan.' : message(reason)); if (reason instanceof ApiError && reason.status === 412) setConflict(true); if (!saved) { if (reason instanceof ApiError && reason.status < 500 && reason.status !== 408) { attempt.current = null; setAmbiguous(false); } else setAmbiguous(true); } }
       finally { setBusy(false); }
     }}><fieldset className="form-fields quote-form" disabled={busy || conflict || ambiguous || !editable}><legend className="quote-sr-only">Datos de orden</legend>
       <section className="quote-section" aria-labelledby="order-general-title"><div className="quote-section-heading"><h2 id="order-general-title">Generales</h2><span>HNL · {calculation?.status ?? saved?.status ?? 'Pendiente'}</span></div><div className="quote-general-fields order-general-fields">

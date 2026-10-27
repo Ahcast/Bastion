@@ -7,7 +7,7 @@ def option(name): return args[args.index(name)+1]
 assert args[0]=='s3api'
 assert option('--bucket')=='bastion-synthetic-attachment-test'
 key=option('--key')
-assert key.startswith('cotizaciones/') and all(part not in ('','..','.') for part in key.split('/'))
+assert key.startswith(('cotizaciones/','ordenes_compra/')) and all(part not in ('','..','.') for part in key.split('/'))
 base=Path(tempfile.gettempdir())/'bastion-synthetic-attachment-test'
 target=base/key
 operation=args[1]

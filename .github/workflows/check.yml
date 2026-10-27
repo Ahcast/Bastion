@@ -156,6 +156,17 @@ jobs:
           chmod +x crates/modules/cotizaciones/tests/fixtures/private_storage.py
           cargo test --locked --package bastion-cotizaciones --test attachments
           cargo test --locked --package bastion-api mysql57_attachment_http
+      - name: Verify purchase order actions with MySQL 5.7 and private storage
+        env:
+          BASTION_DOCUMENTS_ENABLED: 'true'
+          BASTION_AWS_CLI: ${{ github.workspace }}/crates/modules/cotizaciones/tests/fixtures/private_storage.py
+          BASTION_DOCUMENTS_BUCKET: bastion-synthetic-attachment-test
+          BASTION_DOCUMENTS_REGION: synthetic-region
+          BASTION_ORDER_ACTIONS_TEST_URL: mysql://root:bastion_ci_only@127.0.0.1:3306/bastion_order_actions_test?ssl-mode=disabled
+        run: |
+          docker exec ${{ job.services.mysql57.id }} mysql -uroot -pbastion_ci_only -e 'CREATE DATABASE bastion_order_actions_test CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci'
+          chmod +x crates/modules/cotizaciones/tests/fixtures/private_storage.py
+          cargo test --locked --package bastion-document-flows --test order_actions
       - name: Build Lightsail executable
         run: cargo build --release --locked --package bastion-server --target x86_64-unknown-linux-gnu
       - name: Verify executable starts

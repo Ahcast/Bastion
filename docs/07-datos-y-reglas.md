@@ -72,3 +72,5 @@ Colaboración conserva metadatos en MySQL y bytes en el bucket privado S3 del Co
 ## Gastos: persistencia del primer corte
 
 El primer corte guarda el registro general en `gastos_records`, `gastos_create_receipts` y `gastos_actor_limits`; no reutiliza JSON Legacy ni crea asociaciones a órdenes/facturas. HNL es el único valor habilitado por ser el único observado. El cotejo estático de GastosController confirma bases a centavos antes del ISV y total; queda pendiente la revisión contable de negocio. La migración 2 conserva los registros eliminados mediante deleted_at; consulta y resumen excluyen esos registros. Ver [implementación y evidencia](modulos/gastos-implementacion.md).
+
+Órdenes conserva identificadores internos estables de productos para asociar un archivo privado por línea. El módulo posee ordenes_documents, sus recibos y cola de limpieza. Clonar asigna identidades nuevas y excluye archivos. document-flows posee la relación única orden/factura y su instantánea; Facturas posee source_order_json y crea su borrador mediante puerto de dominio. No se inventa numeración fiscal ni se modifica n_bill al convertir.

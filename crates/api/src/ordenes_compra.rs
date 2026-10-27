@@ -2,7 +2,28 @@ use super::*;
 use bastion_ordenes_compra::{OrderFilter, OrderInput, OrderPage, PurchaseOrder};
 
 pub(super) fn routes(state: ApiState) -> Router<ApiState> {
+    let documents = Router::new()
+        .route("/api/v1/ordenes-compra/{id}/documents", get(documents))
+        .route(
+            "/api/v1/ordenes-compra/{id}/documents/{item}",
+            post(upload_document).delete(remove_document),
+        )
+        .route(
+            "/api/v1/ordenes-compra/{id}/documents/{item}/content",
+            get(document_content),
+        )
+        .layer(axum::extract::DefaultBodyLimit::max(14 * 1024 * 1024))
+        .layer(RequestBodyLimitLayer::new(14 * 1024 * 1024));
     Router::new()
+        .route(
+            "/api/v1/ordenes-compra/document-readiness",
+            get(document_readiness),
+        )
+        .route("/api/v1/ordenes-compra/{id}/clone", post(clone_order))
+        .route(
+            "/api/v1/ordenes-compra/{id}/convert/invoice",
+            post(convert_invoice),
+        )
         .route("/api/v1/ordenes-compra", get(list).post(create))
         .route("/api/v1/ordenes-compra/calculate", post(preview))
         .route(
@@ -15,42 +36,59 @@ pub(super) fn routes(state: ApiState) -> Router<ApiState> {
         )
         .route("/api/v1/ordenes-compra/{id}", get(detail).put(replace))
         .layer(RequestBodyLimitLayer::new(1024 * 1024))
+        .merge(documents)
         .route_layer(middleware::from_fn_with_state(state, guard))
 }
 
+static DOCUMENT_REQUESTS: tokio::sync::Semaphore = tokio::sync::Semaphore::const_new(4);
 async fn guard(State(state): State<ApiState>, request: Request, next: Next) -> Response {
-    match tokio::time::timeout(Duration::from_secs(30), async {
-        let user = actor(&state, request.headers()).await?;
-        let capability = if request.method() == Method::GET || request.method() == Method::HEAD {
-            "ver"
-        } else {
-            "editar"
-        };
-        let catalog = request.uri().path().contains("/destinations");
-        if catalog && capability == "ver" {
-            state
-                .ordenes_compra
-                .check_destinations(user.id)
-                .await
-                .map_err(ApiError)?;
-        } else {
-            state
-                .ordenes_compra
-                .check_access(
-                    user.id,
-                    if catalog { "destinos" } else { "documentos" },
-                    capability,
+    let document_operation = request.uri().path().contains("/documents");
+    match tokio::time::timeout(
+        Duration::from_secs(if document_operation { 60 } else { 30 }),
+        async {
+            let _permit = if document_operation {
+                Some(
+                    DOCUMENT_REQUESTS
+                        .try_acquire()
+                        .map_err(|_| ApiError(CoreError::Overloaded))?,
                 )
+            } else {
+                None
+            };
+            let user = actor(&state, request.headers()).await?;
+            let capability = if request.method() == Method::DELETE {
+                "eliminar"
+            } else if request.method() == Method::GET || request.method() == Method::HEAD {
+                "ver"
+            } else {
+                "editar"
+            };
+            let catalog = request.uri().path().contains("/destinations");
+            if catalog && capability == "ver" {
+                state
+                    .ordenes_compra
+                    .check_destinations(user.id)
+                    .await
+                    .map_err(ApiError)?;
+            } else {
+                state
+                    .ordenes_compra
+                    .check_access(
+                        user.id,
+                        if catalog { "destinos" } else { "documentos" },
+                        capability,
+                    )
+                    .await
+                    .map_err(ApiError)?;
+            }
+            state
+                .ordenes_compra
+                .consume_request(user.id)
                 .await
                 .map_err(ApiError)?;
-        }
-        state
-            .ordenes_compra
-            .consume_request(user.id)
-            .await
-            .map_err(ApiError)?;
-        Ok::<_, ApiError>(next.run(request).await)
-    })
+            Ok::<_, ApiError>(next.run(request).await)
+        },
+    )
     .await
     {
         Ok(Ok(response)) => response,
@@ -266,6 +304,15 @@ mod tests {
         bastion_ordenes_compra::OrderService::migrate(&database)
             .await
             .unwrap();
+        bastion_cotizaciones::QuoteService::migrate(&database)
+            .await
+            .unwrap();
+        bastion_facturas::InvoiceService::migrate(&database)
+            .await
+            .unwrap();
+        bastion_document_flows::ConversionService::migrate(&database)
+            .await
+            .unwrap();
         sqlx::query("INSERT INTO persons (id,full_name) VALUES (1,'HTTP Admin'),(2,'HTTP Viewer')")
             .execute(&pool)
             .await
@@ -441,6 +488,56 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(response.status(), StatusCode::PAYLOAD_TOO_LARGE);
+        for (path, method, token, csrf, expected_status) in [
+            (
+                "/api/v1/ordenes-compra/1/clone",
+                "POST",
+                "synthetic-admin",
+                false,
+                StatusCode::FORBIDDEN,
+            ),
+            (
+                "/api/v1/ordenes-compra/1/clone",
+                "POST",
+                "synthetic-viewer",
+                true,
+                StatusCode::FORBIDDEN,
+            ),
+            (
+                "/api/v1/ordenes-compra/1/documents",
+                "GET",
+                "synthetic-viewer",
+                false,
+                StatusCode::OK,
+            ),
+            (
+                "/api/v1/ordenes-compra/1/convert/invoice",
+                "POST",
+                "synthetic-admin",
+                true,
+                StatusCode::NOT_FOUND,
+            ),
+            (
+                "/api/v1/ordenes-compra/1/clone",
+                "POST",
+                "synthetic-admin",
+                true,
+                StatusCode::CREATED,
+            ),
+        ] {
+            let mut req = request(method, path, Some(token), csrf, "https://example.test", "");
+            req.headers_mut()
+                .insert("if-match", HeaderValue::from_static("\"2\""));
+            req.headers_mut().insert(
+                "idempotency-key",
+                HeaderValue::from_static("http-order-actions-0001"),
+            );
+            assert_eq!(
+                app.clone().oneshot(req).await.unwrap().status(),
+                expected_status,
+                "{method} {path}"
+            );
+        }
         core.admin()
             .set_module_enabled(1, "ordenes_compra", false)
             .await
@@ -458,4 +555,125 @@ mod tests {
             .unwrap();
         assert_eq!(response.status(), StatusCode::NOT_FOUND);
     }
+}
+
+async fn clone_order(
+    State(state): State<ApiState>,
+    headers: axum::http::HeaderMap,
+    Path(id): Path<u64>,
+) -> Result<Response, ApiError> {
+    let user = actor(&state, &headers).await?;
+    let expected =
+        version(single_header(&headers, "if-match")?).ok_or(ApiError(CoreError::Invalid))?;
+    let order = state
+        .ordenes_compra
+        .clone_order(
+            user.id,
+            id,
+            expected,
+            single_header(&headers, "idempotency-key")?,
+        )
+        .await
+        .map_err(ApiError)?;
+    let id = order.id;
+    let mut response = order_response(order);
+    *response.status_mut() = StatusCode::CREATED;
+    response.headers_mut().insert(
+        "location",
+        HeaderValue::from_str(&format!("/api/v1/ordenes-compra/{id}"))
+            .map_err(|_| ApiError(CoreError::Invalid))?,
+    );
+    Ok(response)
+}
+async fn convert_invoice(
+    State(state): State<ApiState>,
+    headers: axum::http::HeaderMap,
+    Path(id): Path<u64>,
+) -> Result<Json<bastion_document_flows::OrderInvoiceResult>, ApiError> {
+    let user = actor(&state, &headers).await?;
+    let expected =
+        version(single_header(&headers, "if-match")?).ok_or(ApiError(CoreError::Invalid))?;
+    bastion_document_flows::ConversionService::new(&state.core)
+        .order_invoice(
+            user.id,
+            id,
+            expected,
+            single_header(&headers, "idempotency-key")?,
+        )
+        .await
+        .map(Json)
+        .map_err(ApiError)
+}
+async fn document_readiness() -> Json<serde_json::Value> {
+    Json(
+        serde_json::json!({"storage":bastion_core::DocumentService::from_environment().storage_configured()}),
+    )
+}
+async fn documents(
+    State(state): State<ApiState>,
+    headers: axum::http::HeaderMap,
+    Path(id): Path<u64>,
+) -> Result<Json<bastion_ordenes_compra::OrderDocuments>, ApiError> {
+    let user = actor(&state, &headers).await?;
+    state
+        .ordenes_compra
+        .documents(user.id, id)
+        .await
+        .map(Json)
+        .map_err(ApiError)
+}
+async fn upload_document(
+    State(state): State<ApiState>,
+    headers: axum::http::HeaderMap,
+    Path((id, item)): Path<(u64, String)>,
+    Json(input): Json<bastion_ordenes_compra::OrderDocumentInput>,
+) -> Result<Json<bastion_ordenes_compra::OrderDocumentWrite>, ApiError> {
+    let user = actor(&state, &headers).await?;
+    let expected =
+        version(single_header(&headers, "if-match")?).ok_or(ApiError(CoreError::Invalid))?;
+    state
+        .ordenes_compra
+        .upload_document(
+            user.id,
+            id,
+            &item,
+            expected,
+            single_header(&headers, "idempotency-key")?,
+            input,
+        )
+        .await
+        .map(Json)
+        .map_err(ApiError)
+}
+async fn document_content(
+    State(state): State<ApiState>,
+    headers: axum::http::HeaderMap,
+    Path((id, item)): Path<(u64, String)>,
+) -> Result<Response, ApiError> {
+    let user = actor(&state, &headers).await?;
+    let content = state
+        .ordenes_compra
+        .document_content(user.id, id, &item)
+        .await
+        .map_err(ApiError)?;
+    let mut response = Json(content).into_response();
+    response
+        .headers_mut()
+        .insert("cache-control", HeaderValue::from_static("no-store"));
+    Ok(response)
+}
+async fn remove_document(
+    State(state): State<ApiState>,
+    headers: axum::http::HeaderMap,
+    Path((id, item)): Path<(u64, String)>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    let user = actor(&state, &headers).await?;
+    let expected =
+        version(single_header(&headers, "if-match")?).ok_or(ApiError(CoreError::Invalid))?;
+    let version = state
+        .ordenes_compra
+        .remove_document(user.id, id, &item, expected)
+        .await
+        .map_err(ApiError)?;
+    Ok(Json(serde_json::json!({"order_version":version})))
 }

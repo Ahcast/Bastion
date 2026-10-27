@@ -1,8 +1,8 @@
 openapi: 3.1.0
 info:
   title: Bastion Órdenes de compra
-  version: 0.1.0
-  description: Primer corte local. Órdenes compartidas entre usuarios autorizados, cliente manual y destinos administrados en Ajustes. Sesión, CSRF y origen del Core; 120 solicitudes/minuto/actor, cuerpo 1 MiB, plazo 30 segundos. Sin adjuntos, proveedores, conversiones, clonación, borrado ni MCP.
+  version: 0.2.0
+  description: Primer corte local. Órdenes compartidas entre usuarios autorizados, cliente manual y destinos administrados en Ajustes. Sesión, CSRF y origen del Core; 120 solicitudes/minuto/actor, cuerpo 1 MiB, plazo 30 segundos. Clonación, archivo privado por producto (10 MiB, cuerpo 14 MiB, plazo 60 segundos, cuatro operaciones simultáneas) y conversión única a borrador de factura; sin proveedores, borrado de órdenes ni MCP.
 security:
   - session: []
 paths:
@@ -72,10 +72,95 @@ paths:
         '200': {description: Destino con nueva versión y ETag}
         '409': {description: Nombre ya usado}
         '412': {description: Versión obsoleta}
+  /api/v1/ordenes-compra/document-readiness:
+    get:
+      summary: Consultar almacenamiento privado con documentos/ver
+      responses:
+        '200': {description: 'storage boolean; no requiere Typst'}
+  /api/v1/ordenes-compra/{id}/clone:
+    parameters:
+      - {$ref: '#/components/parameters/OrderId'}
+    post:
+      summary: Clonar con documentos/ver y editar
+      description: Copia independiente sin factura, entrega, archivos ni origen; productos Pendiente.
+      parameters:
+        - {$ref: '#/components/parameters/Version'}
+        - {$ref: '#/components/parameters/ActionKey'}
+      responses:
+        '201': {description: Orden nueva con ETag y Location}
+        '409': {description: Clave reutilizada con otra solicitud}
+        '412': {description: Versión de origen obsoleta}
+  /api/v1/ordenes-compra/{id}/convert/invoice:
+    parameters:
+      - {$ref: '#/components/parameters/OrderId'}
+    post:
+      summary: Crear o recuperar borrador de factura con ver y editar en ambos módulos habilitados
+      description: Una factura por orden; instantánea exacta con costos y gastos. Crédito 30 días; sin emisión fiscal ni cambio de entrega.
+      parameters:
+        - {$ref: '#/components/parameters/Version'}
+        - {$ref: '#/components/parameters/ActionKey'}
+      responses:
+        '200': {description: 'target_module facturas, target_id, order_id, order_version de origen, reused'}
+        '400': {description: Importes incompatibles con Facturas}
+        '403': {description: Sin permisos en origen o destino}
+        '404': {description: Documento inexistente o módulo deshabilitado}
+        '409': {description: Clave reutilizada con otra solicitud}
+        '412': {description: Versión obsoleta antes de crear; una conversión existente se recupera}
+  /api/v1/ordenes-compra/{id}/documents:
+    parameters:
+      - {$ref: '#/components/parameters/OrderId'}
+    get:
+      summary: Listar archivos privados con documentos/ver
+      responses:
+        '200': {description: 'items (id, line_id, filename, mime, byte_size, created_at), order_version; hasta 200'}
+  /api/v1/ordenes-compra/{id}/documents/{item}:
+    parameters:
+      - {$ref: '#/components/parameters/OrderId'}
+      - {name: item, in: path, required: true, schema: {type: string, pattern: '^[a-f0-9]{48}$'}}
+    post:
+      summary: Cargar archivo por line_id con editar; sustituir exige también eliminar
+      parameters:
+        - {$ref: '#/components/parameters/Version'}
+        - {$ref: '#/components/parameters/ActionKey'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [filename, content_base64]
+              properties:
+                filename: {type: string, minLength: 1, maxLength: 255}
+                content_base64: {type: string, maxLength: 13981016}
+      responses:
+        '200': {description: 'attachment y order_version; un archivo por producto'}
+        '409': {description: Clave reutilizada con otro contenido}
+        '412': {description: Orden cambió; no asocia el archivo}
+        '413': {description: Cuerpo supera 14 MiB}
+        '503': {description: Almacenamiento no disponible o saturado}
+    delete:
+      summary: Retirar por attachment_id con documentos/eliminar
+      parameters:
+        - {$ref: '#/components/parameters/Version'}
+      responses:
+        '200': {description: order_version; objeto en cola de limpieza}
+        '412': {description: Orden cambió}
+  /api/v1/ordenes-compra/{id}/documents/{item}/content:
+    parameters:
+      - {$ref: '#/components/parameters/OrderId'}
+      - {name: item, in: path, required: true, schema: {type: string, pattern: '^[a-f0-9]{48}$'}}
+    get:
+      summary: Descargar con documentos/ver y pertenencia a la orden
+      responses:
+        '200': {description: 'filename, mime, content_base64; Cache-Control no-store'}
+        '404': {description: Archivo ajeno o retirado}
 components:
   securitySchemes:
     session: {type: apiKey, in: cookie, name: __Host-bastion_session}
   parameters:
+    OrderId: {name: id, in: path, required: true, schema: {type: integer, minimum: 1}}
+    ActionKey: {name: Idempotency-Key, in: header, required: true, schema: {type: string, minLength: 16, maxLength: 128, pattern: "^[A-Za-z0-9_-]+$"}}
     Version: {name: If-Match, in: header, required: true, schema: {type: string, pattern: '^"[1-9][0-9]*"$'}}
   requestBodies:
     Order:
@@ -116,6 +201,7 @@ components:
             additionalProperties: false
             required: [description, cantidad, sale_price, purchase_price, tracking, isv, status, coments]
             properties:
+              line_id: {type: string, description: Identificador interno estable; conservar al editar, pattern: "^([a-f0-9]{48})?$"}
               description: {type: string, maxLength: 2000}
               cantidad: {type: integer, minimum: 0, maximum: 1000000}
               sale_price: {$ref: '#/components/schemas/Money'}

@@ -1,5 +1,5 @@
 import type { QuoteOrigin } from './conversions.js';
-export interface OrderProduct { description: string; cantidad: number; sale_price: string; purchase_price: string; tracking: string; isv: boolean; status: 'Pendiente' | 'Comprado'; coments: string }
+export interface OrderProduct { line_id?: string; description: string; cantidad: number; sale_price: string; purchase_price: string; tracking: string; isv: boolean; status: 'Pendiente' | 'Comprado'; coments: string }
 export interface OrderExpense { description: string; amount: string }
 export interface OrderInput { n_orders: string; n_bill: string; order_date: string; received_date: string | null; client_name: string; client_rtn: string; id_destination: number | null; comments: string; products: OrderProduct[]; expenses: OrderExpense[] }
 export interface OrderTotals { subtotal: string; subtotal_exonerado: string; tax: string; total: string; products_investment: string; other_expenses: string; investment_total: string; profit: string }

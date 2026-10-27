@@ -122,3 +122,5 @@ El registro general expone `GET/POST /api/v1/gastos` y `GET/PUT/DELETE /api/v1/g
 ## Reportes
 
 `GET /api/v1/reportes/{ordenes|facturas|gastos}` consulta los registros y agregados del período; `GET .../export` genera un libro SpreadsheetML 2003 con resumen y detalle. Requiere `reportes/{dominio}/ver` y lectura del módulo fuente. Gastos excluye registros borrados. DTO, filtros, respuestas y límites propuestos en [OpenAPI](modulos/reportes.openapi.yaml). MCP permanece pospuesto conforme a `06-mcp.md`.
+
+Las acciones de Órdenes de compra agregan clonación, archivos privados por producto y conversión única a borrador de factura. Contrato: [OpenAPI](modulos/ordenes-de-compra.openapi.yaml) y [alcance](modulos/ordenes-de-compra-acciones.md). Conversión exige ver/editar en ambos módulos; retiro de archivos exige eliminar.

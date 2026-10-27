@@ -194,3 +194,5 @@ La auditoría del informe fue estática. Hacer revisión de amenazas y verificac
 - [Cloudflare origin protection](https://developers.cloudflare.com/fundamentals/security/protect-your-origin-server/)
 - [NIST SP 800-63B-4, Authenticator Requirements](https://pages.nist.gov/800-63-4/sp800-63b/authenticators/)
 - [NIST SP 800-63B-4, Authenticator Event Management](https://pages.nist.gov/800-63-4/sp800-63b/events/)
+
+Archivos de Órdenes: prefijo privado ordenes_compra/, máximo 10 MiB por producto. Ver/descargar requiere ver, cargar editar, retirar eliminar; sustituir requiere editar y eliminar. Cada acceso comprueba pertenencia a la orden. Cargar/retirar usa versión optimista, cargas con clave idempotente y limpieza durable. Ninguna respuesta expone una clave S3 o URL pública.

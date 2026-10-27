@@ -17,7 +17,7 @@ Registrar y seguir órdenes, productos, gastos asociados, documentos, estados, e
 | Cabecera | RTN, destino, estado, comentarios | `client_rtn`, `id_destination`, `id_estado`, `comments` | Destino/estado dependen de validación/catálogos. |
 | Producto | Descripción, cantidad, venta, costo | `description`, `cantidad`, `sale_price`, `purchase_price` | Cantidad/precios numéricos. |
 | Producto | Proveedor, tracking, ISV | `id_supplier`, `tracking`, `isv` | Opcionales según línea/flujo. |
-| Adjuntos | Archivo | Documento | Límites y tipos pendientes. |
+| Adjuntos | Archivo | Documento | Un archivo privado por producto, hasta 10 MiB; descarga autenticada. |
 
 ## Botones y efectos
 
@@ -54,3 +54,7 @@ Campos completos, fórmulas/redondeo, transición de estados, tipos/tamaño de a
 ## Implementación local (2026-10-23)
 
 Primer corte de listado/filtros, detalle, alta/edición, cálculo servidor, estados derivados y gastos. El usuario confirma agregar el catálogo de destinos en Ajustes > Órdenes de compra; sus campos son identificador y descripción, con alta/renombrado versionados. Es una ampliación autorizada, no un CRUD confirmado del Legacy. Los demás ajustes quedan pendientes. Ver [alcance, diferencias y pruebas](ordenes-de-compra-implementacion.md) y [OpenAPI](ordenes-de-compra.openapi.yaml). La publicación técnica fue verificada en AWS/Bluehost desde 59a8057, con el módulo disponible sin activar. La paridad sigue abierta.
+
+## Acciones de documentos y conversión
+
+Implementadas clonación, archivos privados por producto y conversión única a borrador de factura. El alcance, límites y diferencias fiscales están en [acciones de órdenes](ordenes-de-compra-acciones.md). La eliminación completa de órdenes y la emisión fiscal permanecen pendientes. Disponibilidad publicada y despliegue deben verificarse por separado.

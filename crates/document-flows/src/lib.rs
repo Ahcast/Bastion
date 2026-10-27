@@ -1,8 +1,10 @@
 #![forbid(unsafe_code)]
+mod order_invoice;
 use bastion_core::{CoreError, Database};
 use bastion_cotizaciones::QuoteService;
 use bastion_facturas::InvoiceService;
 use bastion_ordenes_compra::OrderService;
+pub use order_invoice::OrderInvoiceResult;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 

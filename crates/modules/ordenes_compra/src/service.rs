@@ -10,6 +10,11 @@ use sqlx::{MySql, QueryBuilder, Row, Transaction};
 #[path = "conversion.rs"]
 mod conversion;
 pub use conversion::quote_order_input;
+#[path = "actions.rs"]
+mod actions;
+#[path = "documents.rs"]
+mod documents;
+pub use documents::*;
 
 #[derive(Clone)]
 pub struct OrderService {
@@ -259,7 +264,7 @@ impl OrderService {
             return Err(CoreError::Invalid);
         }
         let mut tx = self.begin(actor, "documentos", "editar").await?;
-        let calculation = calculate(&input)?;
+        let mut calculation = calculate(&input)?;
         calculation.ensure_saveable()?;
         let data = serde_json::to_value(&calculation.data).map_err(|_| CoreError::Invalid)?;
         let request_hash =
@@ -274,6 +279,8 @@ impl OrderService {
             tx.commit().await?;
             return Ok(result);
         }
+        actions::fresh_lines(&mut calculation.data);
+        let data = serde_json::to_value(&calculation.data).map_err(|_| CoreError::Invalid)?;
         validate_destination(&mut tx, calculation.data.id_destination).await?;
         let id=sqlx::query("INSERT INTO ordenes_orders (status,n_orders,n_bill,client_name,order_date,id_destination,total,data_json,calculation_json,created_by,updated_by,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,UTC_TIMESTAMP(6),UTC_TIMESTAMP(6))")
             .bind(&calculation.status).bind(&calculation.data.n_orders).bind(&calculation.data.n_bill).bind(&calculation.data.client_name).bind(calculation.data.order_date).bind(calculation.data.id_destination).bind(&calculation.totals.total).bind(data).bind(serde_json::to_value(&calculation).map_err(|_| CoreError::Invalid)?).bind(actor).bind(actor).execute(&mut *tx).await?.last_insert_id();
@@ -303,6 +310,8 @@ impl OrderService {
         if current.version != expected {
             return Err(CoreError::PreconditionFailed);
         }
+        let mut input = input;
+        actions::prepare_lines(&mut tx, &current, &mut input).await?;
         let calculation = calculate(&input)?;
         calculation.ensure_saveable()?;
         validate_destination(&mut tx, calculation.data.id_destination).await?;
@@ -470,5 +479,6 @@ async fn load(tx: &mut Transaction<'_, MySql>, id: u64) -> Result<PurchaseOrder,
         .map(serde_json::from_value)
         .transpose()
         .map_err(|_| CoreError::Invalid)?;
+    actions::hydrate_lines(&mut order);
     Ok(order)
 }
