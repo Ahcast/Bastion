@@ -11,3 +11,7 @@ API: POST /api/v1/ordenes-compra/{id}/clone y /convert/invoice usan If-Match fue
 Los objetos se cargan fuera de la transacción, con cola de limpieza durable previa. Cargas fallidas, reemplazos y retiros quedan en cola; el worker elimina objetos privados. La retención de versiones S3 depende de la política del bucket. El prefijo ordenes_compra/ requiere acceso del rol AWS antes de despliegue. Construir o publicar código no confirma despliegue.
 
 Corrección autorizada el 2026-10-26: utilidad = total de venta − ISV − inversión total, en la orden y en su borrador de factura. Migraciones propias 4 corrigen el campo derivado profit de documentos y recibos existentes sin cambiar importes fuente, versiones, origen ni auditoría histórica. Los reportes y Excel consumen esa utilidad corregida.
+
+## Publicación y despliegue verificados
+
+El 2026-10-27 se desplegó 50efa7e, CI 40540732266 aprobado. Órdenes 4, Facturas 4 y document-flows 2 aplicadas; seis tablas nuevas vacías, utilidad de la orden existente corregida sin otros cambios de negocio. Se conservaron activaciones y permisos. Se verificaron respaldo, restauración temporal de 63 tablas, hashes del frontend, readiness 200 y protección anónima 401. La interfaz autenticada en producción no se ejercitó con datos sintéticos; las pruebas completas de acciones y migraciones pasaron en CI MySQL 5.7.

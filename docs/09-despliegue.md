@@ -110,3 +110,13 @@ El usuario autorizó reutilizar la credencial MySQL existente sólo durante el p
 ## Órdenes de compra: autorización de migraciones
 
 El 2026-10-27 el usuario autoriza usar la credencial MySQL existente para completar las acciones de Órdenes y la corrección de utilidad. Se permite reutilizarla únicamente en el proceso puntual de migrate, con respaldo privado previo y verificación de datos. No crear cuentas, modificar privilegios ni persistir MYSQL_MIGRATOR_* en el servicio. Esta excepción operativa no cierra el pendiente de separar identidades. Utilidad autorizada: total de venta menos ISV menos inversión total, incluidos productos y gastos.
+
+## Órdenes: acciones y utilidad desplegadas
+
+El 2026-10-27 se instalaron en AWS y Bluehost los artifacts del commit 50efa7ebda634fb1c7dcd7d8baa26179522be9ca, con [CI aprobado](https://github.com/Ahcast/Bastion/actions/runs/40540732266). Se habilitan técnicamente clonación, archivos privados por producto y conversión única a borrador de factura, sin emisión fiscal. La utilidad en Órdenes y Facturas es total de venta menos ISV menos inversión total.
+
+Se verificó el respaldo privado y se ensayó su restauración íntegra en 63 tablas temporales, comparando todas sus filas con las originales. El ensayo usa hexadecimal para campos binarios y UTC para timestamps; las tablas temporales se retiraron sin sustituir datos de producción. Las migraciones propias de Órdenes y Facturas quedaron en 4 y document-flows en 2; el total de tablas pasó de 63 a 69. Las seis nuevas tablas quedaron vacías, sin datos de negocio sintéticos.
+
+La comparación comprobó que sólo se corrigió profit en la orden existente; no había borradores de factura ni recibos anteriores que corregir. Se conservaron precios, impuestos, inversión, versiones, origen, permisos, configuración y estados de todos los módulos. Se usó la credencial MySQL autorizada sólo para migrate; MYSQL_MIGRATOR_* no quedó en el archivo de entorno ni en el proceso del servicio.
+
+Frontend: 44 archivos verificados en disco y 42 recursos por HTTPS, conservando config.js, ambos .htaccess y assets previos. SPA y readiness respondieron 200; Órdenes, documentos, disponibilidad de archivos, Facturas y Reportes sin sesión respondieron 401. Los artifacts y respaldos conservan reversión privada. La prueba integral de interfaz autenticada en producción queda pendiente; los flujos de dominio, HTTP, permisos, archivos y migraciones pasaron CI con MySQL 5.7.

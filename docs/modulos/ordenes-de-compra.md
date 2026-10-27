@@ -58,3 +58,5 @@ Primer corte de listado/filtros, detalle, alta/edición, cálculo servidor, esta
 ## Acciones de documentos y conversión
 
 Implementadas clonación, archivos privados por producto y conversión única a borrador de factura. El alcance, límites y diferencias fiscales están en [acciones de órdenes](ordenes-de-compra-acciones.md). La eliminación completa de órdenes y la emisión fiscal permanecen pendientes. Disponibilidad publicada y despliegue deben verificarse por separado.
+
+El 2026-10-27 se desplegaron clonación, archivo privado por producto y conversión a borrador de factura con utilidad sin ISV desde 50efa7e. La activación existente de Órdenes y Facturas se conservó; no se añadieron permisos ni se activaron otros módulos. Ver [acciones y evidencia](ordenes-de-compra-acciones.md).

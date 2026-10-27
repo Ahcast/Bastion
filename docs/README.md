@@ -214,3 +214,5 @@ El informe se obtuvo de una copia de frontend Angular compilado y backend Larave
 - 2026-10-26: acciones de Órdenes: clonación y archivo privado por producto según Legacy; conversión a borrador vinculado de Facturas, sin emisión fiscal. Véase [alcance y contrato](modulos/ordenes-de-compra-acciones.md).
 
 - 2026-10-26: el usuario corrige la utilidad: total de venta menos ISV menos inversión total (productos y gastos). Se aplica a Órdenes y Facturas, incluida su conversión; las migraciones propias 4 corrigen sólo la utilidad derivada de documentos y recibos existentes.
+
+- 2026-10-27: despliegue verificado de 50efa7e en AWS/Bluehost: acciones de Órdenes y utilidad sin ISV, ensayo de restauración de 63 tablas, migraciones 4/4/2 y conservación de datos y estados. Véase docs/09-despliegue.md.

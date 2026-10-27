@@ -71,3 +71,5 @@ Conversión desde Cotizaciones implementada mediante document-flows: borrador a 
 ## Corrección de utilidad autorizada
 
 El 2026-10-26 el usuario define utilidad = total de venta − ISV − inversión total. Se resta la suma de ISV 15% y 18%; la inversión incluye costos de productos y gastos adicionales. Se conserva la fórmula observada del Legacy como antecedente, reemplazada por esta decisión. La migración propia 4 corrige sólo profit en borradores y respuestas idempotentes existentes; no altera precios, impuestos, totales, versiones, saldo ni origen.
+
+Desplegado el 2026-10-27 desde 50efa7e (CI 40540732266). Migraciones 3 (origen de orden) y 4 (utilidad sin ISV) aplicadas; Facturas continúa limitada a borradores sin emisión fiscal. Se conservó su activación existente y no se crearon facturas sintéticas en producción.
