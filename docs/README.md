@@ -41,6 +41,8 @@ El informe se obtuvo de una copia de frontend Angular compilado y backend Larave
 
 ## Registro de decisiones
 
+- 2026-10-27: el usuario confirma número SAR solo al marcar como enviado; Enviado/Pagado bloquean edición y eliminación; solo se eliminan borradores sin pagos conservando origen. Se completan las acciones de Facturas con pagos, clonación y documentos privados. Autoriza reutilizar la credencial MySQL existente únicamente para la migración 5, con respaldo previo, sin cuentas/privilegios nuevos ni credenciales persistentes. Ver `modulos/facturas-acciones.md`.
+
 - 2026-10-27: el usuario fija para Licitaciones 20 MB por archivo de entrada y acepta 500 MB como tope técnico del expediente completo y del PDF final, por separado, cuando sea necesario acotarlos. El PDF final no está sujeto al límite individual de entrada; se mantiene el requisito de más de 100 páginas y no se fija máximo de páginas. Se documenta MB decimal y validación de bytes reales. Los topes no cambian la política global de Colaboración: requieren adaptar y verificar renderer/almacenamiento/transporte, cuyos límites actuales son menores. Presupuestos de memoria/tiempo/concurrencia y contabilización del historial siguen pendientes. Ver [límites de Licitaciones](modulos/licitaciones.md).
 
 - 2026-10-27: el usuario aclara que una licitación puede superar las 100 páginas. Se incorpora esa capacidad a la ficha y aceptación con índice automático/foliado completo; no se aprueba un máximo de 100 páginas ni otro tope definitivo. Los límites pendientes son peso por archivo/expediente/PDF, píxeles, tiempo/memoria y concurrencia, a dimensionar con muestras reales y mediciones. Ver [capacidad y PDF](modulos/licitaciones.md).

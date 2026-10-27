@@ -1,19 +1,99 @@
 openapi: 3.1.0
 info:
-  title: Bastion Facturas — borradores sin emisión fiscal
-  version: 0.2.0
+  title: Bastion Facturas — emisión, pagos y documentos
+  version: 0.3.0
 paths:
+  /api/v1/facturas/document-readiness:
+    get:
+      summary: Disponibilidad de Empresa y documentos privados (ver)
+      responses:
+        '200':
+          description: Campo pdf booleano; no concede acceso ni sustituye validaciones al generar
+        default: {$ref: '#/components/responses/Problem'}
+  /api/v1/facturas/{id}/mark-sent:
+    parameters:
+      - {name: id, in: path, required: true, schema: {type: integer, minimum: 1}}
+    post:
+      summary: Asignar número SAR y marcar Enviado o Pagado (editar)
+      parameters:
+        - {$ref: '#/components/parameters/IfMatch'}
+        - {$ref: '#/components/parameters/IdempotencyKey'}
+        - {$ref: '#/components/parameters/Csrf'}
+      responses:
+        '200': {$ref: '#/components/responses/Draft'}
+        default: {$ref: '#/components/responses/Problem'}
+  /api/v1/facturas/{id}/payments:
+    parameters:
+      - {name: id, in: path, required: true, schema: {type: integer, minimum: 1}}
+    post:
+      summary: Registrar pago positivo no mayor al saldo en factura Enviada (editar)
+      parameters:
+        - {$ref: '#/components/parameters/IfMatch'}
+        - {$ref: '#/components/parameters/IdempotencyKey'}
+        - {$ref: '#/components/parameters/Csrf'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/Payment'}
+      responses:
+        '200': {$ref: '#/components/responses/Draft'}
+        default: {$ref: '#/components/responses/Problem'}
+  /api/v1/facturas/{id}/clone:
+    parameters:
+      - {name: id, in: path, required: true, schema: {type: integer, minimum: 1}}
+    post:
+      summary: Clonar a borrador sin número, pagos ni origen (editar)
+      parameters:
+        - {$ref: '#/components/parameters/IfMatch'}
+        - {$ref: '#/components/parameters/IdempotencyKey'}
+        - {$ref: '#/components/parameters/Csrf'}
+      responses:
+        '200': {$ref: '#/components/responses/Draft'}
+        default: {$ref: '#/components/responses/Problem'}
+  /api/v1/facturas/{id}/calculate:
+    parameters:
+      - {name: id, in: path, required: true, schema: {type: integer, minimum: 1}}
+    post:
+      summary: Vista previa de borrador con su versión y pagos existentes (editar)
+      parameters:
+        - {$ref: '#/components/parameters/IfMatch'}
+        - {$ref: '#/components/parameters/Csrf'}
+      requestBody: {$ref: '#/components/requestBodies/Input'}
+      responses:
+        '200':
+          description: Cálculo de servidor incluyendo pagos persistidos; sin escritura
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Calculation'}
+        default: {$ref: '#/components/responses/Problem'}
+  /api/v1/facturas/{id}/documents/{kind}:
+    parameters:
+      - {name: id, in: path, required: true, schema: {type: integer, minimum: 1}}
+      - {name: kind, in: path, required: true, schema: {type: string, enum: [invoice, delivery, receipt]}}
+    post:
+      summary: Generar o consultar documento privado de la versión (ver)
+      parameters:
+        - {$ref: '#/components/parameters/IfMatch'}
+        - {$ref: '#/components/parameters/Csrf'}
+      responses:
+        '200':
+          description: Recibo requiere pagos registrados; Borrador se identifica sin emisión fiscal
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Document'}
+        default: {$ref: '#/components/responses/Problem'}
   /api/v1/facturas/dashboard:
     get:
       summary: Resumen para Inicio (facturas/documentos/ver)
       parameters:
         - {name: period, in: query, schema: {type: string, enum: [month, year, all], default: month}}
       responses:
-        '200': {description: 'Ventana Honduras, cantidad, suma de totales disponibles, estados y hasta ocho borradores recientes con saldo; no implica facturación ni cobros.'}
+        '200': {description: 'Ventana Honduras, cantidad, suma de totales disponibles, estados y hasta ocho facturas recientes con estado, pagos y saldo.'}
         default: {$ref: '#/components/responses/Problem'}
   /api/v1/facturas:
     get:
-      summary: Listar borradores (facturas/documentos/ver)
+      summary: Listar facturas activas (facturas/documentos/ver)
       parameters:
         - {name: search, in: query, schema: {type: string, maxLength: 200}}
         - {name: page, in: query, schema: {type: integer, minimum: 1, maximum: 10000, default: 1}}
@@ -37,7 +117,7 @@ paths:
   /api/v1/facturas/calculate:
     post:
       summary: Calcular vista previa sin persistencia (facturas/documentos/editar)
-      description: Permite vista previa de contado sin pago; guardar requiere pago total y en este corte solo acepta contado de total cero.
+      description: Vista previa sin persistir. El pago inicial opcional se valida en Rust; contado requiere total cubierto al guardar.
       parameters:
         - {$ref: '#/components/parameters/Csrf'}
       requestBody: {$ref: '#/components/requestBodies/Input'}
@@ -52,7 +132,7 @@ paths:
     parameters:
       - {name: id, in: path, required: true, schema: {type: integer, minimum: 1}}
     get:
-      summary: Consultar borrador (facturas/documentos/ver)
+      summary: Consultar factura (facturas/documentos/ver)
       responses:
         '200': {$ref: '#/components/responses/Draft'}
         default: {$ref: '#/components/responses/Problem'}
@@ -64,6 +144,15 @@ paths:
       requestBody: {$ref: '#/components/requestBodies/Input'}
       responses:
         '200': {$ref: '#/components/responses/Draft'}
+        default: {$ref: '#/components/responses/Problem'}
+    delete:
+      summary: Archivar únicamente un borrador sin pagos preservando origen (eliminar)
+      parameters:
+        - {$ref: '#/components/parameters/IfMatch'}
+        - {$ref: '#/components/parameters/IdempotencyKey'}
+        - {$ref: '#/components/parameters/Csrf'}
+      responses:
+        '204': {description: Borrador retirado del listado; nunca se recicla número}
         default: {$ref: '#/components/responses/Problem'}
 security:
   - session: []
@@ -87,7 +176,7 @@ components:
         application/problem+json:
           schema: {type: object, required: [type, title, status, detail], properties: {type: {type: string}, title: {type: string}, status: {type: integer}, detail: {type: string}}}
     Draft:
-      description: Borrador sin numeración, ETag fuerte; creación incluye Location
+      description: Factura con ETag fuerte; Borrador sin número y Enviado/Pagado con número SAR. Creación incluye Location
       headers:
         ETag: {schema: {type: string}}
         Location: {schema: {type: string}}
@@ -95,6 +184,31 @@ components:
         application/json:
           schema: {$ref: '#/components/schemas/Draft'}
   schemas:
+    Payment:
+      type: object
+      additionalProperties: false
+      required: [amount]
+      properties:
+        amount: {$ref: '#/components/schemas/Decimal'}
+        date: {type: [string, 'null'], format: date, description: Día de Honduras si se omite o es nulo}
+        method: {type: string, maxLength: 120, default: ''}
+        reference: {type: string, maxLength: 180, default: ''}
+    StoredPayment:
+      type: object
+      required: [id, amount, date, method, reference]
+      properties:
+        id: {type: integer}
+        amount: {type: string}
+        date: {type: string, format: date}
+        method: {type: string}
+        reference: {type: string}
+    Document:
+      type: object
+      required: [filename, mime, content_base64]
+      properties:
+        filename: {type: string}
+        mime: {type: string, const: application/pdf}
+        content_base64: {type: string, contentEncoding: base64, description: PDF privado autorizado; sin URL S3 pública}
     Decimal: {type: string, pattern: '^[0-9]{1,12}(\.[0-9]{1,4})?$'}
     DiscountType: {type: string, enum: [amount, percent]}
     Item:
@@ -121,6 +235,7 @@ components:
       additionalProperties: false
       required: [client_name, order_number, invoice_date, payment_term_type, credit_days, discount_type, discount_value, items, expenses, notes, public_notes]
       properties:
+        initial_payment: {anyOf: [{$ref: '#/components/schemas/Payment'}, {type: 'null'}], description: Pago inicial atómico; no reemplaza el historial}
         id_client: {type: [integer, 'null'], minimum: 1, default: null, description: Cliente de Bastion; cambiarlo exige Clientes activo y permiso de catálogo}
         client_name: {type: string, maxLength: 255}
         client_rtn: {type: string, maxLength: 30, default: '', description: Instantánea resuelta por el servidor; overrides ignorados al guardar}
@@ -175,12 +290,16 @@ components:
         other_expenses: {type: string}
         investment_total: {type: string}
         profit: {type: string, description: Total de venta menos ISV 15% e ISV 18% menos inversión total (productos y gastos)}
-        paid_total: {type: string, const: '0.00'}
+        paid_total: {type: string}
         balance: {type: string}
     Draft:
       type: object
       required: [id, version, status, currency, invoice_number, data, calculation]
       properties:
+        payments: {type: array, maxItems: 200, items: {$ref: '#/components/schemas/StoredPayment'}}
+        sar_snapshot: {type: [object, 'null'], readOnly: true, description: Información SAR capturada al emitir}
+        company_snapshot: {type: [object, 'null'], readOnly: true, description: Empresa capturada al emitir}
+        source_order: {$ref: '#/components/schemas/OrderOrigin'}
         source_quote:
           type: [object, 'null']
           readOnly: true
@@ -192,21 +311,23 @@ components:
             version: {type: integer}
         id: {type: integer}
         version: {type: integer, minimum: 1}
-        status: {type: string, const: Borrador}
+        status: {type: string, enum: [Borrador, Enviado, Pagado]}
         currency: {type: string, const: HNL}
-        invoice_number: {type: 'null'}
+        invoice_number: {type: [string, 'null'], pattern: '^[0-9]{3}-[0-9]{3}-[0-9]{2}-[0-9]{8}$'}
         data: {$ref: '#/components/schemas/Input'}
         calculation: {$ref: '#/components/schemas/Calculation'}
     Summary:
       type: object
       required: [id, version, client_name, order_number, invoice_date, status, total, balance, item_count]
       properties:
+        invoice_number: {type: [string, 'null']}
+        paid_total: {type: string}
         id: {type: integer}
         version: {type: integer}
         client_name: {type: string}
         order_number: {type: string}
         invoice_date: {type: string, format: date}
-        status: {type: string, const: Borrador}
+        status: {type: string, enum: [Borrador, Enviado, Pagado]}
         total: {type: string}
         balance: {type: string}
         item_count: {type: integer}

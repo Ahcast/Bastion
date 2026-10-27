@@ -18,7 +18,7 @@ type ReportRow = OrderRow | InvoiceRow | ExpenseRow;
 type ReportTotals = OrderTotals | InvoiceTotals;
 interface OrderRow { id: number; n_orders: string; n_bill: string; client_name: string; order_date: string; status: string; subtotal: string; isv: string; total: string; products_investment: string; other_expenses: string; investment_total: string; profit: string }
 interface OrderTotals { records: number; subtotal: string; isv: string; total: string; products_investment: string; other_expenses: string; investment_total: string; profit: string }
-interface InvoiceRow { id: number; client_name: string; order_number: string; invoice_date: string; status: string; total: string; paid_total: string; balance: string }
+interface InvoiceRow { id: number; invoice_number?: string | null; client_name: string; order_number: string; invoice_date: string; status: string; total: string; paid_total: string; balance: string }
 interface InvoiceTotals { records: number; total: string; paid_total: string; balance: string }
 interface ExpenseRow { id: number; invoice_number: string; expense_date: string; provider: string; currency: string; taxable_amount: string; exempt_amount: string; isv_15: string; total: string }
 interface ExpenseTotals { currency: string; records: number; taxable_amount: string; exempt_amount: string; isv_15: string; total: string }
@@ -30,7 +30,7 @@ function today(): string {
 function firstOfMonth(value: string) { return `${value.slice(0, 7)}-01`; }
 function queryFor(kind: ReportKind, from: string, to: string, page: number, pageSize: number, status: string, search: string) {
   const query = new URLSearchParams({ date_from: from, date_to: to, page: String(page), page_size: String(pageSize) });
-  if (kind === 'ordenes' && status) query.set('status', status);
+  if ((kind === 'ordenes' || kind === 'facturas') && status) query.set('status', status);
   if (search) query.set('search', search);
   return query.toString();
 }
@@ -104,18 +104,19 @@ export default function Reportes() {
     setKind(next); setPage(1); setStatus(''); setStatusDraft(''); setExportError('');
   };
 
-  return <><Heading title="Reportes" description="Consulta órdenes, borradores de factura y gastos por fecha." action={<button disabled={!data || exporting} onClick={() => void exportReport()}>{exporting ? 'Preparando Excel…' : 'Exportar Excel'}</button>} />
+  return <><Heading title="Reportes" description="Consulta órdenes, facturas y gastos por fecha." action={<button disabled={!data || exporting} onClick={() => void exportReport()}>{exporting ? 'Preparando Excel…' : 'Exportar Excel'}</button>} />
     <nav className="report-tabs" aria-label="Tipo de reporte">{tabs.map(item => <button key={item.id} aria-pressed={visibleKind === item.id} onClick={() => selectTab(item.id)}>{item.label}</button>)}</nav>
     <form className="card report-filters" onSubmit={apply}>
       <label>Fecha inicio<input type="date" required value={fromDraft} onChange={event => setFromDraft(event.target.value)} /></label>
       <label>Fecha fin<input type="date" required value={toDraft} onChange={event => setToDraft(event.target.value)} /></label>
       <label>Búsqueda<input type="search" maxLength={200} value={searchDraft} onChange={event => setSearchDraft(event.target.value)} placeholder="Cliente, orden, factura o proveedor" /></label>
       {visibleKind === 'ordenes' && <label>Estado<select value={statusDraft} onChange={event => setStatusDraft(event.target.value)}><option value="">Todos</option><option value="Pendiente">Pendiente</option><option value="Listo">Listo</option><option value="Entregado">Entregado</option></select></label>}
+      {visibleKind === 'facturas' && <label>Estado<select value={statusDraft} onChange={event => setStatusDraft(event.target.value)}><option value="">Todos</option><option value="Borrador">Borrador</option><option value="Enviado">Enviado</option><option value="Pagado">Pagado</option></select></label>}
       <button className="primary" type="submit">Consultar</button>
     </form>
     <Notice>{filterError || result.error || exportError}</Notice>
     <p className="report-note">Rango máximo: 366 días. La exportación Excel admite hasta 1,000 registros por archivo. Los totales de Gastos se presentan separados por moneda.</p>
-    {visibleKind === 'facturas' && <p className="report-note">En esta etapa se reportan borradores; los pagos todavía no están habilitados.</p>}
+    {visibleKind === 'facturas' && <p className="report-note">Incluye borradores, facturas enviadas y pagadas, con los pagos y saldos registrados.</p>}
     {data && <>
       {visibleKind === 'ordenes' && <OrderSummary data={data.totals as OrderTotals} />}
       {visibleKind === 'facturas' && <InvoiceSummary data={data.totals as InvoiceTotals} />}
@@ -135,7 +136,7 @@ function OrderSummary({ data }: { data: OrderTotals }) {
   ]);
 }
 function InvoiceSummary({ data }: { data: InvoiceTotals }) {
-  return stats([['Borradores', String(data.records)], ['Venta', money(data.total)], ['Pagado', money(data.paid_total)], ['Saldo', money(data.balance)]]);
+  return stats([['Facturas', String(data.records)], ['Venta', money(data.total)], ['Pagado', money(data.paid_total)], ['Saldo', money(data.balance)]]);
 }
 function ExpenseSummary({ data }: { data: ExpenseTotals[] }) {
   return <div className="report-stats">{data.length ? data.map(item => <div className="report-currency" key={item.currency}><span>{item.currency} · {item.records} registros</span><strong>{money(item.total, item.currency)}</strong><small>Gravado {money(item.taxable_amount, item.currency)} · Exento {money(item.exempt_amount, item.currency)} · ISV {money(item.isv_15, item.currency)}</small></div>) : <div><span>Gastos</span><strong>0</strong></div>}</div>;
@@ -145,7 +146,7 @@ function ReportTable({ kind, rows }: { kind: ReportKind; rows: ReportRow[] }) {
     return <Table columns={['N.º orden', 'N.º factura', 'Cliente', 'Fecha', 'Estado', 'Subtotal HNL', 'ISV HNL', 'Total HNL', 'Inversión productos HNL', 'Otros gastos HNL', 'Inversión total HNL', 'Utilidad HNL']} rows={(rows as OrderRow[]).map(row => [row.n_orders, row.n_bill || '—', row.client_name, dashboardDate(row.order_date), row.status, money(row.subtotal), money(row.isv), money(row.total), money(row.products_investment), money(row.other_expenses), money(row.investment_total), money(row.profit)])} />;
   }
   if (kind === 'facturas') {
-    return <Table columns={['ID borrador', 'Cliente', 'N.º orden', 'Fecha', 'Estado', 'Venta HNL', 'Pagado HNL', 'Saldo HNL']} rows={(rows as InvoiceRow[]).map(row => [row.id, row.client_name, row.order_number, dashboardDate(row.invoice_date), row.status, money(row.total), money(row.paid_total), money(row.balance)])} />;
+    return <Table columns={['Factura', 'Cliente', 'N.º orden', 'Fecha', 'Estado', 'Venta HNL', 'Pagado HNL', 'Saldo HNL']} rows={(rows as InvoiceRow[]).map(row => [row.invoice_number ?? `Borrador ${row.id}`, row.client_name, row.order_number, dashboardDate(row.invoice_date), row.status, money(row.total), money(row.paid_total), money(row.balance)])} />;
   }
   return <Table columns={['Factura', 'Fecha', 'Proveedor', 'Moneda', 'Base gravada', 'Base exenta', 'ISV 15%', 'Total']} rows={(rows as ExpenseRow[]).map(row => [row.invoice_number, dashboardDate(row.expense_date), row.provider, row.currency, money(row.taxable_amount, row.currency), money(row.exempt_amount, row.currency), money(row.isv_15, row.currency), money(row.total, row.currency)])} />;
 }

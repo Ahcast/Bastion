@@ -26,6 +26,7 @@ pub fn calculate(input: &InvoiceInput) -> Result<InvoiceCalculation, CoreError> 
         return Err(CoreError::Invalid);
     }
     let mut data = input.clone();
+    data.initial_payment = None;
     data.public_notes = data.public_notes.trim().into();
     if matches!(data.payment_term_type, PaymentTerm::Contado) {
         data.credit_days = 0;
@@ -142,7 +143,7 @@ impl InvoiceCalculation {
     }
 }
 
-fn cents(value: &str) -> Result<i128, CoreError> {
+pub(crate) fn cents(value: &str) -> Result<i128, CoreError> {
     let (whole, fraction) = value.split_once('.').unwrap_or((value, ""));
     if whole.is_empty()
         || whole.len() > 12
@@ -175,7 +176,7 @@ fn add(a: i128, b: i128) -> Result<i128, CoreError> {
 fn mul(a: i128, b: i128) -> Result<i128, CoreError> {
     a.checked_mul(b).ok_or(CoreError::Invalid)
 }
-fn money(value: i128) -> String {
+pub(crate) fn money(value: i128) -> String {
     let sign = if value < 0 { "-" } else { "" };
     let value = value.abs();
     format!("{sign}{}.{:02}", value / 100, value % 100)

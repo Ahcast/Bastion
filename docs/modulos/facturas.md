@@ -6,7 +6,7 @@ Emitir y administrar facturas, pagos/saldos y documentos derivados (PDF, nota de
 
 ## Estado de implementación
 
-Primer corte local iniciado el 2026-10-22: borradores sin numeración fiscal, listado/detalle/editor, cálculo comercial, costos y gastos con permisos y auditoría del Core. No implementa emisión, pagos ni documentos; ver [alcance, diferencias y pendientes](facturas-implementacion.md) y [OpenAPI](facturas.openapi.yaml). La ficha siguiente conserva el alcance objetivo y no implica que esté todo implementado.
+Corte de acciones del 2026-10-27: emisión numerada al marcar como enviado, pagos/saldos, clonación, documentos privados y eliminación limitada a borradores sin pagos. Ver [decisiones, reglas y validación](facturas-acciones.md); ver [alcance, diferencias y pendientes](facturas-implementacion.md) y [OpenAPI](facturas.openapi.yaml). La ficha siguiente conserva el alcance objetivo y no implica que esté todo implementado.
 
 ## Campos
 
@@ -28,11 +28,11 @@ Primer corte local iniciado el 2026-10-22: borradores sin numeración fiscal, li
 
 ## Ciclo de vida y pagos
 
-Estados acordados: `Borrador`, `Enviado` y `Pagado`. Los pagos parciales no cambian `Enviado`; la factura pasa a `Pagado` solo cuando el saldo llega a cero. La condición exacta que marca una factura como `Enviado` sigue pendiente: el informe distingue la acción manual “Marcar como enviado” del envío por correo. También falta definir cómo se corrige una factura después de enviarla; no asumir que puede editarse libremente ni inventar una acción de anulación.
+Estados acordados: `Borrador`, `Enviado` y `Pagado`. Los pagos parciales no cambian `Enviado`; la factura pasa a `Pagado` solo cuando el saldo llega a cero. Confirmado el 2026-10-27: Marcar como enviado asigna número SAR y bloquea edición/eliminación; no envía correo. Si ya está liquidada, queda Pagado. Solo se eliminan borradores sin pagos, preservando origen. No se añade anulación ni se reutiliza numeración.
 
 ## Botones y acciones
 
-Confirmación del usuario del 2026-10-23: cada fila ofrece un único botón desplegable con este orden exacto: **Ver, Editar, Marcar como enviado, Ingresar pago, Clonar, PDF, Nota de entrega, Emitir Recibo, Eliminar**. En el corte de borradores, Ver y Editar funcionan con los permisos vigentes; las demás opciones permanecen visibles y deshabilitadas con el motivo hasta completar sus casos de uso.
+Confirmación del usuario del 2026-10-23: cada fila ofrece un único botón desplegable con este orden exacto: **Ver, Editar, Marcar como enviado, Ingresar pago, Clonar, PDF, Nota de entrega, Emitir Recibo, Eliminar**. Las nueve opciones se habilitan por permisos, estado, saldo y disponibilidad de documentos; ver `facturas-acciones.md`.
 
 Listado: Nueva factura, Ingresar pago (fecha/monto/método/referencia; Guardar pago/Cancelar), Marcar como enviado, Clonar, PDF, Nota de entrega, Emitir recibo, Eliminar, abrir/editar y paginación.
 
@@ -40,9 +40,9 @@ Editor: Guardar; Editar/Cancelar; Agregar/Quitar ítem; Agregar/Quitar gasto; Ag
 
 Resumen recalculado: importes exonerado/exento/gravado, descuentos, ISV, pagado, saldo, inversión de productos/otros gastos, inversión total y utilidad estimada.
 
-El PDF de factura, la nota de entrega y el recibo se generan con Typst mediante el servicio compartido del core. Se conservan las acciones y el flujo actuales; el módulo provee los datos de cada documento y define el permiso correspondiente. Las plantillas y su versionado quedan por definir.
+El PDF de factura, la nota de entrega y el recibo se generan con Typst mediante el servicio compartido del core. Se conservan las acciones y el flujo actuales; el módulo provee los datos de cada documento y define el permiso correspondiente. La plantilla `factura-v1.typ` diferencia factura, entrega y recibo; conserva empresa y SAR del momento de emisión.
 
-Identidad visual confirmada el 2026-10-23: factura y nota de entrega usan el logo de Castillo IT suministrado como recurso compartido del Core, conforme a `../15-identidad-documental.md`. Esta decisión no habilita todavía las acciones PDF pendientes ni agrega firma/sello a estos documentos.
+Identidad visual confirmada el 2026-10-23: factura y nota de entrega usan el logo de Castillo IT suministrado como recurso compartido del Core, conforme a `../15-identidad-documental.md`. No se agrega firma/sello a estos documentos.
 
 ## Settings bajo Ajustes
 
@@ -54,7 +54,7 @@ API actual: CRUD, estado, pago, clonar, borrar, crear desde cotización/orden. E
 
 ## Pendientes
 
-Reglas fiscales, métodos de pago, condición que marca una factura como Enviado, corrección después del envío, numeración, correlación de conversiones, borrado y conciliación contable deben verificarse antes de implementar.
+Persisten la validación fiscal/contable externa, anulación/reembolsos y los contratos futuros de origen de Licitaciones/MCP. Métodos de pago admiten texto opcional como Legacy; no se inventa un catálogo. Emisión, bloqueo, numeración y borrado quedan definidos en `facturas-acciones.md`.
 
 ## Origen futuro: adjudicación de Licitaciones
 

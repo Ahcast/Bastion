@@ -1,20 +1,50 @@
 use super::*;
-use bastion_facturas::{InvoiceDraft, InvoiceFilter, InvoiceInput, InvoicePage};
+use bastion_facturas::{InvoiceDraft, InvoiceFilter, InvoiceInput, InvoicePage, PaymentInput};
 
 pub(super) fn routes(state: ApiState) -> Router<ApiState> {
     Router::new()
+        .route(
+            "/api/v1/facturas/document-readiness",
+            get(document_readiness),
+        )
         .route("/api/v1/facturas/dashboard", get(dashboard))
         .route("/api/v1/facturas", get(list).post(create))
         .route("/api/v1/facturas/calculate", post(preview))
-        .route("/api/v1/facturas/{id}", get(detail).put(replace))
+        .route(
+            "/api/v1/facturas/{id}",
+            get(detail).put(replace).delete(delete),
+        )
+        .route("/api/v1/facturas/{id}/mark-sent", post(mark_sent))
+        .route("/api/v1/facturas/{id}/payments", post(payment))
+        .route("/api/v1/facturas/{id}/clone", post(clone_invoice))
+        .route("/api/v1/facturas/{id}/calculate", post(preview_saved))
+        .route("/api/v1/facturas/{id}/documents/{kind}", post(document))
         .layer(RequestBodyLimitLayer::new(1024 * 1024))
         .route_layer(middleware::from_fn_with_state(state, guard))
+}
+
+async fn document_readiness(
+    State(state): State<ApiState>,
+    headers: axum::http::HeaderMap,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    let user = actor(&state, &headers).await?;
+    state
+        .facturas
+        .document_readiness(user.id)
+        .await
+        .map(Json)
+        .map_err(ApiError)
 }
 
 async fn guard(State(state): State<ApiState>, request: Request, next: Next) -> Response {
     match tokio::time::timeout(Duration::from_secs(30), async {
         let user = actor(&state, request.headers()).await?;
-        let capability = if request.method() == Method::GET || request.method() == Method::HEAD {
+        let capability = if request.method() == Method::DELETE {
+            "eliminar"
+        } else if request.method() == Method::GET
+            || request.method() == Method::HEAD
+            || request.uri().path().contains("/documents/")
+        {
             "ver"
         } else {
             "editar"
@@ -37,6 +67,120 @@ async fn guard(State(state): State<ApiState>, request: Request, next: Next) -> R
         Ok(Err(error)) => error.into_response(),
         Err(_) => ApiError(CoreError::Overloaded).into_response(),
     }
+}
+
+async fn preview_saved(
+    State(state): State<ApiState>,
+    headers: axum::http::HeaderMap,
+    Path(id): Path<u64>,
+    Json(input): Json<InvoiceInput>,
+) -> Result<Json<bastion_facturas::InvoiceCalculation>, ApiError> {
+    let user = actor(&state, &headers).await?;
+    let expected =
+        version(single_header(&headers, "if-match")?).ok_or(ApiError(CoreError::Invalid))?;
+    state
+        .facturas
+        .preview_saved(user.id, id, expected, &input)
+        .await
+        .map(Json)
+        .map_err(ApiError)
+}
+async fn mark_sent(
+    State(state): State<ApiState>,
+    headers: axum::http::HeaderMap,
+    Path(id): Path<u64>,
+) -> Result<Response, ApiError> {
+    let user = actor(&state, &headers).await?;
+    let expected =
+        version(single_header(&headers, "if-match")?).ok_or(ApiError(CoreError::Invalid))?;
+    state
+        .facturas
+        .mark_sent(
+            user.id,
+            id,
+            expected,
+            single_header(&headers, "idempotency-key")?,
+        )
+        .await
+        .map(invoice_response)
+        .map_err(ApiError)
+}
+async fn clone_invoice(
+    State(state): State<ApiState>,
+    headers: axum::http::HeaderMap,
+    Path(id): Path<u64>,
+) -> Result<Response, ApiError> {
+    let user = actor(&state, &headers).await?;
+    let expected =
+        version(single_header(&headers, "if-match")?).ok_or(ApiError(CoreError::Invalid))?;
+    state
+        .facturas
+        .clone_invoice(
+            user.id,
+            id,
+            expected,
+            single_header(&headers, "idempotency-key")?,
+        )
+        .await
+        .map(invoice_response)
+        .map_err(ApiError)
+}
+async fn payment(
+    State(state): State<ApiState>,
+    headers: axum::http::HeaderMap,
+    Path(id): Path<u64>,
+    Json(payment): Json<PaymentInput>,
+) -> Result<Response, ApiError> {
+    let user = actor(&state, &headers).await?;
+    let expected =
+        version(single_header(&headers, "if-match")?).ok_or(ApiError(CoreError::Invalid))?;
+    state
+        .facturas
+        .add_payment(
+            user.id,
+            id,
+            expected,
+            single_header(&headers, "idempotency-key")?,
+            payment,
+        )
+        .await
+        .map(invoice_response)
+        .map_err(ApiError)
+}
+async fn document(
+    State(state): State<ApiState>,
+    headers: axum::http::HeaderMap,
+    Path((id, kind)): Path<(u64, String)>,
+) -> Result<Response, ApiError> {
+    let user = actor(&state, &headers).await?;
+    let expected =
+        version(single_header(&headers, "if-match")?).ok_or(ApiError(CoreError::Invalid))?;
+    state
+        .facturas
+        .document(user.id, id, expected, &kind)
+        .await
+        .map(|doc| Json(doc).into_response())
+        .map_err(ApiError)
+}
+async fn delete(
+    State(state): State<ApiState>,
+    headers: axum::http::HeaderMap,
+    Path(id): Path<u64>,
+) -> Result<StatusCode, ApiError> {
+    let user = actor(&state, &headers).await?;
+    let expected =
+        version(single_header(&headers, "if-match")?).ok_or(ApiError(CoreError::Invalid))?;
+    state
+        .facturas
+        .delete(
+            user.id,
+            id,
+            expected,
+            single_header(&headers, "idempotency-key")?,
+        )
+        .await
+        .map(|_| StatusCode::NO_CONTENT)
+        .map_err(ApiError)
 }
 
 async fn list(

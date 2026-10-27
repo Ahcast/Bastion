@@ -27,6 +27,12 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
         tracing::info!("database connection verified with TLS VerifyIdentity (SELECT 1)");
         return Ok(());
     }
+    if command == "migrate-facturas" {
+        let migrator = Database::connect_lazy(&DatabaseConfig::migrator_from_env()?);
+        bastion_facturas::InvoiceService::migrate(&migrator).await?;
+        tracing::info!("invoice migrations completed; other module schemas unchanged");
+        return Ok(());
+    }
     if command == "migrate" {
         let migrator = Database::connect_lazy(&DatabaseConfig::migrator_from_env()?);
         migrator.migrate().await?;
@@ -157,6 +163,17 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
             loop {
                 if orders.clean_one_document().await.is_err() {
                     tracing::error!("order document cleanup failed");
+                }
+                tokio::time::sleep(std::time::Duration::from_secs(10)).await;
+            }
+        });
+    }
+    if config.facturas_allowed {
+        let invoices = bastion_facturas::InvoiceService::new(core.database(), core.admin());
+        tokio::spawn(async move {
+            loop {
+                if invoices.clean_one_document().await.is_err() {
+                    tracing::error!("invoice document cleanup failed");
                 }
                 tokio::time::sleep(std::time::Duration::from_secs(10)).await;
             }

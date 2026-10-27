@@ -297,11 +297,13 @@ dependencies = [
 name = "bastion-facturas"
 version = "0.1.0"
 dependencies = [
+ "base64 0.22.1",
  "bastion-clientes",
  "bastion-core",
  "bastion-cotizaciones",
  "bastion-ordenes-compra",
  "chrono",
+ "hex",
  "serde",
  "serde_json",
  "sha2 0.10.9",

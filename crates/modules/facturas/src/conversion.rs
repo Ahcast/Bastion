@@ -28,6 +28,7 @@ impl InvoiceService {
         self.lock_conversion(actor, tx).await?;
         let data = &source.data;
         let input = InvoiceInput {
+            initial_payment: None,
             id_client: data.id_client,
             client_name: data.client_name.clone(),
             client_rtn: data.client_rtn.clone(),
@@ -80,6 +81,9 @@ impl InvoiceService {
             status: "Borrador".into(),
             currency: "HNL".into(),
             invoice_number: None,
+            payments: Vec::new(),
+            sar_snapshot: None,
+            company_snapshot: None,
             source_quote: Some(origin),
             source_order: None,
             data: calculation.data.clone(),
@@ -111,6 +115,9 @@ impl InvoiceService {
             status: "Borrador".into(),
             currency: "HNL".into(),
             invoice_number: None,
+            payments: Vec::new(),
+            sar_snapshot: None,
+            company_snapshot: None,
             source_quote: None,
             source_order: Some(origin),
             data: c.data.clone(),
@@ -147,6 +154,7 @@ fn order_invoice_calculation(
         });
     }
     let input = InvoiceInput {
+        initial_payment: None,
         id_client: None,
         client_name: source.data.client_name.clone(),
         client_rtn: source.data.client_rtn.clone(),

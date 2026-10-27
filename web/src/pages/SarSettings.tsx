@@ -40,9 +40,9 @@ function SarEditor({ initial, saved, reload }: { initial: SarRecord; saved: (val
     }}><Notice>{error}</Notice><fieldset className="form-fields" disabled={busy}>
       <label>Rango autorizado<input name="limit_range" maxLength={255} value={values.limit_range} onChange={event => change('limit_range', event.target.value)} /><small>Copia el rango tal como aparece en tu autorización.</small></label>
       <label>Fecha límite de emisión<input name="limit_date" type="date" value={values.limit_date ?? ''} onChange={event => change('limit_date', event.target.value || null)} /></label>
-      <label>Factura actual<input name="current_invoice" maxLength={80} value={values.current_invoice} onChange={event => change('current_invoice', event.target.value)} /></label>
+      <label>Factura actual<input name="current_invoice" maxLength={80} value={values.current_invoice} onChange={event => change('current_invoice', event.target.value)} /><small>Formato completo: 000-000-00-00000000. Se asigna el siguiente número al marcar una factura como enviada; los números utilizados no se reutilizan.</small></label>
       <label>Texto SAR<textarea name="sar_text" rows={4} maxLength={3000} value={values.sar_text} onChange={event => change('sar_text', event.target.value)} /></label>
-      <p className="muted">El estado corresponde a los datos guardados. Guardar configura la información SAR; todavía no emite facturas ni asigna números a los borradores.</p>
+      <p className="muted">El estado corresponde a los datos guardados. Guardar configura la información SAR; la emisión se confirma desde Facturas al marcar como enviado.</p>
       <div className="actions"><button type="submit" className="primary" disabled={!dirty || conflict}>{busy ? 'Guardando…' : 'Guardar SAR'}</button><button type="button" disabled={!dirty} onClick={() => { setValues(initial.settings); setError(''); }}>Cancelar cambios</button><button type="button" onClick={() => { void navigate(reload); }}>Recargar configuración SAR</button></div>
     </fieldset></form></>;
 }
