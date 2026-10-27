@@ -87,3 +87,7 @@ El 2026-10-26 se instalaron los artifacts de `a7757d3` (CI exitoso `40169034037`
 ## Colaboración: activación verificada
 
 El 2026-10-26 se permitió y activó Colaboración sobre la release vigente `a7757d3`, con respaldo privado de configuración y las 61 tablas, sin modificar binarios, esquema ni estados de los otros ocho módulos. La identidad del backend pasó escritura/lectura con integridad, AES256, rechazo anónimo 403 y eliminación de dos versiones y un marcador del objeto sintético exacto bajo `colaboracion/empresa/`, sin residuos. Se añadió `colaboracion` a la allowlist, se verificó la migración ya instalada y se registró la activación operativa con actor de sistema en auditoría. Estado final `1/1/1`; salud HTTPS 200, frontend y chunk de Colaboración verificados y API anónima 401. Se conserva el pendiente de prueba integral autenticada y de carga máxima por el proxy. Ver `modulos/colaboracion-implementacion.md`.
+
+## Mantenimiento del repositorio antes de publicar
+
+Sincronizar las referencias de `origin/main` antes de implementar o preparar un release. Revisar divergencias y equivalencia de commits con `git cherry`; conservar un respaldo recuperable del historial y de los archivos locales antes de reconciliar. Las copias antiguas de módulos ya publicados se comparan con su historial para incorporar sólo los cambios nuevos sobre la versión vigente. Los respaldos operativos quedan fuera de Git y no se suben con el código.

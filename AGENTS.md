@@ -25,7 +25,9 @@ Construir una nueva aplicación en Rust que conserve los módulos, procesos, cam
 - Preservar la separación de despliegue acordada: frontend Bluehost; backend/API/MCP en AWS; MySQL Bluehost, salvo decisión explícita posterior.
 - No almacenar secretos en el frontend ni en los documentos. Usar variables/gestor de secretos para valores de entorno.
 - Al cambiar una decisión arquitectónica, actualizar los documentos afectados y registrar la decisión en `docs/README.md`.
+- Antes de implementar o publicar, sincronizar las referencias de `origin/main` y revisar divergencias y trabajo local. Conservar un respaldo recuperable antes de reconciliar; comparar los cambios con la versión publicada para evitar restaurar copias antiguas de módulos ya corregidos.
+- Publicar commits acotados en `main`, según `docs/09-despliegue.md`. Verificar compilación, pruebas y CI; construir artifacts no equivale a desplegar ni activar un módulo.
 
 ## Estado
 
-Los documentos describen la arquitectura objetivo y la paridad conocida. El repositorio BastionV1 inicia con un esqueleto del servidor y la infraestructura HTTP/MySQL; autenticación, sesiones, ajustes, autorización, auditoría y MCP siguen sin implementarse. Lo marcado `Pendiente` requiere definición o verificación antes de considerarse requisito cerrado.
+El repositorio implementa el Core con autenticación, sesiones, ajustes, autorización y auditoría, frontend React y módulos de negocio. Las fichas de `docs/modulos/` y `docs/09-despliegue.md` registran el alcance y despliegue de cada módulo; disponibilidad, activación y paridad son estados distintos. MCP sigue pospuesto conforme a `docs/06-mcp.md`. Lo marcado `Pendiente` requiere definición o verificación antes de considerarse requisito cerrado.
