@@ -1,4 +1,4 @@
-use bastion_core::{CoreError, CoreService, Database};
+use bastion_core::{CoreError, CoreService, DashboardPeriod, Database};
 use bastion_ordenes_compra::{DestinationInput, OrderFilter, OrderInput, OrderService};
 use sqlx::mysql::MySqlPoolOptions;
 
@@ -137,6 +137,9 @@ async fn mysql57_orders_destinations_atomicity_permissions_and_conflicts() {
     );
     let a = a.unwrap();
     assert_eq!(a.id, b.unwrap().id);
+    let dashboard = service.dashboard(1, DashboardPeriod::All).await.unwrap();
+    assert_eq!(dashboard["metrics"]["total"], 1);
+    assert_eq!(dashboard["recent"][0]["n_orders"], "OC-1");
     assert_eq!(a.calculation.totals.total, "230.00");
     assert_eq!(a.calculation.totals.investment_total, "125.00");
     let mut changed = input();

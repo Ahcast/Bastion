@@ -208,6 +208,8 @@ El informe se obtuvo de una copia de frontend Angular compilado y backend Larave
 
 - 2026-10-26: se reconcilia la copia local con `origin/main`, conservando un respaldo recuperable del historial y archivos previos. Los módulos y correcciones ya publicados se toman de la versión vigente; Reportes se reincorpora como cambio acotado. Se corrige el estado obsoleto de `AGENTS.md` y se documenta sincronización y respaldo antes de publicar. No cambia la arquitectura Bluehost/AWS/MySQL.
 
+- 2026-10-26: Inicio incorpora resúmenes de Órdenes de compra, Facturas y Gastos junto con Procesos y Cotizaciones. Cada módulo aplica su permiso de lectura y calcula los datos en su propio servicio. Gastos conserva totales por moneda; Facturas limita el resumen a borradores existentes. No requiere migraciones ni agrega reglas de negocio.
+
 
 - 2026-10-26: Reportes publicado desde `02c1d89` y desplegado en producción con autorización del usuario, CI exitoso `40430689605` y artifacts verificados. Migración propia 1 aplicada; las 61 tablas previas conservan datos y esquema y el total pasa a 63. Backend AWS y frontend Bluehost verificados por HTTPS; los demás módulos y permisos se preservan. Disponible con `enabled=0`, pendiente de activación administrativa. Se autoriza reutilización puntual del acceso MySQL existente sólo en `migrate`, sin persistir variables de migrador ni cambiar privilegios. Se conservan respaldos privados y pendientes de paridad. Ver [alcance y evidencia](modulos/reportes-implementacion.md) y [despliegue](09-despliegue.md).
 

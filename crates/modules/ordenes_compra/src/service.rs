@@ -3,9 +3,37 @@ use crate::{
     OrderSummary, PurchaseOrder, calculate,
 };
 use crate::{OrderReport, OrderReportFilter, OrderReportRow, OrderReportTotals};
-use bastion_core::{CoreAdmin, CoreError, Database};
+use bastion_core::{
+    CoreAdmin, CoreError, DashboardPeriod, DashboardPoint, DashboardWindow, Database,
+};
 use sha2::{Digest, Sha256};
 use sqlx::{MySql, QueryBuilder, Row, Transaction};
+
+fn dashboard_query(select: &str, window: &DashboardWindow) -> QueryBuilder<MySql> {
+    let mut query = QueryBuilder::new(select.to_owned());
+    query.push(" FROM ordenes_orders WHERE 1=1");
+    if let Some(from) = window.from {
+        query.push(" AND order_date>=").push_bind(from);
+    }
+    if let Some(until) = window.until {
+        query.push(" AND order_date<").push_bind(until);
+    }
+    query
+}
+#[derive(serde::Serialize, sqlx::FromRow)]
+struct OrderDashboardState {
+    label: String,
+    count: i64,
+}
+#[derive(serde::Serialize, sqlx::FromRow)]
+struct OrderDashboardRow {
+    id: u64,
+    n_orders: String,
+    client_name: String,
+    order_date: String,
+    status: String,
+    total: String,
+}
 
 #[path = "conversion.rs"]
 mod conversion;
@@ -234,6 +262,65 @@ impl OrderService {
         })
     }
 
+    pub async fn dashboard(
+        &self,
+        actor: u64,
+        period: DashboardPeriod,
+    ) -> Result<serde_json::Value, CoreError> {
+        let now = chrono::Utc::now();
+        let window = period.window(now)?;
+        let mut tx = self.begin(actor, "documentos", "ver").await?;
+        let metrics = dashboard_query(
+            "SELECT COUNT(*) AS total,CAST(COALESCE(SUM(total),0) AS CHAR) AS amount",
+            &window,
+        );
+        let metrics = metrics.build().fetch_one(&mut *tx).await?;
+        let total: i64 = metrics.try_get("total")?;
+        let amount: String = metrics.try_get("amount")?;
+        let mut states = dashboard_query("SELECT status AS label,COUNT(*) AS count", &window);
+        states.push(" GROUP BY status ORDER BY status LIMIT 20");
+        let states = states
+            .build_query_as::<OrderDashboardState>()
+            .fetch_all(&mut *tx)
+            .await?;
+        let mut chart = QueryBuilder::<MySql>::new("SELECT DATE_FORMAT(order_date,");
+        chart.push_bind(period.sql_format()).push(
+            ") AS bucket,COUNT(*) AS count,CAST(COALESCE(SUM(total),0) AS CHAR) AS amount FROM ordenes_orders WHERE 1=1",
+        );
+        if let Some(from) = window.from {
+            chart.push(" AND order_date>=").push_bind(from);
+        }
+        if let Some(until) = window.until {
+            chart.push(" AND order_date<").push_bind(until);
+        }
+        chart.push(" GROUP BY bucket ORDER BY bucket LIMIT 121");
+        let mut points = chart
+            .build_query_as::<DashboardPoint>()
+            .fetch_all(&mut *tx)
+            .await?;
+        let chart_truncated = points.len() > 120;
+        points.truncate(120);
+        let points = window.fill_series(points, true)?;
+        let mut recent = dashboard_query(
+            "SELECT id,n_orders,client_name,CAST(order_date AS CHAR) AS order_date,status,CAST(total AS CHAR) AS total",
+            &window,
+        );
+        recent.push(" ORDER BY order_date DESC,id DESC LIMIT 8");
+        let recent = recent
+            .build_query_as::<OrderDashboardRow>()
+            .fetch_all(&mut *tx)
+            .await?;
+        tx.commit().await?;
+        Ok(serde_json::json!({
+            "window": window,
+            "as_of": now.to_rfc3339(),
+            "metrics": {"total": total, "amount": amount},
+            "series": points,
+            "chart_truncated": chart_truncated,
+            "distribution": states,
+            "recent": recent
+        }))
+    }
     pub async fn detail(&self, actor: u64, id: u64) -> Result<PurchaseOrder, CoreError> {
         let mut tx = self.begin(actor, "documentos", "ver").await?;
         let order = load(&mut tx, id).await?;

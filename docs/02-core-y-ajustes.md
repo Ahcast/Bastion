@@ -142,7 +142,7 @@ El Core debe poder desplegarse solo en el ambiente de prueba, operar sin módulo
 
 ## Inicio con módulos disponibles
 
-Procesos y Cotizaciones alimentan el panel con datos reales, controles Mes/Año/Todo y Actualizar, resúmenes separados por permiso y estados de carga/error parcial. Cada módulo calcula su dominio; el Core comparte calendario y presentación. Contrato y criterios: [16-dashboard-modulos.md](16-dashboard-modulos.md).
+Procesos, Cotizaciones, Órdenes, Facturas y Gastos alimentan el panel con datos reales, controles Mes/Año/Todo y Actualizar, resúmenes separados por permiso y estados de carga/error parcial. Cada módulo calcula su dominio; el Core comparte calendario y presentación. Contrato y criterios: [16-dashboard-modulos.md](16-dashboard-modulos.md).
 
 
 Empresa/SAR: el formulario de numeración ya permite guardar los cuatro campos observados, desde Facturas o Core > Empresa y SAR, con la misma configuración global y permisos administrativos. Ver [contrato y límites](17-empresa-sar.md). Logo y emisión continúan pendientes.

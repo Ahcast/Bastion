@@ -1,4 +1,4 @@
-use bastion_core::{CoreError, CoreService, Database};
+use bastion_core::{CoreError, CoreService, DashboardPeriod, Database};
 use bastion_facturas::{InvoiceFilter, InvoiceInput, InvoiceService};
 use sqlx::mysql::MySqlPoolOptions;
 
@@ -76,6 +76,10 @@ async fn mysql57_drafts_atomic_receipts_permissions_versions_and_disable() {
     assert_eq!(a.calculation.totals.total, "207.00");
     assert_eq!(a.calculation.profit, "55.00");
     assert_eq!(a.calculation.balance, "207.00");
+    let dashboard = service.dashboard(1, DashboardPeriod::All).await.unwrap();
+    assert_eq!(dashboard["metrics"]["total"], 1);
+    assert_eq!(dashboard["metrics"]["amount"], "207.00");
+    assert_eq!(dashboard["recent"][0]["status"], "Borrador");
     let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM facturas_drafts")
         .fetch_one(&pool)
         .await

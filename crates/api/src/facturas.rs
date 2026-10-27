@@ -3,6 +3,7 @@ use bastion_facturas::{InvoiceDraft, InvoiceFilter, InvoiceInput, InvoicePage};
 
 pub(super) fn routes(state: ApiState) -> Router<ApiState> {
     Router::new()
+        .route("/api/v1/facturas/dashboard", get(dashboard))
         .route("/api/v1/facturas", get(list).post(create))
         .route("/api/v1/facturas/calculate", post(preview))
         .route("/api/v1/facturas/{id}", get(detail).put(replace))
@@ -47,6 +48,19 @@ async fn list(
     state
         .facturas
         .list(user.id, &filter)
+        .await
+        .map(Json)
+        .map_err(ApiError)
+}
+async fn dashboard(
+    State(state): State<ApiState>,
+    headers: axum::http::HeaderMap,
+    Query(query): Query<DashboardQuery>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    let user = actor(&state, &headers).await?;
+    state
+        .facturas
+        .dashboard(user.id, query.period)
         .await
         .map(Json)
         .map_err(ApiError)

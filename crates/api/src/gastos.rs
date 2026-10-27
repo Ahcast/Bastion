@@ -3,6 +3,7 @@ use bastion_gastos::{Expense, ExpenseFilter, ExpenseInput, ExpensePage};
 
 pub(super) fn routes(state: ApiState) -> Router<ApiState> {
     Router::new()
+        .route("/api/v1/gastos/dashboard", get(dashboard))
         .route("/api/v1/gastos", get(list).post(create))
         .route("/api/v1/gastos/calculo", post(preview))
         .route(
@@ -52,6 +53,19 @@ async fn list(
     state
         .gastos
         .list(user.id, &filter)
+        .await
+        .map(Json)
+        .map_err(ApiError)
+}
+async fn dashboard(
+    State(state): State<ApiState>,
+    headers: axum::http::HeaderMap,
+    Query(query): Query<DashboardQuery>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    let user = actor(&state, &headers).await?;
+    state
+        .gastos
+        .dashboard(user.id, query.period)
         .await
         .map(Json)
         .map_err(ApiError)

@@ -3,6 +3,14 @@ info:
   title: Bastion Facturas — borradores sin emisión fiscal
   version: 0.2.0
 paths:
+  /api/v1/facturas/dashboard:
+    get:
+      summary: Resumen para Inicio (facturas/documentos/ver)
+      parameters:
+        - {name: period, in: query, schema: {type: string, enum: [month, year, all], default: month}}
+      responses:
+        '200': {description: 'Ventana Honduras, cantidad, suma de totales disponibles, estados y hasta ocho borradores recientes con saldo; no implica facturación ni cobros.'}
+        default: {$ref: '#/components/responses/Problem'}
   /api/v1/facturas:
     get:
       summary: Listar borradores (facturas/documentos/ver)

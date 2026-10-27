@@ -1,4 +1,4 @@
-use bastion_core::{CoreError, CoreService, Database};
+use bastion_core::{CoreError, CoreService, DashboardPeriod, Database};
 use bastion_gastos::{ExpenseFilter, ExpenseInput, ExpenseService};
 use sqlx::mysql::MySqlPoolOptions;
 fn input(invoice: &str, taxable: &str, exempt: &str) -> ExpenseInput {
@@ -121,6 +121,9 @@ async fn mysql57_expenses_activation_crud_filters_idempotency_audit_and_soft_del
     let mut third = input("null", "2", "0");
     third.provider = "Tercero".into();
     svc.create(1, "expense-create-key-3", third).await.unwrap();
+    let dashboard = svc.dashboard(1, DashboardPeriod::All).await.unwrap();
+    assert_eq!(dashboard["metrics"]["total"], 3);
+    assert_eq!(dashboard["metrics"]["currencies"][0]["currency"], "HNL");
     let page = svc
         .list(
             2,

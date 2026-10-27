@@ -17,7 +17,7 @@ use axum::{
     response::{IntoResponse, Response},
     routing::{get, post},
 };
-use bastion_core::{AuthCookies, CoreError, CoreService, LoginStart};
+use bastion_core::{AuthCookies, CoreError, CoreService, DashboardQuery, LoginStart};
 use ipnet::IpNet;
 use serde::{Deserialize, Serialize};
 use subtle::ConstantTimeEq;

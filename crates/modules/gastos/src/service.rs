@@ -1,8 +1,46 @@
-use crate::{Expense, ExpenseFilter, ExpenseInput, ExpensePage, ExpenseSummary, calculate};
-use crate::{ExpenseCurrencyTotals, ExpenseReport, ExpenseReportFilter, ExpenseReportRow};
-use bastion_core::{CoreAdmin, CoreError, Database};
+use crate::{
+    Expense, ExpenseCurrencyTotals, ExpenseFilter, ExpenseInput, ExpensePage, ExpenseReport,
+    ExpenseReportFilter, ExpenseReportRow, ExpenseSummary, calculate,
+};
+use bastion_core::{
+    CoreAdmin, CoreError, DashboardPeriod, DashboardPoint, DashboardWindow, Database,
+};
 use sha2::{Digest, Sha256};
 use sqlx::{MySql, QueryBuilder, Row, Transaction};
+
+#[derive(serde::Serialize, sqlx::FromRow)]
+struct ExpenseDashboardState {
+    label: String,
+    count: i64,
+}
+#[derive(serde::Serialize, sqlx::FromRow)]
+struct ExpenseDashboardCurrency {
+    currency: String,
+    amount: String,
+}
+#[derive(serde::Serialize, sqlx::FromRow)]
+struct ExpenseDashboardRow {
+    id: u64,
+    invoice_number: String,
+    expense_date: String,
+    provider: String,
+    currency: String,
+    total: String,
+}
+fn expense_dashboard_query(
+    select: &str,
+    window: &DashboardWindow,
+) -> QueryBuilder<MySql> {
+    let mut query = QueryBuilder::new(select.to_owned());
+    query.push(" FROM gastos_records WHERE deleted_at IS NULL");
+    if let Some(from) = window.from {
+        query.push(" AND expense_date>=").push_bind(from);
+    }
+    if let Some(until) = window.until {
+        query.push(" AND expense_date<").push_bind(until);
+    }
+    query
+}
 
 #[derive(Clone)]
 pub struct ExpenseService {
@@ -197,6 +235,75 @@ impl ExpenseService {
             page_size,
             has_more,
         })
+    }
+
+    pub async fn dashboard(
+        &self,
+        actor: u64,
+        period: DashboardPeriod,
+    ) -> Result<serde_json::Value, CoreError> {
+        let now = chrono::Utc::now();
+        let window = period.window(now)?;
+        let mut tx = self.begin(actor, "ver").await?;
+        let metrics = expense_dashboard_query("SELECT COUNT(*) AS total", &window)
+            .build()
+            .fetch_one(&mut *tx)
+            .await?;
+        let total: i64 = metrics.try_get("total")?;
+        let mut currencies = expense_dashboard_query(
+            "SELECT currency,CAST(COALESCE(SUM(total),0) AS CHAR) AS amount",
+            &window,
+        );
+        currencies.push(" GROUP BY currency ORDER BY currency");
+        let currencies = currencies
+            .build_query_as::<ExpenseDashboardCurrency>()
+            .fetch_all(&mut *tx)
+            .await?;
+        let mut states =
+            expense_dashboard_query("SELECT provider AS label,COUNT(*) AS count", &window);
+        states.push(" GROUP BY provider ORDER BY count DESC,provider LIMIT 8");
+        let states = states
+            .build_query_as::<ExpenseDashboardState>()
+            .fetch_all(&mut *tx)
+            .await?;
+        let mut chart = QueryBuilder::<MySql>::new("SELECT DATE_FORMAT(expense_date,");
+        chart
+            .push_bind(period.sql_format())
+            .push(") AS bucket,COUNT(*) AS count FROM gastos_records WHERE deleted_at IS NULL");
+        if let Some(from) = window.from {
+            chart.push(" AND expense_date>=").push_bind(from);
+        }
+        if let Some(until) = window.until {
+            chart.push(" AND expense_date<").push_bind(until);
+        }
+        chart.push(" GROUP BY bucket ORDER BY bucket LIMIT 121");
+        let mut points = chart
+            .build_query_as::<DashboardPoint>()
+            .fetch_all(&mut *tx)
+            .await?;
+        let chart_truncated = points.len() > 120;
+        points.truncate(120);
+        let points = window.fill_series(points, false)?;
+        let recent = expense_dashboard_query(
+            "SELECT id,invoice_number,CAST(expense_date AS CHAR) AS expense_date,provider,currency,CAST(total AS CHAR) AS total",
+            &window,
+        )
+            .push(" ORDER BY expense_date DESC,id DESC LIMIT 8")
+            .build_query_as::<ExpenseDashboardRow>()
+            .fetch_all(&mut *tx)
+            .await?;
+        tx.commit().await?;
+        Ok(
+            serde_json::json!({
+                "window": window,
+                "as_of": now.to_rfc3339(),
+                "metrics": {"total": total, "currencies": currencies},
+                "series": points,
+                "chart_truncated": chart_truncated,
+                "distribution": states,
+                "recent": recent
+            }),
+        )
     }
 
     pub async fn detail(&self, actor: u64, id: u64) -> Result<Expense, CoreError> {

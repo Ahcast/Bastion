@@ -1,5 +1,7 @@
 use crate::{InvoiceReport, InvoiceReportFilter, InvoiceReportRow, InvoiceReportTotals};
-use bastion_core::{CoreAdmin, CoreError, Database};
+use bastion_core::{
+    CoreAdmin, CoreError, DashboardPeriod, DashboardPoint, DashboardWindow, Database,
+};
 use sha2::{Digest, Sha256};
 use sqlx::{MySql, QueryBuilder, Row, Transaction};
 
@@ -7,6 +9,36 @@ use crate::{
     InvoiceCalculation, InvoiceDraft, InvoiceFilter, InvoiceInput, InvoicePage, InvoiceSummary,
     calculate,
 };
+
+#[derive(serde::Serialize, sqlx::FromRow)]
+struct InvoiceDashboardState {
+    label: String,
+    count: i64,
+}
+#[derive(serde::Serialize, sqlx::FromRow)]
+struct InvoiceDashboardRow {
+    id: u64,
+    order_number: String,
+    client_name: String,
+    invoice_date: String,
+    status: String,
+    total: Option<String>,
+    balance: Option<String>,
+}
+fn invoice_dashboard_query(
+    select: &str,
+    window: &DashboardWindow,
+) -> QueryBuilder<MySql> {
+    let mut query = QueryBuilder::new(select.to_owned());
+    query.push(" FROM facturas_drafts WHERE 1=1");
+    if let Some(from) = window.from {
+        query.push(" AND invoice_date>=").push_bind(from);
+    }
+    if let Some(until) = window.until {
+        query.push(" AND invoice_date<").push_bind(until);
+    }
+    query
+}
 
 #[path = "conversion.rs"]
 mod conversion;
@@ -200,6 +232,69 @@ impl InvoiceService {
             page_size,
             has_more,
         })
+    }
+
+    pub async fn dashboard(
+        &self,
+        actor: u64,
+        period: DashboardPeriod,
+    ) -> Result<serde_json::Value, CoreError> {
+        let now = chrono::Utc::now();
+        let window = period.window(now)?;
+        let mut tx = self.begin(actor, "ver").await?;
+        let total_sql = "JSON_UNQUOTE(JSON_EXTRACT(calculation_json,'$.totals.total'))";
+        let metrics = invoice_dashboard_query(
+            &format!("SELECT COUNT(*) AS total,COUNT({total_sql}) AS valued,CAST(COALESCE(SUM(CAST({total_sql} AS DECIMAL(50,2))),0) AS CHAR) AS amount"),
+            &window,
+        )
+        .build()
+        .fetch_one(&mut *tx)
+        .await?;
+        let total: i64 = metrics.try_get("total")?;
+        let valued: i64 = metrics.try_get("valued")?;
+        let amount: String = metrics.try_get("amount")?;
+        let mut states =
+            invoice_dashboard_query("SELECT status AS label,COUNT(*) AS count", &window);
+        states.push(" GROUP BY status ORDER BY status LIMIT 20");
+        let states = states
+            .build_query_as::<InvoiceDashboardState>()
+            .fetch_all(&mut *tx)
+            .await?;
+        let mut chart = QueryBuilder::<MySql>::new("SELECT DATE_FORMAT(invoice_date,");
+        chart.push_bind(period.sql_format()).push(format!(
+            ") AS bucket,COUNT(*) AS count,CAST(COALESCE(SUM(CAST({total_sql} AS DECIMAL(50,2))),0) AS CHAR) AS amount FROM facturas_drafts WHERE 1=1"
+        ));
+        if let Some(from) = window.from {
+            chart.push(" AND invoice_date>=").push_bind(from);
+        }
+        if let Some(until) = window.until {
+            chart.push(" AND invoice_date<").push_bind(until);
+        }
+        chart.push(" GROUP BY bucket ORDER BY bucket LIMIT 121");
+        let mut points = chart
+            .build_query_as::<DashboardPoint>()
+            .fetch_all(&mut *tx)
+            .await?;
+        let chart_truncated = points.len() > 120;
+        points.truncate(120);
+        let points = window.fill_series(points, true)?;
+        let recent = invoice_dashboard_query("SELECT id,order_number,client_name,CAST(invoice_date AS CHAR) AS invoice_date,status,JSON_UNQUOTE(JSON_EXTRACT(calculation_json,'$.totals.total')) AS total,JSON_UNQUOTE(JSON_EXTRACT(calculation_json,'$.balance')) AS balance", &window)
+            .push(" ORDER BY invoice_date DESC,id DESC LIMIT 8")
+            .build_query_as::<InvoiceDashboardRow>()
+            .fetch_all(&mut *tx)
+            .await?;
+        tx.commit().await?;
+        Ok(
+            serde_json::json!({
+                "window": window,
+                "as_of": now.to_rfc3339(),
+                "metrics": {"total": total, "amount": amount, "without_total": total - valued},
+                "series": points,
+                "chart_truncated": chart_truncated,
+                "distribution": states,
+                "recent": recent
+            }),
+        )
     }
 
     pub async fn detail(&self, actor: u64, id: u64) -> Result<InvoiceDraft, CoreError> {

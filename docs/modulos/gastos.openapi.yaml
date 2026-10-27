@@ -6,6 +6,20 @@ info:
 servers:
   - url: https://api.bastion.castilloit.net
 paths:
+  /api/v1/gastos/dashboard:
+    get:
+      summary: Resumen para Inicio (gastos/registros/ver)
+      parameters:
+        - in: query
+          name: period
+          schema: { type: string, enum: [month, year, all], default: month }
+      responses:
+        '200':
+          description: Ventana Honduras, cantidad, totales agrupados por moneda, serie por cantidad, proveedores con más registros y hasta ocho gastos recientes.
+          content:
+            application/json:
+              schema: { type: object }
+        default: {$ref: '#/components/responses/Problem'}
   /api/v1/gastos:
     get:
       summary: Listar gastos

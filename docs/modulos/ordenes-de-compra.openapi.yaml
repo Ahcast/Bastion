@@ -6,6 +6,14 @@ info:
 security:
   - session: []
 paths:
+  /api/v1/ordenes-compra/dashboard:
+    get:
+      summary: Resumen para Inicio (ordenes_compra/documentos/ver)
+      parameters:
+        - {name: period, in: query, schema: {type: string, enum: [month, year, all], default: month}}
+      responses:
+        '200': {description: 'Ventana Honduras, métricas de cantidad y monto HNL, serie por fecha, distribución por estado y hasta ocho órdenes recientes; sin productos ni comentarios.'}
+        default: {$ref: '#/components/responses/Problem'}
   /api/v1/ordenes-compra:
     get:
       summary: Listar con ordenes_compra/documentos/ver

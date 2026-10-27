@@ -9,6 +9,13 @@ export interface ProcessDashboardRow { proceso_id: string; expediente: string; e
 export interface QuoteDashboardRow { id: number; quote_number: string | null; client_name: string; quote_date: string; status: string; total: string | null }
 export type ProcessDashboard = DashboardBase<ProcessDashboardRow, { active: number; marked: number; entities: number; today: number }>;
 export type QuoteDashboard = DashboardBase<QuoteDashboardRow, { total: number; amount: string; without_total: number }>;
+export interface OrderDashboardRow { id: number; n_orders: string; client_name: string; order_date: string; status: string; total: string }
+export interface InvoiceDashboardRow { id: number; order_number: string; client_name: string; invoice_date: string; status: string; total: string | null; balance: string | null }
+export interface ExpenseDashboardRow { id: number; invoice_number: string; expense_date: string; provider: string; currency: string; total: string }
+export type OrderDashboard = DashboardBase<OrderDashboardRow, { total: number; amount: string }>;
+export type InvoiceDashboard = DashboardBase<InvoiceDashboardRow, { total: number; amount: string; without_total: number }>;
+export type ExpenseDashboard = DashboardBase<ExpenseDashboardRow, { total: number; currencies: { currency: string; amount: string }[] }>;
+export type ModuleDashboard = ProcessDashboard | QuoteDashboard | OrderDashboard | InvoiceDashboard | ExpenseDashboard;
 
 // Keep exact decimal money supplied by the server, including amounts above JS's safe integer range.
 export function cents(value: string | null | undefined): bigint | null {
@@ -19,6 +26,10 @@ export function cents(value: string | null | undefined): bigint | null {
 export function dashboardMoney(value: string | null | undefined): string {
   const amount = cents(value);
   return amount === null ? '—' : `L ${(amount / 100n).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',')}.${(amount % 100n).toString().padStart(2, '0')}`;
+}
+export function dashboardCurrency(value: string | null | undefined, currency: string): string {
+  const amount = cents(value);
+  return amount === null ? '—' : `${currency} ${(amount / 100n).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',')}.${(amount % 100n).toString().padStart(2, '0')}`;
 }
 export function chartPercent(value: bigint, maximum: bigint): number {
   return value <= 0n || maximum <= 0n ? 0 : Math.min(100, Math.max(0.5, Number(value * 10000n / maximum) / 100));

@@ -24,6 +24,7 @@ pub(super) fn routes(state: ApiState) -> Router<ApiState> {
             "/api/v1/ordenes-compra/{id}/convert/invoice",
             post(convert_invoice),
         )
+        .route("/api/v1/ordenes-compra/dashboard", get(dashboard))
         .route("/api/v1/ordenes-compra", get(list).post(create))
         .route("/api/v1/ordenes-compra/calculate", post(preview))
         .route(
@@ -106,6 +107,19 @@ async fn list(
     state
         .ordenes_compra
         .list(user.id, &filter)
+        .await
+        .map(Json)
+        .map_err(ApiError)
+}
+async fn dashboard(
+    State(state): State<ApiState>,
+    headers: axum::http::HeaderMap,
+    Query(query): Query<DashboardQuery>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    let user = actor(&state, &headers).await?;
+    state
+        .ordenes_compra
+        .dashboard(user.id, query.period)
         .await
         .map(Json)
         .map_err(ApiError)
