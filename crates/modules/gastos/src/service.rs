@@ -266,7 +266,7 @@ impl ExpenseService {
         let mut chart = QueryBuilder::<MySql>::new("SELECT DATE_FORMAT(expense_date,");
         chart
             .push_bind(period.sql_format())
-            .push(") AS bucket,COUNT(*) AS count FROM gastos_records WHERE deleted_at IS NULL");
+            .push(") AS bucket,COUNT(*) AS count,CAST(NULL AS CHAR) AS amount FROM gastos_records WHERE deleted_at IS NULL");
         if let Some(from) = window.from {
             chart.push(" AND expense_date>=").push_bind(from);
         }
