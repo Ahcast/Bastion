@@ -270,7 +270,7 @@ impl OrderService {
         let now = chrono::Utc::now();
         let window = period.window(now)?;
         let mut tx = self.begin(actor, "documentos", "ver").await?;
-        let metrics = dashboard_query(
+        let mut metrics = dashboard_query(
             "SELECT COUNT(*) AS total,CAST(COALESCE(SUM(total),0) AS CHAR) AS amount",
             &window,
         );
