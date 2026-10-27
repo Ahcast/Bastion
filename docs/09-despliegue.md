@@ -92,6 +92,17 @@ El 2026-10-26 se permitió y activó Colaboración sobre la release vigente `a77
 
 Sincronizar las referencias de `origin/main` antes de implementar o preparar un release. Revisar divergencias y equivalencia de commits con `git cherry`; conservar un respaldo recuperable del historial y de los archivos locales antes de reconciliar. Las copias antiguas de módulos ya publicados se comparan con su historial para incorporar sólo los cambios nuevos sobre la versión vigente. Los respaldos operativos quedan fuera de Git y no se suben con el código.
 
-## Reportes: preparación
+## Reportes: despliegue en producción verificado
 
 El módulo añade su migración de cuota y consultas dentro de Órdenes, Facturas y Gastos. Para desplegar, usar artifacts del mismo commit con CI exitoso, respaldar MySQL y frontend, ejecutar `migrate` con la identidad de migración autorizada, agregar `reportes` a `BASTION_ALLOWED_MODULES` y verificar salud y estados. La activación administrativa y los permisos por dominio se revisan por separado. Mantener frontend en Bluehost y backend en AWS. Ver [alcance y estado](modulos/reportes-implementacion.md).
+
+
+El 2026-10-26, con autorización del usuario para producción, se instalaron en AWS y Bluehost los artifacts del commit `02c1d89`, después de completar [Core checks](https://github.com/Ahcast/Bastion/actions/runs/40430689605) y Scout control checks. Se verificaron ZIP, tar, procedencia del commit y hashes de archivos antes de publicar. Se conservaron respaldos privados de MySQL, configuración y frontend, además de la versión anterior para reversión.
+
+La migración propia 1 añadió `_reportes_migrations` y `reportes_actor_limits`: el esquema y los datos de las 61 tablas previas se cotejaron sin diferencias inmediatamente antes y después de migrar. El total pasó a 63 tablas. Se conservaron la activación de los demás módulos y los permisos existentes; no se importaron datos Legacy ni se crearon registros de negocio sintéticos.
+
+Reportes está incluido en el release y permitido en el ambiente, con estado `1/1/0`: disponible y desactivado, pendiente de activación administrativa desde Ajustes. No se añadieron permisos a roles. Cada reporte requiere su permiso de Reportes y la lectura del dominio fuente.
+
+El frontend verificó los 43 archivos del paquete en disco y 41 recursos públicos por HTTPS contra sus hashes. Se preservaron `config.js`, ambos `.htaccess` y los assets anteriores para cachés. La ruta SPA respondió 200, readiness HTTPS respondió 200 y los tres endpoints de Reportes sin sesión respondieron 401.
+
+El usuario autorizó reutilizar la credencial MySQL existente sólo durante el proceso puntual de `migrate` de Reportes. No se crearon cuentas, no se cambiaron privilegios y `MYSQL_MIGRATOR_*` no se persistió en la configuración ni en el proceso del servicio. Esta excepción no cierra el pendiente general de separar las identidades de ejecución y migración.
