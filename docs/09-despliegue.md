@@ -92,6 +92,10 @@ El 2026-10-26 se permitió y activó Colaboración sobre la release vigente `a77
 
 Sincronizar las referencias de `origin/main` antes de implementar o preparar un release. Revisar divergencias y equivalencia de commits con `git cherry`; conservar un respaldo recuperable del historial y de los archivos locales antes de reconciliar. Las copias antiguas de módulos ya publicados se comparan con su historial para incorporar sólo los cambios nuevos sobre la versión vigente. Los respaldos operativos quedan fuera de Git y no se suben con el código.
 
+## Licitaciones: infraestructura local sin despliegue
+
+El 2026-10-27 comienza la [infraestructura local](modulos/licitaciones-infraestructura.md), autorizada sin campos ni formularios precargados. `migrate` incorpora `_licitaciones_migrations` con versión 1 y la nueva migración `202610270001` de Colaboración para esquemas publicados. El arranque verifica checksums y registra Licitaciones inicialmente deshabilitado. No se cambia la allowlist de ningún host; `licitaciones` requiere inclusión explícita y activación administrativa independiente tras respaldo, CI y migraciones verificadas. La entrega de metadatos no requiere cambiar IAM/S3/Typst. No instala archivos ni plantillas ejecutables ni modifica el origen Facturas. Los límites de 20 MB por entrada y 500 MB independientes por expediente/PDF están en validadores puros; transporte binario, capacidad superior a 100 páginas y presupuestos operativos siguen pendientes de implementación y medición. No acredita despliegue.
+
 ## Reportes: despliegue en producción verificado
 
 El módulo añade su migración de cuota y consultas dentro de Órdenes, Facturas y Gastos. Para desplegar, usar artifacts del mismo commit con CI exitoso, respaldar MySQL y frontend, ejecutar `migrate` con la identidad de migración autorizada, agregar `reportes` a `BASTION_ALLOWED_MODULES` y verificar salud y estados. La activación administrativa y los permisos por dominio se revisan por separado. Mantener frontend en Bluehost y backend en AWS. Ver [alcance y estado](modulos/reportes-implementacion.md).

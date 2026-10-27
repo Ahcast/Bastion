@@ -109,3 +109,9 @@ Completar validación integral del esquema MySQL y las sesiones existentes, alma
 ## Coordinación transaccional entre documentos
 
 El crate interno document-flows implementa los casos de uso que atraviesan Cotizaciones, Órdenes y Facturas. Los adaptadores HTTP no ejecutan reglas ni SQL de dominio. El coordinador solo escribe sus relaciones/recibos y llama a los contratos transaccionales públicos de cada propietario. Mantiene una transacción MySQL común, orden de bloqueos explícito y autorización de ambos módulos. Tiene ledger propio; no registra un módulo ni permisos nuevos. Ver modulos/cotizaciones-conversiones.md.
+
+## Licitaciones: ampliación documental
+
+[Licitaciones](modulos/licitaciones.md) se incorpora al diseño del monolito modular el 2026-10-27 y comienza su [infraestructura local](modulos/licitaciones-infraestructura.md): crate propietario de expedientes/copias/valores y biblioteca de esquemas versionados propiedad de Colaboración mediante puerto autorizado. Registro central, frontend bajo demanda, migraciones y API comunes; no se precargan campos ni formularios. Archivos, paquetes Typst, ensamblado/foliado y relación con Facturas siguen pendientes. No acredita despliegue ni activación.
+
+La revisión recomienda ampliar el servicio documental compartido para paquetes aprobados y ensamblado seguro, dejando las reglas económicas y el orden del expediente en Licitaciones; el renderer actual recibe una plantilla estática. Para adjudicación → borrador se recomienda ampliar `document-flows` y el puerto propietario de Facturas; no crear otro coordinador ni usar SQL ajeno. MySQL/S3 requieren recuperación idempotente, no atomicidad simulada. Se conserva una empresa por base, la infraestructura actual y el aplazamiento de MCP. Contratos, seguridad y decisiones pendientes están en la ficha.

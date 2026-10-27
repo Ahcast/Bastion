@@ -1,6 +1,6 @@
 # Catálogo de módulos
 
-El catálogo inicial se deriva del apartado 4 de `../01-aplicacion-actual-y-paridad.md`. Las fichas no agregan módulos de negocio nuevos. Cada módulo se registra con el core y presenta su configuración bajo `Ajustes`.
+El catálogo inicial se deriva del apartado 4 de `../01-aplicacion-actual-y-paridad.md`. Las ampliaciones nuevas se identifican por separado y requieren una decisión explícita; una ficha de diseño no registra ni activa un módulo ejecutable. Cada módulo implementado se registra con el core y presenta su configuración bajo `Ajustes`.
 
 | Módulo | Pantallas/áreas conocidas | Ficha |
 |---|---|---|
@@ -13,6 +13,12 @@ El catálogo inicial se deriva del apartado 4 de `../01-aplicacion-actual-y-pari
 | Reportes | Órdenes, facturas y gastos; exportación | `reportes.md` |
 | Procesos | Importar, revisar, marcar, anotar y exportar CSV | `procesos.md` |
 | Colaboración y archivos | Archivos comunes y de personas | `colaboracion-y-archivos.md` |
+
+## Módulos nuevos en diseño
+
+| Módulo | Alcance propuesto | Ficha y estado |
+|---|---|---|
+| Licitaciones | Expedientes legal/económico/técnico, variables, copias de Colaboración, PDF único y futura creación de borradores en Facturas | [licitaciones.md](licitaciones.md); [infraestructura inicial local](licitaciones-infraestructura.md), sin formularios ni campos precargados; sin despliegue/activación. [Fuente v1.2](licitaciones-propuesta-v1.2.md). |
 
 ## Settings
 

@@ -84,4 +84,6 @@ El core valida versión del contrato, identificador único, dependencias y colis
 
 ## Pendiente de decisión
 
+La [infraestructura inicial de Licitaciones](modulos/licitaciones-infraestructura.md) registra `licitaciones`, sus permisos comunes sobre `expedientes` y su sección de Ajustes. Se condiciona a allowlist, migraciones exactas y activación administrativa; no se activa desde el cliente. Colaboración es dueño de los esquemas publicados; Licitaciones conserva copias/valores. Settings editables, plantillas PDF y coordinación con Facturas siguen pendientes; el módulo completo no se considera terminado.
+
 Forma técnica de representar la lista permitida por ambiente y el estado activo elegido en Ajustes, recuperación ante cambios incompatibles, compatibilidad semántica, eventos internos y política de datos al retirar un módulo. El control combinado de despliegue y Ajustes, la autorización exclusiva del Administrador y la auditoría están confirmados; artefactos cargables en runtime no forman parte del primer release.

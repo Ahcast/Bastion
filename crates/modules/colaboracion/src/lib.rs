@@ -1,6 +1,11 @@
 #![forbid(unsafe_code)]
 
+mod forms;
 mod policy;
+pub use forms::{
+    FormDefinition, FormSection, FormValues, FormVariable, PublishFormInput, PublishedForm,
+    VariableKind,
+};
 mod service;
 pub use policy::FilePolicy;
 pub use service::CollaborationService;

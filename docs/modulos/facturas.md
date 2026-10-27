@@ -55,3 +55,7 @@ API actual: CRUD, estado, pago, clonar, borrar, crear desde cotización/orden. E
 ## Pendientes
 
 Reglas fiscales, métodos de pago, condición que marca una factura como Enviado, corrección después del envío, numeración, correlación de conversiones, borrado y conciliación contable deben verificarse antes de implementar.
+
+## Origen futuro: adjudicación de Licitaciones
+
+La [incorporación documental de Licitaciones](licitaciones.md) propone crear borradores vinculados mediante un puerto propio de Facturas y el coordinador `document-flows`. No existe ese puerto ni un origen de adjudicación en el contrato vigente. El usuario confirma el 2026-10-27 que solo una adjudicación registrada habilita la creación y que admite un único borrador; la relación necesita unicidad persistente además de idempotencia de la petición. Deben acordarse cliente/instantánea y líneas/importes/impuestos antes de fijar DTO y migraciones; la política de corrección/borrado de ese borrador de Facturas sigue pendiente. La regla de Licitaciones que permite eliminar solo ofertas Borrador y bloquea las Enviadas no modifica la política global de este módulo. Requiere autorización de ambos dominios y respeta el corte actual sin emisión fiscal ni pagos; registrar una adjudicación no crea una factura automáticamente.

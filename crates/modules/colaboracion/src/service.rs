@@ -10,8 +10,8 @@ const FIELDS: &str = "f.id,f.scope,f.id_persona,f.title,f.notes,f.filename,f.siz
 
 #[derive(Clone)]
 pub struct CollaborationService {
-    database: Database,
-    admin: CoreAdmin,
+    pub(crate) database: Database,
+    pub(crate) admin: CoreAdmin,
     storage: DocumentService,
 }
 impl CollaborationService {
@@ -90,7 +90,7 @@ impl CollaborationService {
             .bind(allowed && ready).execute(self.database.pool()).await?;
         Ok(ready)
     }
-    async fn begin(&self) -> Result<Transaction<'_, MySql>, CoreError> {
+    pub(crate) async fn begin(&self) -> Result<Transaction<'_, MySql>, CoreError> {
         let mut tx = self.database.pool().begin().await?;
         let enabled: Option<bool> = sqlx::query_scalar("SELECT (included_in_release AND environment_allowed AND enabled) FROM module_registry WHERE module_id='colaboracion' FOR UPDATE").fetch_optional(&mut *tx).await?;
         if enabled != Some(true) {

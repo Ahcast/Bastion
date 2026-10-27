@@ -25,7 +25,7 @@ Una pantalla se considera documentada cuando especifica:
 
 ## Criterio por módulo
 
-- Está en catálogo basado en el informe.
+- Está en el catálogo basado en el informe o identificado como ampliación nueva solicitada expresamente, sin atribuirle paridad Legacy.
 - Tiene ficha en `docs/modulos/` y contrato de registro definido.
 - Su sección aparece bajo Ajustes con settings/versionado/permisos.
 - API y MCP invocan los mismos casos de uso y permisos.
@@ -38,6 +38,14 @@ Una pantalla se considera documentada cuando especifica:
 - Los listados tienen paginación/tamaño máximo, orden determinista y filtros permitidos; conservan los controles de listado existentes en la interfaz.
 - Las mutaciones que pueden duplicar pagos, conversiones, importaciones o envíos son idempotentes cuando su contrato así lo declara; las repeticiones no duplican efectos.
 - Las ediciones concurrentes detectan versiones obsoletas mediante `ETag`/`If-Match` donde se habilite y permiten recargar los datos actuales sin sobrescritura silenciosa.
+
+## Licitaciones: criterios de la ampliación nueva
+
+El usuario autoriza infraestructura sin formularios ni campos de negocio precargados. El [primer corte](modulos/licitaciones-infraestructura.md) verifica expediente vacío, esquemas publicados exclusivamente por Administrador, copias independientes, tipado inerte, edición sólo de valores, concurrencia/412, idempotencia, borrado sólo Borrador y módulo desactivado conservando datos. Pruebas MySQL/HTTP usan bases aisladas en CI. No cierra aceptación de archivos, lotes/ítems, cálculos, PDF ni Facturas; los límites binarios puros no prueban capacidad operativa.
+
+La capacidad requerida incluye expedientes de más de 100 páginas, con índice automático y foliado continuo completo. Probar documentos representativos de texto y anexos escaneados; no introducir un máximo de 100 páginas. El usuario confirma 20 MB por archivo de entrada y 500 MB como tope técnico del expediente y, por separado, del PDF final (MB decimales). Validar bytes reales, incluidos archivos copiados de biblioteca, y no aplicar el límite de entrada al PDF final. Excesos se rechazan con error controlado, sin truncar o degradar contenido. Medir/adaptar el servicio documental y comprobar almacenamiento/descarga de esos volúmenes antes de declarar soporte operativo; píxeles, tiempo/memoria, concurrencia y contabilización del historial se concretarán en el contrato. No se elevan los límites globales de los demás módulos.
+
+La [ficha de Licitaciones](modulos/licitaciones.md) define escenarios pendientes de implementar/verificar: aislamiento entre expedientes, copia independiente visible solo en el expediente, aprobación/publicación de plantillas exclusiva del Administrador, edición de usuario limitada a valores de variables, cálculo exacto/número a letras, PDF único con todas sus páginas foliadas (portada/índice incluidos) e índice automático correcto, tratamiento explícito de archivos protegidos, versiones inmutables, concurrencia/idempotencia y recuperación MySQL/S3. Crear el único borrador vinculado exige adjudicación registrada y contrato de Facturas. Solo puede eliminarse el expediente/oferta Borrador; Enviada se rechaza también por API y ante concurrencia con el envío. No se exige preservar firmas digitales por confirmación del usuario; se conservan originales y contenido visible. Formularios, columnas y fórmulas se definirán individualmente al incorporar recursos de biblioteca; cada plantilla necesita esquema, reglas y versión aprobados antes de usarse, sin exigir un catálogo completo por adelantado. No se considera disponible por documentarlo; límites, permisos técnicos, settings y contrato OpenAPI se completan por operación antes de implementar.
 
 ## Criterio del core
 

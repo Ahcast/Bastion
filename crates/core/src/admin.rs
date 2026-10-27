@@ -51,6 +51,17 @@ pub struct PersonLabel {
 }
 
 impl CoreAdmin {
+    /// System-only capabilities must never be delegated by a module wildcard.
+    pub async fn require_system_administrator_in_transaction(
+        &self,
+        tx: &mut sqlx::Transaction<'_, MySql>,
+        actor: u64,
+    ) -> Result<(), CoreError> {
+        let found: Option<u64> = sqlx::query_scalar("SELECT u.id FROM users u JOIN roles r ON r.id=u.role_id WHERE u.id=? AND u.status='active' AND r.system_key='system_administrator'")
+            .bind(actor).fetch_optional(&mut **tx).await?;
+        found.map(|_| ()).ok_or(CoreError::Forbidden)
+    }
+
     /// Resource authorization on a domain transaction's connection. Avoids
     /// acquiring another pool connection while holding domain locks.
     pub async fn authorize_in_transaction(

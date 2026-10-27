@@ -17,6 +17,7 @@ pub struct AppConfig {
     pub colaboracion_allowed: bool,
     pub gastos_allowed: bool,
     pub reportes_allowed: bool,
+    pub licitaciones_allowed: bool,
 }
 
 #[derive(Clone)]
@@ -160,6 +161,7 @@ impl AppConfig {
             colaboracion_allowed: allowed_modules.contains(&"colaboracion"),
             gastos_allowed: allowed_modules.contains(&"gastos"),
             reportes_allowed: allowed_modules.contains(&"reportes"),
+            licitaciones_allowed: allowed_modules.contains(&"licitaciones"),
         })
     }
 }
@@ -180,6 +182,7 @@ fn parse_allowed_modules(value: &str) -> Result<Vec<&'static str>, ConfigError> 
             "colaboracion" => "colaboracion",
             "gastos" => "gastos",
             "reportes" => "reportes",
+            "licitaciones" => "licitaciones",
             _ => {
                 return Err(ConfigError {
                     variable: "BASTION_ALLOWED_MODULES",
@@ -217,6 +220,10 @@ mod module_tests {
             vec!["proveedores"]
         );
         assert_eq!(parse_allowed_modules("facturas").unwrap(), vec!["facturas"]);
+        assert_eq!(
+            parse_allowed_modules("licitaciones").unwrap(),
+            vec!["licitaciones"]
+        );
         assert_eq!(
             parse_allowed_modules("ordenes_compra").unwrap(),
             vec!["ordenes_compra"]

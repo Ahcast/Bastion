@@ -188,6 +188,7 @@ dependencies = [
  "bastion-document-flows",
  "bastion-facturas",
  "bastion-gastos",
+ "bastion-licitaciones",
  "bastion-ordenes-compra",
  "bastion-procesos",
  "bastion-proveedores",
@@ -322,6 +323,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "bastion-licitaciones"
+version = "0.1.0"
+dependencies = [
+ "bastion-colaboracion",
+ "bastion-core",
+ "serde",
+ "serde_json",
+ "sha2 0.10.9",
+ "sqlx",
+ "tokio",
+]
+
+[[package]]
 name = "bastion-mcp"
 version = "0.1.0"
 
@@ -392,6 +406,7 @@ dependencies = [
  "bastion-document-flows",
  "bastion-facturas",
  "bastion-gastos",
+ "bastion-licitaciones",
  "bastion-ordenes-compra",
  "bastion-procesos",
  "bastion-proveedores",

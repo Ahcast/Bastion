@@ -102,6 +102,10 @@ Separar cuatro estados: desafío preautenticado, sesión autenticada, confianza 
 
 ## Revisión de vulnerabilidades
 
+La [infraestructura inicial de Licitaciones](modulos/licitaciones-infraestructura.md) aplica permisos comunes sobre expedientes de empresa, valida pertenencia de copias, versiones fuertes y recibos persistentes. Publicar esquemas requiere Administrador del sistema; un comodín de rol no concede esa facultad. Los valores son datos inertes y auditoría no incluye su contenido. No se acepta código Typst ni se amplían formatos/IAM. La futura incorporación de `.typ` y PDF externos requiere aprobación de paquetes, recursos fijados y aislamiento verificado; la raíz de archivos de Typst no acredita por sí sola bloqueo de red ni límites de memoria. No se añade multitenencia implícita. El usuario confirma copias visibles sólo en el expediente y ausencia de requisito de conservar firmas digitales; archivos protegidos y demás propiedades de composición siguen pendientes.
+
+Para esa extensión se confirma aprobación/publicación de plantillas exclusiva del Administrador del sistema; el usuario solo modifica valores de variables autorizadas y no controla plantilla, fórmulas o columnas. El API debe rechazar campos protegidos y no interpretar texto de variables como código. La oferta Enviada no puede eliminarse ni perder sus documentos mediante un borrado indirecto; el permiso `eliminar` solo permite la operación sobre Borrador con confirmación/auditoría y comprobación de estado coordinada con el envío. Facturación requiere adjudicación registrada además de autorización y unicidad del borrador vinculado.
+
 Antes de producción, hacer revisión de amenazas y verificación de controles sobre login/OTP, sesiones, CSRF/XSS, permisos por objeto, API/MCP, archivos, importaciones, conexiones a MySQL y despliegue. OWASP recomienda tokens CSRF en aplicaciones con estado y capas adicionales como `SameSite` y validación de origen; NIST especifica que TOTP tenga duración definida y el OTP no se acepte más de una vez mientras sea válido.
 
 ## Lineamientos de seguridad del core: prioridad alta

@@ -74,7 +74,7 @@ test('bulk controls only target server-approved modules and never grant Inicio o
   assert.equal(permissionState(deleteColumn, 'procesos', 'ver'), true);
 });
 test('one catalog supplies the requested rows and automatically includes future registered modules', () => {
-  assert.deepEqual(PERMISSION_MODULES.map(module => module.label), ['Inicio', 'Clientes', 'Proveedores', 'Órdenes de Compra', 'Cotizaciones', 'Facturas', 'Gastos', 'Reportes', 'Procesos', 'Colaboración', 'Configuración']);
+  assert.deepEqual(PERMISSION_MODULES.map(module => module.label), ['Inicio', 'Clientes', 'Proveedores', 'Órdenes de Compra', 'Cotizaciones', 'Facturas', 'Gastos', 'Reportes', 'Procesos', 'Licitaciones', 'Colaboración', 'Configuración']);
   const module: Module = { module_id: 'inventario', display_name: 'Inventario', included_in_release: true, environment_allowed: true, enabled: true };
   const expanded = permissionModuleCatalog([...registry, module]);
   assert.equal(expanded.at(-1)?.label, 'Inventario');

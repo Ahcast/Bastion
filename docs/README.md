@@ -22,7 +22,11 @@ Este paquete convierte el análisis de la aplicación actual y las decisiones ac
 | `14-permisos-por-rol.md` | Matriz visual de permisos por rol, compatibilidad, conservación y autorización. |
 | `adr/ADR-0002-frontend-react.md` | React + TypeScript + Vite y build estático para Bluehost. |
 | `adr/ADR-0001-stack-inicial.md` | Decisión técnica del primer corte del Core. |
-| `modulos/README.md` | Catálogo de módulos derivado del informe actual. |
+| `modulos/README.md` | Catálogo Legacy y ampliaciones nuevas identificadas por estado. |
+| `modulos/licitaciones.md` | Arquitectura de Licitaciones, compatibilidad verificada y decisiones pendientes. |
+| `modulos/licitaciones-infraestructura.md` | Primer corte local, contratos implementados, pruebas y pendientes operativos. |
+| `modulos/licitaciones.openapi.yaml` | API de expedientes vacíos, esquemas publicados y valores de copias. |
+| `modulos/licitaciones-propuesta-v1.2.md` | Documento fuente aportado para Licitaciones; se conserva sin cambios. |
 | `modulos/_plantilla-modulo.md` | Plantilla común de especificación por módulo. |
 
 Cada módulo del catálogo tendrá una ficha individual dentro de `modulos/`.
@@ -36,6 +40,14 @@ Cada módulo del catálogo tendrá una ficha individual dentro de `modulos/`.
 El informe se obtuvo de una copia de frontend Angular compilado y backend Laravel. No se validaron pantallas en una sesión activa ni se dispuso del esquema completo de producción. No interpretar los pendientes como ausencia de funcionalidad.
 
 ## Registro de decisiones
+
+- 2026-10-27: el usuario fija para Licitaciones 20 MB por archivo de entrada y acepta 500 MB como tope técnico del expediente completo y del PDF final, por separado, cuando sea necesario acotarlos. El PDF final no está sujeto al límite individual de entrada; se mantiene el requisito de más de 100 páginas y no se fija máximo de páginas. Se documenta MB decimal y validación de bytes reales. Los topes no cambian la política global de Colaboración: requieren adaptar y verificar renderer/almacenamiento/transporte, cuyos límites actuales son menores. Presupuestos de memoria/tiempo/concurrencia y contabilización del historial siguen pendientes. Ver [límites de Licitaciones](modulos/licitaciones.md).
+
+- 2026-10-27: el usuario aclara que una licitación puede superar las 100 páginas. Se incorpora esa capacidad a la ficha y aceptación con índice automático/foliado completo; no se aprueba un máximo de 100 páginas ni otro tope definitivo. Los límites pendientes son peso por archivo/expediente/PDF, píxeles, tiempo/memoria y concurrencia, a dimensionar con muestras reales y mediciones. Ver [capacidad y PDF](modulos/licitaciones.md).
+
+- 2026-10-27: el usuario completa las reglas de Licitaciones: incorporará formularios legales y formatos económicos uno por uno a la biblioteca; el Administrador del sistema aprueba/publica las plantillas y el usuario solo edita valores de variables. Crear el único borrador de factura vinculado requiere adjudicación registrada. Todo el PDF se folia, incluidas portada e índice, con índice automático. Solo se permite eliminar el expediente/oferta en Borrador; Enviada no se elimina. Se actualizan ficha, contratos y aceptación; los detalles de cada plantilla, límites técnicos, demás transiciones y correcciones posteriores conservan su definición pendiente. Esta regla de borrado es de Licitaciones y no cambia la política global de Facturas. Ver [decisiones vigentes](modulos/licitaciones.md).
+
+- 2026-10-27: a solicitud del usuario se revisa `BASTION_Licitaciones_Lineamientos_Arquitectura.md` v1.2 contra `origin/main` (`17b95a0`) y se incorpora Licitaciones como ampliación documental nueva, sin atribuirle paridad Legacy ni disponibilidad. La ficha identifica las extensiones pendientes de Colaboración (plantillas/versiones/variables), PDF (paquetes aprobados/ensamblado/foliado) y Facturas (puerto de adjudicación → borrador). Se recomienda reutilizar `document-flows`; no se aprueban campos, cuotas, fórmulas, multitenencia ni ejecución de `.typ` subidos. El usuario confirma copias visibles solo dentro del expediente, ausencia de requisito de conservar firmas digitales y un único borrador por adjudicación. Formularios, cálculos, permisos/settings, límites y demás preguntas conservan estado pendiente. Se preserva la propuesta fuente, infraestructura actual y aplazamiento de MCP. No implica implementación, migración, despliegue o activación. Ver [revisión y decisiones](modulos/licitaciones.md).
 
 - 2026-10-25: el usuario autoriza completar y activar el registro general de Gastos únicamente para el Administrador del sistema. El cotejo de ExpensesComponent/GastosController confirma HNL, factura de 50 caracteres, registro compartido, resumen filtrado, secuencia de redondeo y borrado lógico. Se corrigen edición y persistencia con migración 2, se añade cálculo previo en Rust y pruebas propias en MySQL 5.7 aislado. El código `a7757d3` pasó CI `40169034037` y los artifacts se verificaron en staging privado AWS/Bluehost; la instalación de la migración 2 y la activación aún están pendientes. Los pendientes de integración e histórico se conservan. Ver `modulos/gastos-implementacion.md`.
 
@@ -218,3 +230,5 @@ El informe se obtuvo de una copia de frontend Angular compilado y backend Larave
 - 2026-10-26: el usuario corrige la utilidad: total de venta menos ISV menos inversión total (productos y gastos). Se aplica a Órdenes y Facturas, incluida su conversión; las migraciones propias 4 corrigen sólo la utilidad derivada de documentos y recibos existentes.
 
 - 2026-10-27: despliegue verificado de 50efa7e en AWS/Bluehost: acciones de Órdenes y utilidad sin ISV, ensayo de restauración de 63 tablas, migraciones 4/4/2 y conservación de datos y estados. Véase docs/09-despliegue.md.
+
+- 2026-10-27: el usuario autoriza desarrollar Licitaciones como infraestructura y rechaza campos/formularios iniciales: los incorporará según se necesiten. Se implementan crate/registro/migraciones propios, API, expediente vacío, biblioteca de esquemas de captura en Colaboración con publicación exclusiva del Administrador, copias independientes y edición de valores tipados. No hay reglas económicas ni recursos precargados. Esquemas publicados no son código Typst aprobado; archivos, lotes/ítems, PDF, adjudicación/Facturas y settings editables siguen pendientes. No se modifican hosts, IAM ni activación. Ver [alcance implementado](modulos/licitaciones-infraestructura.md) y [OpenAPI](modulos/licitaciones.openapi.yaml).

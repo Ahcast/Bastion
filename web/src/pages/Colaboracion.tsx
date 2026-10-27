@@ -4,12 +4,16 @@ import { Dialog, Heading, Loading, Notice, Table, useCore, useLoad } from '../ui
 import { moduleCan } from '../types.js';
 import { useUnsavedChanges } from '../navigationGuard.js';
 import { collaborationCan, contentBlob, fileBase64 } from '../collaboration.js';
+import FormLibrary from './FormLibrary.js';
+import { useNavigationGuard } from '../navigationGuard.js';
 import type { CollaborationFile, FileContent, FilePage, FilePolicy } from '../collaboration.js';
 
 export default function Colaboracion() {
   const { access } = useCore();
+  const { navigate } = useNavigationGuard();
+  const [tab, setTab] = useState<'files' | 'forms'>('files');
   if (!collaborationCan(access)) return <Notice>No tienes acceso a Colaboración.</Notice>;
-  return <Workspace />;
+  return <><div className="row section-tabs" aria-label="Contenido de Colaboración"><button aria-pressed={tab === 'files'} onClick={() => { void navigate(() => setTab('files')); }}>Documentos</button>{moduleCan(access, 'colaboracion', 'empresa', 'ver') && <button aria-pressed={tab === 'forms'} onClick={() => { void navigate(() => setTab('forms')); }}>Biblioteca de formularios</button>}</div>{tab === 'forms' ? <FormLibrary /> : <Workspace />}</>;
 }
 function Workspace() {
   const { api, access, notify } = useCore();

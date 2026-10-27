@@ -18,6 +18,7 @@ export const PERMISSION_MODULES: readonly PermissionModule[] = [
   { id: 'gastos', label: 'Gastos', kind: 'module' },
   { id: 'reportes', label: 'Reportes', kind: 'module' },
   { id: 'procesos', label: 'Procesos', kind: 'module' },
+  { id: 'licitaciones', label: 'Licitaciones', kind: 'module' },
   { id: 'colaboracion', label: 'Colaboración', kind: 'module' },
   { id: 'core', label: 'Configuración', kind: 'administration' },
 ];

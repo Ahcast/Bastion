@@ -40,6 +40,7 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
         bastion_document_flows::ConversionService::migrate(&migrator).await?;
         bastion_gastos::ExpenseService::migrate(&migrator).await?;
         bastion_reportes::ReportService::migrate(&migrator).await?;
+        bastion_licitaciones::TenderService::migrate(&migrator).await?;
         tracing::info!("database migrations completed");
         return Ok(());
     }
@@ -110,6 +111,9 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
         .await?;
     bastion_reportes::ReportService::new(core.database(), core.admin())
         .synchronize_release(config.reportes_allowed)
+        .await?;
+    bastion_licitaciones::TenderService::new(core.database(), core.admin())
+        .synchronize_release(config.licitaciones_allowed)
         .await?;
     cleanup.cleanup_retention().await?;
     tokio::spawn(async move {

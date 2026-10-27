@@ -19,6 +19,12 @@ Crear una nueva versión de CastilloIT en Rust, organizada como un core con mód
 
 El catálogo sale del informe de la aplicación: Clientes; Proveedores y destinos; Órdenes de compra; Gastos; Cotizaciones; Facturas; Reportes; Procesos; Colaboración y archivos. El core incluye Acceso, Dashboard, Perfil, Usuarios, Roles/Permisos, Personas y configuración de empresa/correo observados en la aplicación actual.
 
+## Ampliación de arquitectura: Licitaciones
+
+El 2026-10-27 se incorpora al diseño el módulo nuevo [Licitaciones](modulos/licitaciones.md), a solicitud del usuario y tras revisar su compatibilidad con el código vigente. Gestiona expedientes con bloques legal, económico y técnico, variables aisladas, copias de recursos de Colaboración y un PDF final versionado. Se prevé crear borradores vinculados en Facturas mediante un contrato posterior; no implica emisión fiscal.
+
+Es una ampliación propuesta del producto, no paridad Legacy ni una extensión de Procesos/Scout. Sus campos, reglas y contratos pendientes se detallan en la ficha. La incorporación es documental: no lo incluye en el runtime, no ejecuta migraciones ni lo despliega o activa.
+
 ## Alcance técnico acordado
 
 - Backend nuevo en Rust.
@@ -39,7 +45,7 @@ La exportación HTML del panel que compartió el usuario es la referencia visual
 
 ## Fuera de alcance hasta acordarlo
 
-- Añadir módulos de negocio que no aparezcan en el informe.
+- Añadir módulos de negocio que no aparezcan en el informe sin una decisión explícita; Licitaciones tiene incorporación documental y decisiones pendientes según su ficha.
 - Cambiar reglas tributarias/comerciales por inferencia.
 - Definir proveedor o framework específico de UI, runtime AWS o ORM Rust.
 - Migrar datos productivos o cambiar el host MySQL sin una decisión posterior.

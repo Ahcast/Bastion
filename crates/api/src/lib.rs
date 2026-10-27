@@ -34,6 +34,7 @@ mod colaboracion;
 mod cotizaciones;
 mod facturas;
 mod gastos;
+mod licitaciones;
 mod ordenes_compra;
 mod procesos;
 mod proveedores;
@@ -54,6 +55,7 @@ struct ApiState {
     ordenes_compra: bastion_ordenes_compra::OrderService,
     gastos: bastion_gastos::ExpenseService,
     reportes: bastion_reportes::ReportService,
+    licitaciones: bastion_licitaciones::TenderService,
     report_jobs: std::sync::Arc<tokio::sync::Semaphore>,
     procesos_jobs: std::sync::Arc<tokio::sync::Semaphore>,
     scout_csv_path: std::path::PathBuf,
@@ -290,6 +292,7 @@ pub fn router(
         ordenes_compra: bastion_ordenes_compra::OrderService::new(core.database(), core.admin()),
         gastos: bastion_gastos::ExpenseService::new(core.database(), core.admin()),
         reportes: bastion_reportes::ReportService::new(core.database(), core.admin()),
+        licitaciones: bastion_licitaciones::TenderService::new(core.database(), core.admin()),
         report_jobs: std::sync::Arc::new(tokio::sync::Semaphore::new(2)),
         procesos_jobs: std::sync::Arc::new(tokio::sync::Semaphore::new(1)),
         scout_csv_path,
@@ -394,6 +397,7 @@ pub fn router(
         .merge(ordenes_compra::routes(api_state.clone()))
         .merge(gastos::routes(api_state.clone()))
         .merge(reportes::routes(api_state.clone()))
+        .merge(licitaciones::routes(api_state.clone()))
         .fallback(not_found)
         .with_state(api_state)
         .layer(middleware::from_fn(problem_details))

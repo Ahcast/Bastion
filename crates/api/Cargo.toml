@@ -4,6 +4,7 @@ version.workspace = true
 edition.workspace = true
 
 [dependencies]
+bastion-licitaciones = { path = "../modules/licitaciones" }
 bastion-reportes = { path = "../modules/reportes" }
 bastion-document-flows = { path = "../document-flows" }
 axum.workspace = true

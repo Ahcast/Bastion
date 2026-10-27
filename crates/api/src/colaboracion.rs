@@ -4,6 +4,7 @@ static FILE_REQUEST_SLOTS: tokio::sync::Semaphore = tokio::sync::Semaphore::cons
 
 pub(super) fn routes(state: ApiState) -> Router<ApiState> {
     Router::new()
+        .merge(form_routes(state.clone()))
         .route("/api/v1/colaboracion", get(list).post(upload))
         .route("/api/v1/colaboracion/personas", get(people))
         .route(
@@ -18,6 +19,51 @@ pub(super) fn routes(state: ApiState) -> Router<ApiState> {
         .layer(axum::extract::DefaultBodyLimit::max(140 * 1024 * 1024))
         .layer(RequestBodyLimitLayer::new(140 * 1024 * 1024))
         .route_layer(middleware::from_fn_with_state(state, guard))
+}
+
+fn form_routes(state: ApiState) -> Router<ApiState> {
+    Router::new()
+        .route(
+            "/api/v1/colaboracion/formularios",
+            get(list_forms).post(publish_form),
+        )
+        .layer(RequestBodyLimitLayer::new(256 * 1024))
+        .route_layer(middleware::from_fn_with_state(state, form_guard))
+}
+async fn form_guard(State(_state): State<ApiState>, request: Request, next: Next) -> Response {
+    // Authorization is enforced again by owner methods; bounded metadata timeout.
+    match tokio::time::timeout(Duration::from_secs(30), next.run(request)).await {
+        Ok(response) => response,
+        Err(_) => ApiError(CoreError::Overloaded).into_response(),
+    }
+}
+async fn list_forms(
+    State(state): State<ApiState>,
+    headers: axum::http::HeaderMap,
+    Query(filter): Query<bastion_licitaciones::PageQuery>,
+) -> Result<Json<bastion_colaboracion::FilePage<bastion_colaboracion::PublishedForm>>, ApiError> {
+    let user = actor(&state, &headers).await?;
+    let (page, size) = filter.bounds().map_err(ApiError)?;
+    state
+        .colaboracion
+        .list_forms(user.id, page, size)
+        .await
+        .map(Json)
+        .map_err(ApiError)
+}
+async fn publish_form(
+    State(state): State<ApiState>,
+    headers: axum::http::HeaderMap,
+    Json(input): Json<bastion_colaboracion::PublishFormInput>,
+) -> Result<(StatusCode, Json<bastion_colaboracion::PublishedForm>), ApiError> {
+    let user = actor(&state, &headers).await?;
+    let key = super::licitaciones::single_header(&headers, "idempotency-key")?;
+    state
+        .colaboracion
+        .publish_form(user.id, key, input)
+        .await
+        .map(|value| (StatusCode::CREATED, Json(value)))
+        .map_err(ApiError)
 }
 async fn guard(State(state): State<ApiState>, request: Request, next: Next) -> Response {
     match tokio::time::timeout(Duration::from_secs(120), async {

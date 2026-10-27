@@ -1,0 +1,240 @@
+openapi: 3.1.0
+info:
+  title: Infraestructura de Licitaciones y biblioteca de formularios
+  version: 0.1.0
+  description: Sin formularios ni campos de negocio precargados. Ver licitaciones-infraestructura.md para límites, autorización y pendientes.
+security:
+  - session: []
+paths:
+  /api/v1/licitaciones:
+    get:
+      summary: Listar expedientes de empresa con permiso licitaciones/expedientes/ver
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: Página autorizada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExpedientPage'
+    post:
+      summary: Crear expediente vacío en Borrador; requiere editar
+      parameters:
+        - $ref: '#/components/parameters/Idempotency'
+        - $ref: '#/components/parameters/Csrf'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, additionalProperties: false }
+      responses:
+        '201':
+          description: Expediente creado o recibo idéntico; ETag fuerte
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Expedient' }
+        '409': { description: Clave reutilizada con otro cuerpo }
+  /api/v1/licitaciones/{id}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    get:
+      summary: Leer expediente y sus copias; requiere ver
+      responses:
+        '200':
+          description: Expediente con ETag fuerte
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Expedient' }
+    delete:
+      summary: Eliminar lógicamente sólo Borrador; requiere eliminar
+      parameters:
+        - $ref: '#/components/parameters/Version'
+        - $ref: '#/components/parameters/Csrf'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [confirm_id]
+              properties:
+                confirm_id: { type: integer, minimum: 1 }
+      responses:
+        '204': { description: Eliminado sin destruir recibos ni historial }
+        '409': { description: Estado distinto de Borrador }
+        '412': { description: Versión obsoleta }
+  /api/v1/licitaciones/{id}/formularios:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    post:
+      summary: Copiar esquema publicado; editar expediente y leer Colaboración/empresa activa
+      parameters:
+        - $ref: '#/components/parameters/Idempotency'
+        - $ref: '#/components/parameters/Version'
+        - $ref: '#/components/parameters/Csrf'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [source_id, revision]
+              properties:
+                source_id: { type: integer, minimum: 1 }
+                revision: { type: integer, minimum: 1 }
+      responses:
+        '200':
+          description: Expediente actualizado con copia independiente; ETag fuerte
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Expedient' }
+        '409': { description: Clave reutilizada o expediente bloqueado }
+        '412': { description: Versión obsoleta }
+  /api/v1/licitaciones/{id}/formularios/{copy_id}/valores:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+      - name: copy_id
+        in: path
+        required: true
+        schema: { type: integer, minimum: 1 }
+    put:
+      summary: Sustituir sólo valores declarados de una copia perteneciente al expediente
+      parameters:
+        - $ref: '#/components/parameters/Version'
+        - $ref: '#/components/parameters/Csrf'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [values]
+              properties:
+                values: { type: object, additionalProperties: { type: [string, boolean] } }
+      responses:
+        '200':
+          description: Expediente actualizado; cada copia incluye missing_required
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Expedient' }
+        '412': { description: Versión obsoleta }
+  /api/v1/colaboracion/formularios:
+    get:
+      summary: Listar últimas revisiones publicadas; requiere ver Colaboración/empresa
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: Página de esquemas publicados; catálogo inicialmente vacío
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, page, page_size, has_more]
+                properties:
+                  items: { type: array, items: { $ref: '#/components/schemas/PublishedForm' } }
+                  page: { type: integer }
+                  page_size: { type: integer }
+                  has_more: { type: boolean }
+    post:
+      summary: Publicar esquema inmutable; exclusivo del Administrador del sistema
+      parameters:
+        - $ref: '#/components/parameters/Idempotency'
+        - $ref: '#/components/parameters/Csrf'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [definition]
+              properties:
+                form_id: { type: [integer, 'null'], minimum: 1 }
+                expected_revision: { type: [integer, 'null'], minimum: 1 }
+                definition: { $ref: '#/components/schemas/FormDefinition' }
+      responses:
+        '201':
+          description: Revisión publicada o recibo idéntico
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PublishedForm' }
+        '403': { description: Un rol personalizado no publica aunque tenga editar o comodín }
+        '409': { description: Clave reutilizada con otro cuerpo }
+        '412': { description: Revisión anterior cambió }
+components:
+  securitySchemes:
+    session: { type: apiKey, in: cookie, name: __Host-bastion_session }
+  parameters:
+    Id: { name: id, in: path, required: true, schema: { type: integer, minimum: 1 } }
+    Page: { name: page, in: query, schema: { type: integer, minimum: 1, maximum: 10000, default: 1 } }
+    PageSize: { name: page_size, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 25 } }
+    Version: { name: If-Match, in: header, required: true, schema: { type: string, pattern: '^"[1-9][0-9]*"$' } }
+    Idempotency: { name: Idempotency-Key, in: header, required: true, schema: { type: string, pattern: '^[A-Za-z0-9_-]{16,128}$' } }
+    Csrf: { name: X-CSRF-Token, in: header, required: true, schema: { type: string } }
+  schemas:
+    FormDefinition:
+      type: object
+      additionalProperties: false
+      required: [title, section, variables]
+      properties:
+        title: { type: string, minLength: 1, maxLength: 255 }
+        section: { type: string, enum: [legal, economica, tecnica] }
+        variables:
+          type: array
+          maxItems: 100
+          items:
+            type: object
+            additionalProperties: false
+            required: [key, label, kind, required]
+            properties:
+              key: { type: string, pattern: '^[a-z][a-z0-9_]{0,63}$' }
+              label: { type: string, minLength: 1, maxLength: 255 }
+              kind: { type: string, enum: [text, integer, decimal, date, boolean] }
+              required: { type: boolean }
+    PublishedForm:
+      type: object
+      required: [id, revision, hash, definition]
+      properties:
+        id: { type: integer }
+        revision: { type: integer }
+        hash: { type: string, pattern: '^[a-f0-9]{64}$' }
+        definition: { $ref: '#/components/schemas/FormDefinition' }
+    FormCopy:
+      type: object
+      required: [id, source, values, missing_required]
+      properties:
+        id: { type: integer }
+        source: { $ref: '#/components/schemas/PublishedForm' }
+        values: { type: object, additionalProperties: { type: [string, boolean] } }
+        missing_required: { type: array, items: { type: string } }
+    Expedient:
+      type: object
+      required: [id, version, state, forms]
+      properties:
+        id: { type: integer }
+        version: { type: integer }
+        state: { type: string, enum: [borrador] }
+        forms: { type: array, items: { $ref: '#/components/schemas/FormCopy' } }
+    ExpedientPage:
+      type: object
+      required: [items, page, page_size, has_more]
+      properties:
+        items:
+          type: array
+          items:
+            type: object
+            required: [id, version, state]
+            properties:
+              id: { type: integer }
+              version: { type: integer }
+              state: { type: string }
+        page: { type: integer }
+        page_size: { type: integer }
+        has_more: { type: boolean }
