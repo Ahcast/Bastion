@@ -45,7 +45,7 @@ test('invoice summary renders server decimals and negative profit without floati
   const html = renderToStaticMarkup(<InvoiceTotals calculation={calculation} />);
   assert.ok(html.includes('L -25.00'));
   assert.ok(html.includes('L 115.00'));
-  assert.ok(html.includes('Borrador sin emisión'));
+  assert.ok(html.includes('Cálculo del servidor'));
 });
 
 test('invoice rows do not assign a server total to a different item after blank rows are filtered', () => {
@@ -116,10 +116,12 @@ test('invoice dropdown preserves the nine requested actions, permissions, keyboa
       assert.deepEqual(items.map(item => item.childNodes[0]?.textContent), labels);
       assert.equal(items[0]?.disabled, false);
       assert.equal(items[1]?.disabled, !editable);
-      assert.ok(items.slice(2).every(item => item.disabled && item.querySelector('small')?.textContent));
+      assert.equal(items[2]?.disabled, !editable);
+      assert.equal(items[4]?.disabled, !editable);
+      assert.ok([3,5,6,7,8].every(index => items[index]?.disabled && items[index]?.querySelector('small')?.textContent));
       assert.equal(document.activeElement, items[0]);
       await act(async () => document.querySelector('[role="menu"]')!.dispatchEvent(new KeyboardEvent('keydown', { key: 'End', bubbles: true })));
-      assert.equal(document.activeElement, items[editable ? 1 : 0]);
+      assert.equal(document.activeElement, items[editable ? 4 : 0]);
       await act(async () => document.querySelector('[role="menu"]')!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
       assert.equal(document.querySelector('[role="menu"]'), null);
       assert.equal(document.activeElement, trigger);

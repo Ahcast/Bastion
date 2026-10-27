@@ -7,6 +7,9 @@ use sqlx::{FromRow, MySql, QueryBuilder};
 
 use crate::{CoreError, Database};
 
+#[path = "fiscal.rs"]
+mod fiscal;
+
 #[derive(Clone)]
 pub struct CoreAdmin {
     database: Database,
@@ -954,6 +957,7 @@ impl CoreAdmin {
         if crate::sar::sar_version(&previous)? != expected_version {
             return Err(CoreError::PreconditionFailed);
         }
+        self.validate_sar_watermark(&mut tx, &settings).await?;
         let value = serde_json::to_value(settings).map_err(|_| CoreError::Invalid)?;
         sqlx::query("INSERT INTO settings (lookup_hash,module_id,scope_key,setting_key,schema_version,value_json,updated_by) VALUES (?,'core','global','company.sar',1,?,?) ON DUPLICATE KEY UPDATE value_json=VALUES(value_json),updated_by=VALUES(updated_by)")
             .bind(hash_key("core\0global\0company.sar")).bind(&value).bind(actor).execute(&mut *tx).await?;

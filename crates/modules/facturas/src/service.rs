@@ -27,7 +27,7 @@ struct InvoiceDashboardRow {
 }
 fn invoice_dashboard_query(select: &str, window: &DashboardWindow) -> QueryBuilder<MySql> {
     let mut query = QueryBuilder::new(select.to_owned());
-    query.push(" FROM facturas_drafts WHERE 1=1");
+    query.push(" FROM facturas_drafts WHERE deleted_at IS NULL");
     if let Some(from) = window.from {
         query.push(" AND invoice_date>=").push_bind(from);
     }
@@ -37,8 +37,12 @@ fn invoice_dashboard_query(select: &str, window: &DashboardWindow) -> QueryBuild
     query
 }
 
+#[path = "actions.rs"]
+mod actions;
 #[path = "conversion.rs"]
 mod conversion;
+#[path = "documents.rs"]
+mod documents;
 
 #[derive(Clone)]
 pub struct InvoiceService {
@@ -124,7 +128,7 @@ impl InvoiceService {
         let (page, page_size) = filter.bounds()?;
         let mut tx = self.begin(actor, "ver").await?;
         let mut query = QueryBuilder::<MySql>::new(
-            "SELECT id,version,client_name,order_number,CAST(invoice_date AS CHAR) AS invoice_date,CAST(JSON_LENGTH(data_json,'$.items') AS UNSIGNED) AS item_count,status,JSON_UNQUOTE(JSON_EXTRACT(calculation_json,'$.totals.total')) AS total,JSON_UNQUOTE(JSON_EXTRACT(calculation_json,'$.balance')) AS balance FROM facturas_drafts WHERE 1=1",
+            "SELECT id,version,invoice_number,JSON_UNQUOTE(JSON_EXTRACT(calculation_json,'$.paid_total')) AS paid_total,client_name,order_number,CAST(invoice_date AS CHAR) AS invoice_date,CAST(JSON_LENGTH(data_json,'$.items') AS UNSIGNED) AS item_count,status,JSON_UNQUOTE(JSON_EXTRACT(calculation_json,'$.totals.total')) AS total,JSON_UNQUOTE(JSON_EXTRACT(calculation_json,'$.balance')) AS balance FROM facturas_drafts WHERE deleted_at IS NULL",
         );
         if let Some(term) = filter
             .search
@@ -137,7 +141,9 @@ impl InvoiceService {
                 .push_bind(term)
                 .push(",client_name)>0 OR LOCATE(")
                 .push_bind(term)
-                .push(",order_number)>0)");
+                .push(",order_number)>0 OR LOCATE(")
+                .push_bind(term)
+                .push(",invoice_number)>0)");
         }
         query
             .push(" ORDER BY created_at DESC,id DESC LIMIT ")
@@ -164,7 +170,7 @@ impl InvoiceService {
         let (page, page_size) = filter.bounds()?;
         let mut tx = self.begin(actor, "ver").await?;
         let mut totals_query = QueryBuilder::<MySql>::new(
-            "SELECT CAST(COUNT(*) AS UNSIGNED) AS records,CAST(COALESCE(SUM(CAST(JSON_UNQUOTE(JSON_EXTRACT(calculation_json,'$.totals.total')) AS DECIMAL(30,2))),0) AS CHAR) AS total,CAST(COALESCE(SUM(CAST(JSON_UNQUOTE(JSON_EXTRACT(calculation_json,'$.paid_total')) AS DECIMAL(30,2))),0) AS CHAR) AS paid_total,CAST(COALESCE(SUM(CAST(JSON_UNQUOTE(JSON_EXTRACT(calculation_json,'$.balance')) AS DECIMAL(30,2))),0) AS CHAR) AS balance FROM facturas_drafts WHERE invoice_date>=",
+            "SELECT CAST(COUNT(*) AS UNSIGNED) AS records,CAST(COALESCE(SUM(CAST(JSON_UNQUOTE(JSON_EXTRACT(calculation_json,'$.totals.total')) AS DECIMAL(30,2))),0) AS CHAR) AS total,CAST(COALESCE(SUM(CAST(JSON_UNQUOTE(JSON_EXTRACT(calculation_json,'$.paid_total')) AS DECIMAL(30,2))),0) AS CHAR) AS paid_total,CAST(COALESCE(SUM(CAST(JSON_UNQUOTE(JSON_EXTRACT(calculation_json,'$.balance')) AS DECIMAL(30,2))),0) AS CHAR) AS balance FROM facturas_drafts WHERE deleted_at IS NULL AND invoice_date>=",
         );
         totals_query
             .push_bind(filter.date_from)
@@ -181,7 +187,9 @@ impl InvoiceService {
                 .push_bind(term)
                 .push(",client_name)>0 OR LOCATE(")
                 .push_bind(term)
-                .push(",order_number)>0)");
+                .push(",order_number)>0 OR LOCATE(")
+                .push_bind(term)
+                .push(",invoice_number)>0)");
         }
         if let Some(status) = &filter.status {
             totals_query.push(" AND status=").push_bind(status);
@@ -189,7 +197,7 @@ impl InvoiceService {
         let totals: InvoiceReportTotals = totals_query.build_query_as().fetch_one(&mut *tx).await?;
 
         let mut rows_query = QueryBuilder::<MySql>::new(
-            "SELECT id,client_name,order_number,CAST(invoice_date AS CHAR) AS invoice_date,status,JSON_UNQUOTE(JSON_EXTRACT(calculation_json,'$.totals.total')) AS total,JSON_UNQUOTE(JSON_EXTRACT(calculation_json,'$.paid_total')) AS paid_total,JSON_UNQUOTE(JSON_EXTRACT(calculation_json,'$.balance')) AS balance FROM facturas_drafts WHERE invoice_date>=",
+            "SELECT id,invoice_number,client_name,order_number,CAST(invoice_date AS CHAR) AS invoice_date,status,JSON_UNQUOTE(JSON_EXTRACT(calculation_json,'$.totals.total')) AS total,JSON_UNQUOTE(JSON_EXTRACT(calculation_json,'$.paid_total')) AS paid_total,JSON_UNQUOTE(JSON_EXTRACT(calculation_json,'$.balance')) AS balance FROM facturas_drafts WHERE deleted_at IS NULL AND invoice_date>=",
         );
         rows_query
             .push_bind(filter.date_from)
@@ -206,7 +214,9 @@ impl InvoiceService {
                 .push_bind(term)
                 .push(",client_name)>0 OR LOCATE(")
                 .push_bind(term)
-                .push(",order_number)>0)");
+                .push(",order_number)>0 OR LOCATE(")
+                .push_bind(term)
+                .push(",invoice_number)>0)");
         }
         if let Some(status) = &filter.status {
             rows_query.push(" AND status=").push_bind(status);
@@ -259,7 +269,7 @@ impl InvoiceService {
             .await?;
         let mut chart = QueryBuilder::<MySql>::new("SELECT DATE_FORMAT(invoice_date,");
         chart.push_bind(period.sql_format()).push(format!(
-            ") AS bucket,COUNT(*) AS count,CAST(COALESCE(SUM(CAST({total_sql} AS DECIMAL(50,2))),0) AS CHAR) AS amount FROM facturas_drafts WHERE 1=1"
+            ") AS bucket,COUNT(*) AS count,CAST(COALESCE(SUM(CAST({total_sql} AS DECIMAL(50,2))),0) AS CHAR) AS amount FROM facturas_drafts WHERE deleted_at IS NULL"
         ));
         if let Some(from) = window.from {
             chart.push(" AND invoice_date>=").push_bind(from);
@@ -305,7 +315,11 @@ impl InvoiceService {
         input: &InvoiceInput,
     ) -> Result<InvoiceCalculation, CoreError> {
         let tx = self.begin(actor, "editar").await?;
-        let result = calculate(input)?;
+        let mut result = calculate(input)?;
+        if let Some(payment) = input.initial_payment.clone() {
+            let payment = actions::normalize_payment(payment)?;
+            actions::settle(&mut result, crate::calculation::cents(&payment.amount)?)?;
+        }
         tx.commit().await?;
         Ok(result)
     }
@@ -324,35 +338,68 @@ impl InvoiceService {
             return Err(CoreError::Invalid);
         }
         let mut tx = self.begin(actor, "editar").await?;
+        let payment = input
+            .initial_payment
+            .take()
+            .map(actions::normalize_payment)
+            .transpose()?;
         let mut calculation = calculate(&input)?;
+        if let Some(payment) = &payment {
+            actions::settle(
+                &mut calculation,
+                crate::calculation::cents(&payment.amount)?,
+            )?;
+        }
         calculation.ensure_saveable()?;
         let data = serde_json::to_value(&calculation.data).map_err(|_| CoreError::Invalid)?;
+        let hash_data = if payment.is_some() {
+            serde_json::json!({"data":data,"initial_payment":payment})
+        } else {
+            data.clone()
+        };
         let request_hash =
-            Sha256::digest(serde_json::to_vec(&data).map_err(|_| CoreError::Invalid)?).to_vec();
+            Sha256::digest(serde_json::to_vec(&hash_data).map_err(|_| CoreError::Invalid)?)
+                .to_vec();
         let key_hash = Sha256::digest(key.as_bytes()).to_vec();
         let previous: Option<(Vec<u8>, serde_json::Value)> = sqlx::query_as("SELECT request_hash,response_json FROM facturas_create_receipts WHERE actor_id=? AND key_hash=?").bind(actor).bind(&key_hash).fetch_optional(&mut *tx).await?;
         if let Some((hash, response)) = previous {
             if hash != request_hash {
                 return Err(CoreError::Conflict);
             }
-            let result = serde_json::from_value(response).map_err(|_| CoreError::Invalid)?;
+            let result: InvoiceDraft =
+                serde_json::from_value(response).map_err(|_| CoreError::Invalid)?;
+            load(&mut tx, result.id).await?;
             tx.commit().await?;
             return Ok(result);
         }
         self.resolve_client(&mut tx, actor, &mut input, None)
             .await?;
         calculation = calculate(&input)?;
+        if let Some(payment) = &payment {
+            actions::settle(
+                &mut calculation,
+                crate::calculation::cents(&payment.amount)?,
+            )?;
+        }
         calculation.ensure_saveable()?;
         let data = serde_json::to_value(&calculation.data).map_err(|_| CoreError::Invalid)?;
         let id = sqlx::query("INSERT INTO facturas_drafts (client_name,order_number,invoice_date,data_json,calculation_json,created_by,updated_by,created_at,updated_at) VALUES (?,?,?,?,?,?,?,UTC_TIMESTAMP(6),UTC_TIMESTAMP(6))")
             .bind(&calculation.data.client_name).bind(&calculation.data.order_number).bind(calculation.data.invoice_date).bind(data)
             .bind(serde_json::to_value(&calculation).map_err(|_| CoreError::Invalid)?).bind(actor).bind(actor).execute(&mut *tx).await?.last_insert_id();
+        let payments = if let Some(payment) = payment {
+            vec![actions::insert_payment(&mut tx, actor, id, &payment).await?]
+        } else {
+            Vec::new()
+        };
         let draft = InvoiceDraft {
             id,
             version: 1,
             status: "Borrador".into(),
             currency: "HNL".into(),
             invoice_number: None,
+            payments,
+            sar_snapshot: None,
+            company_snapshot: None,
             source_quote: None,
             source_order: None,
             data: calculation.data.clone(),
@@ -390,9 +437,28 @@ impl InvoiceService {
         }
         self.resolve_client(&mut tx, actor, &mut input, Some(&current.data))
             .await?;
-        let calculation = calculate(&input)?;
+        let payment = input
+            .initial_payment
+            .take()
+            .map(actions::normalize_payment)
+            .transpose()?;
+        if payment.is_some() && !current.payments.is_empty() {
+            return Err(CoreError::Conflict);
+        }
+        let mut calculation = calculate(&input)?;
+        let paid = crate::calculation::cents(&current.calculation.paid_total)?
+            + payment
+                .as_ref()
+                .map(|p| crate::calculation::cents(&p.amount))
+                .transpose()?
+                .unwrap_or(0);
+        actions::settle(&mut calculation, paid)?;
         calculation.ensure_saveable()?;
         let version = expected.checked_add(1).ok_or(CoreError::Invalid)?;
+        let mut payments = current.payments;
+        if let Some(payment) = payment {
+            payments.push(actions::insert_payment(&mut tx, actor, id, &payment).await?);
+        }
         sqlx::query("UPDATE facturas_drafts SET version=?,client_name=?,order_number=?,invoice_date=?,data_json=?,calculation_json=?,updated_by=?,updated_at=UTC_TIMESTAMP(6) WHERE id=?")
             .bind(version).bind(&calculation.data.client_name).bind(&calculation.data.order_number).bind(calculation.data.invoice_date)
             .bind(serde_json::to_value(&calculation.data).map_err(|_| CoreError::Invalid)?).bind(serde_json::to_value(&calculation).map_err(|_| CoreError::Invalid)?).bind(actor).bind(id).execute(&mut *tx).await?;
@@ -412,6 +478,9 @@ impl InvoiceService {
             status: "Borrador".into(),
             currency: "HNL".into(),
             invoice_number: None,
+            payments,
+            sar_snapshot: None,
+            company_snapshot: None,
             source_quote: current.source_quote,
             source_order: current.source_order,
             data: calculation.data.clone(),
@@ -449,17 +518,31 @@ impl InvoiceService {
 }
 
 async fn load(tx: &mut Transaction<'_, MySql>, id: u64) -> Result<InvoiceDraft, CoreError> {
-    let row = sqlx::query("SELECT id,version,status,data_json,calculation_json,source_quote_json,source_order_json FROM facturas_drafts WHERE id=? FOR UPDATE").bind(id).fetch_optional(&mut **tx).await?.ok_or(CoreError::NotFound)?;
+    let row = sqlx::query("SELECT id,version,status,data_json,calculation_json,source_quote_json,source_order_json,invoice_number,sar_snapshot_json,company_snapshot_json FROM facturas_drafts WHERE id=? AND deleted_at IS NULL FOR UPDATE").bind(id).fetch_optional(&mut **tx).await?.ok_or(CoreError::NotFound)?;
     let data: serde_json::Value = row.try_get("data_json")?;
     let calculation: serde_json::Value = row.try_get("calculation_json")?;
     let origin: Option<serde_json::Value> = row.try_get("source_quote_json")?;
     let order_origin: Option<serde_json::Value> = row.try_get("source_order_json")?;
+    let payments=sqlx::query_as::<_,crate::InvoicePayment>("SELECT id,CAST(amount AS CHAR) AS amount,payment_date AS date,method,reference FROM facturas_payments WHERE invoice_id=? ORDER BY id").bind(id).fetch_all(&mut **tx).await?;
+    let sar: Option<serde_json::Value> = row.try_get("sar_snapshot_json")?;
+    let company: Option<serde_json::Value> = row.try_get("company_snapshot_json")?;
     Ok(InvoiceDraft {
         id: row.try_get("id")?,
         version: row.try_get("version")?,
         status: row.try_get("status")?,
         currency: "HNL".into(),
-        invoice_number: None,
+        invoice_number: row.try_get("invoice_number")?,
+        payments,
+        sar_snapshot: sar
+            .filter(|v| !v.is_null())
+            .map(serde_json::from_value)
+            .transpose()
+            .map_err(|_| CoreError::Invalid)?,
+        company_snapshot: company
+            .filter(|v| !v.is_null())
+            .map(serde_json::from_value)
+            .transpose()
+            .map_err(|_| CoreError::Invalid)?,
         source_order: order_origin
             .map(serde_json::from_value)
             .transpose()

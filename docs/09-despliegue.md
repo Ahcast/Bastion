@@ -129,3 +129,8 @@ Frontend: 44 archivos verificados en disco y 42 recursos por HTTPS, conservando 
 ## Licitaciones: backend desplegado en AWS
 
 El 2026-10-27 se instaló el backend de 0d951d5 con CI aprobado, artefacto verificado, respaldo privado y restauración ensayada de las 69 tablas previas. Migraciones de Licitaciones 1 y Colaboración 202610270001; total de 77 tablas y conservación de datos y estados de los demás módulos. Licitaciones queda disponible y desactivado (1/1/0). Readiness HTTPS 200 y rutas privadas anónimas 401. El frontend Bluehost no se publicó en esta operación. Ver [evidencia, recuperación y pendientes](modulos/licitaciones-despliegue.md).
+
+
+## Facturas: autorización de migración 5
+
+El usuario autoriza el 2026-10-27 reutilizar la credencial MySQL existente únicamente para la migración 5 de Facturas, después de respaldo privado verificado. Usar el comando acotado `migrate-facturas`; no migrar otros módulos, crear cuentas, cambiar privilegios ni persistir `MYSQL_MIGRATOR_*` en el servicio. El runtime de documentos necesita acceso al prefijo privado `facturas/` en el bucket existente. Mantener las activaciones y configuración existentes; no generar documentos comerciales sintéticos ni consumir números SAR durante la verificación. Ver `modulos/facturas-acciones.md`.

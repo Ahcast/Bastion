@@ -64,7 +64,7 @@ test('SAR saves all four fields atomically, uses the server status and retains e
     assert.equal(writes, 1);
     assert.equal(notices[0], 'Configuración SAR guardada.');
     assert.ok(container.querySelector('[aria-label="Estado SAR guardado"]')?.textContent?.includes('Facturas restantes: 10'));
-    assert.ok(container.textContent?.includes('todavía no emite facturas'));
+    assert.ok(container.textContent?.includes('la emisión se confirma desde Facturas'));
     await change('current_invoice', '91'); await submit();
     assert.equal(writes, 2);
     assert.equal(container.querySelector<HTMLInputElement>('[name="current_invoice"]')?.value, '91');

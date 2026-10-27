@@ -57,7 +57,7 @@ function QuoteSettings() { return <section className="card"><h2>Cotizaciones</h2
 
 function ClientSettings() { return <section className="card"><h2>Clientes</h2><p>Catálogo de clientes y contactos con búsqueda, alta y edición.</p><p>Esta versión no tiene ajustes editables. Los ajustes propios del módulo siguen pendientes de definición.</p></section>; }
 
-function InvoiceSettings() { return <section className="card stack"><h2>Facturas</h2><p>Primera etapa: borradores con venta, inversión, gastos y saldo calculados por el servidor. Emisión, pagos, PDF, nota de entrega, recibos y conversiones siguen pendientes.</p><SarSettings /></section>; }
+function InvoiceSettings() { return <section className="card stack"><h2>Facturas</h2><p>Facturas con número SAR al marcar como enviado, pagos y saldos, clonación y documentos privados. Las facturas enviadas y pagadas no se editan ni eliminan. Solo se eliminan borradores sin pagos; se conservan sus relaciones de origen.</p><SarSettings /></section>; }
 
 
 function ReportSettings() { return <section className="card"><h2>Reportes</h2><p>El módulo no tiene ajustes propios documentados. Los permisos de lectura se asignan por cada dominio en Roles y permisos.</p></section>; }

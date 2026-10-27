@@ -44,6 +44,8 @@ pub struct InvoiceExpense {
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct InvoiceInput {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub initial_payment: Option<PaymentInput>,
     #[serde(default)]
     pub id_client: Option<u64>,
     pub client_name: String,
@@ -78,6 +80,12 @@ pub struct OrderOrigin {
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct InvoiceDraft {
+    #[serde(default)]
+    pub payments: Vec<InvoicePayment>,
+    #[serde(default)]
+    pub sar_snapshot: Option<bastion_core::SarSettings>,
+    #[serde(default)]
+    pub company_snapshot: Option<bastion_core::DocumentCompany>,
     #[serde(default)]
     pub source_order: Option<OrderOrigin>,
     #[serde(default)]
@@ -125,6 +133,8 @@ pub struct InvoicePage {
 
 #[derive(Serialize, sqlx::FromRow)]
 pub struct InvoiceSummary {
+    pub invoice_number: Option<String>,
+    pub paid_total: String,
     pub id: u64,
     pub version: u64,
     pub client_name: String,
@@ -168,7 +178,7 @@ impl InvoiceReportFilter {
             || self
                 .status
                 .as_deref()
-                .is_some_and(|status| status != "Borrador")
+                .is_some_and(|status| !matches!(status, "Borrador" | "Enviado" | "Pagado"))
         {
             return Err(CoreError::Invalid);
         }
@@ -178,6 +188,7 @@ impl InvoiceReportFilter {
 
 #[derive(Debug, Serialize, sqlx::FromRow)]
 pub struct InvoiceReportRow {
+    pub invoice_number: Option<String>,
     pub id: u64,
     pub client_name: String,
     pub order_number: String,
@@ -203,4 +214,34 @@ pub struct InvoiceReport {
     pub page: u32,
     pub page_size: u32,
     pub has_more: bool,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct PaymentInput {
+    pub amount: String,
+    #[serde(default = "payment_today", deserialize_with = "payment_date")]
+    pub date: NaiveDate,
+    #[serde(default)]
+    pub method: String,
+    #[serde(default)]
+    pub reference: String,
+}
+
+fn payment_today() -> NaiveDate {
+    chrono::Utc::now()
+        .with_timezone(&chrono::FixedOffset::west_opt(21600).expect("Honduras offset"))
+        .date_naive()
+}
+fn payment_date<'de, D: serde::Deserializer<'de>>(deserializer: D) -> Result<NaiveDate, D::Error> {
+    Ok(Option::<NaiveDate>::deserialize(deserializer)?.unwrap_or_else(payment_today))
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, sqlx::FromRow)]
+pub struct InvoicePayment {
+    pub id: u64,
+    pub amount: String,
+    pub date: NaiveDate,
+    pub method: String,
+    pub reference: String,
 }

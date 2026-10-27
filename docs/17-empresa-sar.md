@@ -25,3 +25,8 @@ Instalado en AWS y Bluehost desde [`a85bca73`](https://github.com/Ahcast/Bastion
 Artifacts del mismo commit, ZIP/tar/archivos verificados por SHA-256, respaldo privado y despliegue con reversión. No hubo migraciones ni cambios de configuración del ambiente. Se verificó la conservación de datos comerciales, settings, documentos y activación de módulos. Salud HTTPS 200, ruta SAR sin sesión 401 y 35 archivos públicos verificados, incluido el bundle actual de Ajustes. El frontend conserva su origen API, cabeceras del hosting y assets anteriores.
 
 La revisión visual local usó datos sintéticos. No se inició una sesión administrativa real ni se guardó numeración de ejemplo en el ambiente desplegado: la configuración SAR sigue sin configurar para que el administrador ingrese los datos de la empresa. Esto no valida una autorización fiscal ni habilita emisión, correlativos o documentos pendientes.
+
+
+## Emisión desde Facturas — 2026-10-27
+
+El usuario confirma que el número se reserva al marcar como enviado, no al crear borradores. El Core conserva una secuencia máxima por prefijo (`company.sar.sequence`), impide retrocesos de prefijos utilizados y avanza el ajuste junto a la factura en una transacción. Rango completo y fecha vigente se validan al emitir; los ajustes guardados no emiten documentos por sí solos. Ver [reglas y diferencias](modulos/facturas-acciones.md).

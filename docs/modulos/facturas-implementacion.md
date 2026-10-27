@@ -73,3 +73,8 @@ Conversión desde Cotizaciones implementada mediante document-flows: borrador a 
 El 2026-10-26 el usuario define utilidad = total de venta − ISV − inversión total. Se resta la suma de ISV 15% y 18%; la inversión incluye costos de productos y gastos adicionales. Se conserva la fórmula observada del Legacy como antecedente, reemplazada por esta decisión. La migración propia 4 corrige sólo profit en borradores y respuestas idempotentes existentes; no altera precios, impuestos, totales, versiones, saldo ni origen.
 
 Desplegado el 2026-10-27 desde 50efa7e (CI 40540732266). Migraciones 3 (origen de orden) y 4 (utilidad sin ISV) aplicadas; Facturas continúa limitada a borradores sin emisión fiscal. Se conservó su activación existente y no se crearon facturas sintéticas en producción.
+
+
+## Acciones completadas — 2026-10-27
+
+El corte anterior de borradores se amplía con emisión al marcar enviado, pagos, clonación, tres PDF privados y eliminación acotada. Las decisiones del usuario sobre número SAR al enviar, inmutabilidad y conservación de origen sustituyen los pendientes históricos anteriores. No se modifica la corrección de utilidad ni las conversiones ya publicadas. Ver [contrato del corte](facturas-acciones.md).
