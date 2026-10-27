@@ -6,7 +6,7 @@ Incorporación documental solicitada el 2026-10-27, después de contrastar la pr
 
 Fuente: [propuesta v1.2 aportada](licitaciones-propuesta-v1.2.md), conservada sin cambios. Esta ficha registra su revisión de compatibilidad y las condiciones de integración; las decisiones posteriores confirmadas aquí prevalecen sobre los puntos pendientes o propuestas de la fuente. Las etiquetas `[U]` de la fuente son atribuciones del documento aportado; no convierten sus tablas, interfaces ni decisiones pendientes en contratos existentes o aprobaciones de implementación. En esta ficha, **verificado** describe código/documentos vigentes; **requisito de la propuesta**, **recomendación** y **pendiente** mantienen significados distintos.
 
-La incorporación conserva Rust/AWS, React/Bluehost, MySQL/Bluehost y el monolito modular. Colaboración comienza su biblioteca de esquemas; archivos y paquetes de plantillas, servicio PDF y Facturas siguen como trabajo futuro. Disponibilidad, activación y paridad no se deducen de esta ficha.
+La incorporación conserva Rust/AWS, React/Bluehost, MySQL/Bluehost y el monolito modular. Colaboración aporta biblioteca de esquemas y archivos autorizados. Se publicaron nombre editable y copias privadas de PDF/imágenes desde PC o Colaboración en los bloques legal y técnico; ver [evidencia de AWS y Bluehost](licitaciones-archivos-despliegue.md). Paquetes de plantillas, PDF final y adjudicación/Facturas siguen pendientes. Disponibilidad, activación y paridad son estados distintos.
 
 ## Propósito y límites funcionales
 

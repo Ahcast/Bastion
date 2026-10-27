@@ -2,6 +2,8 @@
 
 Este paquete convierte el análisis de la aplicación actual y las decisiones acordadas en una especificación para desarrollar la nueva aplicación en Rust.
 
+Licitaciones, ampliación autorizada el 2026-10-27: nombre editable y copias privadas de PDF/imágenes desde PC o Colaboración, conservando AWS/Bluehost/MySQL. [Contratos y publicación verificada](modulos/licitaciones-archivos-despliegue.md). No incorpora formularios precargados ni cierra PDF final, lotes/ítems o adjudicación.
+
 ## Documentos
 
 | Archivo | Propósito |
