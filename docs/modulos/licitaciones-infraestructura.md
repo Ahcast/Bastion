@@ -2,6 +2,8 @@
 
 ## Decisión de alcance del 2026-10-27
 
+Decisión posterior: el usuario pide **nombre editable del expediente**. Se agrega exclusivamente ese campo con edición versionada; el ID interno se conserva y los demás datos de negocio siguen dependiendo de los formularios. Ver [contrato, migración y aceptación](licitaciones-nombre.md). Las referencias siguientes al expediente vacío describen el corte inicial.
+
 El usuario solicita desarrollar la infraestructura y rechaza campos iniciales de expediente, lotes e ítems. Incorporará formularios y archivos según se necesiten. No se crean formularios precargados, campos de negocio, reglas económicas, monedas ni transiciones de envío/adjudicación. El expediente inicial se identifica por su ID técnico y permanece en Borrador.
 
 Se implementan expediente vacío, biblioteca de esquemas de formularios en Colaboración, publicación exclusiva del Administrador y copia independiente de una versión publicada al expediente. Publicar aquí aprueba **el esquema de captura**, no código Typst ni una plantilla PDF. No se admite código ejecutable. El catálogo nace vacío. Tipos técnicos iniciales: texto, entero, decimal exacto como cadena, fecha ISO y booleano; cada recurso define sus nombres, etiquetas y obligatoriedad al incorporarse. No hay fórmulas, impuestos ni cálculo de dinero implícitos.

@@ -1,6 +1,12 @@
 /* Concreto: shared Core tokens and the section/list rhythm of Cotizaciones. */
 .document-workspace{min-width:0;display:grid;gap:24px}
 .document-workspace>.pagehead{margin-bottom:0}
+.document-workspace>.pagehead>div{min-width:0}
+.document-workspace .pagehead h1{overflow-wrap:anywhere}
+.document-record{min-width:0;overflow-wrap:anywhere}
+.document-record strong{font-weight:500}
+.document-record small{display:block;margin-top:3px;color:var(--muted)}
+.document-name{max-width:680px;margin-bottom:24px}
 .document-section{min-width:0;border-top:2px solid var(--ink)}
 .document-section-heading{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;padding-top:12px;margin-bottom:16px}
 .document-section-heading h2{font-size:17px;line-height:1.4;font-weight:600;margin:0}

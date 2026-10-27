@@ -29,6 +29,8 @@ pub fn validate_final_pdf_budget(actual_bytes: u64) -> Result<(), CoreError> {
 #[derive(Clone, Debug, Serialize, Deserialize, sqlx::FromRow)]
 pub struct ExpedientSummary {
     pub id: u64,
+    #[serde(default)]
+    pub name: String,
     pub version: u64,
     pub state: String,
 }
@@ -42,6 +44,9 @@ pub struct FormCopy {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Expedient {
     pub id: u64,
+    // Old persistent idempotency receipts predate the editable name.
+    #[serde(default)]
+    pub name: String,
     pub version: u64,
     pub state: String,
     pub forms: Vec<FormCopy>,
@@ -85,6 +90,23 @@ pub struct ValuesInput {
 pub struct EmptyInput {}
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
+pub struct NameInput {
+    pub name: String,
+}
+impl NameInput {
+    pub fn normalize(self) -> Result<String, CoreError> {
+        if self.name.chars().any(char::is_control) {
+            return Err(CoreError::Invalid);
+        }
+        let name = self.name.trim();
+        if name.is_empty() || name.chars().count() > 255 {
+            return Err(CoreError::Invalid);
+        }
+        Ok(name.to_owned())
+    }
+}
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct DeleteInput {
     pub confirm_id: u64,
 }
@@ -92,6 +114,17 @@ pub struct DeleteInput {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn editable_names_are_inert_bounded_and_compatible_with_old_receipts() {
+        assert_eq!(NameInput { name: "  Oferta de equipos  ".into() }.normalize().unwrap(), "Oferta de equipos");
+        assert!(NameInput { name: "é".repeat(255) }.normalize().is_ok());
+        for name in ["".to_string(), "   ".into(), "x".repeat(256), "a\nb".into(), "a\0b".into()] {
+            assert!(NameInput { name }.normalize().is_err());
+        }
+        assert!(serde_json::from_str::<NameInput>(r#"{"name":"Oferta","state":"enviada"}"#).is_err());
+        let old: Expedient = serde_json::from_str(r#"{"id":1,"version":1,"state":"borrador","forms":[]}"#).unwrap();
+        assert!(old.name.is_empty());
+    }
     #[test]
     fn budgets_keep_decimal_mb_and_final_pdf_separate() {
         assert_eq!(

@@ -84,7 +84,7 @@ impl TenderService {
     pub async fn list(&self, actor: u64, filter: &PageQuery) -> Result<ExpedientPage, CoreError> {
         let (page, size) = filter.bounds()?;
         let mut tx = self.begin(actor, "ver").await?;
-        let mut items:Vec<ExpedientSummary>=sqlx::query_as("SELECT id,version,state FROM licitaciones_expedientes WHERE deleted_at IS NULL ORDER BY id DESC LIMIT ? OFFSET ?")
+        let mut items:Vec<ExpedientSummary>=sqlx::query_as("SELECT id,name,version,state FROM licitaciones_expedientes WHERE deleted_at IS NULL ORDER BY id DESC LIMIT ? OFFSET ?")
             .bind(size+1).bind((page-1)*size).fetch_all(&mut *tx).await?;
         let has_more = items.len() > size as usize;
         items.truncate(size as usize);
@@ -121,6 +121,29 @@ impl TenderService {
         let result = load(&mut tx, id).await?;
         save_receipt(&mut tx, actor, &key, &hash, &result).await?;
         event(&mut tx, actor, "expedient.create", id, 1).await?;
+        tx.commit().await?;
+        Ok(result)
+    }
+    pub async fn rename(
+        &self,
+        actor: u64,
+        id: u64,
+        expected: u64,
+        input: NameInput,
+    ) -> Result<Expedient, CoreError> {
+        let name = input.normalize()?;
+        let mut tx = self.begin(actor, "editar").await?;
+        let current = load(&mut tx, id).await?;
+        editable(&current, expected)?;
+        if current.name == name {
+            tx.commit().await?;
+            return Ok(current);
+        }
+        sqlx::query("UPDATE licitaciones_expedientes SET name=? WHERE id=?")
+            .bind(name).bind(id).execute(&mut *tx).await?;
+        bump(&mut tx, actor, id, expected).await?;
+        let result = load(&mut tx, id).await?;
+        event(&mut tx, actor, "expedient.rename", id, result.version).await?;
         tx.commit().await?;
         Ok(result)
     }
@@ -249,7 +272,7 @@ async fn bump(
     Ok(())
 }
 async fn load(tx: &mut Transaction<'_, MySql>, id: u64) -> Result<Expedient, CoreError> {
-    let e:ExpedientSummary=sqlx::query_as("SELECT id,version,state FROM licitaciones_expedientes WHERE id=? AND deleted_at IS NULL FOR UPDATE")
+    let e:ExpedientSummary=sqlx::query_as("SELECT id,name,version,state FROM licitaciones_expedientes WHERE id=? AND deleted_at IS NULL FOR UPDATE")
         .bind(id).fetch_optional(&mut **tx).await?.ok_or(CoreError::NotFound)?;
     let rows:Vec<(u64,serde_json::Value,serde_json::Value)>=sqlx::query_as("SELECT id,source_json,values_json FROM licitaciones_formularios WHERE expediente_id=? ORDER BY id")
         .bind(id).fetch_all(&mut **tx).await?;
@@ -271,6 +294,7 @@ async fn load(tx: &mut Transaction<'_, MySql>, id: u64) -> Result<Expedient, Cor
     }
     Ok(Expedient {
         id: e.id,
+        name: e.name,
         version: e.version,
         state: e.state,
         forms,

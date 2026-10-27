@@ -47,6 +47,31 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Expedient' }
+    patch:
+      summary: Cambiar el nombre de un expediente Borrador; requiere editar
+      parameters:
+        - $ref: '#/components/parameters/Version'
+        - $ref: '#/components/parameters/Csrf'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [name]
+              properties:
+                name: { type: string, minLength: 1, maxLength: 255, description: Se recortan espacios externos; no se admiten nombres vacíos ni caracteres de control. }
+      responses:
+        '200':
+          description: Expediente actualizado con ETag fuerte; el ID se conserva
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Expedient' }
+        '400': { description: Nombre inválido o campos no admitidos }
+        '403': { description: Sin permiso de edición }
+        '409': { description: Expediente fuera de Borrador }
+        '412': { description: Versión obsoleta }
     delete:
       summary: Eliminar lógicamente sólo Borrador; requiere eliminar
       parameters:
@@ -216,12 +241,13 @@ components:
         missing_required: { type: array, items: { type: string } }
     Expedient:
       type: object
-      required: [id, version, state, forms]
+      required: [id, name, version, state, forms]
       properties:
         id: { type: integer }
         version: { type: integer }
         state: { type: string, enum: [borrador] }
         forms: { type: array, items: { $ref: '#/components/schemas/FormCopy' } }
+        name: { type: string, maxLength: 255, description: Vacío mientras no se asigne; independiente del ID técnico. }
     ExpedientPage:
       type: object
       required: [items, page, page_size, has_more]
@@ -230,11 +256,12 @@ components:
           type: array
           items:
             type: object
-            required: [id, version, state]
+            required: [id, name, version, state]
             properties:
               id: { type: integer }
               version: { type: integer }
               state: { type: string }
+              name: { type: string, maxLength: 255 }
         page: { type: integer }
         page_size: { type: integer }
         has_more: { type: boolean }

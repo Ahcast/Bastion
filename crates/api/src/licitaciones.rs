@@ -1,12 +1,12 @@
 use super::*;
 use bastion_licitaciones::{
-    CopyFormInput, DeleteInput, EmptyInput, Expedient, PageQuery, ValuesInput,
+    CopyFormInput, DeleteInput, EmptyInput, Expedient, NameInput, PageQuery, ValuesInput,
 };
 
 pub(super) fn routes(state: ApiState) -> Router<ApiState> {
     Router::new()
         .route("/api/v1/licitaciones", get(list).post(create))
-        .route("/api/v1/licitaciones/{id}", get(detail).delete(remove))
+        .route("/api/v1/licitaciones/{id}", get(detail).patch(rename).delete(remove))
         .route("/api/v1/licitaciones/{id}/formularios", post(copy_form))
         .route(
             "/api/v1/licitaciones/{id}/formularios/{copy_id}/valores",
@@ -87,6 +87,16 @@ async fn create(
         HeaderValue::from_str(&format!("/api/v1/licitaciones/{id}")).expect("integer location"),
     );
     Ok(output)
+}
+async fn rename(
+    State(state): State<ApiState>,
+    headers: axum::http::HeaderMap,
+    Path(id): Path<u64>,
+    Json(input): Json<NameInput>,
+) -> Result<Response, ApiError> {
+    let user = actor(&state, &headers).await?;
+    state.licitaciones.rename(user.id, id, expected(&headers)?, input)
+        .await.map(response).map_err(ApiError)
 }
 async fn copy_form(
     State(state): State<ApiState>,
@@ -423,6 +433,22 @@ mod tests {
                 .status(),
             StatusCode::CREATED
         );
+        let renamed = app.clone().oneshot(request(
+            "PATCH", &path, Some("synthetic-tender-admin"), true,
+            "https://example.test", r#"{"name":"  Oferta HTTP  "}"#.into(), "\"1\""
+        )).await.unwrap();
+        assert_eq!(renamed.status(), StatusCode::OK);
+        assert_eq!(renamed.headers()["etag"], "\"2\"");
+        let renamed:serde_json::Value=serde_json::from_slice(&to_bytes(renamed.into_body(),256*1024).await.unwrap()).unwrap();
+        assert_eq!(renamed["name"],"Oferta HTTP"); assert_eq!(renamed["id"],id);
+        for (token,body,version,status) in [
+            ("synthetic-tender-reader",r#"{"name":"No autorizado"}"#,"\"2\"",StatusCode::FORBIDDEN),
+            ("synthetic-tender-admin",r#"{"name":"Obsoleto"}"#,"\"1\"",StatusCode::PRECONDITION_FAILED),
+            ("synthetic-tender-admin",r#"{"name":"   "}"#,"\"2\"",StatusCode::BAD_REQUEST),
+            ("synthetic-tender-admin",r#"{"name":"Otro","state":"enviada"}"#,"\"2\"",StatusCode::UNPROCESSABLE_ENTITY),
+        ] {
+            assert_eq!(app.clone().oneshot(request("PATCH",&path,Some(token),true,"https://example.test",body.into(),version)).await.unwrap().status(),status);
+        }
         assert_eq!(
             app.clone()
                 .oneshot(request(
@@ -432,7 +458,7 @@ mod tests {
                     true,
                     "https://example.test",
                     format!("{{\"confirm_id\":{id}}}"),
-                    "\"1\""
+                    "\"2\""
                 ))
                 .await
                 .unwrap()

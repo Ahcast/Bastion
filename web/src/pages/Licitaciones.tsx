@@ -25,7 +25,7 @@ function ExpedientList({ open }: { open: (id: number) => void }) {
   }}>{busy ? 'Creando…' : 'Nuevo expediente'}</button>} />
     <DocumentSection title="Listado de expedientes" metadata={result.data ? `${result.data.items.length} en esta página` : undefined} list>
     <Notice>{error || result.error}</Notice>
-    {result.data ? <><Table columns={['Expediente', 'Estado', 'Versión', 'Acción']} rows={result.data.items.map(e => [<span className="document-id">#{e.id}</span>, <span className="document-state">{e.state === 'borrador' ? 'Borrador' : e.state}</span>, <span className="document-id">{e.version}</span>, <button onClick={() => open(e.id)}>Abrir expediente</button>])} /><DocumentPagination page={page} hasMore={result.data.has_more} change={setPage} busy={busy} /></> : !result.error && <Loading />}
+    {result.data ? <><Table columns={['Expediente', 'Estado', 'Versión', 'Acción']} rows={result.data.items.map(e => [<div className="document-record"><strong>{e.name || "Sin nombre"}</strong><small className="document-id">#{e.id}</small></div>, <span className="document-state">{e.state === 'borrador' ? 'Borrador' : e.state}</span>, <span className="document-id">{e.version}</span>, <button onClick={() => open(e.id)}>Abrir expediente</button>])} /><DocumentPagination page={page} hasMore={result.data.has_more} change={setPage} busy={busy} /></> : !result.error && <Loading />}
     </DocumentSection>
   </>;
 }
@@ -38,11 +38,11 @@ function ExpedientWorkspace({ id, back }: { id: number; back: () => void }) {
   const editable = record?.state === 'borrador' && moduleCan(access, 'licitaciones', 'expedientes', 'editar');
   const tabs: { id: Tab; label: string }[] = [{ id: 'resumen', label: 'Resumen' }, { id: 'variables', label: 'Variables' }, ...Object.entries(sectionLabels).map(([key, label]) => ({ id: key as FormSection, label })), { id: 'pdf', label: 'PDF final' }];
   const selectedCopy = record?.forms.find(c => c.id === copyId);
-  return <><Heading title={`Expediente #${id}`} description="Cada formulario conserva la revisión de biblioteca con la que fue incorporado." action={<button onClick={() => { void navigate(back); }}>Volver al listado</button>} />
+  return <><Heading title={record?.name || `Expediente #${id}`} description={`Expediente #${id} · Cada formulario conserva su revisión de biblioteca.`} action={<button onClick={() => { void navigate(back); }}>Volver al listado</button>} />
     <Notice>{result.error}</Notice>{!record && !result.error && <Loading />}
     {record && <><div className="row section-tabs document-tabs" aria-label="Secciones del expediente">{tabs.map(entry => <button key={entry.id} aria-pressed={tab === entry.id} onClick={() => { void navigate(() => { setCopyId(null); setTab(entry.id); }); }}>{entry.label}</button>)}</div>
       <div className="document-details"><span className="document-metadata">{record.state === 'borrador' ? 'Borrador' : record.state} · Versión {record.version}</span><button onClick={() => { void navigate(result.reload); }}>Actualizar expediente</button></div>
-      {tab === 'resumen' ? <DocumentSection title="Contenido del expediente"><div className="stack"><p>{record.forms.length} formularios incorporados. {record.forms.reduce((n, c) => n + c.missing_required.length, 0)} valores obligatorios pendientes.</p><p>El expediente comienza vacío. Los campos se declaran al incorporar cada formulario en Colaboración → Biblioteca de formularios.</p><p>Lotes, ítems, archivos, generación PDF y adjudicación están pendientes de las siguientes etapas.</p>{moduleCan(access, 'licitaciones', 'expedientes', 'eliminar') && record.state === 'borrador' && <button className="danger" onClick={() => setDeleting(true)}>Eliminar borrador</button>}</div></DocumentSection>
+      {tab === 'resumen' ? <DocumentSection title="Contenido del expediente"><ExpedientName key={record.version} record={record} editable={Boolean(editable)} saved={value => { result.setData(value); notify("Nombre del expediente guardado."); }} reload={() => { void navigate(result.reload); }} /><div className="stack"><p>{record.forms.length} formularios incorporados. {record.forms.reduce((n, c) => n + c.missing_required.length, 0)} valores obligatorios pendientes.</p><p>El expediente comienza vacío. Los campos se declaran al incorporar cada formulario en Colaboración → Biblioteca de formularios.</p><p>Lotes, ítems, archivos, generación PDF y adjudicación están pendientes de las siguientes etapas.</p>{moduleCan(access, 'licitaciones', 'expedientes', 'eliminar') && record.state === 'borrador' && <button className="danger" onClick={() => setDeleting(true)}>Eliminar borrador</button>}</div></DocumentSection>
         : tab === 'pdf' ? <DocumentSection title="PDF final"><p>La generación, el índice automático, el foliado y el historial se incorporarán al completar la infraestructura documental. Todavía no hay un PDF generado.</p></DocumentSection>
         : <DocumentSection title={tabs.find(t => t.id === tab)?.label ?? "Formularios"} list action={editable && tab !== 'variables' && moduleCan(access, 'colaboracion', 'empresa', 'ver') && <button onClick={() => { void navigate(() => { setCopyId(null); setCopying(true); }); }}>Incorporar formulario</button>}>
           {!moduleCan(access, 'colaboracion', 'empresa', 'ver') && tab !== 'variables' && <p className="muted">Para incorporar nuevos formularios necesitas acceso a Colaboración. Las copias existentes siguen disponibles.</p>}
@@ -53,6 +53,30 @@ function ExpedientWorkspace({ id, back }: { id: number; back: () => void }) {
       {deleting && <DeleteExpedient record={record} close={() => setDeleting(false)} deleted={back} />}
     </>}
   </>;
+}
+function ExpedientName({ record, editable, saved, reload }: { record: Expedient; editable: boolean; saved: (value: Expedient) => void; reload: () => void }) {
+  const { api } = useCore();
+  const [name, setName] = useState(record.name ?? ''), [busy, setBusy] = useState(false), [error, setError] = useState(''), [conflict, setConflict] = useState(false);
+  const baseline = useRef(record.name ?? '');
+  useUnsavedChanges(name !== baseline.current, busy);
+  if (!editable) return <p>Nombre del expediente: {record.name || 'Sin nombre'}</p>;
+  return <form className="stack document-name" onSubmit={async event => {
+    event.preventDefault(); if (busy) return;
+    if (!name.trim()) { setError('Escribe un nombre para el expediente.'); return; }
+    setBusy(true); setError(''); setConflict(false);
+    try {
+      const updated = await api.request<Expedient>(`/api/v1/licitaciones/${record.id}`, { method: 'PATCH', body: { name }, ifMatch: record.version });
+      baseline.current = updated.name; setName(updated.name); saved(updated);
+    } catch (reason) {
+      const stale = reason instanceof ApiError && reason.status === 412;
+      setConflict(stale); setError(stale ? 'El expediente cambió. Conservamos tu nombre sin guardar; carga la versión actual antes de editar de nuevo.' : message(reason));
+    } finally { setBusy(false); }
+  }}><Notice>{error}</Notice>{conflict && <button type="button" disabled={busy} onClick={reload}>Cargar versión actual</button>}
+    <fieldset className="document-fields" disabled={busy}>
+      <label className="document-wide">Nombre del expediente<input name="expedient_name" value={name} required maxLength={255} placeholder="Asigna un nombre al expediente" onChange={event => setName(event.target.value)} /></label>
+      <div className="document-wide document-save"><button className="primary" type="submit" disabled={name === baseline.current}>{busy ? 'Guardando…' : 'Guardar nombre'}</button></div>
+    </fieldset>
+  </form>;
 }
 function ValuesEditor({ copy, record, editable, saved, reload }: { copy: FormCopy; record: Expedient; editable: boolean; saved: (e: Expedient) => void; reload: () => void }) {
   const { api } = useCore();

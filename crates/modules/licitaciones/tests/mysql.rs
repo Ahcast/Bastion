@@ -2,7 +2,7 @@ use bastion_colaboracion::{
     CollaborationService, FormDefinition, FormSection, FormVariable, PublishFormInput, VariableKind,
 };
 use bastion_core::{CoreError, CoreService, Database};
-use bastion_licitaciones::{CopyFormInput, PageQuery, TenderService, ValuesInput};
+use bastion_licitaciones::{CopyFormInput, NameInput, PageQuery, TenderService, ValuesInput};
 use sqlx::mysql::MySqlPoolOptions;
 
 fn definition(title: &str) -> FormDefinition {
@@ -234,4 +234,24 @@ async fn mysql57_tenders_snapshots_permissions_races_receipts_and_deletion() {
         .await
         .unwrap();
     assert_eq!(count, 2);
+    core.admin().set_module_enabled(1, "licitaciones", true).await.unwrap();
+    let named = tenders.create(1, "create-for-name-001").await.unwrap();
+    assert!(named.name.is_empty());
+    sqlx::query("DELETE FROM role_permissions WHERE role_id=2 AND module_id='licitaciones' AND capability='editar'").execute(&pool).await.unwrap();
+    assert!(matches!(tenders.rename(2, named.id, 1, NameInput { name: "No autorizado".into() }).await, Err(CoreError::Forbidden)));
+    let (a,b) = tokio::join!(
+        tenders.rename(1,named.id,1,NameInput { name: "Oferta uno".into() }),
+        tenders.rename(1,named.id,1,NameInput { name: "Oferta dos".into() })
+    );
+    assert_eq!(usize::from(a.is_ok())+usize::from(b.is_ok()),1);
+    assert!(matches!(a.as_ref().err().or(b.as_ref().err()),Some(CoreError::PreconditionFailed)));
+    let updated=tenders.rename(1,named.id,2,NameInput { name: "  Equipos de oficina  ".into() }).await.unwrap();
+    assert_eq!(updated.name,"Equipos de oficina"); assert_eq!(updated.id,named.id); assert_eq!(updated.version,3); assert!(updated.forms.is_empty());
+    assert_eq!(tenders.rename(1,named.id,3,NameInput { name: updated.name.clone() }).await.unwrap().version,3);
+    assert!(matches!(tenders.rename(1,named.id,2,NameInput { name: updated.name.clone() }).await,Err(CoreError::PreconditionFailed)));
+    assert_eq!(tenders.list(1,&PageQuery::default()).await.unwrap().items[0].name,updated.name);
+    let sent=tenders.detail(1,first.id).await.unwrap();
+    assert!(matches!(tenders.rename(1,sent.id,sent.version,NameInput { name: "No cambiar enviada".into() }).await,Err(CoreError::Conflict)));
+    let details:Vec<serde_json::Value>=sqlx::query_scalar("SELECT details_json FROM audit_events WHERE module_id='licitaciones' AND action='expedient.rename'").fetch_all(&pool).await.unwrap();
+    assert!(!serde_json::to_string(&details).unwrap().contains("Equipos"));
 }

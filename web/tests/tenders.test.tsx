@@ -41,7 +41,7 @@ test('tenders need an active module and read permission; library publication is 
 
 test('expedients start empty; values preserve drafts on 412 and navigation asks before discarding', async () => {
   const calls: { path: string; init: RequestInit }[] = [];
-  const record: Expedient = { id: 7, version: 2, state: 'borrador', forms: [{ id: 8, source: { id: 3, revision: 1, hash: 'a'.repeat(64), definition: { title: '<img src=x onerror=evil()>', section: 'legal', variables: [{ key: 'dato', label: 'Dato sintético', kind: 'text', required: true }] } }, values: {}, missing_required: ['dato'] }] };
+  const record: Expedient = { id: 7, name: '', version: 2, state: 'borrador', forms: [{ id: 8, source: { id: 3, revision: 1, hash: 'a'.repeat(64), definition: { title: '<img src=x onerror=evil()>', section: 'legal', variables: [{ key: 'dato', label: 'Dato sintético', kind: 'text', required: true }] } }, values: {}, missing_required: ['dato'] }] };
   let stale = true, created = false;
   const api = new ApiClient('https://example.test', async (url, init = {}) => {
     const path = new URL(String(url)).pathname;
@@ -86,5 +86,44 @@ test('new library schemas have no default variables and require explicit adminis
     assert.equal(dialog.querySelectorAll('legend').length, 0);
     assert.equal([...dialog.querySelectorAll('button')].find(b => b.textContent === 'Aprobar y publicar')?.disabled, true);
     assert.equal(writes, 0);
+  } finally { await act(async () => root.unmount()); container.remove(); }
+});
+
+test('expedient names persist with a version, keep text on conflicts and update headings and lists', async () => {
+  let record: Expedient = { id: 9, name: '', version: 1, state: 'borrador', forms: [] };
+  let conflict = true;
+  const writes: RequestInit[] = [];
+  const api = new ApiClient('https://example.test', async (url, init = {}) => {
+    const path = new URL(String(url)).pathname;
+    if (init.method === 'PATCH') {
+      writes.push(init);
+      if (conflict) return Response.json({ title: 'Precondition Failed' }, { status: 412 });
+      const { name } = JSON.parse(String(init.body)) as { name: string };
+      record = { ...record, name: name.trim(), version: 2 }; return Response.json(record);
+    }
+    return Response.json(path === '/api/v1/licitaciones' ? { items: [record], page: 1, page_size: 25, has_more: false } : record);
+  });
+  const context = { ...access, permissions: [...access.permissions, { module_id: 'licitaciones', scope_key: 'expedientes', capability: 'editar' }] };
+  const container = document.createElement('div'); document.body.append(container); const root = createRoot(container);
+  const click = async (text: string, scope: ParentNode = container) => { const button = [...scope.querySelectorAll('button')].find(b => b.textContent === text); assert.ok(button,text); await act(async () => button.click()); };
+  try {
+    await act(async () => root.render(<NavigationGuardProvider><CoreContext.Provider value={{ api, access: context, notify: () => {} }}><Licitaciones /></CoreContext.Provider></NavigationGuardProvider>));
+    assert.ok(container.textContent?.includes('Sin nombre'));
+    await click('Abrir expediente');
+    const input = container.querySelector<HTMLInputElement>('input[name="expedient_name"]')!;
+    assert.ok(input); assert.equal(input.maxLength,255);
+    const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,'value')!.set!;
+    await act(async () => { setter.call(input,'  Mi oferta <script>  '); input.dispatchEvent(new Event('input',{bubbles:true})); });
+    await act(async () => container.querySelector('form')!.dispatchEvent(new Event('submit',{bubbles:true,cancelable:true})));
+    assert.equal(input.value,'  Mi oferta <script>  '); assert.ok(container.textContent?.includes('Conservamos tu nombre'));
+    assert.equal(new Headers(writes[0]!.headers).get('if-match'),'"1"');
+    assert.deepEqual(JSON.parse(String(writes[0]!.body)),{name:'  Mi oferta <script>  '});
+    await click('Volver al listado'); assert.ok(document.body.textContent?.includes('Cambios sin guardar')); await click('Seguir editando',document.body);
+    conflict=false;
+    await act(async () => container.querySelector('form')!.dispatchEvent(new Event('submit',{bubbles:true,cancelable:true})));
+    assert.equal(container.querySelector('h1')?.textContent,'Mi oferta <script>'); assert.equal(container.querySelectorAll('script').length,0);
+    await click('Volver al listado'); assert.ok(container.textContent?.includes('Mi oferta <script>')); assert.ok(container.textContent?.includes('#9'));
+    await act(async () => root.render(<NavigationGuardProvider><CoreContext.Provider value={{ api, access, notify: () => {} }}><Licitaciones /></CoreContext.Provider></NavigationGuardProvider>));
+    await click('Abrir expediente'); assert.equal(container.querySelector('input[name="expedient_name"]'),null);
   } finally { await act(async () => root.unmount()); container.remove(); }
 });

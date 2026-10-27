@@ -5,8 +5,8 @@ export interface FormDefinition { title: string; section: FormSection; variables
 export interface PublishedForm { id: number; revision: number; hash: string; definition: FormDefinition }
 export type FormValues = Record<string, string | boolean>;
 export interface FormCopy { id: number; source: PublishedForm; values: FormValues; missing_required: string[] }
-export interface Expedient { id: number; version: number; state: string; forms: FormCopy[] }
-export interface ExpedientSummary { id: number; version: number; state: string }
+export interface Expedient { id: number; name: string; version: number; state: string; forms: FormCopy[] }
+export interface ExpedientSummary { id: number; name: string; version: number; state: string }
 export interface TenderPage<T> { items: T[]; page: number; page_size: number; has_more: boolean }
 export const sectionLabels: Record<FormSection, string> = { legal: 'Documentación legal', economica: 'Oferta económica', tecnica: 'Especificaciones técnicas' };
 export const kindLabels: Record<VariableKind, string> = { text: 'Texto', integer: 'Entero', decimal: 'Decimal', date: 'Fecha', boolean: 'Sí / No' };
