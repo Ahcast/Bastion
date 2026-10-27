@@ -166,7 +166,7 @@ components:
         product_investment: {type: string}
         other_expenses: {type: string}
         investment_total: {type: string}
-        profit: {type: string}
+        profit: {type: string, description: Total de venta menos ISV 15% e ISV 18% menos inversión total (productos y gastos)}
         paid_total: {type: string, const: '0.00'}
         balance: {type: string}
     Draft:

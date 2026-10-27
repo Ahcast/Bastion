@@ -114,6 +114,10 @@ pub fn calculate(input: &InvoiceInput) -> Result<InvoiceCalculation, CoreError> 
     data.expenses = expenses;
     let investment = add(product_investment, other_expenses)?;
     let total = cents(&commercial.totals.total)?;
+    let tax = add(
+        cents(&commercial.totals.isv_15)?,
+        cents(&commercial.totals.isv_18)?,
+    )?;
     Ok(InvoiceCalculation {
         data,
         items: commercial.items,
@@ -121,7 +125,7 @@ pub fn calculate(input: &InvoiceInput) -> Result<InvoiceCalculation, CoreError> 
         product_investment: money(product_investment),
         other_expenses: money(other_expenses),
         investment_total: money(investment),
-        profit: money(total - investment),
+        profit: money(total - tax - investment),
         paid_total: "0.00".into(),
         balance: money(total),
     })
@@ -209,10 +213,42 @@ mod tests {
         assert_eq!(c.product_investment, "120.26");
         assert_eq!(c.other_expenses, "5.13");
         assert_eq!(c.investment_total, "125.39");
-        assert_eq!(c.profit, "81.61");
+        assert_eq!(c.profit, "54.61");
         assert_eq!(c.balance, "207.00");
         assert_eq!(c.paid_total, "0.00");
         assert!(c.ensure_saveable().is_ok());
+    }
+    #[test]
+    fn profit_excludes_both_isv_rates_and_includes_all_investment() {
+        let mut i = input();
+        i.items[0].quantity = "1".into();
+        i.items[0].discount_value = "0".into();
+        i.items[0].cost_price = "60".into();
+        i.expenses[0].amount = "5".into();
+        let mut second = i.items[0].clone();
+        second.unit_price = "50".into();
+        second.cost_price = "10".into();
+        second.tax_type = crate::TaxType::Isv18;
+        let mut third = i.items[0].clone();
+        third.unit_price = "20".into();
+        third.cost_price = "5".into();
+        third.tax_type = crate::TaxType::Exempt;
+        i.items.extend([second, third]);
+        let c = calculate(&i).unwrap();
+        assert_eq!(c.totals.total, "194.00");
+        assert_eq!(c.totals.isv_15, "15.00");
+        assert_eq!(c.totals.isv_18, "9.00");
+        assert_eq!(c.investment_total, "80.00");
+        assert_eq!(c.profit, "90.00");
+        assert_eq!(c.balance, "194.00");
+        for tax in [
+            crate::TaxType::Exempt,
+            crate::TaxType::Isv15,
+            crate::TaxType::Isv18,
+        ] {
+            i.items[0].tax_type = tax;
+            assert_eq!(calculate(&i).unwrap().profit, "90.00");
+        }
     }
     #[test]
     fn cash_requires_full_payment_and_no_status_or_payment_mass_assignment() {

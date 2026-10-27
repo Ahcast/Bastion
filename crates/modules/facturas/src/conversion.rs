@@ -206,7 +206,7 @@ mod order_tests {
         assert_eq!(c.totals.total, "230.00");
         assert_eq!(c.product_investment, "120.00");
         assert_eq!(c.investment_total, "125.00");
-        assert_eq!(c.profit, "105.00");
+        assert_eq!(c.profit, "75.00");
         assert_eq!(c.data.credit_days, 30);
         assert!(c.data.notes.is_empty());
         assert_eq!(c.data.client_rtn, "RTN");

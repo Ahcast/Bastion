@@ -109,7 +109,7 @@ pub fn calculate(input: &OrderInput) -> Result<OrderCalculation, CoreError> {
             products_investment: money(product_investment)?,
             other_expenses: money(expenses)?,
             investment_total: money(investment_total)?,
-            profit: money(total - investment_total)?,
+            profit: money(total - tax - investment_total)?,
         },
     })
 }
@@ -177,7 +177,7 @@ mod tests {
         assert_eq!(c.totals.tax, "30.00");
         assert_eq!(c.totals.total, "230.00");
         assert_eq!(c.totals.investment_total, "125.01");
-        assert_eq!(c.totals.profit, "104.99");
+        assert_eq!(c.totals.profit, "74.99");
         assert_eq!(c.status, "Pendiente");
         value.products[0].status = ProductStatus::Comprado;
         assert_eq!(calculate(&value).unwrap().status, "Listo");

@@ -74,7 +74,7 @@ async fn mysql57_drafts_atomic_receipts_permissions_versions_and_disable() {
     assert_eq!(a.invoice_number, None);
     assert_eq!(a.status, "Borrador");
     assert_eq!(a.calculation.totals.total, "207.00");
-    assert_eq!(a.calculation.profit, "82.00");
+    assert_eq!(a.calculation.profit, "55.00");
     assert_eq!(a.calculation.balance, "207.00");
     let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM facturas_drafts")
         .fetch_one(&pool)

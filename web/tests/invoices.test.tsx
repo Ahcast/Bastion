@@ -15,7 +15,7 @@ import { InvoiceItems } from '../src/components/InvoiceItems.js';
 const access: Access = { is_system_administrator: false, modules: [{ module_id: 'facturas', display_name: 'Facturas' }], permissions: [{ module_id: 'facturas', scope_key: 'documentos', capability: 'ver' }] };
 const input = newInvoice(new Date('2026-10-23T02:00:00Z'));
 input.payment_term_type = 'credito'; input.credit_days = 30;
-const calculation: InvoiceCalculation = { data: input, items: [], totals: { subtotal: '100.00', importe_exonerado: '0.00', importe_exento: '0.00', importe_gravado_15: '100.00', importe_gravado_18: '0.00', descuentos_rebajas: '0.00', isv_15: '15.00', isv_18: '0.00', total: '115.00' }, product_investment: '120.00', other_expenses: '5.00', investment_total: '125.00', profit: '-10.00', paid_total: '0.00', balance: '115.00' };
+const calculation: InvoiceCalculation = { data: input, items: [], totals: { subtotal: '100.00', importe_exonerado: '0.00', importe_exento: '0.00', importe_gravado_15: '100.00', importe_gravado_18: '0.00', descuentos_rebajas: '0.00', isv_15: '15.00', isv_18: '0.00', total: '115.00' }, product_investment: '120.00', other_expenses: '5.00', investment_total: '125.00', profit: '-25.00', paid_total: '0.00', balance: '115.00' };
 const draft: InvoiceDraft = { id: 7, version: 3, status: 'Borrador', currency: 'HNL', invoice_number: null, data: input, calculation };
 const editorAccess: Access = { ...access, permissions: [...access.permissions, { module_id: 'facturas', scope_key: 'documentos', capability: 'editar' }] };
 
@@ -43,7 +43,7 @@ test('invoice navigation and creation follow activation and separate read/edit c
 
 test('invoice summary renders server decimals and negative profit without floating point arithmetic', () => {
   const html = renderToStaticMarkup(<InvoiceTotals calculation={calculation} />);
-  assert.ok(html.includes('L -10.00'));
+  assert.ok(html.includes('L -25.00'));
   assert.ok(html.includes('L 115.00'));
   assert.ok(html.includes('Borrador sin emisión'));
 });

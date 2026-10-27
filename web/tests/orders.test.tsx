@@ -15,7 +15,7 @@ import { mainNavigation, settingsSections } from '../src/navigation.js';
 const access: Access = { is_system_administrator: false, modules: [{ module_id: 'ordenes_compra', display_name: 'Órdenes de compra' }], permissions: [{ module_id: 'ordenes_compra', scope_key: 'documentos', capability: 'ver' }] };
 const editor: Access = { ...access, permissions: [...access.permissions, { module_id: 'ordenes_compra', scope_key: 'documentos', capability: 'editar' }] };
 const input = { ...newOrder(new Date('2026-10-23T02:00:00Z')), n_orders: 'OC-1', client_name: 'Cliente sintético', id_destination: 1 };
-const calculation: OrderCalculation = { data: input, status: 'Pendiente', totals: { subtotal: '100.00', subtotal_exonerado: '0.00', tax: '15.00', total: '115.00', products_investment: '120.00', other_expenses: '5.00', investment_total: '125.00', profit: '-10.00' } };
+const calculation: OrderCalculation = { data: input, status: 'Pendiente', totals: { subtotal: '100.00', subtotal_exonerado: '0.00', tax: '15.00', total: '115.00', products_investment: '120.00', other_expenses: '5.00', investment_total: '125.00', profit: '-25.00' } };
 const order: PurchaseOrder = { id: 7, version: 3, status: 'Pendiente', currency: 'HNL', data: input, calculation };
 const destinations: Destination[] = [{ id: 1, version: 2, destination: 'Oficina' }];
 
@@ -32,7 +32,7 @@ test('orders use Honduras date and activation and separate destination permissio
   const catalogOnly: Access = { ...access, permissions: [{ module_id: 'ordenes_compra', scope_key: 'destinos', capability: 'ver' }] };
   assert.ok(settingsSections(catalogOnly).some(section => section.id === 'ordenes_compra'));
   assert.ok(!mainNavigation(catalogOnly).some(page => page.id === 'ordenes_compra'));
-  assert.ok(renderToStaticMarkup(<OrderSummaryTotals calculation={calculation} />).includes('L -10.00'));
+  assert.ok(renderToStaticMarkup(<OrderSummaryTotals calculation={calculation} />).includes('L -25.00'));
 });
 
 const window = new Window();

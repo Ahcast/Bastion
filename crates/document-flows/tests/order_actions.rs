@@ -162,6 +162,67 @@ async fn mysql57_order_actions_private_files_clone_and_invoice_are_atomic() {
             .items
             .is_empty()
     );
+    // Reproduce pre-correction derived values, then run the data migration twice.
+    // Document inputs, versions, origins and every unrelated calculation field stay identical.
+    sqlx::query("UPDATE ordenes_orders SET calculation_json=JSON_SET(calculation_json,'$.totals.profit','105.00')")
+        .execute(&pool).await.unwrap();
+    for statement in [
+        "UPDATE ordenes_create_receipts SET response_json=JSON_SET(response_json,'$.calculation.totals.profit','105.00')",
+        "UPDATE ordenes_clone_receipts SET response_json=JSON_SET(response_json,'$.calculation.totals.profit','105.00')",
+    ] {
+        sqlx::query(statement).execute(&pool).await.unwrap();
+    }
+    for _ in 0..2 {
+        sqlx::raw_sql(include_str!(
+            "../../modules/ordenes_compra/migrations/0004_profit_without_isv.sql"
+        ))
+        .execute(&pool)
+        .await
+        .unwrap();
+    }
+    assert_eq!(current.calculation.totals.profit, "75.00");
+    assert_eq!(
+        serde_json::to_value(orders.detail(1, order.id).await.unwrap()).unwrap(),
+        serde_json::to_value(&current).unwrap()
+    );
+    assert_eq!(
+        serde_json::to_value(orders.detail(1, clone.id).await.unwrap()).unwrap(),
+        serde_json::to_value(&clone).unwrap()
+    );
+    assert_eq!(
+        orders
+            .create(1, "order-actions-source-01", input())
+            .await
+            .unwrap()
+            .calculation
+            .totals
+            .profit,
+        "75.00"
+    );
+    assert_eq!(
+        serde_json::to_value(
+            orders
+                .clone_order(1, order.id, 3, "order-actions-clone-01")
+                .await
+                .unwrap()
+        )
+        .unwrap(),
+        serde_json::to_value(&clone).unwrap()
+    );
+    let report = orders
+        .report(
+            1,
+            &bastion_ordenes_compra::OrderReportFilter {
+                date_from: current.data.order_date,
+                date_to: current.data.order_date,
+                status: Some("Entregado".into()),
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
+    assert_eq!(report.totals.profit, "75.00");
+    assert_eq!(report.items[0].profit, "75.00");
     assert_eq!(
         orders
             .clone_order(1, order.id, 3, "order-actions-clone-01")
@@ -228,6 +289,41 @@ async fn mysql57_order_actions_private_files_clone_and_invoice_are_atomic() {
     assert_eq!(invoice.data.credit_days, 30);
     assert!(invoice.data.notes.is_empty());
     assert_eq!(invoice.data.expenses.len(), 1);
+    assert_eq!(invoice.calculation.profit, "75.00");
+    let manual = invoices
+        .create(1, "order-actions-profit-receipt-01", invoice.data.clone())
+        .await
+        .unwrap();
+    sqlx::query("UPDATE facturas_drafts SET calculation_json=JSON_SET(calculation_json,'$.profit','105.00')")
+        .execute(&pool).await.unwrap();
+    sqlx::query("UPDATE facturas_create_receipts SET response_json=JSON_SET(response_json,'$.calculation.profit','105.00')")
+        .execute(&pool).await.unwrap();
+    for _ in 0..2 {
+        sqlx::raw_sql(include_str!(
+            "../../modules/facturas/migrations/0004_profit_without_isv.sql"
+        ))
+        .execute(&pool)
+        .await
+        .unwrap();
+    }
+    assert_eq!(
+        serde_json::to_value(invoices.detail(1, invoice.id).await.unwrap()).unwrap(),
+        serde_json::to_value(&invoice).unwrap()
+    );
+    assert_eq!(
+        serde_json::to_value(invoices.detail(1, manual.id).await.unwrap()).unwrap(),
+        serde_json::to_value(&manual).unwrap()
+    );
+    assert_eq!(
+        serde_json::to_value(
+            invoices
+                .create(1, "order-actions-profit-receipt-01", invoice.data.clone())
+                .await
+                .unwrap()
+        )
+        .unwrap(),
+        serde_json::to_value(&manual).unwrap()
+    );
     let updated = invoices
         .replace(1, invoice.id, 1, invoice.data.clone())
         .await

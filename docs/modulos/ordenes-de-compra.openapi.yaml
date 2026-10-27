@@ -33,7 +33,7 @@ paths:
       description: No persiste ni exige completar cabecera. Misma normalización y cálculo que guardar.
       requestBody: {$ref: '#/components/requestBodies/Order'}
       responses:
-        '200': {description: 'data, status y totals (subtotal, subtotal_exonerado, tax, total, products_investment, other_expenses, investment_total, profit), importes como cadenas con dos decimales'}
+        '200': {description: 'data, status y totals (subtotal, subtotal_exonerado, tax, total, products_investment, other_expenses, investment_total, profit), importes como cadenas con dos decimales; profit = total de venta menos ISV menos inversión total'}
   /api/v1/ordenes-compra/{id}:
     parameters:
       - {name: id, in: path, required: true, schema: {type: integer, minimum: 1}}

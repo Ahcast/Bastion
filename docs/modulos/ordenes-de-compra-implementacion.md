@@ -17,7 +17,7 @@ Los nombres Legacy están invertidos respecto de su lectura habitual: **`sale_pr
 - Subtotal = suma de `purchase_price × cantidad`; subtotal exonerado = líneas sin ISV.
 - ISV = 15% de la base gravada; total = subtotal sin redondear + impuesto sin redondear, redondeado al final.
 - Inversión de productos = suma de `sale_price × cantidad`; otros gastos = gastos positivos redondeados individualmente a dos decimales. Los gastos cero se descartan como en Legacy.
-- Inversión total = inversión de productos sin redondear + gastos normalizados, redondeada al final. Utilidad estimada = total menos inversión total.
+- Inversión total = inversión de productos sin redondear + gastos normalizados, redondeada al final. La fórmula Legacy observada era total menos inversión total. El usuario la corrige el 2026-10-26: utilidad estimada = total de venta − ISV − inversión total (productos y gastos). Es una decisión autorizada que reemplaza la fórmula observada.
 - El servidor usa enteros escalados, conserva hasta cuatro decimales de precio unitario y redondea los resultados a centavos con mitad hacia arriba. No delega totales al navegador. Las pruebas cubren la agregación antes de redondear y la estabilidad al reeditar. No se afirma equivalencia de los errores binarios del float PHP ni validación contable con ejemplos reales.
 
 ## Contrato e integración

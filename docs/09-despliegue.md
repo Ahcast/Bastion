@@ -106,3 +106,7 @@ Reportes está incluido en el release y permitido en el ambiente, con estado `1/
 El frontend verificó los 43 archivos del paquete en disco y 41 recursos públicos por HTTPS contra sus hashes. Se preservaron `config.js`, ambos `.htaccess` y los assets anteriores para cachés. La ruta SPA respondió 200, readiness HTTPS respondió 200 y los tres endpoints de Reportes sin sesión respondieron 401.
 
 El usuario autorizó reutilizar la credencial MySQL existente sólo durante el proceso puntual de `migrate` de Reportes. No se crearon cuentas, no se cambiaron privilegios y `MYSQL_MIGRATOR_*` no se persistió en la configuración ni en el proceso del servicio. Esta excepción no cierra el pendiente general de separar las identidades de ejecución y migración.
+
+## Órdenes de compra: autorización de migraciones
+
+El 2026-10-27 el usuario autoriza usar la credencial MySQL existente para completar las acciones de Órdenes y la corrección de utilidad. Se permite reutilizarla únicamente en el proceso puntual de migrate, con respaldo privado previo y verificación de datos. No crear cuentas, modificar privilegios ni persistir MYSQL_MIGRATOR_* en el servicio. Esta excepción operativa no cierra el pendiente de separar identidades. Utilidad autorizada: total de venta menos ISV menos inversión total, incluidos productos y gastos.
