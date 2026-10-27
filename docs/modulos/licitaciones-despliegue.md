@@ -23,3 +23,7 @@ Las migraciones utilizaron el acceso existente únicamente en el proceso puntual
 El proceso activo corresponde al ejecutable de ese commit y readiness local respondió 200. La verificación pública por HTTPS con TLS validado comprobó `/health/ready` y `/health/live` en 200; Licitaciones, biblioteca de formularios de Colaboración, Órdenes, Facturas y Reportes sin sesión respondieron 401.
 
 El usuario solicitó Git y AWS. **El frontend de Bluehost no se publicó en esta operación**; su `BUILD.txt` seguía en `50efa7ebda634fb1c7dcd7d8baa26179522be9ca` durante la comprobación pública. Las pantallas nuevas requieren su propio despliegue estático antes de verificar el recorrido autenticado. No se activó Licitaciones ni se modificaron S3, IAM, Typst o las reglas de Facturas. Archivos, lotes/ítems, PDF y adjudicación siguen con los pendientes de la ficha de infraestructura.
+
+## Publicación posterior del frontend
+
+En una solicitud posterior del mismo día, el usuario autoriza publicar el frontend siguiendo el diseño de Cotizaciones. Se instala en Bluehost `51885f26295e2f06e1b936b60e7d4038cbb9036e`, con CI aprobado, respaldo privado y hashes verificados. El backend conserva `0d951d5`; no se repiten migraciones ni se cambia la activación. Ver [diseño, evidencia y límites de revisión visual](licitaciones-frontend.md).
