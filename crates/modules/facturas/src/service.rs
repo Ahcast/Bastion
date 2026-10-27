@@ -25,10 +25,7 @@ struct InvoiceDashboardRow {
     total: Option<String>,
     balance: Option<String>,
 }
-fn invoice_dashboard_query(
-    select: &str,
-    window: &DashboardWindow,
-) -> QueryBuilder<MySql> {
+fn invoice_dashboard_query(select: &str, window: &DashboardWindow) -> QueryBuilder<MySql> {
     let mut query = QueryBuilder::new(select.to_owned());
     query.push(" FROM facturas_drafts WHERE 1=1");
     if let Some(from) = window.from {
@@ -284,17 +281,15 @@ impl InvoiceService {
             .fetch_all(&mut *tx)
             .await?;
         tx.commit().await?;
-        Ok(
-            serde_json::json!({
-                "window": window,
-                "as_of": now.to_rfc3339(),
-                "metrics": {"total": total, "amount": amount, "without_total": total - valued},
-                "series": points,
-                "chart_truncated": chart_truncated,
-                "distribution": states,
-                "recent": recent
-            }),
-        )
+        Ok(serde_json::json!({
+            "window": window,
+            "as_of": now.to_rfc3339(),
+            "metrics": {"total": total, "amount": amount, "without_total": total - valued},
+            "series": points,
+            "chart_truncated": chart_truncated,
+            "distribution": states,
+            "recent": recent
+        }))
     }
 
     pub async fn detail(&self, actor: u64, id: u64) -> Result<InvoiceDraft, CoreError> {

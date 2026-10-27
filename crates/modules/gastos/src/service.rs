@@ -27,10 +27,7 @@ struct ExpenseDashboardRow {
     currency: String,
     total: String,
 }
-fn expense_dashboard_query(
-    select: &str,
-    window: &DashboardWindow,
-) -> QueryBuilder<MySql> {
+fn expense_dashboard_query(select: &str, window: &DashboardWindow) -> QueryBuilder<MySql> {
     let mut query = QueryBuilder::new(select.to_owned());
     query.push(" FROM gastos_records WHERE deleted_at IS NULL");
     if let Some(from) = window.from {
@@ -293,17 +290,15 @@ impl ExpenseService {
             .fetch_all(&mut *tx)
             .await?;
         tx.commit().await?;
-        Ok(
-            serde_json::json!({
-                "window": window,
-                "as_of": now.to_rfc3339(),
-                "metrics": {"total": total, "currencies": currencies},
-                "series": points,
-                "chart_truncated": chart_truncated,
-                "distribution": states,
-                "recent": recent
-            }),
-        )
+        Ok(serde_json::json!({
+            "window": window,
+            "as_of": now.to_rfc3339(),
+            "metrics": {"total": total, "currencies": currencies},
+            "series": points,
+            "chart_truncated": chart_truncated,
+            "distribution": states,
+            "recent": recent
+        }))
     }
 
     pub async fn detail(&self, actor: u64, id: u64) -> Result<Expense, CoreError> {
