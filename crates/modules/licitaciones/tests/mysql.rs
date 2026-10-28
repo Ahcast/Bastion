@@ -542,6 +542,7 @@ async fn mysql57_tenders_snapshots_permissions_races_receipts_and_deletion() {
     }
     tenders.save_global_variables(1, exp.id, 9, ready, false).await.unwrap();
     let template = "#import \"items1_std.typ\": items";
+    sqlx::query("DELETE FROM role_permissions WHERE role_id=2 AND module_id='licitaciones' AND capability='ver'").execute(&pool).await.unwrap();
     assert!(matches!(tenders.prepare_typst_snapshot(2, exp.id, 10, 8, template).await, Err(CoreError::Forbidden)));
     assert!(matches!(tenders.prepare_typst_snapshot(1, exp.id, 9, 8, template).await, Err(CoreError::PreconditionFailed)));
     let snapshot=tenders.prepare_typst_snapshot(1, exp.id, 10, 8, template).await.unwrap();
