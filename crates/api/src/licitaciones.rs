@@ -45,7 +45,6 @@ fn file_routes(state: ApiState) -> Router<ApiState> {
         .layer(RequestBodyLimitLayer::new(134_000_000))
         .route_layer(middleware::from_fn_with_state(state, file_guard))
 }
-static FILE_SLOTS: tokio::sync::Semaphore = tokio::sync::Semaphore::const_new(1);
 async fn file_guard(State(state): State<ApiState>, request: Request, next: Next) -> Response {
     match tokio::time::timeout(Duration::from_secs(900), async {
         let user = actor(&state, request.headers()).await?;
@@ -64,9 +63,19 @@ async fn file_guard(State(state): State<ApiState>, request: Request, next: Next)
             .consume_request(user.id)
             .await
             .map_err(ApiError)?;
-        let _permit = FILE_SLOTS
-            .try_acquire()
-            .map_err(|_| ApiError(CoreError::Overloaded))?;
+        let path = request.uri().path();
+        let large = (*request.method() == Method::POST && path.ends_with("/archivos"))
+            || path.ends_with("/preview")
+            || path.ends_with("/download");
+        let _permit = if large {
+            Some(
+                super::LARGE_FILE_SLOTS
+                    .try_acquire()
+                    .map_err(|_| ApiError(CoreError::Overloaded))?,
+            )
+        } else {
+            None
+        };
         Ok::<_, ApiError>(next.run(request).await)
     })
     .await

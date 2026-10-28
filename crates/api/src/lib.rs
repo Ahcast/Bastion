@@ -44,6 +44,9 @@ mod reportes;
 mod sar;
 
 const GENERAL_REQUEST_BODY_LIMIT: usize = 1024 * 1024;
+// Large document requests can each hold multiple copies of a 100 MB body.
+// Share one slot across modules to bound the memory used by the API process.
+static LARGE_FILE_SLOTS: tokio::sync::Semaphore = tokio::sync::Semaphore::const_new(1);
 
 #[derive(Clone)]
 struct ApiState {

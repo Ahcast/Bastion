@@ -87,6 +87,19 @@ async fn guard(State(state): State<ApiState>, request: Request, next: Next) -> R
             .await
             .map_err(|_| ApiError(CoreError::Overloaded))?
             .map_err(|_| ApiError(CoreError::Overloaded))?;
+        let path = request.uri().path();
+        let large = (*request.method() == Method::POST && path == "/api/v1/colaboracion")
+            || path.ends_with("/preview")
+            || path.ends_with("/download");
+        let _large_permit = if large {
+            Some(
+                super::LARGE_FILE_SLOTS
+                    .try_acquire()
+                    .map_err(|_| ApiError(CoreError::Overloaded))?,
+            )
+        } else {
+            None
+        };
         state
             .colaboracion
             .consume_request(user.id)
