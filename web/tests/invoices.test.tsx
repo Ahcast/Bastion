@@ -48,6 +48,11 @@ test('invoice summary renders server decimals and negative profit without floati
   assert.ok(html.includes('Cálculo del servidor'));
 });
 
+test('invoice editor exposes the requested commercial and fiscal fields', () => {
+  const html = renderToStaticMarkup(<NavigationGuardProvider><CoreContext.Provider value={{ api: new ApiClient('https://example.test'), access: editorAccess, notify: () => {} }}><InvoiceEditor initial={draft} editable close={() => {}} /></CoreContext.Provider></NavigationGuardProvider>);
+  for (const label of ['Fecha', 'Términos', 'Contado', 'Crédito', 'Descuento', 'Valor descuento', 'Orden de Compra / Exenta No.', 'Constancia de Registro No.', 'Registro SAG No.']) assert.ok(html.includes(label), label);
+});
+
 test('invoice rows do not assign a server total to a different item after blank rows are filtered', () => {
   const shortened = { ...calculation, data: { ...input, items: [] }, items: [{ total: '999.99' }] } as unknown as InvoiceCalculation;
   const html = renderToStaticMarkup(<InvoiceItems items={input.items} calculation={shortened} change={() => {}} remove={() => {}} add={() => {}} />);
@@ -85,10 +90,18 @@ test('invoice client combobox saves a catalog selection and clears its snapshot 
     for (const key of ['ArrowDown', 'ArrowDown', 'Enter']) await act(async () => field.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true })));
     assert.equal(field.value, 'Cliente del catálogo');
     assert.equal(bodies.length, 0);
+    for (const [label, value] of [['Orden de Compra / Exenta No.', 'EXENTA-123'], ['Constancia de Registro No.', 'CONST-456'], ['Registro SAG No.', 'SAG-789']]) {
+      const wrapper = [...container.querySelectorAll('label')].find(node => node.textContent?.startsWith(label!));
+      const fiscal = wrapper?.querySelector('input'); assert.ok(fiscal);
+      await act(async () => { Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')!.set!.call(fiscal, value); fiscal.dispatchEvent(new Event('input', { bubbles: true })); });
+    }
     await act(async () => container.querySelector('form')!.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })));
     assert.equal(bodies[0]?.id_client, 41);
     assert.equal(bodies[0]?.client_rtn, '08011900000000');
     assert.equal(bodies[0]?.client_email, 'client@example.test');
+    assert.equal(bodies[0]?.purchase_order_exempt_number, 'EXENTA-123');
+    assert.equal(bodies[0]?.registration_certificate_number, 'CONST-456');
+    assert.equal(bodies[0]?.sag_registration_number, 'SAG-789');
     await act(async () => { Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')!.set!.call(field, 'Cliente manual'); field.dispatchEvent(new Event('input', { bubbles: true })); });
     await act(async () => container.querySelector('form')!.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })));
     assert.equal(bodies[1]?.id_client, null);

@@ -19,6 +19,7 @@ Corte de acciones del 2026-10-27: emisión numerada al marcar como enviado, pago
 | Condición | `payment_term_type` | Contado o crédito. |
 | Días de crédito | `credit_days` | Plazo del crédito. |
 | Descuento | `discount_type`, `discount_value` | Monto o porcentaje. |
+| Orden de Compra / Exenta No., Constancia de Registro No. y Registro SAG No. | `purchase_order_exempt_number`, `registration_certificate_number`, `sag_registration_number` | Referencias opcionales capturadas en Generales y mostradas en el PDF de factura. |
 | Estado | `status` | Estados acordados: Borrador, Enviado y Pagado. Borrador es el estado inicial. |
 | Referencias | `purchase_order_exempt_number`, `registration_certificate_number`, `sag_registration_number`, `client_request_id` | Referencias de orden/exoneración/registro/solicitud. |
 | Ítem | descripción, cantidad, precio venta, costo, proveedor, descuento e impuesto | Calcula venta, costo e impuestos (exento/ISV 15/18). Sin tracking ni comentarios por confirmación del usuario del 2026-10-23. |
