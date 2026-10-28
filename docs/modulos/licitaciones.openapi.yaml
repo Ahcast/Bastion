@@ -91,6 +91,28 @@ paths:
         '204': { description: Eliminado sin destruir recibos ni historial }
         '409': { description: Estado distinto de Borrador }
         '412': { description: Versión obsoleta }
+  /api/v1/licitaciones/{id}/variables:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    put:
+      summary: Sustituir las variables globales del expediente en Borrador
+      parameters:
+        - $ref: '#/components/parameters/Version'
+        - $ref: '#/components/parameters/Csrf'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [variables]
+              properties:
+                variables: { type: array, maxItems: 100, items: { $ref: '#/components/schemas/GlobalVariable' } }
+      responses:
+        '200': { description: Expediente con variables actualizadas y ETag fuerte }
+        '400': { description: Variables o valores inválidos }
+        '412': { description: Versión obsoleta }
   /api/v1/licitaciones/{id}/formularios:
     parameters:
       - $ref: '#/components/parameters/Id'
@@ -127,7 +149,7 @@ paths:
         required: true
         schema: { type: integer, minimum: 1 }
     put:
-      summary: Sustituir sólo valores declarados de una copia perteneciente al expediente
+      summary: Compatibilidad; actualizar valores globales de los campos declarados en esta copia
       parameters:
         - $ref: '#/components/parameters/Version'
         - $ref: '#/components/parameters/Csrf'
@@ -374,22 +396,33 @@ components:
         revision: { type: integer }
         hash: { type: string, pattern: '^[a-f0-9]{64}$' }
         definition: { $ref: '#/components/schemas/FormDefinition' }
+    GlobalVariable:
+      type: object
+      additionalProperties: false
+      required: [key, label, kind, value]
+      properties:
+        key: { type: string, pattern: '^[a-z][a-z0-9_]{0,63}$' }
+        label: { type: string, minLength: 1, maxLength: 255 }
+        kind: { type: string, enum: [text, integer, decimal, date, boolean] }
+        value: { type: [string, boolean, 'null'] }
     FormCopy:
       type: object
-      required: [id, source, values, missing_required]
+      required: [id, source, values, legacy_values, missing_required]
       properties:
         id: { type: integer }
         source: { $ref: '#/components/schemas/PublishedForm' }
         values: { type: object, additionalProperties: { type: [string, boolean] } }
+        legacy_values: { type: object, additionalProperties: { type: [string, boolean] } }
         missing_required: { type: array, items: { type: string } }
     Expedient:
       type: object
-      required: [id, name, version, state, forms]
+      required: [id, name, version, state, forms, variables]
       properties:
         id: { type: integer }
         version: { type: integer }
         state: { type: string, enum: [borrador] }
         forms: { type: array, items: { $ref: '#/components/schemas/FormCopy' } }
+        variables: { type: array, maxItems: 100, items: { $ref: '#/components/schemas/GlobalVariable' } }
         name: { type: string, maxLength: 255, description: Vacío mientras no se asigne; independiente del ID técnico. }
     ExpedientPage:
       type: object
