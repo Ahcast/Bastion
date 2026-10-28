@@ -1,0 +1,13 @@
+# Licitaciones: límites, referencias y formularios — 2026-10-28
+
+Se desplegaron en AWS y Bluehost los artifacts del commit `c79727c2fb19ebb01872722e6f865b8a916b507f`, con [Core checks aprobado](https://github.com/Ahcast/Bastion/actions/runs/40675746529). El frontend tenía previamente `c6d2124` y el backend `43e65be`; ambos son ancestros del cambio. Se preservaron los cambios publicados de Facturas y Colaboración y el trabajo local ajeno.
+
+Cada PDF o imagen puede medir hasta 100.000.000 bytes y el presupuesto del expediente es 1.000.000.000 bytes, incluyendo referencias y reservas pendientes de limpieza. Las nuevas selecciones de Colaboración conservan únicamente una referencia; las copias anteriores siguen intactas. La referencia se muestra como no disponible cuando falta el original o el usuario ya no puede leerlo. Quitarla del expediente no elimina el original.
+
+En **Colaboración → Biblioteca de formularios → Nuevo formulario**, el Administrador del sistema puede seleccionar un archivo `.typ` ya cargado en Colaboración y declarar sus variables con **Añadir variable**. Las revisiones previas mantienen sus definiciones. La asociación no ejecuta Typst; el ensamblado del PDF final sigue pendiente.
+
+El CI comprobó compilación, formato, 134 pruebas del frontend, flujos MySQL 5.7 con almacenamiento sintético, límites, referencias y variables. Se verificaron los hashes de ZIP, paquete y manifiestos; SHA-256 del paquete backend `1e9d6084a026c7a0331305054d9ad8c17681d366d12fc4769dd59e806002af14`. Se comprobó en el S3 real la escritura cifrada, lectura con hash y eliminación permanente de todas las versiones de un archivo sintético de 100.000.000 bytes, con acceso anónimo 403. No quedaron versiones sintéticas de esa comprobación.
+
+La migración propia `4` permite referencias sin clave de copia. Antes se detuvo el servicio, se respaldaron privadamente las 84 tablas y se ensayó la restauración íntegra en tablas temporales. Tras migrar se verificaron las filas y campos previos de archivos, otras tablas, configuración y estado de módulos; permanecieron intactos. La base conserva 84 tablas. La credencial de migración se usó sólo en el proceso puntual y no quedó en el servicio.
+
+En Bluehost se verificaron 47 archivos locales y 45 hashes públicos; config.js, ambas reglas Apache y assets anteriores se conservaron. El backend activo identifica el commit indicado y readiness respondió 200; las rutas privadas sin sesión respondieron 401. Respaldos de datos, configuración y sitio permanecen privados en los hosts. La prueba autenticada de extremo a extremo con un archivo de 100 MB por el navegador aún no se realizó; la comprobación real de 100 MB corresponde al transporte S3.
