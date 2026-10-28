@@ -17,7 +17,7 @@ use bastion_colaboracion::{
     FormDefinition, FormSection, FormValues, FormVariable, PublishedForm, VariableKind,
 };
 use bastion_core::CoreError;
-pub use folio::{parse_pdfinfo_pages, prepare_folio_sources, FolioPage};
+pub use folio::{FolioPage, parse_pdfinfo_pages, prepare_folio_sources};
 pub use frontmatter::prepare_frontmatter_sources;
 pub use lots::{Lot, LotInput, LotItem, LotSummary};
 pub use order::{PdfOrder, PdfOrderInput, PdfOrderItem};
