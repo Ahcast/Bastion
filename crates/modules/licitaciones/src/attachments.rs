@@ -31,6 +31,9 @@ pub struct Attachment {
     pub sha256: String,
     pub source_id: Option<u64>,
     pub source_sha256: Option<String>,
+    pub is_reference: bool,
+    #[sqlx(default)]
+    pub available: bool,
     pub created_at: chrono::NaiveDateTime,
 }
 #[derive(Serialize)]
@@ -136,8 +139,35 @@ impl TenderService {
     pub async fn attachments(&self, actor: u64, id: u64) -> Result<AttachmentList, CoreError> {
         let mut tx = self.begin(actor, "ver").await?;
         let expedient = load(&mut tx, id).await?;
-        let items=sqlx::query_as("SELECT id,section,filename,mime,byte_size,LOWER(HEX(sha256)) AS sha256,source_id,LOWER(HEX(source_sha256)) AS source_sha256,created_at FROM licitaciones_archivos WHERE expediente_id=? ORDER BY created_at,id LIMIT 1000")
+        let mut items:Vec<Attachment>=sqlx::query_as("SELECT id,section,filename,mime,byte_size,LOWER(HEX(sha256)) AS sha256,source_id,LOWER(HEX(source_sha256)) AS source_sha256,(object_key IS NULL) AS is_reference,created_at FROM licitaciones_archivos WHERE expediente_id=? ORDER BY created_at,id LIMIT 1000")
             .bind(id).fetch_all(&mut *tx).await?;
+        for file in &mut items {
+            file.available = if file.is_reference {
+                let source = file.source_id.ok_or(CoreError::Invalid)?;
+                match self
+                    .library
+                    .file_metadata_in_transaction(&mut tx, actor, source)
+                    .await
+                {
+                    Ok((_, hash)) => {
+                        hash.iter()
+                            .map(|byte| format!("{byte:02x}"))
+                            .collect::<String>()
+                            == file.sha256
+                    }
+                    Err(CoreError::NotFound | CoreError::Forbidden) => false,
+                    Err(error) => return Err(error),
+                }
+            } else {
+                true
+            };
+            if !file.available {
+                file.filename = "Archivo de Colaboración no disponible".into();
+                file.mime = "application/octet-stream".into();
+                file.sha256.clear();
+                file.source_sha256 = None;
+            }
+        }
         let retained_bytes = retained(&mut tx, id).await?;
         tx.commit().await?;
         Ok(AttachmentList {
@@ -205,25 +235,26 @@ impl TenderService {
             return Ok(current);
         }
         editable(&current, expected)?;
-        tx.commit().await?;
-        let snapshot = self
+        let (source, source_hash) = self
             .library
-            .file_snapshot(actor, input.source_id, MAX_INPUT_BYTES as usize)
+            .file_metadata_in_transaction(&mut tx, actor, input.source_id)
             .await?;
-        self.store_attachment(
-            actor,
-            id,
-            expected,
-            key,
-            StoredInput {
-                section: input.section,
-                filename: snapshot.filename,
-                bytes: snapshot.bytes,
-                source: Some((snapshot.id, snapshot.sha256)),
-                request_hash: hash,
-            },
-        )
-        .await
+        let name = filename(&source.filename)?;
+        policy().check(&name, &source.mime, b"reference")?;
+        validate_input_budget(retained(&mut tx, id).await?, source.size_bytes)?;
+        let count:i64=sqlx::query_scalar("SELECT (SELECT COUNT(*) FROM licitaciones_archivos WHERE expediente_id=?)+(SELECT COUNT(*) FROM licitaciones_archivo_limpieza WHERE expediente_id=?)").bind(id).bind(id).fetch_one(&mut *tx).await?;
+        if count >= 1000 {
+            return Err(CoreError::Invalid);
+        }
+        let file_id = DocumentService::object_suffix();
+        sqlx::query("INSERT INTO licitaciones_archivos(id,expediente_id,section,filename,mime,byte_size,sha256,source_id,source_sha256,object_key) VALUES (?,?,?,?,?,?,?,?,?,NULL)")
+            .bind(file_id).bind(id).bind(input.section.key()).bind(name).bind(source.mime).bind(source.size_bytes).bind(&source_hash).bind(input.source_id).bind(&source_hash).execute(&mut *tx).await?;
+        bump(&mut tx, actor, id, expected).await?;
+        sqlx::query("INSERT INTO licitaciones_archivo_recibos(actor_id,key_hash,request_hash,expediente_id) VALUES (?,?,?,?)").bind(actor).bind(key_hash(key)?).bind(hash).bind(id).execute(&mut *tx).await?;
+        let result = load(&mut tx, id).await?;
+        event(&mut tx, actor, "file.attach", id, result.version).await?;
+        tx.commit().await?;
+        Ok(result)
     }
     async fn store_attachment(
         &self,
@@ -314,8 +345,8 @@ impl TenderService {
         attachment_id(file)?;
         let mut tx = self.begin(actor, "ver").await?;
         load(&mut tx, id).await?;
-        let record:Attachment=sqlx::query_as("SELECT id,section,filename,mime,byte_size,LOWER(HEX(sha256)) AS sha256,source_id,LOWER(HEX(source_sha256)) AS source_sha256,created_at FROM licitaciones_archivos WHERE id=? AND expediente_id=?").bind(file).bind(id).fetch_optional(&mut *tx).await?.ok_or(CoreError::NotFound)?;
-        let key: String = sqlx::query_scalar(
+        let record:Attachment=sqlx::query_as("SELECT id,section,filename,mime,byte_size,LOWER(HEX(sha256)) AS sha256,source_id,LOWER(HEX(source_sha256)) AS source_sha256,(object_key IS NULL) AS is_reference,created_at FROM licitaciones_archivos WHERE id=? AND expediente_id=?").bind(file).bind(id).fetch_optional(&mut *tx).await?.ok_or(CoreError::NotFound)?;
+        let key: Option<String> = sqlx::query_scalar(
             "SELECT object_key FROM licitaciones_archivos WHERE id=? AND expediente_id=?",
         )
         .bind(file)
@@ -323,10 +354,17 @@ impl TenderService {
         .fetch_one(&mut *tx)
         .await?;
         tx.commit().await?;
-        let bytes = self
-            .storage
-            .get_with_limit(key.clone(), MAX_INPUT_BYTES as usize)
-            .await?;
+        let bytes = if let Some(object_key) = &key {
+            self.storage
+                .get_with_limit(object_key.clone(), MAX_INPUT_BYTES as usize)
+                .await?
+        } else {
+            let source_id = record.source_id.ok_or(CoreError::Invalid)?;
+            self.library
+                .file_snapshot(actor, source_id, MAX_INPUT_BYTES as usize)
+                .await?
+                .bytes
+        };
         if bytes.len() as u64 != record.byte_size
             || format!("{:x}", Sha256::digest(&bytes)) != record.sha256
         {
@@ -334,15 +372,25 @@ impl TenderService {
         }
         let mut tx = self.begin(actor, "ver").await?;
         let expedient = load(&mut tx, id).await?;
-        let current: Option<String> = sqlx::query_scalar(
+        let current: Option<Option<String>> = sqlx::query_scalar(
             "SELECT object_key FROM licitaciones_archivos WHERE id=? AND expediente_id=?",
         )
         .bind(file)
         .bind(id)
         .fetch_optional(&mut *tx)
         .await?;
-        if current.as_ref() != Some(&key) {
+        if current != Some(key) {
             return Err(CoreError::NotFound);
+        }
+        if record.is_reference {
+            let source_id = record.source_id.ok_or(CoreError::Invalid)?;
+            let (_, current_hash) = self
+                .library
+                .file_metadata_in_transaction(&mut tx, actor, source_id)
+                .await?;
+            if Sha256::digest(&bytes).as_slice() != current_hash.as_slice() {
+                return Err(CoreError::Conflict);
+            }
         }
         event(
             &mut tx,
@@ -392,7 +440,7 @@ impl TenderService {
         if exists.is_none() {
             return Err(CoreError::NotFound);
         }
-        sqlx::query("INSERT INTO licitaciones_archivo_limpieza(object_key,expediente_id,byte_size,state,reason,available_at) SELECT object_key,expediente_id,byte_size,'queued','explicit',UTC_TIMESTAMP(6) FROM licitaciones_archivos WHERE id=? AND expediente_id=?")
+        sqlx::query("INSERT INTO licitaciones_archivo_limpieza(object_key,expediente_id,byte_size,state,reason,available_at) SELECT object_key,expediente_id,byte_size,'queued','explicit',UTC_TIMESTAMP(6) FROM licitaciones_archivos WHERE id=? AND expediente_id=? AND object_key IS NOT NULL")
             .bind(file).bind(id).execute(&mut *tx).await?;
         sqlx::query("DELETE FROM licitaciones_archivos WHERE id=? AND expediente_id=?")
             .bind(file)
@@ -465,7 +513,7 @@ pub(crate) async fn enqueue_expedient_deletion(
     tx: &mut Transaction<'_, MySql>,
     id: u64,
 ) -> Result<(), CoreError> {
-    sqlx::query("INSERT INTO licitaciones_archivo_limpieza(object_key,expediente_id,byte_size,state,reason,available_at) SELECT object_key,expediente_id,byte_size,'queued','explicit',UTC_TIMESTAMP(6) FROM licitaciones_archivos WHERE expediente_id=?").bind(id).execute(&mut **tx).await?;
+    sqlx::query("INSERT INTO licitaciones_archivo_limpieza(object_key,expediente_id,byte_size,state,reason,available_at) SELECT object_key,expediente_id,byte_size,'queued','explicit',UTC_TIMESTAMP(6) FROM licitaciones_archivos WHERE expediente_id=? AND object_key IS NOT NULL").bind(id).execute(&mut **tx).await?;
     sqlx::query("DELETE FROM licitaciones_archivos WHERE expediente_id=?")
         .bind(id)
         .execute(&mut **tx)

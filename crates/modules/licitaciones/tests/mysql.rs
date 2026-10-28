@@ -7,6 +7,7 @@ use sqlx::mysql::MySqlPoolOptions;
 
 fn definition(title: &str) -> FormDefinition {
     FormDefinition {
+        template_source_id: None,
         title: title.into(),
         section: FormSection::Legal,
         variables: vec![FormVariable {

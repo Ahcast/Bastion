@@ -1,7 +1,7 @@
 export type FormSection = 'legal' | 'economica' | 'tecnica';
 export type VariableKind = 'text' | 'integer' | 'decimal' | 'date' | 'boolean';
 export interface FormVariable { key: string; label: string; kind: VariableKind; required: boolean }
-export interface FormDefinition { title: string; section: FormSection; variables: FormVariable[] }
+export interface FormDefinition { title: string; section: FormSection; variables: FormVariable[]; template_source_id?: number }
 export interface PublishedForm { id: number; revision: number; hash: string; definition: FormDefinition }
 export type FormValues = Record<string, string | boolean>;
 export interface FormCopy { id: number; source: PublishedForm; values: FormValues; missing_required: string[] }

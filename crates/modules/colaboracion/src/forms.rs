@@ -38,6 +38,8 @@ pub struct FormDefinition {
     pub title: String,
     pub section: FormSection,
     pub variables: Vec<FormVariable>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub template_source_id: Option<u64>,
 }
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -60,7 +62,10 @@ fn label_ok(s: &str) -> bool {
 }
 impl FormDefinition {
     pub fn validate(&self) -> Result<(), CoreError> {
-        if !label_ok(&self.title) || self.variables.len() > 100 {
+        if !label_ok(&self.title)
+            || self.variables.len() > 100
+            || self.template_source_id == Some(0)
+        {
             return Err(CoreError::Invalid);
         }
         let mut keys = BTreeSet::new();
@@ -225,6 +230,16 @@ impl CollaborationService {
             tx.commit().await?;
             return Ok(result);
         }
+        if let Some(source_id) = input.definition.template_source_id {
+            let (source, _) = self
+                .file_metadata_in_transaction(&mut tx, actor, source_id)
+                .await?;
+            if !source.filename.to_ascii_lowercase().ends_with(".typ")
+                || source.mime != "text/plain"
+            {
+                return Err(CoreError::Invalid);
+            }
+        }
         let (id, revision) = match (input.form_id, input.expected_revision) {
             (None, None) => {
                 let id = sqlx::query(
@@ -305,6 +320,7 @@ mod tests {
     use super::*;
     fn schema(kind: VariableKind) -> FormDefinition {
         FormDefinition {
+            template_source_id: None,
             title: "Sintético".into(),
             section: FormSection::Legal,
             variables: vec![FormVariable {

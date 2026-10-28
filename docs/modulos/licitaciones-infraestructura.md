@@ -2,6 +2,8 @@
 
 ## Decisión de alcance del 2026-10-27
 
+Ampliación del 2026-10-28: [100 MB por archivo, 1 GB por expediente, referencias de Colaboración y selección de plantillas Typst con variables](licitaciones-archivos.md#ampliación-solicitada-el-2026-10-28). Las descripciones de límites y copias posteriores reflejan el corte inicial.
+
 Decisión posterior: el usuario pide **nombre editable del expediente**. Se agrega exclusivamente ese campo con edición versionada; el ID interno se conserva y los demás datos de negocio siguen dependiendo de los formularios. Ver [contrato, migración y aceptación](licitaciones-nombre.md). Las referencias siguientes al expediente vacío describen el corte inicial.
 
 También autoriza incorporar PDF/imágenes desde Colaboración o PC en los bloques legal y técnico. Se añaden copias privadas, descarga/vista previa y limpieza recuperable, conservando los originales. Ver [archivos del expediente](licitaciones-archivos.md); las referencias posteriores a archivos pendientes describen el corte inicial y ya no suponen el alcance de esta ampliación. Lotes/ítems, generación del PDF final y adjudicación siguen pendientes.

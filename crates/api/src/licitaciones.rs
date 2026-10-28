@@ -41,13 +41,13 @@ fn file_routes(state: ApiState) -> Router<ApiState> {
             "/api/v1/licitaciones/{id}/archivos/{attachment}",
             axum::routing::delete(remove_file),
         )
-        .layer(axum::extract::DefaultBodyLimit::max(27_000_000))
-        .layer(RequestBodyLimitLayer::new(27_000_000))
+        .layer(axum::extract::DefaultBodyLimit::max(134_000_000))
+        .layer(RequestBodyLimitLayer::new(134_000_000))
         .route_layer(middleware::from_fn_with_state(state, file_guard))
 }
-static FILE_SLOTS: tokio::sync::Semaphore = tokio::sync::Semaphore::const_new(2);
+static FILE_SLOTS: tokio::sync::Semaphore = tokio::sync::Semaphore::const_new(1);
 async fn file_guard(State(state): State<ApiState>, request: Request, next: Next) -> Response {
-    match tokio::time::timeout(Duration::from_secs(180), async {
+    match tokio::time::timeout(Duration::from_secs(900), async {
         let user = actor(&state, request.headers()).await?;
         let capability = match *request.method() {
             Method::GET | Method::HEAD => "ver",

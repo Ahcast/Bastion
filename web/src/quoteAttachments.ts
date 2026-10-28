@@ -4,10 +4,10 @@ export interface QuoteFile { filename: string; mime: string; content_base64: str
 export interface QuoteAttachment { id: string; filename: string; title: string; mime: string; byte_size: number; created_at: string }
 export interface AttachmentPage { items: QuoteAttachment[]; page: number; has_more: boolean; quote_version: number }
 export interface AttachmentWrite { attachment: QuoteAttachment; quote_version: number }
-export function fileBlob(file: QuoteFile): Blob {
-  if (file.content_base64.length > Math.ceil(maxAttachmentBytes / 3) * 4) throw new Error('El archivo supera 20 MiB.');
+export function fileBlob(file: QuoteFile, limit = maxAttachmentBytes): Blob {
+  if (file.content_base64.length > Math.ceil(limit / 3) * 4) throw new Error('El archivo supera el límite permitido.');
   const raw = atob(file.content_base64);
-  if (raw.length > maxAttachmentBytes) throw new Error('El archivo supera 20 MiB.');
+  if (raw.length > limit) throw new Error('El archivo supera el límite permitido.');
   if (file.mime === 'application/pdf' && !raw.startsWith('%PDF-')) throw new Error('El PDF recibido no es válido.');
   return new Blob([Uint8Array.from(raw, char => char.charCodeAt(0))], { type: file.mime === 'application/pdf' ? 'application/pdf' : 'application/octet-stream' });
 }

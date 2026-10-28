@@ -389,6 +389,25 @@ impl CollaborationService {
             bytes,
         })
     }
+    pub async fn file_metadata_in_transaction(
+        &self,
+        tx: &mut Transaction<'_, MySql>,
+        actor: u64,
+        id: u64,
+    ) -> Result<(FileRecord, Vec<u8>), CoreError> {
+        let enabled:Option<bool>=sqlx::query_scalar("SELECT (included_in_release AND environment_allowed AND enabled) FROM module_registry WHERE module_id='colaboracion' FOR UPDATE").fetch_optional(&mut **tx).await?;
+        if enabled != Some(true) {
+            return Err(CoreError::NotFound);
+        }
+        let record = load(tx, id).await?;
+        self.authorize_record(tx, actor, &record, "ver").await?;
+        let hash: Vec<u8> =
+            sqlx::query_scalar("SELECT content_hash FROM colaboracion_files WHERE id=?")
+                .bind(id)
+                .fetch_one(&mut **tx)
+                .await?;
+        Ok((record, hash))
+    }
     pub async fn validate_file_snapshot_in_transaction(
         &self,
         tx: &mut Transaction<'_, MySql>,

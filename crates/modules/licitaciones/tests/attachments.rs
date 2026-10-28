@@ -1,5 +1,8 @@
 use base64::{Engine, engine::general_purpose::STANDARD};
-use bastion_colaboracion::{CollaborationService, UploadInput};
+use bastion_colaboracion::{
+    CollaborationService, FormDefinition, FormSection, FormVariable, PublishFormInput, UploadInput,
+    VariableKind,
+};
 use bastion_core::{CoreError, CoreService, Database, DocumentService};
 use bastion_licitaciones::{AttachmentCopy, AttachmentSection, AttachmentUpload, TenderService};
 use sqlx::mysql::MySqlPoolOptions;
@@ -143,6 +146,45 @@ async fn mysql57_tender_files_private_copies_integrity_recovery_and_budgets() {
         .await
         .unwrap();
     let original_id = original.id;
+    let template = library
+        .upload(
+            1,
+            "tender-template-upload1",
+            UploadInput {
+                scope: "empresa".into(),
+                id_persona: None,
+                title: "Plantilla".into(),
+                notes: String::new(),
+                filename: "formulario.typ".into(),
+                content_base64: STANDARD.encode(b"= Documento\n#let nombre = \"\"\n"),
+            },
+        )
+        .await
+        .unwrap();
+    let form = library
+        .publish_form(
+            1,
+            "tender-template-form01",
+            PublishFormInput {
+                form_id: None,
+                expected_revision: None,
+                definition: FormDefinition {
+                    title: "Formulario".into(),
+                    section: FormSection::Legal,
+                    template_source_id: Some(template.id),
+                    variables: vec![FormVariable {
+                        key: "nombre".into(),
+                        label: "Nombre".into(),
+                        kind: VariableKind::Text,
+                        required: true,
+                    }],
+                },
+            },
+        )
+        .await
+        .unwrap();
+    assert_eq!(form.definition.template_source_id, Some(template.id));
+    assert_eq!(form.definition.variables[0].key, "nombre");
     let copied = service
         .copy_attachment(
             1,
@@ -167,11 +209,14 @@ async fn mysql57_tender_files_private_copies_integrity_recovery_and_budgets() {
         copied_file.source_sha256.as_deref(),
         Some(copied_file.sha256.as_str())
     );
-    library.delete(1, original_id, original_id).await.unwrap();
-    core.admin()
-        .set_module_enabled(1, "colaboracion", false)
-        .await
-        .unwrap();
+    assert!(copied_file.is_reference && copied_file.available);
+    let key: Option<String> =
+        sqlx::query_scalar("SELECT object_key FROM licitaciones_archivos WHERE id=?")
+            .bind(&copied_file.id)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert!(key.is_none());
     assert_eq!(
         service
             .read_attachment(1, first.id, &copied_file.id, true)
@@ -180,6 +225,26 @@ async fn mysql57_tender_files_private_copies_integrity_recovery_and_budgets() {
             .content_base64,
         STANDARD.encode(pdf)
     );
+    library.delete(1, original_id, original_id).await.unwrap();
+    let missing = service.attachments(1, first.id).await.unwrap();
+    let missing = missing
+        .items
+        .iter()
+        .find(|item| item.id == copied_file.id)
+        .unwrap();
+    assert!(!missing.available);
+    assert_eq!(missing.filename, "Archivo de Colaboración no disponible");
+    core.admin()
+        .set_module_enabled(1, "colaboracion", false)
+        .await
+        .unwrap();
+    assert!(copied_file.is_reference);
+    assert!(matches!(
+        service
+            .read_attachment(1, first.id, &copied_file.id, true)
+            .await,
+        Err(CoreError::NotFound)
+    ));
     assert!(
         service
             .copy_attachment(
@@ -211,7 +276,7 @@ async fn mysql57_tender_files_private_copies_integrity_recovery_and_budgets() {
         Err(CoreError::NotFound)
     ));
     let pending = "licitaciones/synthetic-reserved-budget";
-    sqlx::query("INSERT INTO licitaciones_archivo_limpieza(object_key,expediente_id,byte_size,state,reason,available_at) VALUES (?,?,499999999,'reserved','abandoned_upload',UTC_TIMESTAMP(6)+INTERVAL 1 DAY)")
+    sqlx::query("INSERT INTO licitaciones_archivo_limpieza(object_key,expediente_id,byte_size,state,reason,available_at) VALUES (?,?,999999999,'reserved','abandoned_upload',UTC_TIMESTAMP(6)+INTERVAL 1 DAY)")
         .bind(pending).bind(first.id).execute(&pool).await.unwrap();
     assert!(matches!(
         service
@@ -276,7 +341,7 @@ async fn mysql57_tender_files_private_copies_integrity_recovery_and_budgets() {
         .remove_all_versions(format!("{orphan}-neighbor"))
         .await
         .unwrap();
-    let mut large = vec![b' '; 20_000_000];
+    let mut large = vec![b' '; 100_000_000];
     large[..pdf.len()].copy_from_slice(pdf);
     assert!(
         service

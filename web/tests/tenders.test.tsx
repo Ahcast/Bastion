@@ -90,6 +90,19 @@ test('new library schemas have no default variables and require explicit adminis
   } finally { await act(async () => root.unmount()); container.remove(); }
 });
 
+test('a form editor can select a Typst file and add its variables', async () => {
+  const api = new ApiClient('https://example.test', async (url) => Response.json({ items: new URL(String(url)).pathname === '/api/v1/colaboracion' ? [{ id: 7, filename: 'formulario.typ', mime: 'text/plain', size_bytes: 30 }] : [], page: 1, page_size: 25, has_more: false }));
+  const container = document.createElement('div'); document.body.append(container); const root = createRoot(container);
+  try {
+    await act(async () => root.render(<NavigationGuardProvider><CoreContext.Provider value={{ api, access: { ...access, modules: [{ module_id: 'colaboracion', display_name: 'Colaboración' }], permissions: [{ module_id: 'colaboracion', scope_key: 'empresa', capability: 'ver' }], is_system_administrator: true }, notify: () => {} }}><FormLibrary /></CoreContext.Provider></NavigationGuardProvider>));
+    await act(async () => [...container.querySelectorAll('button')].find(b => b.textContent === 'Nuevo formulario')!.click());
+    const dialog = document.body.querySelector('[role="dialog"]')!;
+    await act(async () => [...dialog.querySelectorAll('button')].find(b => b.textContent === 'Seleccionar plantilla')!.click());
+    await act(async () => [...dialog.querySelectorAll('button')].find(b => b.textContent === 'Añadir variable')!.click());
+    assert.ok(dialog.textContent?.includes('archivo #7')); assert.equal(dialog.querySelectorAll('legend').length, 1);
+  } finally { await act(async () => root.unmount()); container.remove(); }
+});
+
 test('expedient names persist with a version, keep text on conflicts and update headings and lists', async () => {
   let record: Expedient = { id: 9, name: '', version: 1, state: 'borrador', forms: [] };
   let conflict = true;

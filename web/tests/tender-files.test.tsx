@@ -50,7 +50,7 @@ test('Collaboration selection respects library read access and copies into the t
  const posts:RequestInit[]=[];
  const api=new ApiClient('https://example.test',async(url,init={})=>{
   if(init.method==='POST'){posts.push(init);return Response.json({...record,version:2});}
-  if(new URL(String(url)).pathname==='/api/v1/colaboracion')return Response.json({items:[{id:4,filename:'permitida.pdf',mime:'application/pdf',size_bytes:10},{id:5,filename:'grande.pdf',mime:'application/pdf',size_bytes:20_000_001},{id:6,filename:'activo.svg',mime:'image/svg+xml',size_bytes:10}],page:1,page_size:25,has_more:false});
+  if(new URL(String(url)).pathname==='/api/v1/colaboracion')return Response.json({items:[{id:4,filename:'permitida.pdf',mime:'application/pdf',size_bytes:10},{id:5,filename:'grande.pdf',mime:'application/pdf',size_bytes:100_000_001},{id:6,filename:'activo.svg',mime:'image/svg+xml',size_bytes:10}],page:1,page_size:25,has_more:false});
   return Response.json(list);
  });
  const container=document.createElement('div');document.body.append(container);const root=createRoot(container);

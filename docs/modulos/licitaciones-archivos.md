@@ -1,5 +1,11 @@
 # Archivos legales y técnicos de Licitaciones
 
+## Ampliación solicitada el 2026-10-28
+
+El límite pasa a 100.000.000 bytes por archivo y 1.000.000.000 bytes por expediente, contabilizando también las referencias. Las copias ya existentes se conservan; las nuevas incorporaciones desde Colaboración son referencias y no generan otra copia S3. Visualizar o descargar una referencia requiere que el archivo original siga disponible y que el usuario tenga acceso vigente a él; si se retira el original o el acceso, el expediente muestra la referencia como no disponible. Quitarla nunca elimina el original. Los apartados históricos siguientes describen el corte anterior de 20 MB y 500 MB.
+
+La biblioteca de formularios permite seleccionar un archivo `.typ` de Colaboración y declarar variables en cada revisión. El archivo se referencia, y la selección valida acceso, extensión y MIME; el código de la plantilla no se ejecuta ni se genera el PDF final en esta entrega. Las variables existentes conservan su revisión y su validación. La publicación sigue reservada al Administrador del sistema.
+
 Decisión del usuario del 2026-10-27: Documentación legal y Especificaciones técnicas deben permitir seleccionar PDF/imágenes de Colaboración o subirlos desde el PC para incorporarlos al expediente. Cada archivo es una copia independiente, privada y visible sólo dentro de su expediente y bloque. No se introducen lotes/ítems ni campos adicionales por inferencia. El bloque económico conserva sus formularios, sin carga de archivos en esta entrega.
 
 Se aceptan PDF y las imágenes rasterizadas reconocidas por la política existente: PNG, JPEG, GIF, WebP, BMP y TIFF. Se valida extensión y contenido detectado en servidor; SVG/HTML y ejecutables no se admiten. El contenido de cada archivo permanece intacto. El transporte de entrada es JSON/base64, acotado a 27.000.000 bytes; el máximo del archivo real es 20.000.000 bytes y el presupuesto conjunto del expediente es 500.000.000 bytes. Se contabilizan archivos disponibles y reservas/objetos pendientes de limpieza, sin eludir el tope mediante errores de subida. Se limita la metadata a 1.000 archivos por expediente, dos solicitudes de archivo simultáneas por proceso y 180 segundos por operación; estos son presupuestos técnicos, no un límite de páginas PDF.

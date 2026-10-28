@@ -10,7 +10,7 @@ export function pdfBlob(pdf: QuotePdf): Blob {
   if (!raw.startsWith('%PDF-')) throw new Error('El PDF recibido no es válido.');
   return new Blob([Uint8Array.from(raw, char => char.charCodeAt(0))], { type: 'application/pdf' });
 }
-export function reservePdfViewer() {
+export function reservePdfViewer(maxBytes?: number) {
   // Reserve the tab in the click event, before asynchronous generation, to avoid popup blocking.
   const viewer = window.open('about:blank', '_blank');
   if (!viewer) throw new Error('El navegador bloqueó la pestaña del PDF. Permite abrirla y vuelve a intentarlo.');
@@ -24,7 +24,7 @@ export function reservePdfViewer() {
       if (viewer.closed) return;
       // Do not replace a tab that the user has navigated elsewhere while generation ran.
       try { if (viewer.location.href !== 'about:blank') return; } catch { return; }
-      const blob = fileBlob(file);
+      const blob = fileBlob(file, maxBytes);
       url = URL.createObjectURL(blob); viewer.document.title = file.filename; viewer.location.replace(url);
       poll = setInterval(() => { if (viewer.closed) release(); }, 1000);
       expiry = setTimeout(release, 60 * 60 * 1000);

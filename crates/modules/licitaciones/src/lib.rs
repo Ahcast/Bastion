@@ -11,8 +11,8 @@ use bastion_core::CoreError;
 use serde::{Deserialize, Serialize};
 pub use service::TenderService;
 
-pub const MAX_INPUT_BYTES: u64 = 20_000_000;
-pub const MAX_EXPEDIENT_BYTES: u64 = 500_000_000;
+pub const MAX_INPUT_BYTES: u64 = 100_000_000;
+pub const MAX_EXPEDIENT_BYTES: u64 = 1_000_000_000;
 pub const MAX_FINAL_PDF_BYTES: u64 = 500_000_000;
 
 /// Independent budgets; revisions count until an explicit retention policy exists.
@@ -155,11 +155,11 @@ mod tests {
     #[test]
     fn budgets_keep_decimal_mb_and_final_pdf_separate() {
         assert_eq!(
-            validate_input_budget(480_000_000, 20_000_000).unwrap(),
-            500_000_000
+            validate_input_budget(900_000_000, 100_000_000).unwrap(),
+            1_000_000_000
         );
-        assert!(validate_input_budget(480_000_001, 20_000_000).is_err());
-        assert!(validate_input_budget(0, 20_000_001).is_err());
+        assert!(validate_input_budget(900_000_001, 100_000_000).is_err());
+        assert!(validate_input_budget(0, 100_000_001).is_err());
         assert!(validate_input_budget(u64::MAX, 1).is_err());
         assert!(validate_input_budget(0, 0).is_err());
         assert!(validate_final_pdf_budget(500_000_000).is_ok());

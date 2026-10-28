@@ -6,6 +6,7 @@ import { useNavigationGuard, useUnsavedChanges } from '../navigationGuard.js';
 import { DocumentSection, DocumentPagination } from '../components/DocumentWorkspace.js';
 import { kindLabels, sectionLabels } from '../tenders.js';
 import type { FormDefinition, FormSection, FormVariable, PublishedForm, TenderPage, VariableKind } from '../tenders.js';
+import type { CollaborationFile, FilePage } from '../collaboration.js';
 
 export default function FormLibrary() {
   const { api, access, notify } = useCore();
@@ -17,7 +18,7 @@ export default function FormLibrary() {
     <DocumentSection title="Formularios publicados" metadata={result.data ? `${result.data.items.length} en esta página` : undefined} list>
     <Notice>{result.error}</Notice>
     {result.data ? <><Table columns={['Formulario', 'Bloque', 'Revisión', 'Variables', 'Acción']} rows={result.data.items.map(form => [form.definition.title, sectionLabels[form.definition.section], form.revision, form.definition.variables.length, access.is_system_administrator ? <button onClick={() => setEditing(form)}>Nueva revisión</button> : 'Publicado'])} /><DocumentPagination page={page} hasMore={result.data.has_more} change={setPage} /></> : !result.error && <Loading />}
-    <p className="document-note">Esta biblioteca define la captura de datos. Los PDF e imágenes se incorporan dentro del expediente; las plantillas para generar el PDF final siguen pendientes.</p>
+    <p className="document-note">Crea un formulario para seleccionar su archivo .typ de Colaboración y declarar sus variables. La generación del PDF final sigue pendiente.</p>
     </DocumentSection>
     {editing && <SchemaEditor initial={editing === 'new' ? null : editing} close={() => setEditing(null)} saved={() => { setEditing(null); result.reload(); notify('Esquema aprobado y publicado.'); }} />}
   </div>;
@@ -28,6 +29,8 @@ function SchemaEditor({ initial, close, saved }: { initial: PublishedForm | null
   const [definition, setDefinition] = useState<FormDefinition>(() => initial ? structuredClone(initial.definition) : { title: '', section: 'legal', variables: [] });
   const baseline = useRef(JSON.stringify(definition));
   const [busy, setBusy] = useState(false), [error, setError] = useState(''), [confirmed, setConfirmed] = useState(false);
+  const [templatePage, setTemplatePage] = useState(1);
+  const templates = useLoad(signal => api.request<FilePage<CollaborationFile>>(`/api/v1/colaboracion?trash=false&page=${templatePage}&page_size=25`, { signal }), [templatePage]);
   const attempt = useRef<{ body: string; key: string } | null>(null);
   useUnsavedChanges(JSON.stringify(definition) !== baseline.current, busy);
   const update = (index: number, change: Partial<FormVariable>) => { setConfirmed(false); setDefinition(d => ({ ...d, variables: d.variables.map((v, i) => i === index ? { ...v, ...change } : v) })); };
@@ -43,6 +46,8 @@ function SchemaEditor({ initial, close, saved }: { initial: PublishedForm | null
     }}><Notice>{error}</Notice><fieldset disabled={busy} className="document-fields">
       <label>Nombre del formulario<input value={definition.title} required maxLength={255} onChange={e => { setConfirmed(false); setDefinition(d => ({ ...d, title: e.target.value })); }} /></label>
       <label>Bloque<select value={definition.section} onChange={e => { setConfirmed(false); setDefinition(d => ({ ...d, section: e.target.value as FormSection })); }}>{Object.entries(sectionLabels).map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select></label>
+      <div className="document-wide"><h3>Plantilla Typst de Colaboración</h3><p>Seleccionada: {definition.template_source_id ? `archivo #${definition.template_source_id}` : 'ninguna'}</p><Notice>{templates.error}</Notice>{templates.data && <><Table columns={['Archivo', 'Acción']} rows={templates.data.items.filter(file => file.filename.toLowerCase().endsWith('.typ') && file.mime === 'text/plain').map(file => [file.filename,<button type="button" onClick={() => { setConfirmed(false); setDefinition(d => ({ ...d, template_source_id: file.id })); }}>Seleccionar plantilla</button>])} /><DocumentPagination page={templatePage} hasMore={templates.data.has_more} change={setTemplatePage} busy={busy} /></>}</div>
+      <h3 className="document-wide">Variables del formulario</h3>
       <p className="document-wide document-note">Declara sólo los datos que pide este formulario. Publicar una revisión no modifica copias anteriores.</p>
       {definition.variables.map((variable, index) => <fieldset className="document-variable" key={index}><legend>Variable {index + 1}</legend>
         <label>Identificador<input value={variable.key} required pattern="[a-z][a-z0-9_]{0,63}" maxLength={64} onChange={e => update(index, { key: e.target.value })} /><small>Minúsculas, números y guion bajo; empieza por una letra.</small></label>

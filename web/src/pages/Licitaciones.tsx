@@ -120,5 +120,5 @@ function DeleteExpedient({ record, close, deleted }: { record: Expedient; close:
 }
 
 export function TenderSettings() {
-  return <section className="card stack"><h2>Licitaciones</h2><p>Los formularios se incorporan individualmente en la biblioteca de Colaboración. El expediente conserva sus valores y copias independientes.</p><p>Entradas: 20 MB por archivo. Presupuestos técnicos independientes: 500 MB para expediente y 500 MB para PDF final. Los archivos legales y técnicos se incorporan desde PC o Colaboración. La generación del PDF final sigue pendiente.</p><p>Los ajustes editables del módulo se definirán cuando sean necesarios.</p></section>;
+  return <section className="card stack"><h2>Licitaciones</h2><p>Los formularios se incorporan individualmente en la biblioteca de Colaboración. El expediente conserva sus valores y copias independientes.</p><p>Entradas: 100 MB por archivo y 1 GB por expediente. El PDF final conserva su presupuesto independiente de 500 MB. Los archivos legales y técnicos se incorporan desde PC o Colaboración. La generación del PDF final sigue pendiente.</p><p>Los ajustes editables del módulo se definirán cuando sean necesarios.</p></section>;
 }

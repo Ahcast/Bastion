@@ -221,7 +221,7 @@ paths:
               properties:
                 section: { $ref: '#/components/schemas/AttachmentSection' }
                 filename: { type: string, minLength: 1, maxLength: 255 }
-                content_base64: { type: string, maxLength: 26666668, description: Máximo real de 20000000 bytes; extensión y MIME se validan en servidor. }
+                content_base64: { type: string, maxLength: 133333336, description: Máximo real de 100000000 bytes; extensión y MIME se validan en servidor. }
       responses:
         '200': { $ref: '#/components/responses/FileWrite' }
         '400': { description: Tipo, tamaño o presupuesto de expediente inválido }
@@ -281,7 +281,7 @@ paths:
       - $ref: '#/components/parameters/Id'
       - $ref: '#/components/parameters/AttachmentId'
     get:
-      summary: Leer copia privada con MIME verificado; requiere ver
+      summary: Leer archivo privado o referencia autorizada con MIME verificado; requiere ver
       responses:
         '200': { $ref: '#/components/responses/FileContent' }
         '404': { description: No pertenece al expediente, eliminado o sin acceso }
@@ -326,16 +326,18 @@ components:
     AttachmentSection: { type: string, enum: [legal, tecnica] }
     Attachment:
       type: object
-      required: [id, section, filename, mime, byte_size, sha256, source_id, source_sha256, created_at]
+      required: [id, section, filename, mime, byte_size, sha256, source_id, source_sha256, is_reference, available, created_at]
       properties:
         id: { type: string, pattern: '^[a-f0-9]{48}$' }
         section: { $ref: '#/components/schemas/AttachmentSection' }
         filename: { type: string }
         mime: { type: string }
-        byte_size: { type: integer, minimum: 1, maximum: 20000000 }
+        byte_size: { type: integer, minimum: 1, maximum: 100000000 }
         sha256: { type: string }
         source_id: { type: [integer, 'null'] }
         source_sha256: { type: [string, 'null'] }
+        is_reference: { type: boolean }
+        available: { type: boolean }
         created_at: { type: string }
     AttachmentList:
       type: object
@@ -351,6 +353,7 @@ components:
       properties:
         title: { type: string, minLength: 1, maxLength: 255 }
         section: { type: string, enum: [legal, economica, tecnica] }
+        template_source_id: { type: integer, minimum: 1, description: Referencia al archivo Typst autorizado de Colaboración. }
         variables:
           type: array
           maxItems: 100

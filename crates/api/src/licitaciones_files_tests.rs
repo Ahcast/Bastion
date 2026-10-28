@@ -242,7 +242,7 @@ async fn mysql57_tender_files_http_private_upload_copy_and_limits() {
                 true,
                 2,
                 "tender-http-largekey",
-                " ".repeat(27_000_001)
+                " ".repeat(134_000_001)
             ))
             .await
             .unwrap()
