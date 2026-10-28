@@ -6,7 +6,6 @@ fn input() -> InvoiceInput {
     serde_json::from_value(serde_json::json!({
         "client_name":"Cliente de prueba", "order_number":"ORD-ACCIONES", "invoice_date":"2026-10-22",
         "payment_term_type":"credito", "credit_days":30, "discount_type":"amount", "discount_value":"0",
-        "purchase_order_exempt_number":"OC-EXENTA-123", "registration_certificate_number":"CONST-456", "sag_registration_number":"SAG-789",
         "notes":"NOTA PRIVADA QUE NO VA AL PDF", "public_notes":"Entrega de prueba", "expenses":[],
         "items":[{"description":"Equipo #text(\"no ejecutar\")", "quantity":"1", "unit_price":"100", "cost_price":"60", "discount_type":"amount", "discount_value":"0", "tax_type":"isv15"}]
     })).unwrap()
@@ -70,19 +69,24 @@ async fn mysql57_invoice_actions_numbering_payments_documents_and_preserved_orig
         .await
         .unwrap();
     assert!(a.invoice_number.is_none());
-    assert_eq!(a.data.purchase_order_exempt_number, "OC-EXENTA-123");
-    assert_eq!(a.data.registration_certificate_number, "CONST-456");
-    assert_eq!(a.data.sag_registration_number, "SAG-789");
     assert!(matches!(
         invoices
             .mark_sent(2, a.id, 1, "invoice-actions-denied")
             .await,
         Err(CoreError::Forbidden)
     ));
+    let mut fiscal_input = input();
+    fiscal_input.purchase_order_exempt_number = "OC-EXENTA-123".into();
+    fiscal_input.registration_certificate_number = "CONST-456".into();
+    fiscal_input.sag_registration_number = "SAG-789".into();
     let b = invoices
-        .create(1, "invoice-actions-create-b", input())
+        .create(1, "invoice-actions-create-b", fiscal_input)
         .await
         .unwrap();
+    assert_eq!(b.data.purchase_order_exempt_number, "OC-EXENTA-123");
+    assert_eq!(b.data.registration_certificate_number, "CONST-456");
+    assert_eq!(b.data.sag_registration_number, "SAG-789");
+    assert_eq!(b.calculation.totals.total, "100.00");
     let (sent_a, sent_b) = tokio::join!(
         invoices.mark_sent(1, a.id, 1, "invoice-actions-send-a"),
         invoices.mark_sent(1, b.id, 1, "invoice-actions-send-b")
