@@ -2,7 +2,7 @@ name: Core checks
 
 on:
   push:
-    branches: [main]
+    branches: [main, codex/licitaciones-lotes-wip]
   pull_request:
     branches: [main]
 

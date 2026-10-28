@@ -59,14 +59,14 @@ test('expedients start empty; values preserve drafts on 412 and navigation asks 
     await act(async () => root.render(<NavigationGuardProvider><CoreContext.Provider value={{ api, access: context, notify: () => {} }}><Licitaciones /></CoreContext.Provider></NavigationGuardProvider>));
     await click('Abrir expediente'); await click('Variables');
     assert.equal(container.querySelectorAll('img').length, 0);
-    const input = [...container.querySelectorAll<HTMLInputElement>('input')].find(e => e.parentElement?.textContent?.startsWith('Valor'))!; assert.ok(input);
+    const row = [...container.querySelectorAll('fieldset.document-variable')].find(e => e.querySelector<HTMLInputElement>('input')?.value === 'dato')!; const input = [...row.querySelectorAll<HTMLInputElement>('input')].find(e => e.parentElement?.textContent?.startsWith('Valor'))!; assert.ok(input);
     const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')!.set!;
     await act(async () => { setter.call(input, 'Texto privado'); input.dispatchEvent(new Event('input', { bubbles: true })); });
     await act(async () => container.querySelector('form')!.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })));
     assert.equal(input.value, 'Texto privado'); assert.ok(container.textContent?.includes('Cambió la versión'));
     const write = calls.find(c => c.init.method === 'PUT')!;
     assert.equal(new Headers(write.init.headers).get('if-match'), '"2"');
-    assert.equal(write.path, '/api/v1/licitaciones/7/variables'); assert.deepEqual(JSON.parse(String(write.init.body)), { variables: [{ key:'dato', label:'Dato sintético', kind:'text', value:'Texto privado' }] });
+    assert.equal(write.path, '/api/v1/licitaciones/7/variables'); assert.deepEqual(JSON.parse(String(write.init.body)).variables.find((v: {key:string}) => v.key === 'dato'), { key:'dato', label:'Dato sintético', kind:'text', value:'Texto privado' });
     await click('Volver al listado'); assert.ok(document.body.textContent?.includes('Cambios sin guardar')); await click('Seguir editando', document.body);
     stale = false; await act(async () => container.querySelector('form')!.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })));
     await click('Volver al listado'); await click('Nuevo expediente');
@@ -89,11 +89,11 @@ test('variables are created in the expediente before any form is added', async (
   try {
     await act(async () => root.render(<NavigationGuardProvider><CoreContext.Provider value={{ api, access: context, notify: () => {} }}><Licitaciones /></CoreContext.Provider></NavigationGuardProvider>));
     await click('Abrir expediente'); await click('Variables'); await click('Añadir variable');
-    const inputs = [...container.querySelectorAll<HTMLInputElement>('fieldset.document-variable input')];
+    const row = [...container.querySelectorAll('fieldset.document-variable')].at(-1)!; const inputs = [...row.querySelectorAll<HTMLInputElement>('input')];
     const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')!.set!;
     for (const [i, value] of ['nombre', 'Nombre', 'Marco'].entries()) await act(async () => { setter.call(inputs[i], value); inputs[i]!.dispatchEvent(new Event('input', { bubbles: true })); });
     await act(async () => container.querySelector('form')!.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })));
-    assert.deepEqual(body, { variables: [{ key: 'nombre', label: 'Nombre', kind: 'text', value: 'Marco' }] });
+    assert.deepEqual((body as {variables: {key:string}[]}).variables.find(v => v.key === 'nombre'), { key: 'nombre', label: 'Nombre', kind: 'text', value: 'Marco' });
     assert.ok(container.textContent?.includes('#variables.nombre'));
   } finally { await act(async () => root.unmount()); container.remove(); }
 });
