@@ -7,7 +7,7 @@ mod image_pdf;
 mod lots;
 mod order;
 mod pagination;
-mod pdf_compose;
+pub mod pdf_compose;
 mod service;
 mod typst_data;
 pub use attachments::{

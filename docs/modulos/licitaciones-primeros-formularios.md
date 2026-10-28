@@ -37,3 +37,7 @@ El 2026-10-28 el usuario confirmó que el folio se coloca sobre el margen existe
 ## Firmas y prueba de composición
 
 El usuario autorizó incluir PDF con firma digital aunque la firma no se conserve al unirlos. El archivo original de Colaboración sigue siendo una referencia; las copias previamente existentes se mantienen. El 2026-10-28 se comprobó visualmente una unión y foliado de prueba con QPDF 12.4.2 en páginas verticales, horizontales y rotadas. Esta prueba es exploratoria: aún no integra ni despliega un servicio de composición. El archivo oficial Linux `qpdf-12.4.2-bin-linux-x86_64.zip` registra SHA-256 `db367d897829f22c4198ce1094143c9d467bd6ee7dfabc44ba6f02056b24f8b1`; la selección final del compositor requiere prueba de aislamiento y límites.
+
+## Proceso aislado de composición
+
+La rama de desarrollo incluye un ejecutable de composición para un único trabajo; recibe únicamente la cantidad de piezas y toma las rutas de una configuración del servicio. Rechaza ejecutarse como root o compartiendo el espacio de red de PID 1. Estas comprobaciones no bastan por sí solas: antes de conectarlo a la API o desplegarlo deben configurarse una identidad sin credenciales, un directorio privado por trabajo accesible únicamente a ese trabajo, aislamiento de red y límites de CPU, memoria, disco y duración. El servicio también debe verificar versiones y permisos de los originales antes de entregar el resultado y limpiar archivos temporales. La creación del servicio, el transporte desde la API y la activación en AWS siguen pendientes.
