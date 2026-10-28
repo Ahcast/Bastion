@@ -73,7 +73,7 @@ mod tests {
         let root=std::env::temp_dir().join(format!("bastion-compose-{}",std::process::id()));
         fs::create_dir_all(&root).unwrap();
         for (filename,source) in [("piece-000001", "#page(width: 612pt, height: 792pt)[Primera]"),("piece-000002", "#page(width: 792pt, height: 612pt)[Segunda]"),("folios", "#page(width: 612pt, height: 792pt)[#place(bottom + center)[1]]\n#page(width: 792pt, height: 612pt)[#place(bottom + center)[2]]")] {
-            fs::write(root.join(format!("{filename}.typ")),source).unwrap();
+            if filename == "folios" { for (name,bytes) in crate::folio::prepare_folio_sources(&[crate::folio::FolioPage{width_pt:612.0,height_pt:792.0},crate::folio::FolioPage{width_pt:792.0,height_pt:612.0}]).unwrap() { fs::write(root.join(name),bytes).unwrap(); } } else { fs::write(root.join(format!("{filename}.typ")),source).unwrap(); }
             let status=Command::new(&typst).arg("compile").arg("--root").arg(&root).arg(root.join(format!("{filename}.typ"))).arg(root.join(format!("{filename}.pdf"))).status().unwrap();
             assert!(status.success());
         }
