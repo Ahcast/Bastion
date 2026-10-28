@@ -5,6 +5,7 @@ mod frontmatter;
 mod lots;
 mod order;
 mod pagination;
+mod pdf_compose;
 mod service;
 mod typst_data;
 pub use attachments::{

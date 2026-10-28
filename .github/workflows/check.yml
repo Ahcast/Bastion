@@ -129,6 +129,14 @@ jobs:
           tar -xJf "$RUNNER_TEMP/typst.tar.xz" --strip-components=1 -C "$RUNNER_TEMP/bastion-typst"
           echo "BASTION_TYPST_BIN=$RUNNER_TEMP/bastion-typst/typst" >> "$GITHUB_ENV"
           echo "BASTION_DOCUMENTS_WORK_DIR=$RUNNER_TEMP/bastion-documents" >> "$GITHUB_ENV"
+      - name: Install pinned QPDF for tender assembly tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fsSL https://github.com/qpdf/qpdf/releases/download/v12.4.2/qpdf-12.4.2-bin-linux-x86_64.zip -o "$RUNNER_TEMP/qpdf.zip"
+          echo "db367d897829f22c4198ce1094143c9d467bd6ee7dfabc44ba6f02056b24f8b1  $RUNNER_TEMP/qpdf.zip" | sha256sum -c -
+          unzip -q "$RUNNER_TEMP/qpdf.zip" -d "$RUNNER_TEMP/bastion-qpdf"
+          echo "BASTION_QPDF_BIN=$RUNNER_TEMP/bastion-qpdf/bin/qpdf" >> "$GITHUB_ENV"
       - name: Run workspace tests
         # Shared PDF template runs with synthetic data and no S3 or SMTP credentials.
         # Each module uses an isolated disposable MySQL 5.7 database.
