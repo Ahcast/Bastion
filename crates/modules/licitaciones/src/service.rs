@@ -234,7 +234,9 @@ impl TenderService {
             }
         }
         crate::lots::reconcile(&mut tx, id, &current.variables, &variables, false).await?;
-        let validated = GlobalVariablesInput { variables: variables.clone() };
+        let validated = GlobalVariablesInput {
+            variables: variables.clone(),
+        };
         validated.validate()?;
         validated.validate_form_config()?;
         sqlx::query("UPDATE licitaciones_expedientes SET variables_json=? WHERE id=?")
@@ -261,7 +263,14 @@ impl TenderService {
         let mut tx = self.begin(actor, "editar").await?;
         let current = load(&mut tx, id).await?;
         editable(&current, expected)?;
-        crate::lots::reconcile(&mut tx, id, &current.variables, &input.variables, confirm_discard).await?;
+        crate::lots::reconcile(
+            &mut tx,
+            id,
+            &current.variables,
+            &input.variables,
+            confirm_discard,
+        )
+        .await?;
         sqlx::query("UPDATE licitaciones_expedientes SET variables_json=? WHERE id=?")
             .bind(serde_json::to_value(input.variables).map_err(|_| CoreError::Invalid)?)
             .bind(id)
