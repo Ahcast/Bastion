@@ -1,6 +1,6 @@
 use super::*;
 use bastion_licitaciones::{
-    CopyFormInput, DeleteInput, EmptyInput, Expedient, NameInput, PageQuery, ValuesInput,
+    CopyFormInput, DeleteInput, EmptyInput, Expedient, GlobalVariablesInput, NameInput, PageQuery, ValuesInput,
 };
 
 pub(super) fn routes(state: ApiState) -> Router<ApiState> {
@@ -11,6 +11,7 @@ pub(super) fn routes(state: ApiState) -> Router<ApiState> {
             get(detail).patch(rename).delete(remove),
         )
         .route("/api/v1/licitaciones/{id}/formularios", post(copy_form))
+        .route("/api/v1/licitaciones/{id}/variables", axum::routing::put(global_variables))
         .route(
             "/api/v1/licitaciones/{id}/formularios/{copy_id}/valores",
             axum::routing::put(values),
@@ -298,6 +299,15 @@ async fn values(
         .await
         .map(response)
         .map_err(ApiError)
+}
+async fn global_variables(
+    State(state): State<ApiState>,
+    headers: axum::http::HeaderMap,
+    Path(id): Path<u64>,
+    Json(input): Json<GlobalVariablesInput>,
+) -> Result<Response, ApiError> {
+    let user = actor(&state, &headers).await?;
+    state.licitaciones.save_global_variables(user.id, id, expected(&headers)?, input).await.map(response).map_err(ApiError)
 }
 async fn remove(
     State(state): State<ApiState>,
@@ -663,6 +673,18 @@ mod tests {
                 status
             );
         }
+        let variables_path = format!("{path}/variables");
+        let global_body = r#"{"variables":[{"key":"nombre","label":"Nombre","kind":"text","value":"Valor privado"}]}"#;
+        for (actor, csrf, version, status) in [
+            ("synthetic-tender-reader", true, "\"2\"", StatusCode::FORBIDDEN),
+            ("synthetic-tender-admin", false, "\"2\"", StatusCode::FORBIDDEN),
+            ("synthetic-tender-admin", true, "\"1\"", StatusCode::PRECONDITION_FAILED),
+        ] {
+            assert_eq!(app.clone().oneshot(request("PUT", &variables_path, Some(actor), csrf, "https://example.test", global_body.into(), version)).await.unwrap().status(), status);
+        }
+        let saved = app.clone().oneshot(request("PUT", &variables_path, Some("synthetic-tender-admin"), true, "https://example.test", global_body.into(), "\"2\"")).await.unwrap();
+        assert_eq!(saved.status(), StatusCode::OK);
+        assert_eq!(saved.headers()["etag"], "\"3\"");
         assert_eq!(
             app.clone()
                 .oneshot(request(
@@ -672,7 +694,7 @@ mod tests {
                     true,
                     "https://example.test",
                     format!("{{\"confirm_id\":{id}}}"),
-                    "\"2\""
+                    "\"3\""
                 ))
                 .await
                 .unwrap()

@@ -6,7 +6,7 @@ pub use attachments::{
     Attachment, AttachmentContent, AttachmentCopy, AttachmentDelete, AttachmentList,
     AttachmentSection, AttachmentUpload,
 };
-use bastion_colaboracion::{FormValues, PublishedForm};
+use bastion_colaboracion::{FormDefinition, FormSection, FormValues, FormVariable, PublishedForm, VariableKind};
 use bastion_core::CoreError;
 use serde::{Deserialize, Serialize};
 pub use service::TenderService;
@@ -44,6 +44,8 @@ pub struct FormCopy {
     pub id: u64,
     pub source: PublishedForm,
     pub values: FormValues,
+    #[serde(default)]
+    pub legacy_values: FormValues,
     pub missing_required: Vec<String>,
 }
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -55,6 +57,32 @@ pub struct Expedient {
     pub version: u64,
     pub state: String,
     pub forms: Vec<FormCopy>,
+    #[serde(default)]
+    pub variables: Vec<GlobalVariable>,
+}
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct GlobalVariable {
+    pub key: String,
+    pub label: String,
+    pub kind: VariableKind,
+    pub value: Option<serde_json::Value>,
+}
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct GlobalVariablesInput {
+    pub variables: Vec<GlobalVariable>,
+}
+impl GlobalVariablesInput {
+    pub fn validate(&self) -> Result<(), CoreError> {
+        let schema = FormDefinition {
+            title: "Variables".into(), section: FormSection::Legal, template_source_id: None,
+            variables: self.variables.iter().map(|v| FormVariable { key: v.key.clone(), label: v.label.clone(), kind: v.kind, required: false }).collect(),
+        };
+        let values = self.variables.iter().filter_map(|v| v.value.clone().map(|value| (v.key.clone(), value))).collect();
+        schema.validate_values(&values)?;
+        Ok(())
+    }
 }
 #[derive(Default, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -164,6 +192,13 @@ mod tests {
         assert!(validate_input_budget(0, 0).is_err());
         assert!(validate_final_pdf_budget(500_000_000).is_ok());
         assert!(validate_final_pdf_budget(500_000_001).is_err());
+    }
+    #[test]
+    fn global_variables_are_typed_unique_and_inert() {
+        let variable = GlobalVariable { key: "nombre".into(), label: "Nombre".into(), kind: VariableKind::Text, value: Some(serde_json::json!("<script>")) };
+        assert!(GlobalVariablesInput { variables: vec![variable.clone()] }.validate().is_ok());
+        assert!(GlobalVariablesInput { variables: vec![variable.clone(), variable] }.validate().is_err());
+        assert!(GlobalVariablesInput { variables: vec![GlobalVariable { key: "Monto".into(), label: "Monto".into(), kind: VariableKind::Decimal, value: Some(serde_json::json!(1.5)) }] }.validate().is_err());
     }
     #[test]
     fn clients_cannot_assign_state_schema_or_business_fields() {

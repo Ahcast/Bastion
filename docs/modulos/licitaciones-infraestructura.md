@@ -2,6 +2,8 @@
 
 ## Decisión de alcance del 2026-10-27
 
+El 2026-10-28 se solicita crear y valorar las variables en la pestaña Variables, con alcance global al expediente, y utilizar `#variables.nombre` en Typst. [Contrato, conservación de valores anteriores y límite actual de generación](licitaciones-variables-globales.md).
+
 Ampliación del 2026-10-28: [100 MB por archivo, 1 GB por expediente, referencias de Colaboración y selección de plantillas Typst con variables](licitaciones-archivos.md#ampliación-solicitada-el-2026-10-28). Las descripciones de límites y copias posteriores reflejan el corte inicial.
 
 Decisión posterior: el usuario pide **nombre editable del expediente**. Se agrega exclusivamente ese campo con edición versionada; el ID interno se conserva y los demás datos de negocio siguen dependiendo de los formularios. Ver [contrato, migración y aceptación](licitaciones-nombre.md). Las referencias siguientes al expediente vacío describen el corte inicial.

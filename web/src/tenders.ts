@@ -2,10 +2,11 @@ export type FormSection = 'legal' | 'economica' | 'tecnica';
 export type VariableKind = 'text' | 'integer' | 'decimal' | 'date' | 'boolean';
 export interface FormVariable { key: string; label: string; kind: VariableKind; required: boolean }
 export interface FormDefinition { title: string; section: FormSection; variables: FormVariable[]; template_source_id?: number }
+export interface GlobalVariable { key: string; label: string; kind: VariableKind; value: string | boolean | null }
 export interface PublishedForm { id: number; revision: number; hash: string; definition: FormDefinition }
 export type FormValues = Record<string, string | boolean>;
-export interface FormCopy { id: number; source: PublishedForm; values: FormValues; missing_required: string[] }
-export interface Expedient { id: number; name: string; version: number; state: string; forms: FormCopy[] }
+export interface FormCopy { id: number; source: PublishedForm; values: FormValues; legacy_values?: FormValues; missing_required: string[] }
+export interface Expedient { id: number; name: string; version: number; state: string; forms: FormCopy[]; variables?: GlobalVariable[] }
 export interface ExpedientSummary { id: number; name: string; version: number; state: string }
 export interface TenderPage<T> { items: T[]; page: number; page_size: number; has_more: boolean }
 export const sectionLabels: Record<FormSection, string> = { legal: 'Documentación legal', economica: 'Oferta económica', tecnica: 'Especificaciones técnicas' };

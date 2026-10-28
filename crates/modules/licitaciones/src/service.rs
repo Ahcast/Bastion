@@ -216,17 +216,35 @@ impl TenderService {
             .find(|c| c.id == copy_id)
             .ok_or(CoreError::NotFound)?;
         copy.source.definition.validate_values(&input.values)?;
-        sqlx::query(
-            "UPDATE licitaciones_formularios SET values_json=? WHERE id=? AND expediente_id=?",
-        )
-        .bind(serde_json::to_value(input.values).map_err(|_| CoreError::Invalid)?)
-        .bind(copy_id)
-        .bind(id)
-        .execute(&mut *tx)
-        .await?;
+        let mut variables = current.variables.clone();
+        for field in &copy.source.definition.variables {
+            let value = input.values.get(&field.key).cloned();
+            if let Some(existing) = variables.iter_mut().find(|v| v.key == field.key) {
+                if existing.kind != field.kind { return Err(CoreError::Conflict); }
+                existing.value = value;
+            } else {
+                variables.push(GlobalVariable { key: field.key.clone(), label: field.label.clone(), kind: field.kind, value });
+            }
+        }
+        GlobalVariablesInput { variables: variables.clone() }.validate()?;
+        sqlx::query("UPDATE licitaciones_expedientes SET variables_json=? WHERE id=?")
+            .bind(serde_json::to_value(&variables).map_err(|_| CoreError::Invalid)?).bind(id).execute(&mut *tx).await?;
         bump(&mut tx, actor, id, expected).await?;
         let result = load(&mut tx, id).await?;
         event(&mut tx, actor, "form.values", id, result.version).await?;
+        tx.commit().await?;
+        Ok(result)
+    }
+    pub async fn save_global_variables(&self, actor: u64, id: u64, expected: u64, input: GlobalVariablesInput) -> Result<Expedient, CoreError> {
+        input.validate()?;
+        let mut tx = self.begin(actor, "editar").await?;
+        let current = load(&mut tx, id).await?;
+        editable(&current, expected)?;
+        sqlx::query("UPDATE licitaciones_expedientes SET variables_json=? WHERE id=?")
+            .bind(serde_json::to_value(input.variables).map_err(|_| CoreError::Invalid)?).bind(id).execute(&mut *tx).await?;
+        bump(&mut tx, actor, id, expected).await?;
+        let result = load(&mut tx, id).await?;
+        event(&mut tx, actor, "expedient.variables", id, result.version).await?;
         tx.commit().await?;
         Ok(result)
     }
@@ -289,6 +307,10 @@ pub(crate) async fn load(tx: &mut Transaction<'_, MySql>, id: u64) -> Result<Exp
         .bind(id).fetch_optional(&mut **tx).await?.ok_or(CoreError::NotFound)?;
     let rows:Vec<(u64,serde_json::Value,serde_json::Value)>=sqlx::query_as("SELECT id,source_json,values_json FROM licitaciones_formularios WHERE expediente_id=? ORDER BY id")
         .bind(id).fetch_all(&mut **tx).await?;
+    let global_json:Option<serde_json::Value>=sqlx::query_scalar("SELECT variables_json FROM licitaciones_expedientes WHERE id=?")
+        .bind(id).fetch_one(&mut **tx).await?;
+    let variables: Vec<GlobalVariable> = global_json.map(serde_json::from_value).transpose().map_err(|_| CoreError::Invalid)?.unwrap_or_default();
+    GlobalVariablesInput { variables: variables.clone() }.validate()?;
     let mut forms = Vec::with_capacity(rows.len());
     for (id, source, values) in rows {
         let source: PublishedForm =
@@ -296,12 +318,18 @@ pub(crate) async fn load(tx: &mut Transaction<'_, MySql>, id: u64) -> Result<Exp
         if source.definition.hash()? != source.hash {
             return Err(CoreError::Conflict);
         }
-        let values = serde_json::from_value(values).map_err(|_| CoreError::Invalid)?;
+        let legacy_values = serde_json::from_value(values).map_err(|_| CoreError::Invalid)?;
+        source.definition.validate_values(&legacy_values)?;
+        let values = source.definition.variables.iter().filter_map(|field| {
+            variables.iter().find(|v| v.key == field.key && v.kind == field.kind)
+                .and_then(|v| v.value.clone()).map(|value| (field.key.clone(), value))
+        }).collect();
         let missing_required = source.definition.validate_values(&values)?;
         forms.push(FormCopy {
             id,
             source,
             values,
+            legacy_values,
             missing_required,
         });
     }
@@ -311,6 +339,7 @@ pub(crate) async fn load(tx: &mut Transaction<'_, MySql>, id: u64) -> Result<Exp
         version: e.version,
         state: e.state,
         forms,
+        variables,
     })
 }
 async fn receipt(

@@ -41,7 +41,7 @@ test('tenders need an active module and read permission; library publication is 
 
 test('expedients start empty; values preserve drafts on 412 and navigation asks before discarding', async () => {
   const calls: { path: string; init: RequestInit }[] = [];
-  const record: Expedient = { id: 7, name: '', version: 2, state: 'borrador', forms: [{ id: 8, source: { id: 3, revision: 1, hash: 'a'.repeat(64), definition: { title: '<img src=x onerror=evil()>', section: 'legal', variables: [{ key: 'dato', label: 'Dato sintético', kind: 'text', required: true }] } }, values: {}, missing_required: ['dato'] }] };
+  const record: Expedient = { id: 7, name: '', version: 2, state: 'borrador', variables: [{ key:'dato', label:'Dato sintético', kind:'text', value:null }], forms: [{ id: 8, source: { id: 3, revision: 1, hash: 'a'.repeat(64), definition: { title: '<img src=x onerror=evil()>', section: 'legal', variables: [{ key: 'dato', label: 'Dato sintético', kind: 'text', required: true }] } }, values: {}, missing_required: ['dato'] }] };
   let stale = true, created = false;
   const api = new ApiClient('https://example.test', async (url, init = {}) => {
     const path = new URL(String(url)).pathname;
@@ -57,21 +57,44 @@ test('expedients start empty; values preserve drafts on 412 and navigation asks 
   const click = async (text: string, scope: ParentNode = container) => { const button = [...scope.querySelectorAll('button')].find(b => b.textContent === text); assert.ok(button, text); await act(async () => button.click()); };
   try {
     await act(async () => root.render(<NavigationGuardProvider><CoreContext.Provider value={{ api, access: context, notify: () => {} }}><Licitaciones /></CoreContext.Provider></NavigationGuardProvider>));
-    await click('Abrir expediente'); await click('Documentación legal'); await click('Abrir valores');
+    await click('Abrir expediente'); await click('Variables');
     assert.equal(container.querySelectorAll('img').length, 0);
-    const textarea = container.querySelector('textarea')!; assert.ok(textarea);
-    const setter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value')!.set!;
-    await act(async () => { setter.call(textarea, 'Texto privado'); textarea.dispatchEvent(new Event('input', { bubbles: true })); });
+    const input = [...container.querySelectorAll<HTMLInputElement>('input')].find(e => e.parentElement?.textContent?.startsWith('Valor'))!; assert.ok(input);
+    const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')!.set!;
+    await act(async () => { setter.call(input, 'Texto privado'); input.dispatchEvent(new Event('input', { bubbles: true })); });
     await act(async () => container.querySelector('form')!.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })));
-    assert.equal(textarea.value, 'Texto privado'); assert.ok(container.textContent?.includes('Cambió la versión'));
+    assert.equal(input.value, 'Texto privado'); assert.ok(container.textContent?.includes('Cambió la versión'));
     const write = calls.find(c => c.init.method === 'PUT')!;
     assert.equal(new Headers(write.init.headers).get('if-match'), '"2"');
-    assert.deepEqual(JSON.parse(String(write.init.body)), { values: { dato: 'Texto privado' } });
+    assert.equal(write.path, '/api/v1/licitaciones/7/variables'); assert.deepEqual(JSON.parse(String(write.init.body)), { variables: [{ key:'dato', label:'Dato sintético', kind:'text', value:'Texto privado' }] });
     await click('Volver al listado'); assert.ok(document.body.textContent?.includes('Cambios sin guardar')); await click('Seguir editando', document.body);
     stale = false; await act(async () => container.querySelector('form')!.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })));
     await click('Volver al listado'); await click('Nuevo expediente');
     assert.ok(container.textContent?.includes('0 formularios incorporados'));
     assert.ok(!container.textContent?.includes('Entidad convocante'));
+  } finally { await act(async () => root.unmount()); container.remove(); }
+});
+
+test('variables are created in the expediente before any form is added', async () => {
+  const record: Expedient = { id: 7, name: '', version: 1, state: 'borrador', forms: [], variables: [] };
+  let body: unknown;
+  const api = new ApiClient('https://example.test', async (url, init = {}) => {
+    const path = new URL(String(url)).pathname;
+    if (init.method === 'PUT') { body = JSON.parse(String(init.body)); return Response.json({ ...record, version: 2, variables: (body as { variables: unknown }).variables }); }
+    return Response.json(path === '/api/v1/licitaciones' ? { items: [record], page: 1, page_size: 25, has_more: false } : record);
+  });
+  const context = { ...access, permissions: [...access.permissions, { module_id: 'licitaciones', scope_key: 'expedientes', capability: 'editar' }] };
+  const container = document.createElement('div'); document.body.append(container); const root = createRoot(container);
+  const click = async (label: string) => { const button = [...container.querySelectorAll('button')].find(b => b.textContent === label); assert.ok(button, label); await act(async () => button.click()); };
+  try {
+    await act(async () => root.render(<NavigationGuardProvider><CoreContext.Provider value={{ api, access: context, notify: () => {} }}><Licitaciones /></CoreContext.Provider></NavigationGuardProvider>));
+    await click('Abrir expediente'); await click('Variables'); await click('Añadir variable');
+    const inputs = [...container.querySelectorAll<HTMLInputElement>('fieldset.document-variable input')];
+    const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')!.set!;
+    for (const [i, value] of ['nombre', 'Nombre', 'Marco'].entries()) await act(async () => { setter.call(inputs[i], value); inputs[i]!.dispatchEvent(new Event('input', { bubbles: true })); });
+    await act(async () => container.querySelector('form')!.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })));
+    assert.deepEqual(body, { variables: [{ key: 'nombre', label: 'Nombre', kind: 'text', value: 'Marco' }] });
+    assert.ok(container.textContent?.includes('#variables.nombre'));
   } finally { await act(async () => root.unmount()); container.remove(); }
 });
 
@@ -90,7 +113,7 @@ test('new library schemas have no default variables and require explicit adminis
   } finally { await act(async () => root.unmount()); container.remove(); }
 });
 
-test('a form editor can select a Typst file and add its variables', async () => {
+test('a form editor selects a Typst file while variables are global', async () => {
   const api = new ApiClient('https://example.test', async (url) => Response.json({ items: new URL(String(url)).pathname === '/api/v1/colaboracion' ? [{ id: 7, filename: 'formulario.typ', mime: 'text/plain', size_bytes: 30 }] : [], page: 1, page_size: 25, has_more: false }));
   const container = document.createElement('div'); document.body.append(container); const root = createRoot(container);
   try {
@@ -98,8 +121,7 @@ test('a form editor can select a Typst file and add its variables', async () => 
     await act(async () => [...container.querySelectorAll('button')].find(b => b.textContent === 'Nuevo formulario')!.click());
     const dialog = document.body.querySelector('[role="dialog"]')!;
     await act(async () => [...dialog.querySelectorAll('button')].find(b => b.textContent === 'Seleccionar plantilla')!.click());
-    await act(async () => [...dialog.querySelectorAll('button')].find(b => b.textContent === 'Añadir variable')!.click());
-    assert.ok(dialog.textContent?.includes('archivo #7')); assert.equal(dialog.querySelectorAll('legend').length, 1);
+    assert.ok(dialog.textContent?.includes('archivo #7')); assert.ok(dialog.textContent?.includes('pestaña Variables')); assert.equal(dialog.querySelectorAll('legend').length, 0);
   } finally { await act(async () => root.unmount()); container.remove(); }
 });
 
