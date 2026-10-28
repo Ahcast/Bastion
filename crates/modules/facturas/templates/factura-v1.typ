@@ -1,6 +1,6 @@
 #let d = json("data.json")
 #let money(value) = "L " + value
-#let title = if d.kind == "delivery" { "Nota de entrega" } else if d.kind == "receipt" { "Recibo" } else if not d.issued { "Proforma" } else { "Factura" }
+#let title = if d.kind == "delivery" { "Nota de entrega" } else if d.kind == "receipt" { "Recibo" } else if not d.issued { "Factura Proforma" } else { "Factura" }
 #set document(title: title + " " + d.number, author: d.company.name)
 #set page(paper: "us-letter", margin: 0.5in, numbering: "1 / 1")
 #set text(font: ("Arial", "Liberation Sans", "Libertinus Serif"), size: 9pt, lang: "es")
@@ -42,8 +42,8 @@
 }
 #v(12pt)
 #if d.kind != "delivery" {
- block(breakable:false)[
- #align(left)[#table(columns:(180pt,85pt),stroke:none,inset:2pt,
+ block(width:100%,breakable:false)[
+ #align(right)[#box(width:265pt)[#table(columns:(180pt,85pt),stroke:none,inset:2pt,align:left,
  [Subtotal],money(d.totals.subtotal),
  [Importe exonerado],money(d.totals.importe_exonerado),
  [Importe exento],money(d.totals.importe_exento),
@@ -52,7 +52,7 @@
  [Descuentos y rebajas],money(d.totals.descuentos_rebajas),
  [ISV 15%],money(d.totals.isv_15),[ISV 18%],money(d.totals.isv_18),
  strong("Total de factura"),strong(money(d.totals.total)),
- [Total pagado],money(d.paid_total),[Saldo],money(d.balance))]
+ [Total pagado],money(d.paid_total),[Saldo],money(d.balance))]]
  ]
 }
 #if d.public_notes != "" { [#v(12pt) #strong[Notas:] \ #d.public_notes] }
