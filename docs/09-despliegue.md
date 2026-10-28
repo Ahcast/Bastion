@@ -142,3 +142,7 @@ El 2026-10-27 se instalaron en AWS y Bluehost los artifacts verificados de `e5c8
 ## Facturas: permisos S3 verificados
 
 El 2026-10-27, después de que el usuario agregó los permisos acotados a `facturas/*`, se verificaron con la identidad del servicio la enumeración y eliminación permanente de versiones, escritura/lectura con hash, cifrado AES256 y acceso anónimo 403. Se eliminaron todos los remanentes sintéticos de ambas comprobaciones y se confirmó que los prefijos de prueba quedaron vacíos. Se cierra el pendiente IAM registrado arriba; sin cambios en datos financieros, numeración, credenciales, activaciones o binarios. Ver [cierre y alcance](modulos/facturas-acciones.md#cierre-de-permisos-s3--2026-10-27).
+
+## Facturas: recibo independiente del pago previo
+
+El 2026-10-27 se desplegó en AWS y Bluehost `204f90e`, con [CI aprobado](https://github.com/Ahcast/Bastion/actions/runs/40621961030): Emitir Recibo ya no requiere pagos registrados. El documento refleja el saldo real y no registra pagos ni cambia la factura. Actualización de código sin migraciones, con respaldos privados y comprobación de facturas, pagos y activaciones. Se verificaron 47 archivos del frontend y 45 hashes públicos; configuración y assets anteriores conservados, readiness 200 y rutas privadas anónimas 401. Ver [regla y validación](modulos/facturas-acciones.md#recibo-sin-pago-previo--2026-10-27).
