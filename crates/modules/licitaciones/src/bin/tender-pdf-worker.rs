@@ -119,11 +119,17 @@ fn perform() -> Result<u32, ()> {
 fn main() {
     let args: Vec<_> = std::env::args_os().skip(1).collect();
     if args.len() == 1 && args[0] == "--check-sandbox" {
-        if network_is_private_and_nonroot() { println!("sandbox-ok"); return; }
+        if network_is_private_and_nonroot() {
+            println!("sandbox-ok");
+            return;
+        }
         eprintln!("No se cumplen las restricciones de aislamiento.");
         std::process::exit(1);
     }
-    if !args.is_empty() { eprintln!("Opción no admitida."); std::process::exit(1); }
+    if !args.is_empty() {
+        eprintln!("Opción no admitida.");
+        std::process::exit(1);
+    }
     match perform() {
         Ok(pages) => println!("{{\"pages\":{pages}}}"),
         Err(()) => {
