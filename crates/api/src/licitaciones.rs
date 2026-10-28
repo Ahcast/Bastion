@@ -1,7 +1,7 @@
 use super::*;
 use bastion_licitaciones::{
-    CopyFormInput, DeleteInput, EmptyInput, Expedient, GlobalVariablesInput, LotInput, NameInput, PageQuery, PdfOrderInput,
-    ValuesInput,
+    CopyFormInput, DeleteInput, EmptyInput, Expedient, GlobalVariablesInput, LotInput, NameInput,
+    PageQuery, PdfOrderInput, ValuesInput,
 };
 
 pub(super) fn routes(state: ApiState) -> Router<ApiState> {
@@ -17,8 +17,14 @@ pub(super) fn routes(state: ApiState) -> Router<ApiState> {
             axum::routing::put(global_variables),
         )
         .route("/api/v1/licitaciones/{id}/lotes", get(lot_summaries))
-        .route("/api/v1/licitaciones/{id}/lotes/{numero}", get(lot).put(save_lot))
-        .route("/api/v1/licitaciones/{id}/pdf/orden", get(pdf_order).put(save_pdf_order))
+        .route(
+            "/api/v1/licitaciones/{id}/lotes/{numero}",
+            get(lot).put(save_lot),
+        )
+        .route(
+            "/api/v1/licitaciones/{id}/pdf/orden",
+            get(pdf_order).put(save_pdf_order),
+        )
         .route(
             "/api/v1/licitaciones/{id}/formularios/{copy_id}/valores",
             axum::routing::put(values),
@@ -316,7 +322,15 @@ async fn global_variables(
     let user = actor(&state, &headers).await?;
     state
         .licitaciones
-        .save_global_variables(user.id, id, expected(&headers)?, GlobalVariablesInput { variables: input.variables }, input.confirm_discard)
+        .save_global_variables(
+            user.id,
+            id,
+            expected(&headers)?,
+            GlobalVariablesInput {
+                variables: input.variables,
+            },
+            input.confirm_discard,
+        )
         .await
         .map(response)
         .map_err(ApiError)
@@ -328,25 +342,72 @@ struct GlobalVariablesUpdate {
     #[serde(default)]
     confirm_discard: bool,
 }
-async fn lot(State(state): State<ApiState>, headers: axum::http::HeaderMap, Path((id, numero)): Path<(u64, u32)>) -> Result<Json<bastion_licitaciones::Lot>, ApiError> {
+async fn lot(
+    State(state): State<ApiState>,
+    headers: axum::http::HeaderMap,
+    Path((id, numero)): Path<(u64, u32)>,
+) -> Result<Json<bastion_licitaciones::Lot>, ApiError> {
     let user = actor(&state, &headers).await?;
-    state.licitaciones.lot(user.id, id, numero).await.map(Json).map_err(ApiError)
+    state
+        .licitaciones
+        .lot(user.id, id, numero)
+        .await
+        .map(Json)
+        .map_err(ApiError)
 }
-async fn lot_summaries(State(state): State<ApiState>, headers: axum::http::HeaderMap, Path(id): Path<u64>) -> Result<Json<Vec<bastion_licitaciones::LotSummary>>, ApiError> {
+async fn lot_summaries(
+    State(state): State<ApiState>,
+    headers: axum::http::HeaderMap,
+    Path(id): Path<u64>,
+) -> Result<Json<Vec<bastion_licitaciones::LotSummary>>, ApiError> {
     let user = actor(&state, &headers).await?;
-    state.licitaciones.lot_summaries(user.id, id).await.map(Json).map_err(ApiError)
+    state
+        .licitaciones
+        .lot_summaries(user.id, id)
+        .await
+        .map(Json)
+        .map_err(ApiError)
 }
-async fn save_lot(State(state): State<ApiState>, headers: axum::http::HeaderMap, Path((id, numero)): Path<(u64, u32)>, Json(input): Json<LotInput>) -> Result<Response, ApiError> {
+async fn save_lot(
+    State(state): State<ApiState>,
+    headers: axum::http::HeaderMap,
+    Path((id, numero)): Path<(u64, u32)>,
+    Json(input): Json<LotInput>,
+) -> Result<Response, ApiError> {
     let user = actor(&state, &headers).await?;
-    state.licitaciones.save_lot(user.id, id, numero, expected(&headers)?, input).await.map(response).map_err(ApiError)
+    state
+        .licitaciones
+        .save_lot(user.id, id, numero, expected(&headers)?, input)
+        .await
+        .map(response)
+        .map_err(ApiError)
 }
-async fn pdf_order(State(state): State<ApiState>, headers: axum::http::HeaderMap, Path(id): Path<u64>) -> Result<Json<bastion_licitaciones::PdfOrder>, ApiError> {
+async fn pdf_order(
+    State(state): State<ApiState>,
+    headers: axum::http::HeaderMap,
+    Path(id): Path<u64>,
+) -> Result<Json<bastion_licitaciones::PdfOrder>, ApiError> {
     let user = actor(&state, &headers).await?;
-    state.licitaciones.pdf_order(user.id, id).await.map(Json).map_err(ApiError)
+    state
+        .licitaciones
+        .pdf_order(user.id, id)
+        .await
+        .map(Json)
+        .map_err(ApiError)
 }
-async fn save_pdf_order(State(state): State<ApiState>, headers: axum::http::HeaderMap, Path(id): Path<u64>, Json(input): Json<PdfOrderInput>) -> Result<Response, ApiError> {
+async fn save_pdf_order(
+    State(state): State<ApiState>,
+    headers: axum::http::HeaderMap,
+    Path(id): Path<u64>,
+    Json(input): Json<PdfOrderInput>,
+) -> Result<Response, ApiError> {
     let user = actor(&state, &headers).await?;
-    state.licitaciones.save_pdf_order(user.id, id, expected(&headers)?, input).await.map(response).map_err(ApiError)
+    state
+        .licitaciones
+        .save_pdf_order(user.id, id, expected(&headers)?, input)
+        .await
+        .map(response)
+        .map_err(ApiError)
 }
 async fn remove(
     State(state): State<ApiState>,
