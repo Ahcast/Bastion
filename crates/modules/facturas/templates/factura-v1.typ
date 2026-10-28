@@ -19,7 +19,7 @@
  let term = if d.payment_term_type == "credito" { "Crédito (" + str(d.credit_days) + " días)" } else { "Contado" }
  let discount_type = if d.discount_type == "percent" { "Porcentaje" } else { "Valor (HNL)" }
  let discount = if d.discount_type == "percent" { d.discount_value + "%" } else { money(d.discount_value) }
- let display(value) = if value == "" { "—" } else { value }
+ let display(value) = if value == "" { "—" } else if value.len() <= 35 { value } else { value.clusters().join("\u{200b}") }
  [#v(8pt) #grid(columns:(1fr,1fr),gutter:16pt,
   [#strong[Términos:] #term \ #strong[Descuento:] #discount_type \ #strong[Valor descuento:] #discount],
   [#strong[Orden de Compra / Exenta No.:] #display(d.purchase_order_exempt_number) \ #strong[Constancia de Registro No.:] #display(d.registration_certificate_number) \ #strong[Registro SAG No.:] #display(d.sag_registration_number)])]
