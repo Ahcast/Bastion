@@ -42,21 +42,34 @@ fn status_is_restricted(status: &str) -> bool {
 }
 #[cfg(any(test, target_os = "linux"))]
 fn parse_namespace(value: &str) -> Option<&str> {
-    let value=value.trim();
-    let digits=value.strip_prefix("net:[")?.strip_suffix(']')?;
-    if digits.is_empty() || !digits.bytes().all(|b|b.is_ascii_digit()) {return None;}
+    let value = value.trim();
+    let digits = value.strip_prefix("net:[")?.strip_suffix(']')?;
+    if digits.is_empty() || !digits.bytes().all(|b| b.is_ascii_digit()) {
+        return None;
+    }
     Some(value)
 }
 #[cfg(target_os = "linux")]
 fn trusted_host_namespace() -> Option<PathBuf> {
     use std::os::unix::fs::MetadataExt;
-    if let Ok(link)=std::fs::read_link("/proc/1/ns/net") {return Some(link);}
+    if let Ok(link) = std::fs::read_link("/proc/1/ns/net") {
+        return Some(link);
+    }
     // A root-owned service creates this marker from PID 1 on every boot.
     // Neither the file nor its fixed parent may be writable by the worker.
-    let parent=std::fs::symlink_metadata("/run").ok()?;
-    let file=std::fs::symlink_metadata("/run/bastion-tender-host-netns").ok()?;
-    if !parent.file_type().is_dir() || parent.uid()!=0 || parent.mode() & 0o022 != 0 || !file.file_type().is_file() || file.uid()!=0 || file.mode() & 0o022 != 0 || file.len()>80 {return None;}
-    let text=std::fs::read_to_string("/run/bastion-tender-host-netns").ok()?;
+    let parent = std::fs::symlink_metadata("/run").ok()?;
+    let file = std::fs::symlink_metadata("/run/bastion-tender-host-netns").ok()?;
+    if !parent.file_type().is_dir()
+        || parent.uid() != 0
+        || parent.mode() & 0o022 != 0
+        || !file.file_type().is_file()
+        || file.uid() != 0
+        || file.mode() & 0o022 != 0
+        || file.len() > 80
+    {
+        return None;
+    }
+    let text = std::fs::read_to_string("/run/bastion-tender-host-netns").ok()?;
     Some(PathBuf::from(parse_namespace(&text)?))
 }
 #[cfg(target_os = "linux")]
@@ -141,7 +154,10 @@ mod tests {
     }
     #[test]
     fn namespace_marker_requires_exact_kernel_identifier() {
-        assert_eq!(parse_namespace("net:[4026531993]\n"),Some("net:[4026531993]"));
+        assert_eq!(
+            parse_namespace("net:[4026531993]\n"),
+            Some("net:[4026531993]")
+        );
         assert!(parse_namespace("net:[]").is_none());
         assert!(parse_namespace("net:[1] other").is_none());
         assert!(parse_namespace("net:[1/2]").is_none());
