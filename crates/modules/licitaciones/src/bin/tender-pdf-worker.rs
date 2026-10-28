@@ -28,8 +28,8 @@ fn request(bytes: &[u8]) -> Result<Request, ()> {
 fn status_is_restricted(status: &str) -> bool {
     let field = |key: &str| status.lines().find_map(|line| line.strip_prefix(key)).map(str::trim);
     let uid=field("Uid:").and_then(|v|v.split_whitespace().nth(1)).and_then(|v|v.parse::<u32>().ok());
-    let capabilities=field("CapEff:").and_then(|v|u64::from_str_radix(v,16).ok());
-    uid.is_some_and(|uid|uid!=0) && capabilities==Some(0) && field("NoNewPrivs:")==Some("1")
+    let capabilities=["CapEff:","CapPrm:","CapInh:","CapAmb:"].iter().all(|key|field(key).and_then(|v|u64::from_str_radix(v,16).ok())==Some(0));
+    uid.is_some_and(|uid|uid!=0) && capabilities && field("NoNewPrivs:")==Some("1")
 }
 #[cfg(target_os = "linux")]
 fn network_is_private_and_nonroot() -> bool {
@@ -97,7 +97,7 @@ mod tests {
     }
     #[test]
     fn process_status_requires_no_privilege_or_capabilities() {
-        let good="Uid:\t1001\t1001\t1001\t1001\nCapEff:\t0000000000000000\nNoNewPrivs:\t1\n";
+        let good="Uid:\t1001\t1001\t1001\t1001\nCapEff:\t0000000000000000\nCapPrm:\t0000000000000000\nCapInh:\t0000000000000000\nCapAmb:\t0000000000000000\nNoNewPrivs:\t1\n";
         assert!(status_is_restricted(good));
         assert!(!status_is_restricted(&good.replace("1001\t1001", "1001\t0")));
         assert!(!status_is_restricted(&good.replace("CapEff:\t0000000000000000", "CapEff:\t0000000000000001")));
