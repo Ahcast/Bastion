@@ -12,16 +12,29 @@ mod tests {
     use base64::{Engine as _, engine::general_purpose::STANDARD};
     #[test]
     fn renders_a_real_image_when_typst_is_available() {
-        let Some(bin)=std::env::var_os("BASTION_TYPST_BIN") else {return;};
-        let root=std::env::temp_dir().join(format!("bastion-image-pdf-{}",std::process::id()));
+        let Some(bin) = std::env::var_os("BASTION_TYPST_BIN") else {
+            return;
+        };
+        let root = std::env::temp_dir().join(format!("bastion-image-pdf-{}", std::process::id()));
         std::fs::create_dir_all(&root).unwrap();
         let image=STANDARD.decode("iVBORw0KGgoAAAANSUhEUgAAAAIAAAADCAIAAAA2iEnWAAAAFElEQVR4nGP0qZjJwMDAxAAGUAoAGe4BY53ckeUAAAAASUVORK5CYII=").unwrap();
-        std::fs::write(root.join("attachment.bin"),image).unwrap();
-        std::fs::write(root.join("image.typ"),IMAGE_PAGE_TYPST).unwrap();
-        let output=std::process::Command::new(bin).arg("compile").arg("--root").arg(&root).arg(root.join("image.typ")).arg(root.join("image.pdf")).output().unwrap();
-        assert!(output.status.success(),"{}",String::from_utf8_lossy(&output.stderr));
-        let bytes=std::fs::read(root.join("image.pdf")).unwrap();
+        std::fs::write(root.join("attachment.bin"), image).unwrap();
+        std::fs::write(root.join("image.typ"), IMAGE_PAGE_TYPST).unwrap();
+        let output = std::process::Command::new(bin)
+            .arg("compile")
+            .arg("--root")
+            .arg(&root)
+            .arg(root.join("image.typ"))
+            .arg(root.join("image.pdf"))
+            .output()
+            .unwrap();
+        assert!(
+            output.status.success(),
+            "{}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        let bytes = std::fs::read(root.join("image.pdf")).unwrap();
         assert!(bytes.starts_with(b"%PDF-"));
-        let _=std::fs::remove_dir_all(&root);
+        let _ = std::fs::remove_dir_all(&root);
     }
 }
