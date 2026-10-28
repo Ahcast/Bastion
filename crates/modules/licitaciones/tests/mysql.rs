@@ -538,19 +538,49 @@ async fn mysql57_tenders_snapshots_permissions_races_receipts_and_deletion() {
         ("descripcion", VariableKind::Text, "Equipo"),
         ("dato", VariableKind::Text, "Global"),
     ] {
-        ready.variables.push(GlobalVariable {key:key.into(), label:key.into(), kind, value:Some(serde_json::json!(value))});
+        ready.variables.push(GlobalVariable {
+            key: key.into(),
+            label: key.into(),
+            kind,
+            value: Some(serde_json::json!(value)),
+        });
     }
-    tenders.save_global_variables(1, exp.id, 9, ready, false).await.unwrap();
+    tenders
+        .save_global_variables(1, exp.id, 9, ready, false)
+        .await
+        .unwrap();
     let template = "#import \"items1_std.typ\": items";
     sqlx::query("DELETE FROM role_permissions WHERE role_id=2 AND module_id='licitaciones' AND capability='ver'").execute(&pool).await.unwrap();
-    assert!(matches!(tenders.prepare_typst_snapshot(2, exp.id, 10, 8, template).await, Err(CoreError::Forbidden)));
-    assert!(matches!(tenders.prepare_typst_snapshot(1, exp.id, 9, 8, template).await, Err(CoreError::PreconditionFailed)));
-    let snapshot=tenders.prepare_typst_snapshot(1, exp.id, 10, 8, template).await.unwrap();
+    assert!(matches!(
+        tenders
+            .prepare_typst_snapshot(2, exp.id, 10, 8, template)
+            .await,
+        Err(CoreError::Forbidden)
+    ));
+    assert!(matches!(
+        tenders
+            .prepare_typst_snapshot(1, exp.id, 9, 8, template)
+            .await,
+        Err(CoreError::PreconditionFailed)
+    ));
+    let snapshot = tenders
+        .prepare_typst_snapshot(1, exp.id, 10, 8, template)
+        .await
+        .unwrap();
     assert_eq!(snapshot.expediente.version, 10);
-    assert_eq!(snapshot.order.iter().map(|item| item.key.clone()).collect::<Vec<_>>(),keys);
-    assert_eq!(snapshot.sources.offered_lots,vec![1]);
-    let config:serde_json::Value=serde_json::from_slice(&snapshot.sources.files["config.json"]).unwrap();
-    assert_eq!(config["total_paginas"],8);
-    let items:serde_json::Value=serde_json::from_slice(&snapshot.sources.files["items1_std.json"]).unwrap();
-    assert_eq!(items[0]["descripcion"],"Equipo");
+    assert_eq!(
+        snapshot
+            .order
+            .iter()
+            .map(|item| item.key.clone())
+            .collect::<Vec<_>>(),
+        keys
+    );
+    assert_eq!(snapshot.sources.offered_lots, vec![1]);
+    let config: serde_json::Value =
+        serde_json::from_slice(&snapshot.sources.files["config.json"]).unwrap();
+    assert_eq!(config["total_paginas"], 8);
+    let items: serde_json::Value =
+        serde_json::from_slice(&snapshot.sources.files["items1_std.json"]).unwrap();
+    assert_eq!(items[0]["descripcion"], "Equipo");
 }
