@@ -51,6 +51,7 @@ test('invoice summary renders server decimals and negative profit without floati
 test('invoice editor exposes the requested commercial and fiscal fields', () => {
   const html = renderToStaticMarkup(<NavigationGuardProvider><CoreContext.Provider value={{ api: new ApiClient('https://example.test'), access: editorAccess, notify: () => {} }}><InvoiceEditor initial={draft} editable close={() => {}} /></CoreContext.Provider></NavigationGuardProvider>);
   for (const label of ['Fecha', 'Términos', 'Contado', 'Crédito', 'Descuento', 'Valor descuento', 'Orden de Compra / Exenta No.', 'Constancia de Registro No.', 'Registro SAG No.']) assert.ok(html.includes(label), label);
+  assert.ok(html.includes('se exonera el impuesto de todos los ítems'));
 });
 
 test('invoice rows do not assign a server total to a different item after blank rows are filtered', () => {

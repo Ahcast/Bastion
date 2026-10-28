@@ -128,6 +128,7 @@ export function InvoiceEditor({ initial, editable, edit, close }: { initial: Inv
           <label>Constancia de Registro No.<input maxLength={150} value={data.registration_certificate_number} onChange={e => change('registration_certificate_number', e.target.value)} /></label>
           <label>Registro SAG No.<input maxLength={150} value={data.sag_registration_number} onChange={e => change('sag_registration_number', e.target.value)} /></label>
         </div>
+        <p className="quote-note">Al ingresar cualquiera de estos tres números, se exonera el impuesto de todos los ítems.</p>
         {data.payment_term_type === 'contado' && <p className="quote-note" role="status">Contado exige pago total antes de guardar. Registra el pago inicial debajo de los datos de factura.</p>}
       </section>
       {editable && !(saved?.payments?.length) && <section className="quote-section"><h2>Pago inicial</h2><label><input type="checkbox" checked={Boolean(data.initial_payment)} onChange={event=>change('initial_payment',event.target.checked?newPayment():null)} /> Registrar pago al guardar</label>{data.initial_payment && <InvoicePaymentFields value={data.initial_payment} change={value=>change('initial_payment',value)} />}</section>}
