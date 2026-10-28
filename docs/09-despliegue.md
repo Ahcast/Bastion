@@ -157,3 +157,7 @@ El 2026-10-28 se desplegó en AWS el backend `43e65be2ec16b712b310abd3a47f683715
 ## Facturas: corrección SAR, proforma y recibo
 
 El 2026-10-28 se desplegó en AWS y Bluehost `cac1fa4`, con [CI aprobado](https://github.com/Ahcast/Bastion/actions/runs/40677322367). El rango SAR admite espacios alrededor de sus guiones sin alterar la configuración y mantiene las validaciones de secuencia, prefijo, límites y fecha. El PDF de borrador se presenta como Proforma con totales compactos a la izquierda; el recibo requiere factura emitida y usa el texto y total en letras solicitados, sin registrar pagos. Respaldo privado previo, sin migraciones ni consumo de números SAR; 47 archivos frontend, 45 hashes públicos, readiness 200 y rutas privadas anónimas 401. No se emitió una factura real durante la verificación. Ver [detalle y diagnóstico](modulos/facturas-acciones.md#emisión-sar-y-presentación--2026-10-28).
+
+## Facturas: edición de enviadas
+
+El 2026-10-28 se desplegó en AWS y Bluehost `ae475e8`, con [CI aprobado](https://github.com/Ahcast/Bastion/actions/runs/40679375678). Las facturas Enviadas admiten edición; conservan número SAR, pagos y snapshots, y su saldo se recalcula sin permitir un total inferior a lo pagado. Pagado continúa sin edición y se mantienen las reglas de eliminación. Sin migraciones, con respaldos privados y verificación de datos/activaciones, 47 archivos frontend, 45 hashes públicos y readiness 200. Ver [evidencia](modulos/facturas-acciones.md#edición-de-facturas-enviadas--despliegue-2026-10-28).
