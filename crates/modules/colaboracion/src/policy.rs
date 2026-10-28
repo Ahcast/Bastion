@@ -23,7 +23,7 @@ impl Default for FilePolicy {
             trash_retention_days: 30,
             allowed_extensions: [
                 "pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx", "odt", "ods", "odp", "txt",
-                "csv", "rtf", "png", "jpg", "jpeg", "gif", "webp", "bmp", "tif", "tiff", "zip",
+                "csv", "rtf", "typ", "png", "jpg", "jpeg", "gif", "webp", "bmp", "tif", "tiff", "zip",
             ]
             .into_iter()
             .map(str::to_owned)
@@ -85,7 +85,7 @@ impl FilePolicy {
         if bytes.starts_with(b"MZ") || bytes.starts_with(b"\x7fELF") || bytes.starts_with(b"#!") {
             return Err(CoreError::Invalid);
         }
-        if matches!(ext, "txt" | "csv") {
+        if matches!(ext, "txt" | "csv" | "typ") {
             let text = std::str::from_utf8(bytes)
                 .map_err(|_| CoreError::Invalid)?
                 .trim_start()
@@ -126,6 +126,7 @@ fn expected_mime(ext: &str) -> Option<&'static [&'static str]> {
         "ods" => &["application/vnd.oasis.opendocument.spreadsheet"],
         "odp" => &["application/vnd.oasis.opendocument.presentation"],
         "txt" => &["text/plain"],
+        "typ" => &["text/plain"],
         "csv" => &["text/plain", "text/csv"],
         "rtf" => &["text/rtf", "application/rtf"],
         "png" => &["image/png"],
@@ -221,12 +222,23 @@ mod tests {
             p.check("contrato.pdf", "application/pdf", b"%PDF-1.7")
                 .is_ok()
         );
+        assert!(p.allowed_extensions.iter().any(|ext| ext == "typ"));
+        assert!(p
+            .check(
+                "plantilla.typ",
+                "text/plain",
+                b"= Cotizacion\n#let total = 10\n"
+            )
+            .is_ok());
+        assert!(p.check("captura.jpeg", "image/jpeg", &[0xff, 0xd8, 0xff]).is_ok());
+        assert!(p.check("captura.png", "image/png", b"\x89PNG\r\n\x1a\n").is_ok());
         for (name, mime, bytes) in [
             ("foto.jpg", "application/pdf", b"%PDF-".as_slice()),
             ("factura.exe.pdf", "application/pdf", b"%PDF-"),
             ("foto.png", "image/png", b"MZbinary"),
             ("script.txt", "text/plain", b"#!/bin/sh"),
             ("correo.txt", "text/plain", b"<script>x</script>"),
+            ("malicioso.typ", "text/plain", b"  <!doctype html><script>x</script>"),
         ] {
             assert!(p.check(name, mime, bytes).is_err());
         }

@@ -1,5 +1,7 @@
 # Documentación del nuevo CastilloIT
 
+- 2026-10-27: el usuario solicita permitir `.typ`, `.png` y `.jpeg` en Colaboración. `.png` y `.jpeg` ya estaban en la política predeterminada; se conserva su validación MIME. Se añade `.typ` como texto plano (`text/plain`), sujeto a los controles existentes contra scripts, HTML activo y ejecutables. No habilita ejecución de Typst ni añade funciones de plantillas de Licitaciones. Ver `modulos/colaboracion-y-archivos.md` y `modulos/colaboracion-implementacion.md`.
+
 Este paquete convierte el análisis de la aplicación actual y las decisiones acordadas en una especificación para desarrollar la nueva aplicación en Rust.
 
 Licitaciones, ampliación autorizada el 2026-10-27: nombre editable y copias privadas de PDF/imágenes desde PC o Colaboración, conservando AWS/Bluehost/MySQL. [Contratos y publicación verificada](modulos/licitaciones-archivos-despliegue.md). No incorpora formularios precargados ni cierra PDF final, lotes/ítems o adjudicación.
