@@ -146,3 +146,7 @@ El 2026-10-27, después de que el usuario agregó los permisos acotados a `factu
 ## Facturas: recibo independiente del pago previo
 
 El 2026-10-27 se desplegó en AWS y Bluehost `204f90e`, con [CI aprobado](https://github.com/Ahcast/Bastion/actions/runs/40621961030): Emitir Recibo ya no requiere pagos registrados. El documento refleja el saldo real y no registra pagos ni cambia la factura. Actualización de código sin migraciones, con respaldos privados y comprobación de facturas, pagos y activaciones. Se verificaron 47 archivos del frontend y 45 hashes públicos; configuración y assets anteriores conservados, readiness 200 y rutas privadas anónimas 401. Ver [regla y validación](modulos/facturas-acciones.md#recibo-sin-pago-previo--2026-10-27).
+
+## Facturas: campos comerciales y fiscales
+
+El 2026-10-27 se desplegó en AWS y Bluehost `c6d2124`, con [CI aprobado](https://github.com/Ahcast/Bastion/actions/runs/40623822103). Se muestran en el editor los tres números fiscales ya almacenados, y el PDF de factura incluye esos números, términos y descuento. El editor informa que cualquiera de los tres números aplica la exoneración existente a todos los ítems. Se preservaron facturas, pagos y activaciones, sin migraciones; respaldos privados y verificación de 47 archivos locales, 45 hashes públicos, readiness 200 y rutas privadas anónimas 401. Ver [alcance y pruebas](modulos/facturas.md#campos-comerciales-y-fiscales--2026-10-27).
