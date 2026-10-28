@@ -318,11 +318,15 @@ mod tests {
                     .success()
             );
         }
-        assert!(Command::new(&qpdf)
-            .arg(root.join("piece-000001.pdf"))
-            .arg("--rotate=+90:1")
-            .arg(root.join("piece-000003.pdf"))
-            .status().unwrap().success());
+        assert!(
+            Command::new(&qpdf)
+                .arg(root.join("piece-000001.pdf"))
+                .arg("--rotate=+90:1")
+                .arg(root.join("piece-000003.pdf"))
+                .status()
+                .unwrap()
+                .success()
+        );
         assert_eq!(
             measure_and_compose_pdf(
                 Path::new(&typst),
@@ -338,7 +342,8 @@ mod tests {
             pages(Path::new(&qpdf), &root.join("result.pdf")).unwrap(),
             3
         );
-        let folios: serde_json::Value = serde_json::from_slice(&fs::read(root.join("folios.json")).unwrap()).unwrap();
+        let folios: serde_json::Value =
+            serde_json::from_slice(&fs::read(root.join("folios.json")).unwrap()).unwrap();
         assert_eq!(folios[2]["width_pt"], 792.0);
         assert_eq!(folios[2]["height_pt"], 612.0);
         let _ = fs::remove_dir_all(&root);
