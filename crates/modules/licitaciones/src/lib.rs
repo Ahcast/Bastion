@@ -1,6 +1,7 @@
 #![forbid(unsafe_code)]
 
 mod attachments;
+mod frontmatter;
 mod lots;
 mod order;
 mod pagination;
@@ -14,6 +15,7 @@ use bastion_colaboracion::{
     FormDefinition, FormSection, FormValues, FormVariable, PublishedForm, VariableKind,
 };
 use bastion_core::CoreError;
+pub use frontmatter::prepare_frontmatter_sources;
 pub use lots::{Lot, LotInput, LotItem, LotSummary};
 pub use order::{PdfOrder, PdfOrderInput, PdfOrderItem};
 pub use pagination::{MeasuredPiece, PageConvergence, PagePlan, PageRange, plan_pdf_pages};
