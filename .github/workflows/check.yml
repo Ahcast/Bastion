@@ -223,6 +223,33 @@ jobs:
             exit 1
           fi
           grep -F 'unknown command' startup-check.txt
+      - name: Build isolated tender PDF worker
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo build --release --locked --package bastion-licitaciones --bin tender-pdf-worker --target x86_64-unknown-linux-gnu
+          worker=target/x86_64-unknown-linux-gnu/release/tender-pdf-worker
+          file "$worker"
+          ldd "$worker"
+          if printf '{"pieces":1}' | env -i "$worker" > worker-check.txt 2>&1; then
+            echo "Worker must fail closed without its isolated service environment"
+            exit 1
+          fi
+          mkdir -p dist/tender-worker
+          cp "$worker" dist/tender-worker/
+          git rev-parse HEAD > dist/tender-worker/BUILD.txt
+          (cd dist/tender-worker && sha256sum tender-pdf-worker > SHA256SUMS)
+          tar -czf dist/tender-pdf-worker-linux-x86_64.tar.gz -C dist/tender-worker .
+          (cd dist && sha256sum tender-pdf-worker-linux-x86_64.tar.gz > tender-pdf-worker-linux-x86_64.tar.gz.sha256)
+      - name: Upload isolated tender PDF worker
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: tender-pdf-worker-linux-x86_64
+          path: |
+            dist/tender-pdf-worker-linux-x86_64.tar.gz
+            dist/tender-pdf-worker-linux-x86_64.tar.gz.sha256
+          if-no-files-found: error
+          retention-days: 30
       - name: Package Lightsail executable
         shell: bash
         run: |
