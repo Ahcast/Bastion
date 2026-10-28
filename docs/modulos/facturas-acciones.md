@@ -75,3 +75,9 @@ El commit `204f90e0eba8444da6d3605af533d860207eeee1` aprobó [CI](https://github
 ## Emisión SAR y presentación — 2026-10-28
 
 El rango SAR configurado puede contener espacios junto a los guiones de un número; se eliminan solo para su validación, sin alterar los valores fiscales guardados ni relajar la comprobación de prefijo, rango, fecha o correlativo. La proforma compacta sus totales a la izquierda. El recibo requiere factura emitida y usa el total en letras y el texto acordado, sin depender de pagos registrados. Este corte actualiza la presentación histórica indicada arriba.
+
+### Despliegue verificado — 2026-10-28
+
+El error de emisión del borrador se identificó mediante inspección de solo lectura: el segundo extremo del rango SAR contenía un espacio inmediatamente después de un guion, que el intérprete anterior separaba como un tercer fragmento. Sin cambiar la configuración, el rango normalizado conserva prefijos coincidentes y el siguiente número está dentro de los límites; fecha SAR vigente y borrador con cliente e ítem. No se intentó emitir una factura real ni se consumió numeración durante esta comprobación.
+
+El commit `cac1fa4b27ba040b760710c37fd90420a720b27a` pasó [CI](https://github.com/Ahcast/Bastion/actions/runs/40677322367), incluidas las pruebas de emisión con espacios, recibo bloqueado en borrador, recibo emitido sin exigir pago y conversión de importes a letras. Los PDF de proforma y recibo se revisaron visualmente con datos sintéticos. AWS y Bluehost ejecutan el artifact verificado: sin migraciones, con respaldos privados, facturas/pagos/activaciones preservados; frontend de 47 archivos y 45 hashes públicos, readiness 200 y rutas privadas sin sesión 401. La emisión real queda para que el usuario la efectúe.
