@@ -432,8 +432,26 @@ impl InvoiceService {
         if current.version != expected {
             return Err(CoreError::PreconditionFailed);
         }
-        if current.status != "Borrador" {
+        if !matches!(current.status.as_str(), "Borrador" | "Enviado") {
             return Err(CoreError::Conflict);
+        }
+        let issued = current.status == "Enviado";
+        if issued
+            && (input.initial_payment.is_some()
+                || input.client_name.trim().is_empty()
+                || input.items.is_empty())
+        {
+            return Err(CoreError::Invalid);
+        }
+        if issued
+            && input.invoice_date != current.data.invoice_date
+            && current
+                .sar_snapshot
+                .as_ref()
+                .and_then(|sar| sar.limit_date)
+                .is_none_or(|limit| input.invoice_date > limit)
+        {
+            return Err(CoreError::Invalid);
         }
         self.resolve_client(&mut tx, actor, &mut input, Some(&current.data))
             .await?;
@@ -454,19 +472,33 @@ impl InvoiceService {
                 .unwrap_or(0);
         actions::settle(&mut calculation, paid)?;
         calculation.ensure_saveable()?;
+        if issued
+            && (calculation.data.client_name.trim().is_empty() || calculation.data.items.is_empty())
+        {
+            return Err(CoreError::Invalid);
+        }
         let version = expected.checked_add(1).ok_or(CoreError::Invalid)?;
+        let status = if issued && calculation.balance == "0.00" {
+            "Pagado"
+        } else {
+            current.status.as_str()
+        };
         let mut payments = current.payments;
         if let Some(payment) = payment {
             payments.push(actions::insert_payment(&mut tx, actor, id, &payment).await?);
         }
-        sqlx::query("UPDATE facturas_drafts SET version=?,client_name=?,order_number=?,invoice_date=?,data_json=?,calculation_json=?,updated_by=?,updated_at=UTC_TIMESTAMP(6) WHERE id=?")
-            .bind(version).bind(&calculation.data.client_name).bind(&calculation.data.order_number).bind(calculation.data.invoice_date)
+        sqlx::query("UPDATE facturas_drafts SET version=?,status=?,client_name=?,order_number=?,invoice_date=?,data_json=?,calculation_json=?,updated_by=?,updated_at=UTC_TIMESTAMP(6) WHERE id=?")
+            .bind(version).bind(status).bind(&calculation.data.client_name).bind(&calculation.data.order_number).bind(calculation.data.invoice_date)
             .bind(serde_json::to_value(&calculation.data).map_err(|_| CoreError::Invalid)?).bind(serde_json::to_value(&calculation).map_err(|_| CoreError::Invalid)?).bind(actor).bind(id).execute(&mut *tx).await?;
         CoreAdmin::record_domain_event(
             &mut tx,
             actor,
             "facturas",
-            "invoice.draft.update",
+            if issued {
+                "invoice.issued.update"
+            } else {
+                "invoice.draft.update"
+            },
             &id.to_string(),
             serde_json::json!({"version":version}),
         )
@@ -475,12 +507,12 @@ impl InvoiceService {
         Ok(InvoiceDraft {
             id,
             version,
-            status: "Borrador".into(),
+            status: status.into(),
             currency: "HNL".into(),
-            invoice_number: None,
+            invoice_number: current.invoice_number,
             payments,
-            sar_snapshot: None,
-            company_snapshot: None,
+            sar_snapshot: current.sar_snapshot,
+            company_snapshot: current.company_snapshot,
             source_quote: current.source_quote,
             source_order: current.source_order,
             data: calculation.data.clone(),

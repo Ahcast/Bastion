@@ -5,7 +5,7 @@
 El usuario solicita terminar las acciones del desplegable y confirma:
 
 - El número SAR se asigna únicamente al **marcar como enviado**. Crear, convertir o clonar conserva un borrador sin número fiscal.
-- Enviado y Pagado no admiten edición ni eliminación. Solo se eliminan borradores sin pagos, conservando las relaciones de origen.
+- El 2026-10-28 el usuario cambia la regla: Enviado admite edición. Pagado permanece sin edición; Enviado y Pagado no se eliminan. Solo se eliminan borradores sin pagos, conservando las relaciones de origen.
 - Para instalar la migración 5 se autoriza reutilizar la credencial MySQL existente únicamente durante ese proceso, después de un respaldo privado verificado. No crear cuentas, cambiar privilegios ni persistir credenciales de migración en el servicio.
 
 Se conserva el orden Ver, Editar, Marcar como enviado, Ingresar pago, Clonar, PDF, Nota de entrega, Emitir Recibo y Eliminar. Una acción se deshabilita por permisos, estado, saldo, pagos o configuración real; se retiran los bloqueos permanentes por implementación pendiente.
@@ -19,6 +19,8 @@ Formato técnico admitido: `NNN-NNN-NN-NNNNNNNN` para factura actual; rango comp
 Pago: importe decimal positivo, fecha (día de Honduras si se omite o es nula), método opcional de hasta 120 caracteres y referencia opcional de hasta 180, como `FacturasController::addPayment` observado. No se inventa un catálogo de métodos. No hay flotantes monetarios. Se rechazan importes mayores al saldo, se suman pagos y se actualizan pagado/saldo/estado/version/auditoría juntos. Los parciales conservan Enviado y saldo cero pasa a Pagado. Límite técnico nuevo: 200 pagos por factura, además de cuotas y tamaño de petición existentes.
 
 Los borradores pueden guardar un pago inicial dentro de la misma transacción mediante `initial_payment`; los de contado exigen total cubierto al guardar. El campo no se persiste dentro del JSON editable ni permite reemplazar el historial. La vista previa de un borrador existente consulta su versión e historial en servidor. Se conservan fechas, descuentos, costos y la utilidad confirmada el 2026-10-26: venta − ISV − inversión total.
+
+Al editar una factura Enviada se conserva su número SAR y las instantáneas de empresa y autorización, sus relaciones de origen y los pagos registrados. El total y saldo se recalculan sin permitir que el total sea inferior a lo pagado; saldo cero cambia el estado a Pagado. La fecha modificada no puede superar la fecha límite SAR capturada. La edición mantiene la autorización y control de versión y registra una auditoría propia. Los documentos se regeneran para la versión nueva.
 
 ## Clonar y eliminar
 

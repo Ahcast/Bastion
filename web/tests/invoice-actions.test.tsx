@@ -16,7 +16,7 @@ const {act}=await import('react');const {createRoot}=await import('react-dom/cli
 const access:Access={is_system_administrator:false,modules:[{module_id:'facturas',display_name:'Facturas'}],permissions:['ver','editar','eliminar'].map(capability=>({module_id:'facturas',scope_key:'documentos',capability}))};
 const row:InvoiceSummary={id:7,version:3,invoice_number:'000-001-01-00000001',client_name:'Cliente',order_number:'ORD-1',invoice_date:'2026-10-27',status:'Enviado',paid_total:'20.00',total:'115.00',balance:'95.00',item_count:1};
 
-test('issued invoice actions respect immutable state, payments, document readiness and permissions',async()=>{
+test('sent invoice actions respect editing permission, payments and document readiness',async()=>{
  for(const editor of [true,false]){
   for(const invoice of [row,{...row,paid_total:'0.00',balance:row.total}]){
   const calls:string[]=[];const api=new ApiClient('https://example.test',async(url,init={})=>{
@@ -27,7 +27,7 @@ test('issued invoice actions respect immutable state, payments, document readine
    await act(async()=>root.render(<NavigationGuardProvider><CoreContext.Provider value={{api,access:editor?access:{...access,permissions:access.permissions.filter(p=>p.capability==='ver')},notify:()=>{}}}><Facturas/></CoreContext.Provider></NavigationGuardProvider>));
    await act(async()=>container.querySelector<HTMLButtonElement>('[aria-haspopup="menu"]')!.click());
    const items=[...document.querySelectorAll<HTMLButtonElement>('[role="menuitem"]')];
-   assert.equal(items[1]?.disabled,true);assert.equal(items[2]?.disabled,true);assert.equal(items[8]?.disabled,true);
+   assert.equal(items[1]?.disabled,!editor);assert.equal(items[2]?.disabled,true);assert.equal(items[8]?.disabled,true);
    assert.equal(items[3]?.disabled,!editor);assert.equal(items[4]?.disabled,!editor);
    assert.ok([5,6,7].every(index=>items[index]?.disabled===false),'document actions use read permission');
    assert.ok(calls.every(method=>method==='GET'));
@@ -45,6 +45,18 @@ test('receipt is unavailable for drafts and remains available for issued invoice
   await act(async()=>container.querySelector<HTMLButtonElement>('[aria-haspopup="menu"]')!.click());
   const receipt=[...document.querySelectorAll<HTMLButtonElement>('[role="menuitem"]')].find(item=>item.textContent?.includes('Emitir Recibo'));
   assert.equal(receipt?.disabled,true);assert.ok(receipt?.textContent?.includes('Primero emite la factura'));
+ }finally{await act(async()=>root.unmount());container.remove();}
+});
+
+test('paid invoices remain read-only in the action menu',async()=>{
+ const invoice={...row,status:'Pagado' as const,balance:'0.00'};
+ const api=new ApiClient('https://example.test',async url=>Response.json(new URL(String(url)).pathname.endsWith('/document-readiness')?{pdf:true}:{items:[invoice],page:1,page_size:25,has_more:false}));
+ const container=document.createElement('div');document.body.append(container);const root=createRoot(container);
+ try{
+  await act(async()=>root.render(<NavigationGuardProvider><CoreContext.Provider value={{api,access,notify:()=>{}}}><Facturas/></CoreContext.Provider></NavigationGuardProvider>));
+  await act(async()=>container.querySelector<HTMLButtonElement>('[aria-haspopup="menu"]')!.click());
+  const edit=[...document.querySelectorAll<HTMLButtonElement>('[role="menuitem"]')].find(item=>item.textContent?.startsWith('Editar'));
+  assert.equal(edit?.disabled,true);
  }finally{await act(async()=>root.unmount());container.remove();}
 });
 
@@ -68,7 +80,7 @@ test('ambiguous payment retries freeze the payload and reuse the same idempotenc
  }finally{await act(async()=>root.unmount());container.remove();}
 });
 
-test('marking sent requires an explicit versioned confirmation and explains numbering and immutability',async()=>{
+test('marking sent requires an explicit versioned confirmation and explains numbering and editability',async()=>{
  let calls=0;
  const api=new ApiClient('https://example.test',async(url,init={})=>{
   calls++;assert.equal(new URL(String(url)).pathname,'/api/v1/facturas/7/mark-sent');assert.equal(new Headers(init.headers).get('If-Match'),'"3"');assert.ok(new Headers(init.headers).get('Idempotency-Key'));
@@ -77,7 +89,7 @@ test('marking sent requires an explicit versioned confirmation and explains numb
  const container=document.createElement('div');document.body.append(container);const root=createRoot(container);
  try{
   await act(async()=>root.render(<CoreContext.Provider value={{api,access,notify:()=>{}}}><InvoiceCommandDialog invoice={{...row,status:'Borrador',invoice_number:null}} action="sent" close={()=>{}} changed={()=>{}} completed={()=>{}}/></CoreContext.Provider>));
-  assert.equal(calls,0);assert.ok(document.body.textContent?.includes('Se asignará el siguiente número SAR'));assert.ok(document.body.textContent?.includes('Esta acción no envía un correo'));
+  assert.equal(calls,0);assert.ok(document.body.textContent?.includes('Se asignará el siguiente número SAR'));assert.ok(document.body.textContent?.includes('podrá editarse'));assert.ok(document.body.textContent?.includes('Esta acción no envía un correo'));
   await act(async()=>document.querySelector('form')!.dispatchEvent(new Event('submit',{bubbles:true,cancelable:true})));
   assert.equal(calls,1);assert.ok(document.body.textContent?.includes('La factura cambió'));
   await act(async()=>document.querySelector('form')!.dispatchEvent(new Event('submit',{bubbles:true,cancelable:true})));

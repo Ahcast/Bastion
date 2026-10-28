@@ -55,7 +55,7 @@ paths:
     parameters:
       - {name: id, in: path, required: true, schema: {type: integer, minimum: 1}}
     post:
-      summary: Vista previa de borrador con su versión y pagos existentes (editar)
+      summary: Vista previa de factura borrador o enviada con su versión y pagos existentes (editar)
       parameters:
         - {$ref: '#/components/parameters/IfMatch'}
         - {$ref: '#/components/parameters/Csrf'}
@@ -137,7 +137,7 @@ paths:
         '200': {$ref: '#/components/responses/Draft'}
         default: {$ref: '#/components/responses/Problem'}
     put:
-      summary: Reemplazar borrador con control de versión (facturas/documentos/editar)
+      summary: Editar factura borrador o enviada con control de versión, preservando pagos y número SAR (facturas/documentos/editar)
       parameters:
         - {$ref: '#/components/parameters/IfMatch'}
         - {$ref: '#/components/parameters/Csrf'}

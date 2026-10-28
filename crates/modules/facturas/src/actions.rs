@@ -179,13 +179,13 @@ impl InvoiceService {
         if saved.version != expected {
             return Err(CoreError::PreconditionFailed);
         }
-        if saved.status != "Borrador" {
+        if !matches!(saved.status.as_str(), "Borrador" | "Enviado") {
             return Err(CoreError::Conflict);
         }
         let mut result = calculate(input)?;
         let mut paid = cents(&saved.calculation.paid_total)?;
         if let Some(payment) = input.initial_payment.clone() {
-            if !saved.payments.is_empty() {
+            if saved.status != "Borrador" || !saved.payments.is_empty() {
                 return Err(CoreError::Conflict);
             }
             paid += cents(&normalize_payment(payment)?.amount)?;

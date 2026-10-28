@@ -16,7 +16,7 @@ export function InvoiceCommandDialog({ invoice, action, close, completed, change
   const key = useRef(crypto.randomUUID());
   const title = action === 'sent' ? 'Marcar como enviado' : action === 'payment' ? 'Ingresar pago' : 'Eliminar factura';
   return <Dialog title={`${title} · ${invoice.invoice_number ?? `Borrador ${invoice.id}`}`} close={() => { if (!busy) close(); }}>
-    {action === 'sent' && <p>Se asignará el siguiente número SAR y la factura quedará bloqueada para edición y eliminación. Esta acción no envía un correo. Revisa empresa, rango autorizado y fecha límite en Ajustes antes de confirmar.</p>}
+    {action === 'sent' && <p>Se asignará el siguiente número SAR. La factura enviada podrá editarse, pero no eliminarse. Esta acción no envía un correo. Revisa empresa, rango autorizado y fecha límite en Ajustes antes de confirmar.</p>}
     {action === 'delete' && <p>Se quitará el borrador del listado. Sus relaciones de origen se conservarán; no se podrá repetir su conversión ni recuperar el borrador desde esta pantalla. Solo se permiten borradores sin pagos.</p>}
     {action === 'payment' && <p>Saldo registrado: L {invoice.balance}. El pago no puede superar este saldo.</p>}
     <Notice>{error}</Notice>{ambiguous && <p role="status">No se confirmó la respuesta. Reintenta con los mismos datos y la misma clave para evitar duplicados.</p>}

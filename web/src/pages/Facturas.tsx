@@ -20,7 +20,7 @@ export default function Facturas({ initialId }: { initialId?: number } = {}) {
   return <Workspace initialId={initialId} />;
 }
 
-const stage = 'El número SAR se asigna al marcar como enviado. Las facturas enviadas y pagadas no se editan ni eliminan.';
+const stage = 'El número SAR se asigna al marcar como enviado. Las facturas enviadas pueden editarse; las pagadas no se editan y solo los borradores sin pagos pueden eliminarse.';
 
 function Workspace({ initialId }: { initialId?: number }) {
   const { api, access, notify } = useCore();
@@ -51,7 +51,7 @@ function Workspace({ initialId }: { initialId?: number }) {
     void api.request<QuotePdf>(`/api/v1/facturas/${row.id}/documents/${kind}`,{method:'POST',ifMatch:row.version}).then(value=>viewer.show(value)).catch(reason=>{viewer.close();setError(message(reason));if(reason instanceof ApiError && reason.status===412) result.reload();}).finally(()=>setBusy(false));
   };
   useEffect(() => { if (initialId) void open(initialId, 'edit'); }, [initialId, api]);
-  if (selected) return <InvoiceEditor key={selected === 'new' ? 'new' : selected.id} initial={selected === 'new' ? null : selected} editable={editable && mode === 'edit' && (selected==='new' || selected.status==='Borrador')} edit={editable && selected!=='new' && selected.status==='Borrador' && mode === 'view' ? () => setMode('edit') : undefined} close={() => { setSelected(null); result.reload(); }} />;
+  if (selected) return <InvoiceEditor key={selected === 'new' ? 'new' : selected.id} initial={selected === 'new' ? null : selected} editable={editable && mode === 'edit' && (selected==='new' || selected.status==='Borrador' || selected.status==='Enviado')} edit={editable && selected!=='new' && (selected.status==='Borrador' || selected.status==='Enviado') && mode === 'view' ? () => setMode('edit') : undefined} close={() => { setSelected(null); result.reload(); }} />;
   return <><Heading title="Facturas" description="Administra facturas, documentos, pagos y saldos." action={editable && <button className="primary" disabled={busy} onClick={() => { setSelected('new'); setMode('edit'); }}>Nueva factura</button>} />
     <p className="quote-stage">{stage}</p>
     <section className="quote-list invoice-list" aria-labelledby="invoice-list-title"><div className="quote-list-heading"><h2 id="invoice-list-title">Listado de facturas</h2>{result.data && <span>{result.data.items.length} en esta página</span>}</div>
@@ -59,7 +59,7 @@ function Workspace({ initialId }: { initialId?: number }) {
     <Notice>{error || result.error}</Notice>{initialId && error && <button disabled={busy} onClick={() => void open(initialId, 'edit')}>Reintentar abrir documento convertido</button>}{result.error && <button onClick={result.reload}>Reintentar consulta</button>}
     {result.data ? <><Table columns={['Factura / referencia', 'Cliente', 'Fecha', 'Ítems', 'Total (HNL)', 'Saldo (HNL)', 'Estado', 'Acciones']} rows={result.data.items.map(row => [<span className="quote-number">{row.invoice_number ?? `Borrador ${row.id}`}</span>, <div className="quote-list-client">{row.client_name || 'Sin cliente'}{row.order_number && <small>{row.order_number}</small>}</div>, row.invoice_date, row.item_count, <span className="quote-money">{row.total}</span>, <span className="quote-money">{row.balance}</span>, <span className="quote-status" data-state={row.status}>{row.status}</span>, <InvoiceActions number={`borrador de factura ${row.id}`} busy={busy} actions={[
       { label: 'Ver', run: () => void open(row.id, 'view') },
-      { label: 'Editar', disabled: !editable || row.status!=='Borrador', reason: !editable ? 'Sin permiso de edición' : row.status!=='Borrador' ? 'Una factura emitida no se edita' : undefined, run: () => void open(row.id, 'edit') },
+      { label: 'Editar', disabled: !editable || row.status==='Pagado', reason: !editable ? 'Sin permiso de edición' : row.status==='Pagado' ? 'Una factura pagada no se edita' : undefined, run: () => void open(row.id, 'edit') },
       { label: 'Marcar como enviado', disabled: !editable || row.status!=='Borrador', reason: !editable ? 'Sin permiso de edición' : row.status!=='Borrador' ? 'La factura ya fue emitida' : undefined, run:()=>setCommand({invoice:row,action:'sent'}) },
       { label: 'Ingresar pago', disabled: !editable || row.status!=='Enviado' || row.balance==='0.00', reason: !editable ? 'Sin permiso de edición' : row.status==='Borrador' ? 'Primero marca la factura como enviada' : row.balance==='0.00' ? 'Sin saldo pendiente' : undefined, run:()=>setCommand({invoice:row,action:'payment'}) },
       { label: 'Clonar', disabled: !editable, reason: !editable ? 'Sin permiso de edición' : undefined, run:()=>void clone(row) },
@@ -95,13 +95,13 @@ export function InvoiceEditor({ initial, editable, edit, close }: { initial: Inv
   const change = <K extends keyof InvoiceInput>(key: K, value: InvoiceInput[K]) => { setData(previous => ({ ...previous, [key]: value })); setDirty(true); };
   const item = <K extends keyof InvoiceItem>(index: number, key: K, value: InvoiceItem[K]) => change('items', data.items.map((row, i) => i === index ? { ...row, [key]: value } : row));
   return <><Heading title={saved ? saved.invoice_number ?? `Borrador de factura · ${saved.id}` : 'Nueva factura'} description={`Estado: ${saved?.status ?? 'Borrador'} · Moneda: HNL`} action={<div className="actions">{edit && <button onClick={edit}>Editar</button>}<button disabled={busy} onClick={() => void navigate(close)}>Volver</button></div>} />
-    <h2 className="invoice-focus-heading" tabIndex={-1} ref={heading}>Editor de borrador de factura</h2><p className="quote-stage">{stage}</p>{saved?.source_quote && <p className="quote-note">Origen: {saved.source_quote.number ?? ("Cotización " + saved.source_quote.id)} · revisión {saved.source_quote.version}</p>}<Notice>{error}</Notice>{saved?.source_order&&<p className="quote-note">Origen: Orden {saved.source_order.number} · revisión {saved.source_order.version}</p>}
+    <h2 className="invoice-focus-heading" tabIndex={-1} ref={heading}>{saved?.status === 'Enviado' ? 'Editor de factura enviada' : 'Editor de borrador de factura'}</h2><p className="quote-stage">{stage}</p>{saved?.source_quote && <p className="quote-note">Origen: {saved.source_quote.number ?? ("Cotización " + saved.source_quote.id)} · revisión {saved.source_quote.version}</p>}<Notice>{error}</Notice>{saved?.source_order&&<p className="quote-note">Origen: Orden {saved.source_order.number} · revisión {saved.source_order.version}</p>}
     {conflict && <div role="status"><p>Tus cambios se conservan en pantalla. Abre la versión actual para revisarlos antes de guardar.</p><button disabled={busy} onClick={() => void navigate(() => {
       setBusy(true); setError('');
       void api.request<InvoiceDraft>(`/api/v1/facturas/${saved!.id}`).then(latest => { setSaved(latest); setData(latest.data); setDirty(false); setConflict(false); attempt.current = null; }).catch(reason => setError(message(reason))).finally(() => setBusy(false));
     })}>Abrir versión actual</button></div>}
     <form className="stack quote-editor invoice-editor" onSubmit={async e => {
-      e.preventDefault(); if (busy || conflict || !editable || cashPending) return;
+      e.preventDefault(); if (busy || conflict || !editable || saved?.status === 'Pagado' || cashPending) return;
       setBusy(true); setError('');
       try {
         let updated: InvoiceDraft;
@@ -111,10 +111,10 @@ export function InvoiceEditor({ initial, editable, edit, close }: { initial: Inv
           if (!attempt.current || attempt.current.body !== body) attempt.current = { body, key: crypto.randomUUID() };
           updated = await api.request<InvoiceDraft>('/api/v1/facturas', { method: 'POST', body: data, idempotencyKey: attempt.current.key });
         }
-        setSaved(updated); setData(updated.data); setDirty(false); attempt.current = null; notify('Borrador de factura guardado.');
+        setSaved(updated); setData(updated.data); setDirty(false); attempt.current = null; notify(updated.status === 'Borrador' ? 'Borrador de factura guardado.' : 'Factura guardada.');
       } catch (reason) { setError(message(reason)); if (reason instanceof ApiError && reason.status === 412) setConflict(true); }
       finally { setBusy(false); }
-    }}><fieldset className="form-fields quote-form" disabled={busy || conflict || !editable}><legend className="quote-sr-only">Datos de factura</legend>
+    }}><fieldset className="form-fields quote-form" disabled={busy || conflict || !editable || saved?.status === 'Pagado'}><legend className="quote-sr-only">Datos de factura</legend>
       <section className="quote-section" aria-labelledby="invoice-general-title"><div className="quote-section-heading"><h2 id="invoice-general-title">Generales</h2><span>HNL · {saved?.status ?? 'Borrador'}</span></div>
         <div className="quote-general-fields invoice-general-fields">
           <QuoteClientPicker value={data.client_name} selected={data.id_client ? { id: data.id_client, cliente_name: data.client_name, rtn: data.client_rtn ?? '', email: data.client_email ?? '' } : null}
@@ -131,7 +131,7 @@ export function InvoiceEditor({ initial, editable, edit, close }: { initial: Inv
         <p className="quote-note">Al ingresar cualquiera de estos tres números, se exonera el impuesto de todos los ítems.</p>
         {data.payment_term_type === 'contado' && <p className="quote-note" role="status">Contado exige pago total antes de guardar. Registra el pago inicial debajo de los datos de factura.</p>}
       </section>
-      {editable && !(saved?.payments?.length) && <section className="quote-section"><h2>Pago inicial</h2><label><input type="checkbox" checked={Boolean(data.initial_payment)} onChange={event=>change('initial_payment',event.target.checked?newPayment():null)} /> Registrar pago al guardar</label>{data.initial_payment && <InvoicePaymentFields value={data.initial_payment} change={value=>change('initial_payment',value)} />}</section>}
+      {editable && (!saved || saved.status === 'Borrador') && !(saved?.payments?.length) && <section className="quote-section"><h2>Pago inicial</h2><label><input type="checkbox" checked={Boolean(data.initial_payment)} onChange={event=>change('initial_payment',event.target.checked?newPayment():null)} /> Registrar pago al guardar</label>{data.initial_payment && <InvoicePaymentFields value={data.initial_payment} change={value=>change('initial_payment',value)} />}</section>}
       <InvoiceItems items={data.items} calculation={calculation} change={item} remove={index => change('items', data.items.filter((_, i) => i !== index))} add={() => change('items', [...data.items, newInvoiceItem()])} />
       <section className="quote-section" aria-labelledby="invoice-expenses-title"><div className="quote-section-heading"><h2 id="invoice-expenses-title">Gastos</h2><span>{data.expenses.length} / 200</span></div>
         <div className="invoice-expenses">{data.expenses.map((expense, index) => <fieldset className="invoice-expense" key={index}><legend>Gasto {index + 1}</legend><label>Descripción del gasto<input aria-label={`Descripción del gasto ${index + 1}`} maxLength={1000} value={expense.description} onChange={e => change('expenses', data.expenses.map((row, i) => i === index ? { ...row, description: e.target.value } : row))} /></label><Decimal label={`Monto del gasto ${index + 1} (HNL)`} caption="Monto (HNL)" value={expense.amount} change={v => change('expenses', data.expenses.map((row, i) => i === index ? { ...row, amount: v } : row))} /><button type="button" className="quote-remove" aria-label={`Quitar gasto ${index + 1}`} onClick={() => change('expenses', data.expenses.filter((_, i) => i !== index))}>Quitar gasto</button></fieldset>)}</div>
@@ -143,7 +143,7 @@ export function InvoiceEditor({ initial, editable, edit, close }: { initial: Inv
           <Notice>{calculationError}</Notice>{calculation ? <InvoiceTotals calculation={calculation} /> : !calculationError && <p role="status">Calculando totales…</p>}
         </div>
       </div>
-      {editable && <div className="quote-save"><button className="primary" type="submit" disabled={cashPending}>{busy ? 'Guardando…' : 'Guardar borrador'}</button></div>}
+      {editable && saved?.status !== 'Pagado' && <div className="quote-save"><button className="primary" type="submit" disabled={cashPending}>{busy ? 'Guardando…' : saved?.status === 'Enviado' ? 'Guardar factura' : 'Guardar borrador'}</button></div>}
     </fieldset></form>
     {!!saved?.payments?.length && <section className="card"><h2>Pagos registrados</h2><Table columns={['Fecha','Monto (HNL)','Método','Referencia']} rows={saved.payments.map(payment=>[payment.date,payment.amount,payment.method || '—',payment.reference || '—'])} /></section>}
   </>;

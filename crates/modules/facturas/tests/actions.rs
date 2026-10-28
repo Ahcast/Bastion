@@ -108,10 +108,20 @@ async fn mysql57_invoice_actions_numbering_payments_documents_and_preserved_orig
             .invoice_number,
         sent_a.invoice_number
     );
-    assert!(matches!(
-        invoices.replace(1, a.id, 2, input()).await,
-        Err(CoreError::Conflict)
-    ));
+    let mut updated_input = sent_b.data.clone();
+    updated_input.public_notes = "Actualizada sin pago".into();
+    let edited_b = invoices.replace(1, b.id, 2, updated_input).await.unwrap();
+    assert_eq!(edited_b.status, "Enviado");
+    assert_eq!(edited_b.invoice_number, sent_b.invoice_number);
+    assert_eq!(edited_b.version, 3);
+    assert_eq!(
+        serde_json::to_value(&edited_b.sar_snapshot).unwrap(),
+        serde_json::to_value(&sent_b.sar_snapshot).unwrap()
+    );
+    assert_eq!(
+        serde_json::to_value(&edited_b.company_snapshot).unwrap(),
+        serde_json::to_value(&sent_b.company_snapshot).unwrap()
+    );
     assert!(matches!(
         invoices
             .delete(1, a.id, 2, "invoice-actions-delete-issued")
@@ -159,6 +169,10 @@ async fn mysql57_invoice_actions_numbering_payments_documents_and_preserved_orig
     assert_eq!(paid.calculation.balance, "0.00");
     assert_eq!(paid.calculation.paid_total, "115.00");
     assert_eq!(paid.payments.len(), 2);
+    assert!(matches!(
+        invoices.replace(1, a.id, 4, input()).await,
+        Err(CoreError::Conflict)
+    ));
     assert!(matches!(
         invoices
             .add_payment(1, a.id, 4, "invoice-actions-payment-3", payment("1"))
@@ -310,13 +324,47 @@ async fn mysql57_invoice_actions_numbering_payments_documents_and_preserved_orig
     assert_eq!(count, 3);
     let before_receipt = invoices.detail(2, b.id).await.unwrap();
     assert!(before_receipt.payments.is_empty());
-    let receipt = invoices.document(2, b.id, 2, "receipt").await.unwrap();
+    let receipt = invoices.document(2, b.id, 3, "receipt").await.unwrap();
     assert!(!receipt.content_base64.is_empty());
     let after_receipt = invoices.detail(2, b.id).await.unwrap();
     assert_eq!(
         serde_json::to_value(before_receipt).unwrap(),
         serde_json::to_value(after_receipt).unwrap()
     );
+    let partially_paid_b = invoices
+        .add_payment(1, b.id, 3, "invoice-actions-b-payment", payment("20"))
+        .await
+        .unwrap();
+    let mut revised = partially_paid_b.data.clone();
+    revised.items[0].unit_price = "90".into();
+    let preview = invoices.preview_saved(1, b.id, 4, &revised).await.unwrap();
+    assert_eq!(preview.paid_total, "20.00");
+    assert_eq!(preview.balance, "70.00");
+    let edited_with_payment = invoices.replace(1, b.id, 4, revised.clone()).await.unwrap();
+    assert_eq!(edited_with_payment.invoice_number, sent_b.invoice_number);
+    assert_eq!(edited_with_payment.payments.len(), 1);
+    assert_eq!(edited_with_payment.calculation.balance, "70.00");
+    revised.items[0].unit_price = "10".into();
+    assert!(matches!(
+        invoices.replace(1, b.id, 5, revised).await,
+        Err(CoreError::Invalid)
+    ));
+    assert!(matches!(
+        invoices
+            .replace(1, b.id, 4, edited_with_payment.data.clone())
+            .await,
+        Err(CoreError::PreconditionFailed)
+    ));
+    let mut fully_covered = edited_with_payment.data.clone();
+    fully_covered.items[0].unit_price = "20".into();
+    let paid_by_revision = invoices.replace(1, b.id, 5, fully_covered).await.unwrap();
+    assert_eq!(paid_by_revision.status, "Pagado");
+    assert_eq!(paid_by_revision.calculation.balance, "0.00");
+    assert_eq!(paid_by_revision.invoice_number, sent_b.invoice_number);
+    assert!(matches!(
+        invoices.replace(1, b.id, 6, paid_by_revision.data).await,
+        Err(CoreError::Conflict)
+    ));
     assert!(matches!(
         invoices.document(2, a.id, 3, "invoice").await,
         Err(CoreError::PreconditionFailed)
