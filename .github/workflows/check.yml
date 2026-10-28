@@ -137,6 +137,13 @@ jobs:
           echo "db367d897829f22c4198ce1094143c9d467bd6ee7dfabc44ba6f02056b24f8b1  $RUNNER_TEMP/qpdf.zip" | sha256sum -c -
           unzip -q "$RUNNER_TEMP/qpdf.zip" -d "$RUNNER_TEMP/bastion-qpdf"
           echo "BASTION_QPDF_BIN=$RUNNER_TEMP/bastion-qpdf/bin/qpdf" >> "$GITHUB_ENV"
+      - name: Install PDF inspection tool for tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq --no-install-recommends poppler-utils
+          echo "BASTION_PDFINFO_BIN=$(command -v pdfinfo)" >> "$GITHUB_ENV"
       - name: Run workspace tests
         # Shared PDF template runs with synthetic data and no S3 or SMTP credentials.
         # Each module uses an isolated disposable MySQL 5.7 database.

@@ -121,6 +121,48 @@ pub fn compose_prepared_pdf(qpdf: &Path, root: &Path, pieces: u32) -> Result<u32
     Ok(sum)
 }
 
+/// Measure all pages, create a transparent numbered overlay, and merge. This
+/// does not create the job sandbox; it must only run inside that sandbox.
+pub fn measure_and_compose_pdf(typst: &Path, pdfinfo: &Path, qpdf: &Path, root: &Path, pieces: u32) -> Result<u32, CoreError> {
+    if !typst.is_absolute() || !pdfinfo.is_absolute() || !qpdf.is_absolute() || !root.is_absolute() || pieces == 0 || pieces > 4000 {return Err(CoreError::Invalid);}
+    regular_file(typst)?; regular_file(pdfinfo)?; regular_file(qpdf)?;
+    if !fs::symlink_metadata(root).map_err(|_|CoreError::Invalid)?.file_type().is_dir() {return Err(CoreError::Invalid);}
+    let mut geometry=Vec::new();
+    for number in 1..=pieces {
+        let input=root.join(format!("piece-{number:06}.pdf"));
+        let count=pages(qpdf,&input)?;
+        if count>100_000 || geometry.len().checked_add(count as usize).filter(|n| *n<=100_000).is_none() {return Err(CoreError::Invalid);}
+        let info=root.join(format!("page-info-{number:06}.txt"));
+        let output=fs::OpenOptions::new().write(true).create_new(true).open(&info).map_err(|_|CoreError::Invalid)?;
+        let mut command=Command::new(pdfinfo);
+        command.env_clear().env("LC_ALL","C").stdin(Stdio::null()).stdout(Stdio::from(output)).stderr(Stdio::null()).args(["-f","1","-l"]).arg(count.to_string()).arg("-box").arg(&input);
+        let mut child=command.spawn().map_err(|_|CoreError::Overloaded)?;
+        let start=Instant::now();
+        loop {
+            match child.try_wait().map_err(|_|CoreError::Overloaded)? {
+                Some(status) if status.success()=>break,
+                Some(_)=>return Err(CoreError::Invalid),
+                None if start.elapsed()>=Duration::from_secs(120)=>{let _=child.kill();let _=child.wait();return Err(CoreError::Overloaded);},
+                None=>thread::sleep(Duration::from_millis(50)),
+            }
+        }
+        if fs::metadata(&info).map_err(|_|CoreError::Invalid)?.len()>50_000_000 {return Err(CoreError::Invalid);}
+        let measured=fs::read_to_string(&info).map_err(|_|CoreError::Invalid)?;
+        geometry.extend(crate::folio::parse_pdfinfo_pages(&measured,count)?);
+        fs::remove_file(info).map_err(|_|CoreError::Overloaded)?;
+    }
+    for (name, bytes) in crate::folio::prepare_folio_sources(&geometry)? {
+        use std::io::Write;
+        let mut file=fs::OpenOptions::new().write(true).create_new(true).open(root.join(name)).map_err(|_|CoreError::Invalid)?;
+        file.write_all(&bytes).map_err(|_|CoreError::Overloaded)?;
+    }
+    let mut compile=Command::new(typst);
+    compile.arg("compile").arg("--root").arg(root).arg(root.join("folios.typ")).arg(root.join("folios.pdf"));
+    run(compile)?;
+    let actual=compose_prepared_pdf(qpdf,root,pieces)?;
+    if actual as usize != geometry.len() {return Err(CoreError::Invalid);}
+    Ok(actual)
+}
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -180,5 +222,18 @@ mod tests {
         assert!(root.join("result.pdf").is_file());
         assert!(compose_prepared_pdf(Path::new(&qpdf), &root, 2).is_err());
         let _ = fs::remove_dir_all(&root);
+    }
+    #[test]
+    fn measures_and_composes_a_mixed_size_pdf_when_binaries_are_available() {
+        let (Some(typst),Some(qpdf),Some(pdfinfo))=(std::env::var_os("BASTION_TYPST_BIN"),std::env::var_os("BASTION_QPDF_BIN"),std::env::var_os("BASTION_PDFINFO_BIN")) else {return;};
+        let root=std::env::temp_dir().join(format!("bastion-measured-compose-{}",std::process::id()));
+        fs::create_dir_all(&root).unwrap();
+        for (name,source) in [("piece-000001", "#page(width: 612pt, height: 792pt)[Primera]"),("piece-000002", "#page(width: 792pt, height: 612pt)[Segunda]")] {
+            fs::write(root.join(format!("{name}.typ")),source).unwrap();
+            assert!(Command::new(&typst).arg("compile").arg("--root").arg(&root).arg(root.join(format!("{name}.typ"))).arg(root.join(format!("{name}.pdf"))).status().unwrap().success());
+        }
+        assert_eq!(measure_and_compose_pdf(Path::new(&typst),Path::new(&pdfinfo),Path::new(&qpdf),&root,2).unwrap(),2);
+        assert_eq!(pages(Path::new(&qpdf),&root.join("result.pdf")).unwrap(),2);
+        let _=fs::remove_dir_all(&root);
     }
 }
