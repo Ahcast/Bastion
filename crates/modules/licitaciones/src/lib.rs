@@ -6,7 +6,9 @@ pub use attachments::{
     Attachment, AttachmentContent, AttachmentCopy, AttachmentDelete, AttachmentList,
     AttachmentSection, AttachmentUpload,
 };
-use bastion_colaboracion::{FormDefinition, FormSection, FormValues, FormVariable, PublishedForm, VariableKind};
+use bastion_colaboracion::{
+    FormDefinition, FormSection, FormValues, FormVariable, PublishedForm, VariableKind,
+};
 use bastion_core::CoreError;
 use serde::{Deserialize, Serialize};
 pub use service::TenderService;
@@ -76,10 +78,25 @@ pub struct GlobalVariablesInput {
 impl GlobalVariablesInput {
     pub fn validate(&self) -> Result<(), CoreError> {
         let schema = FormDefinition {
-            title: "Variables".into(), section: FormSection::Legal, template_source_id: None,
-            variables: self.variables.iter().map(|v| FormVariable { key: v.key.clone(), label: v.label.clone(), kind: v.kind, required: false }).collect(),
+            title: "Variables".into(),
+            section: FormSection::Legal,
+            template_source_id: None,
+            variables: self
+                .variables
+                .iter()
+                .map(|v| FormVariable {
+                    key: v.key.clone(),
+                    label: v.label.clone(),
+                    kind: v.kind,
+                    required: false,
+                })
+                .collect(),
         };
-        let values = self.variables.iter().filter_map(|v| v.value.clone().map(|value| (v.key.clone(), value))).collect();
+        let values = self
+            .variables
+            .iter()
+            .filter_map(|v| v.value.clone().map(|value| (v.key.clone(), value)))
+            .collect();
         schema.validate_values(&values)?;
         Ok(())
     }
@@ -195,10 +212,38 @@ mod tests {
     }
     #[test]
     fn global_variables_are_typed_unique_and_inert() {
-        let variable = GlobalVariable { key: "nombre".into(), label: "Nombre".into(), kind: VariableKind::Text, value: Some(serde_json::json!("<script>")) };
-        assert!(GlobalVariablesInput { variables: vec![variable.clone()] }.validate().is_ok());
-        assert!(GlobalVariablesInput { variables: vec![variable.clone(), variable] }.validate().is_err());
-        assert!(GlobalVariablesInput { variables: vec![GlobalVariable { key: "Monto".into(), label: "Monto".into(), kind: VariableKind::Decimal, value: Some(serde_json::json!(1.5)) }] }.validate().is_err());
+        let variable = GlobalVariable {
+            key: "nombre".into(),
+            label: "Nombre".into(),
+            kind: VariableKind::Text,
+            value: Some(serde_json::json!("<script>")),
+        };
+        assert!(
+            GlobalVariablesInput {
+                variables: vec![variable.clone()]
+            }
+            .validate()
+            .is_ok()
+        );
+        assert!(
+            GlobalVariablesInput {
+                variables: vec![variable.clone(), variable]
+            }
+            .validate()
+            .is_err()
+        );
+        assert!(
+            GlobalVariablesInput {
+                variables: vec![GlobalVariable {
+                    key: "Monto".into(),
+                    label: "Monto".into(),
+                    kind: VariableKind::Decimal,
+                    value: Some(serde_json::json!(1.5))
+                }]
+            }
+            .validate()
+            .is_err()
+        );
     }
     #[test]
     fn clients_cannot_assign_state_schema_or_business_fields() {

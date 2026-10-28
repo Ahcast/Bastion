@@ -2,7 +2,10 @@ use bastion_colaboracion::{
     CollaborationService, FormDefinition, FormSection, FormVariable, PublishFormInput, VariableKind,
 };
 use bastion_core::{CoreError, CoreService, Database};
-use bastion_licitaciones::{CopyFormInput, GlobalVariable, GlobalVariablesInput, NameInput, PageQuery, TenderService, ValuesInput};
+use bastion_licitaciones::{
+    CopyFormInput, GlobalVariable, GlobalVariablesInput, NameInput, PageQuery, TenderService,
+    ValuesInput,
+};
 use sqlx::mysql::MySqlPoolOptions;
 
 fn definition(title: &str) -> FormDefinition {
@@ -341,23 +344,88 @@ async fn mysql57_tenders_snapshots_permissions_races_receipts_and_deletion() {
     ));
     let details:Vec<serde_json::Value>=sqlx::query_scalar("SELECT details_json FROM audit_events WHERE module_id='licitaciones' AND action='expedient.rename'").fetch_all(&pool).await.unwrap();
     assert!(!serde_json::to_string(&details).unwrap().contains("Equipos"));
-    core.admin().set_module_enabled(1, "colaboracion", true).await.unwrap();
+    core.admin()
+        .set_module_enabled(1, "colaboracion", true)
+        .await
+        .unwrap();
     let exp = tenders.create(1, "create-global-test-001").await.unwrap();
-    let a = tenders.copy_form(1, exp.id, 1, "copy-global-test-0001", CopyFormInput { source_id: published.id, revision: 1 }).await.unwrap();
-    let b = tenders.copy_form(1, exp.id, 2, "copy-global-test-0002", CopyFormInput { source_id: published.id, revision: 1 }).await.unwrap();
-    sqlx::query("UPDATE licitaciones_formularios SET values_json=? WHERE id=?").bind(serde_json::json!({"dato":"Anterior uno"})).bind(a.forms[0].id).execute(&pool).await.unwrap();
-    sqlx::query("UPDATE licitaciones_formularios SET values_json=? WHERE id=?").bind(serde_json::json!({"dato":"Anterior dos"})).bind(b.forms[1].id).execute(&pool).await.unwrap();
+    let a = tenders
+        .copy_form(
+            1,
+            exp.id,
+            1,
+            "copy-global-test-0001",
+            CopyFormInput {
+                source_id: published.id,
+                revision: 1,
+            },
+        )
+        .await
+        .unwrap();
+    let b = tenders
+        .copy_form(
+            1,
+            exp.id,
+            2,
+            "copy-global-test-0002",
+            CopyFormInput {
+                source_id: published.id,
+                revision: 1,
+            },
+        )
+        .await
+        .unwrap();
+    sqlx::query("UPDATE licitaciones_formularios SET values_json=? WHERE id=?")
+        .bind(serde_json::json!({"dato":"Anterior uno"}))
+        .bind(a.forms[0].id)
+        .execute(&pool)
+        .await
+        .unwrap();
+    sqlx::query("UPDATE licitaciones_formularios SET values_json=? WHERE id=?")
+        .bind(serde_json::json!({"dato":"Anterior dos"}))
+        .bind(b.forms[1].id)
+        .execute(&pool)
+        .await
+        .unwrap();
     let before = tenders.detail(1, exp.id).await.unwrap();
     assert!(before.variables.is_empty());
     assert_eq!(before.forms[0].legacy_values["dato"], "Anterior uno");
     assert_eq!(before.forms[1].legacy_values["dato"], "Anterior dos");
-    let input = || GlobalVariablesInput { variables: vec![GlobalVariable { key: "dato".into(), label: "Dato".into(), kind: VariableKind::Text, value: Some(serde_json::json!("Global")) }] };
-    assert!(matches!(tenders.save_global_variables(2, exp.id, 3, input()).await, Err(CoreError::Forbidden)));
-    let updated = tenders.save_global_variables(1, exp.id, 3, input()).await.unwrap();
+    let input = || GlobalVariablesInput {
+        variables: vec![GlobalVariable {
+            key: "dato".into(),
+            label: "Dato".into(),
+            kind: VariableKind::Text,
+            value: Some(serde_json::json!("Global")),
+        }],
+    };
+    assert!(matches!(
+        tenders.save_global_variables(2, exp.id, 3, input()).await,
+        Err(CoreError::Forbidden)
+    ));
+    let updated = tenders
+        .save_global_variables(1, exp.id, 3, input())
+        .await
+        .unwrap();
     assert_eq!(updated.version, 4);
-    assert!(updated.forms.iter().all(|form| form.values["dato"] == "Global" && form.missing_required.is_empty()));
+    assert!(
+        updated
+            .forms
+            .iter()
+            .all(|form| form.values["dato"] == "Global" && form.missing_required.is_empty())
+    );
     assert_eq!(updated.forms[0].legacy_values["dato"], "Anterior uno");
     assert_eq!(updated.forms[1].legacy_values["dato"], "Anterior dos");
-    assert!(matches!(tenders.save_global_variables(1, exp.id, 3, input()).await, Err(CoreError::PreconditionFailed)));
-    assert!(tenders.detail(1, named.id).await.unwrap().variables.is_empty());
+    assert!(matches!(
+        tenders.save_global_variables(1, exp.id, 3, input()).await,
+        Err(CoreError::PreconditionFailed)
+    ));
+    assert!(
+        tenders
+            .detail(1, named.id)
+            .await
+            .unwrap()
+            .variables
+            .is_empty()
+    );
 }
