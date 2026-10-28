@@ -161,3 +161,7 @@ El 2026-10-28 se desplegó en AWS y Bluehost `cac1fa4`, con [CI aprobado](https:
 ## Facturas: edición de enviadas
 
 El 2026-10-28 se desplegó en AWS y Bluehost `ae475e8`, con [CI aprobado](https://github.com/Ahcast/Bastion/actions/runs/40679375678). Las facturas Enviadas admiten edición; conservan número SAR, pagos y snapshots, y su saldo se recalcula sin permitir un total inferior a lo pagado. Pagado continúa sin edición y se mantienen las reglas de eliminación. Sin migraciones, con respaldos privados y verificación de datos/activaciones, 47 archivos frontend, 45 hashes públicos y readiness 200. Ver [evidencia](modulos/facturas-acciones.md#edición-de-facturas-enviadas--despliegue-2026-10-28).
+
+## Facturas: ajuste visual de PDF
+
+El 2026-10-28 se desplegó en AWS `07c1877`, con [CI aprobado](https://github.com/Ahcast/Bastion/actions/runs/40682083139): totales compactos en el lado derecho con contenido alineado a la izquierda y título «Factura Proforma». Revisión visual de ambos PDF sintéticos, respaldo previo, sin migraciones; datos y activaciones preservados, readiness HTTPS 200 y documentos privados anónimos 401. El frontend no requirió cambios. Ver [detalle](modulos/facturas-acciones.md#diseño-de-factura-y-proforma--2026-10-28).

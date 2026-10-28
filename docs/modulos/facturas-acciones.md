@@ -89,3 +89,9 @@ El commit `cac1fa4b27ba040b760710c37fd90420a720b27a` pasó [CI](https://github.c
 A petición del usuario, las facturas Enviadas se pueden editar con permiso de edición; las Pagadas siguen bloqueadas. La actualización conserva numeración SAR, instantáneas fiscales y de empresa, relaciones y pagos, comprueba la versión y evita un total menor a lo pagado. Un saldo cero cambia el estado a Pagado. Se mantiene la restricción de eliminar únicamente borradores sin pagos.
 
 El commit `ae475e8e9272b84977c2cd2b733d62c0c4883b3c` pasó [CI](https://github.com/Ahcast/Bastion/actions/runs/40679375678), con pruebas de edición sin pagos, edición con pago parcial, conservación de número e instantáneas, rechazo de total inferior a lo pagado, conflicto de versión y bloqueo de Pagado. AWS y Bluehost ejecutan los artifacts verificados: respaldos privados, sin migraciones, facturas/pagos/activaciones preservados, 47 archivos frontend, 45 hashes públicos, readiness 200 y rutas privadas sin sesión 401. No se editaron facturas reales durante la verificación.
+
+## Diseño de factura y proforma — 2026-10-28
+
+Por indicación del usuario, el título del PDF de borrador es «Factura Proforma» y conserva «Estado: Proforma». En ambos PDF el bloque compacto de totales se sitúa a la derecha de la página, con etiquetas e importes alineados a la izquierda. Esta indicación sustituye la ubicación anterior del bloque a la izquierda.
+
+La plantilla se desplegó en AWS en el commit `07c18775ae3b271702255fecf4ec9f55801e4b8b`, tras [CI aprobado](https://github.com/Ahcast/Bastion/actions/runs/40682083139) y revisión visual de factura y proforma con datos sintéticos. Respaldo privado previo; sin migraciones ni modificación de facturas o pagos. El ejecutable activo contiene la plantilla nueva y readiness HTTPS responde 200; documento sin sesión responde 401. Bluehost conserva la interfaz vigente al no cambiar el frontend.
