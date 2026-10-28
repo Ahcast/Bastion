@@ -18,6 +18,40 @@ pub(super) fn fiscal_parts(number: &str) -> Result<(&str, u32), CoreError> {
     ))
 }
 
+#[cfg(test)]
+mod range_tests {
+    use super::{fiscal_parts, normalize_range_spacing};
+    #[test]
+    fn spacing_around_hyphens_does_not_split_fiscal_numbers() {
+        let value = normalize_range_spacing("000-001-01-00000001 / 000- 001-01-00000005");
+        let numbers: Vec<_> = value
+            .split(|c: char| !c.is_ascii_digit() && c != '-')
+            .filter(|part| !part.is_empty())
+            .collect();
+        assert_eq!(numbers.len(), 2);
+        assert!(numbers.iter().all(|number| fiscal_parts(number).is_ok()));
+        assert!(fiscal_parts("000-001-01-123").is_err());
+    }
+}
+
+fn normalize_range_spacing(range: &str) -> String {
+    let chars: Vec<char> = range.chars().collect();
+    chars
+        .iter()
+        .enumerate()
+        .filter_map(|(i, &c)| {
+            if c.is_whitespace() {
+                let before = chars[..i].iter().rev().find(|v| !v.is_whitespace());
+                let after = chars[i + 1..].iter().find(|v| !v.is_whitespace());
+                if before == Some(&'-') || after == Some(&'-') {
+                    return None;
+                }
+            }
+            Some(c)
+        })
+        .collect()
+}
+
 impl CoreAdmin {
     /// Called by the invoice domain on its own transaction. Core owns the SAR
     /// setting and the per-prefix high-water mark; no number is recycled.
@@ -44,8 +78,8 @@ impl CoreAdmin {
         }
         let (prefix, sequence) = fiscal_parts(&settings.current_invoice)?;
         let prefix = prefix.to_owned();
-        let numbers: Vec<_> = settings
-            .limit_range
+        let normalized_range = normalize_range_spacing(&settings.limit_range);
+        let numbers: Vec<_> = normalized_range
             .split(|c: char| !c.is_ascii_digit() && c != '-')
             .filter(|part| !part.is_empty())
             .map(fiscal_parts)

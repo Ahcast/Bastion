@@ -78,7 +78,7 @@ paths:
         - {$ref: '#/components/parameters/Csrf'}
       responses:
         '200':
-          description: Recibo independiente de pagos previos y sin registrar pagos; Borrador se identifica sin emisión fiscal
+          description: Recibo solo para factura emitida, sin exigir ni registrar pagos; factura borrador se presenta como Proforma
           content:
             application/json:
               schema: {$ref: '#/components/schemas/Document'}

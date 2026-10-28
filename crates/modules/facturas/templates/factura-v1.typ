@@ -1,6 +1,6 @@
 #let d = json("data.json")
 #let money(value) = "L " + value
-#let title = if d.kind == "delivery" { "Nota de entrega" } else if d.kind == "receipt" { "Recibo" } else { "Factura" }
+#let title = if d.kind == "delivery" { "Nota de entrega" } else if d.kind == "receipt" { "Recibo" } else if not d.issued { "Proforma" } else { "Factura" }
 #set document(title: title + " " + d.number, author: d.company.name)
 #set page(paper: "us-letter", margin: 0.5in, numbering: "1 / 1")
 #set text(font: ("Arial", "Liberation Sans", "Libertinus Serif"), size: 9pt, lang: "es")
@@ -9,12 +9,21 @@
  if d.logo {image("logo.png",width:140pt,height:65pt,fit:"contain")} else {text(size:18pt,weight:"bold",d.company.name)},
  [#strong(d.company.name) \ RTN: #d.company.rtn \ #d.company.address \ #d.company.phone · #d.company.email])
 #v(12pt)
+#if d.kind == "receipt" {
+ align(center, text(size:18pt, weight:"bold", title))
+ v(35pt)
+ set par(justify:true)
+ [Hemos recibido de #d.client_name la cantidad de #money(d.totals.total) por concepto de pago de la Factura #d.number.]
+ v(18pt)
+ [#strong[Total en letras:] #d.total_words]
+ v(45pt)
+ [Firma autorizada: #line(length:180pt,stroke:0.5pt)]
+} else { [
 #text(size:18pt,weight:"bold",title)
-#if not d.issued { [\ #strong[BORRADOR — SIN EMISIÓN FISCAL]] }
 #v(8pt)
 #grid(columns:(1fr,1fr),gutter:16pt,
  [#strong[Cliente:] #d.client_name \ #strong[RTN:] #d.client_rtn \ #strong[Referencia:] #d.order_number],
- [#strong[Número:] #d.number \ #strong[Fecha:] #d.date \ #strong[Estado:] #d.status])
+ [#strong[Número:] #d.number \ #strong[Fecha:] #d.date \ #strong[Estado:] #if not d.issued and d.kind == "invoice" { "Proforma" } else { d.status }])
 #if d.kind == "invoice" {
  let term = if d.payment_term_type == "credito" { "Crédito (" + str(d.credit_days) + " días)" } else { "Contado" }
  let discount_type = if d.discount_type == "percent" { "Porcentaje" } else { "Valor (HNL)" }
@@ -26,13 +35,7 @@
 }
 #v(12pt)
 #set table(inset:6pt,stroke:(bottom:0.4pt),align:(left,right))
-#if d.kind == "receipt" {
- if d.payments.len() == 0 { [Sin pagos registrados.] } else {
- table(columns:(1fr,1fr,2fr,1fr),
- table.header(repeat:true,..("Fecha","Método","Referencia","Monto").map(x=>strong(x))),
- ..d.payments.map(p=>(p.date,p.method,p.reference,money(p.amount))).flatten())
- }
-} else if d.kind == "delivery" {
+#if d.kind == "delivery" {
  table(columns:(4fr,1fr),table.header(repeat:true,strong("Descripción"),strong("Cantidad")),..d.items.map(i=>(i.description,i.quantity)).flatten())
 } else {
  table(columns:(3fr,1fr,1fr,1fr,1fr),table.header(repeat:true,..("Descripción","Cantidad","Precio unitario","Descuento","Importe").map(x=>strong(x))),..d.items.map(i=>(i.description,i.quantity,money(i.unit_price),money(i.discount),money(i.total))).flatten())
@@ -40,7 +43,7 @@
 #v(12pt)
 #if d.kind != "delivery" {
  block(breakable:false)[
- #align(right)[#table(columns:(220pt,100pt),stroke:none,
+ #align(left)[#table(columns:(180pt,85pt),stroke:none,inset:2pt,
  [Subtotal],money(d.totals.subtotal),
  [Importe exonerado],money(d.totals.importe_exonerado),
  [Importe exento],money(d.totals.importe_exento),
@@ -55,4 +58,6 @@
 #if d.public_notes != "" { [#v(12pt) #strong[Notas:] \ #d.public_notes] }
 #if d.sar != none and d.kind == "invoice" {
  [#v(16pt) #line(length:100%,stroke:0.5pt) \ #d.sar.sar_text \ #strong[Rango autorizado:] #d.sar.limit_range \ #strong[Fecha límite de emisión:] #d.sar.limit_date]
+}
+]
 }

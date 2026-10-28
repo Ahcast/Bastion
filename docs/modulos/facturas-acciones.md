@@ -30,9 +30,9 @@ Eliminar exige permiso `eliminar`, versión y confirmación. Se archiva el borra
 
 Se usa Typst mediante `DocumentService`, almacenamiento S3 privado y prefijo `facturas/`. El módulo conserva metadatos de versión, tipo, SHA-256 y tamaño. Las descargas requieren `ver`, sesión y módulo activo, incluso después del trabajo de almacenamiento. Las tres acciones usan POST con CSRF y la versión consultada; no requieren `editar` por generar un documento.
 
-- PDF de factura: líneas de venta, descuentos, bases/ISV, pagado/saldo y datos SAR de la instantánea emitida. Un borrador se identifica **BORRADOR — SIN EMISIÓN FISCAL**.
+- PDF de factura: líneas de venta, descuentos, bases/ISV, pagado/saldo y datos SAR de la instantánea emitida. Un borrador se identifica como **Proforma**, con estado Proforma.
 - Nota de entrega: cliente, referencia, número/fecha, descripción, cantidad y notas públicas; sin precios, costos ni impuestos.
-- Recibo: se puede emitir sin pagos previos, conforme al cambio solicitado el 2026-10-27. Muestra los pagos existentes cuando los hay; en caso contrario indica «Sin pagos registrados». Conserva total pagado y saldo reales. Generarlo no registra pagos, cambia el estado o asigna numeración SAR, ni inventa un correlativo fiscal de recibos.
+- Recibo: únicamente para facturas emitidas, con o sin pagos registrados. Usa el texto solicitado por el usuario con cliente, total, número de factura y total en letras; no incluye tabla de pagos, estado ni totales desglosados. Generarlo no registra pagos, cambia el estado o asigna numeración SAR, ni inventa un correlativo fiscal de recibos.
 
 Factura y nota usan el logo compartido del Core, sin firma/sello añadidos. No se exponen notas privadas, costos, inversión ni utilidad. El texto recibido se trata como datos de JSON, no como código Typst. Se cachea por versión, contenido, plantilla y recursos de marca; cada render tiene clave propia y el archivo huérfano se limpia sin borrar el de otro generador. Los borrados de objetos siguen la política existente del servicio privado; la retención de versiones S3 sigue el pendiente operativo común.
 
@@ -71,3 +71,7 @@ Tras la actualización IAM confirmada por el usuario, la comprobación con la id
 Por indicación del usuario, Emitir Recibo funciona sin ingresar un pago previo. Se retiró el requisito del menú y del backend. El PDF se titula «Recibo», muestra «Sin pagos registrados» cuando corresponde y conserva importes, total pagado y saldo reales; emitirlo no cambia la factura ni registra pagos o numeración SAR. Se revisaron visualmente ambos PDF, con y sin pagos, y la prueba de integración comprueba que generar el recibo sin pagos conserva íntegra la ficha de la factura.
 
 El commit `204f90e0eba8444da6d3605af533d860207eeee1` aprobó [CI](https://github.com/Ahcast/Bastion/actions/runs/40621961030), incluidas pruebas frontend, Rust, MySQL 5.7 y documentos. Sus artifacts se desplegaron en AWS y Bluehost con respaldos privados. No se aplicaron migraciones; se cotejaron facturas/pagos, ledger y activaciones, sin cambios. Frontend: 47 archivos verificados y 45 hashes públicos HTTPS, conservando configuración y assets anteriores. Readiness 200 y rutas privadas sin sesión 401. No se generaron recibos comerciales ni pagos de prueba en producción.
+
+## Emisión SAR y presentación — 2026-10-28
+
+El rango SAR configurado puede contener espacios junto a los guiones de un número; se eliminan solo para su validación, sin alterar los valores fiscales guardados ni relajar la comprobación de prefijo, rango, fecha o correlativo. La proforma compacta sus totales a la izquierda. El recibo requiere factura emitida y usa el total en letras y el texto acordado, sin depender de pagos registrados. Este corte actualiza la presentación histórica indicada arriba.

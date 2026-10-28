@@ -36,6 +36,18 @@ test('issued invoice actions respect immutable state, payments, document readine
  }
 });
 
+test('receipt is unavailable for drafts and remains available for issued invoices without payments',async()=>{
+ const invoice={...row,status:'Borrador' as const,invoice_number:null,paid_total:'0.00'};
+ const api=new ApiClient('https://example.test',async url=>Response.json(new URL(String(url)).pathname.endsWith('/document-readiness')?{pdf:true}:{items:[invoice],page:1,page_size:25,has_more:false}));
+ const container=document.createElement('div');document.body.append(container);const root=createRoot(container);
+ try{
+  await act(async()=>root.render(<NavigationGuardProvider><CoreContext.Provider value={{api,access,notify:()=>{}}}><Facturas/></CoreContext.Provider></NavigationGuardProvider>));
+  await act(async()=>container.querySelector<HTMLButtonElement>('[aria-haspopup="menu"]')!.click());
+  const receipt=[...document.querySelectorAll<HTMLButtonElement>('[role="menuitem"]')].find(item=>item.textContent?.includes('Emitir Recibo'));
+  assert.equal(receipt?.disabled,true);assert.ok(receipt?.textContent?.includes('Primero emite la factura'));
+ }finally{await act(async()=>root.unmount());container.remove();}
+});
+
 test('ambiguous payment retries freeze the payload and reuse the same idempotency key and invoice version',async()=>{
  const bodies:string[]=[],keys:(string|null)[]=[];let completed=0;
  const api=new ApiClient('https://example.test',async(url,init={})=>{

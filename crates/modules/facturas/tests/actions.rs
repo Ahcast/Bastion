@@ -55,7 +55,7 @@ async fn mysql57_invoice_actions_numbering_payments_documents_and_preserved_orig
         .set_sar_settings(
             1,
             bastion_core::SarSettings {
-                limit_range: "000-001-01-00000001 al 000-001-01-00000005".into(),
+                limit_range: "000-001-01-00000001 / 000- 001-01-00000005".into(),
                 current_invoice: "000-001-01-00000000".into(),
                 limit_date: Some(chrono::NaiveDate::from_ymd_opt(9999, 12, 31).unwrap()),
                 sar_text: "CAI de prueba".into(),
@@ -69,6 +69,10 @@ async fn mysql57_invoice_actions_numbering_payments_documents_and_preserved_orig
         .await
         .unwrap();
     assert!(a.invoice_number.is_none());
+    assert!(matches!(
+        invoices.document(2, a.id, 1, "receipt").await,
+        Err(CoreError::Conflict)
+    ));
     assert!(matches!(
         invoices
             .mark_sent(2, a.id, 1, "invoice-actions-denied")
