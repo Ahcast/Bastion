@@ -21,7 +21,7 @@ pub use order::{PdfOrder, PdfOrderInput, PdfOrderItem};
 pub use pagination::{MeasuredPiece, PageConvergence, PagePlan, PageRange, plan_pdf_pages};
 use serde::{Deserialize, Serialize};
 pub use service::TenderService;
-pub use typst_data::{TypstLotSources, prepare_typst_lot_sources};
+pub use typst_data::{TenderTypstSnapshot, TypstLotSources, prepare_typst_lot_sources};
 
 pub const MAX_INPUT_BYTES: u64 = 100_000_000;
 pub const MAX_EXPEDIENT_BYTES: u64 = 1_000_000_000;

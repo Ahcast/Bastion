@@ -21,7 +21,7 @@ pub struct PdfOrderInput {
     pub items: Vec<String>,
 }
 
-async fn candidates(
+pub(crate) async fn candidates(
     service: &TenderService,
     tx: &mut Transaction<'_, MySql>,
     actor: u64,
@@ -90,6 +90,13 @@ async fn candidates(
     }
     Ok(items)
 }
+pub(crate) fn resolve_order(stored: Option<serde_json::Value>, available: &mut Vec<PdfOrderItem>) -> Result<Vec<PdfOrderItem>, CoreError> {
+    let keys: Vec<String> = stored.map(serde_json::from_value).transpose().map_err(|_| CoreError::Invalid)?.unwrap_or_default();
+    let mut result = Vec::new();
+    for key in keys { if let Some(index) = available.iter().position(|item| item.key == key) { result.push(available.remove(index)); } }
+    result.append(available);
+    Ok(result)
+}
 impl TenderService {
     pub async fn pdf_order(&self, actor: u64, id: u64) -> Result<PdfOrder, CoreError> {
         let mut tx = self.begin(actor, "ver").await?;
@@ -100,18 +107,7 @@ impl TenderService {
                 .bind(id)
                 .fetch_one(&mut *tx)
                 .await?;
-        let keys: Vec<String> = stored
-            .map(serde_json::from_value)
-            .transpose()
-            .map_err(|_| CoreError::Invalid)?
-            .unwrap_or_default();
-        let mut result = Vec::new();
-        for key in keys {
-            if let Some(index) = available.iter().position(|item| item.key == key) {
-                result.push(available.remove(index));
-            }
-        }
-        result.extend(available);
+        let result = resolve_order(stored, &mut available)?;
         tx.commit().await?;
         Ok(PdfOrder {
             items: result,

@@ -118,6 +118,35 @@ pub fn prepare_typst_lot_sources(
     })
 }
 
+/// A versioned database snapshot for the future isolated renderer. Attachment
+/// bytes and template approvals are intentionally not captured by this method;
+/// the renderer must authorize and verify those independently before use.
+pub struct TenderTypstSnapshot {
+    pub expediente: crate::Expedient,
+    pub order: Vec<crate::PdfOrderItem>,
+    pub sources: TypstLotSources,
+}
+impl crate::TenderService {
+    pub async fn prepare_typst_snapshot(&self, actor: u64, id: u64, expected: u64, total_pages: u32, lot_template: &str) -> Result<TenderTypstSnapshot, CoreError> {
+        let mut tx = self.begin(actor, "ver").await?;
+        // load locks the expediente row: its variables, order and lots are a
+        // consistent version while this transaction is reading them.
+        let expediente = crate::service::load(&mut tx, id).await?;
+        if expediente.version != expected { return Err(CoreError::PreconditionFailed); }
+        if expediente.forms.iter().any(|form| !form.missing_required.is_empty()) { return Err(CoreError::Invalid); }
+        let rows: Vec<(u32, serde_json::Value)> = sqlx::query_as("SELECT numero,items_json FROM licitaciones_lotes WHERE expediente_id=? ORDER BY numero")
+            .bind(id).fetch_all(&mut *tx).await?;
+        let mut lots = BTreeMap::new();
+        for (number, raw) in rows { lots.insert(number, serde_json::from_value(raw).map_err(|_| CoreError::Invalid)?); }
+        let sources = prepare_typst_lot_sources(&expediente.variables, &lots, total_pages, lot_template)?;
+        let mut candidates = crate::order::candidates(self, &mut tx, actor, &expediente).await?;
+        let stored: Option<serde_json::Value> = sqlx::query_scalar("SELECT pdf_order_json FROM licitaciones_expedientes WHERE id=?")
+            .bind(id).fetch_one(&mut *tx).await?;
+        let order = crate::order::resolve_order(stored, &mut candidates)?;
+        tx.commit().await?;
+        Ok(TenderTypstSnapshot { expediente, order, sources })
+    }
+}
 #[cfg(test)]
 mod tests {
     use super::*;
