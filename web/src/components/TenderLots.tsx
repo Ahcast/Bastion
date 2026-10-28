@@ -17,6 +17,7 @@ export default function TenderLots({ record, editable, saved }: { record: Expedi
   const valid = Number.isSafeInteger(count) && count > 0 && count <= 1000 && (style === 'bid' || style === 'std');
   const result = useLoad(signal => valid ? api.request<Lot>(`/api/v1/licitaciones/${record.id}/lotes/${number}`, { signal }) : Promise.resolve(null), [record.id, number, record.version, valid]);
   useEffect(() => { if (result.data) { setItems(structuredClone(result.data.items)); baseline.current = JSON.stringify(result.data.items); } }, [result.data]);
+  useEffect(() => { if (Number.isSafeInteger(count) && count > 0 && number > count) setNumber(1); }, [count, number]);
   useUnsavedChanges(JSON.stringify(items) !== baseline.current, busy);
   if (!valid) return <p>Define la cantidad de lotes y el estilo en la pestaña Variables para preparar la oferta.</p>;
   const change = (index: number, key: keyof Item, value: string) => setItems(current => current.map((item, i) => i === index ? { ...item, [key]: value } : item));

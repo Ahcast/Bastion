@@ -33,3 +33,7 @@ Se registraron las siguientes huellas SHA-256 de los paquetes descargados desde 
 ## Ubicación del folio
 
 El 2026-10-28 el usuario confirmó que el folio se coloca sobre el margen existente, sin añadir una franja externa. Si el contenido ocupa ese margen, se coloca el número de todos modos, incluso si puede superponerse al contenido. Esta decisión sustituye la recomendación anterior de garantizar que el folio nunca cubra contenido.
+
+## Firmas y prueba de composición
+
+El usuario autorizó incluir PDF con firma digital aunque la firma no se conserve al unirlos. El archivo original de Colaboración sigue siendo una referencia; las copias previamente existentes se mantienen. El 2026-10-28 se comprobó visualmente una unión y foliado de prueba con QPDF 12.4.2 en páginas verticales, horizontales y rotadas. Esta prueba es exploratoria: aún no integra ni despliega un servicio de composición. El archivo oficial Linux `qpdf-12.4.2-bin-linux-x86_64.zip` registra SHA-256 `db367d897829f22c4198ce1094143c9d467bd6ee7dfabc44ba6f02056b24f8b1`; la selección final del compositor requiere prueba de aislamiento y límites.
