@@ -16,7 +16,7 @@ use bastion_colaboracion::{
 use bastion_core::CoreError;
 pub use lots::{Lot, LotInput, LotItem, LotSummary};
 pub use order::{PdfOrder, PdfOrderInput, PdfOrderItem};
-pub use pagination::{plan_pdf_pages, MeasuredPiece, PageConvergence, PagePlan, PageRange};
+pub use pagination::{MeasuredPiece, PageConvergence, PagePlan, PageRange, plan_pdf_pages};
 use serde::{Deserialize, Serialize};
 pub use service::TenderService;
 pub use typst_data::{TypstLotSources, prepare_typst_lot_sources};

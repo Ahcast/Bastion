@@ -29,3 +29,7 @@ Las fuentes utilizan `@preview/oxifmt:1.0.0` y `@preview/num2words:0.2.0`; las d
 El 2026-10-28 se probaron los formularios aportados con datos ficticios y Typst 0.15.1: carta BID, presentación STD, lote STD y los dos formularios legales compilaron. El adaptador prepara `config.json` y los archivos de ítems como datos, convierte cantidades y montos a `decimal` y construye los imports solo para lotes ofertados. Esta prueba aislada no acredita todavía la integración de los formularios ni la composición del PDF final.
 
 Se registraron las siguientes huellas SHA-256 de los paquetes descargados desde `packages.typst.org`: `num2words-0.2.0.tar.gz` `101c973cc233a3bcd9d97f8351b1f4900f33b930efb7e4a2375b8839b8c7018a`, `oxifmt-1.0.0.tar.gz` `7d17a1fc8ad01740ec3cb2b03c7360a4225ff9318e5710765fa98ea6fd59594f`. Antes de su uso en producción deben almacenarse y verificarse como dependencias fijadas, sin permitir descargas del compilador. En la prueba local faltaron las fuentes Carlito y Liberation Serif; se deben fijar y verificar también en el entorno final para mantener el aspecto de los originales.
+
+## Ubicación del folio
+
+El 2026-10-28 el usuario confirmó que el folio se coloca sobre el margen existente, sin añadir una franja externa. Si el contenido ocupa ese margen, se coloca el número de todos modos, incluso si puede superponerse al contenido. Esta decisión sustituye la recomendación anterior de garantizar que el folio nunca cubra contenido.
