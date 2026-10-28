@@ -24,8 +24,15 @@ fn request(bytes: &[u8]) -> Result<Request, ()> {
     if value.pieces == 0 || value.pieces > 4000 {
         return Err(());
     }
-    let mut seen=std::collections::BTreeSet::new();
-    if value.sources.len()>value.pieces as usize || value.sources.iter().any(|n| *n==0 || *n>value.pieces || !seen.insert(*n)) {return Err(());}
+    let mut seen = std::collections::BTreeSet::new();
+    if value.sources.len() > value.pieces as usize
+        || value
+            .sources
+            .iter()
+            .any(|n| *n == 0 || *n > value.pieces || !seen.insert(*n))
+    {
+        return Err(());
+    }
     Ok(value)
 }
 #[cfg(any(test, target_os = "linux"))]
@@ -95,7 +102,9 @@ fn network_is_private_and_nonroot() -> bool {
 }
 fn trusted_path(key: &str) -> Result<PathBuf, ()> {
     let value = std::env::var_os(key).map(PathBuf::from).ok_or(())?;
-    if !value.is_absolute() { return Err(()); }
+    if !value.is_absolute() {
+        return Err(());
+    }
     Ok(value)
 }
 fn perform() -> Result<u32, ()> {
@@ -113,9 +122,17 @@ fn perform() -> Result<u32, ()> {
         .read_to_end(&mut bytes)
         .map_err(|_| ())?;
     let job = request(&bytes)?;
-    let packages=std::env::var_os("BASTION_TYPST_PACKAGE_PATH").map(PathBuf::from);
-    let fonts=std::env::var_os("BASTION_TYPST_FONT_PATH").map(PathBuf::from);
-    bastion_licitaciones::pdf_compose::render_prepared_sources(&typst,&root,job.pieces,&job.sources,packages.as_deref(),fonts.as_deref()).map_err(|_|())?;
+    let packages = std::env::var_os("BASTION_TYPST_PACKAGE_PATH").map(PathBuf::from);
+    let fonts = std::env::var_os("BASTION_TYPST_FONT_PATH").map(PathBuf::from);
+    bastion_licitaciones::pdf_compose::render_prepared_sources(
+        &typst,
+        &root,
+        job.pieces,
+        &job.sources,
+        packages.as_deref(),
+        fonts.as_deref(),
+    )
+    .map_err(|_| ())?;
     bastion_licitaciones::pdf_compose::measure_and_compose_pdf(
         &typst, &pdfinfo, &qpdf, &root, job.pieces,
     )

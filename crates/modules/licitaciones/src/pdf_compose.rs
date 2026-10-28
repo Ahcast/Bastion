@@ -127,24 +127,67 @@ pub fn compose_prepared_pdf(qpdf: &Path, root: &Path, pieces: u32) -> Result<u32
 /// Compile prepared, explicitly approved sources in the private job root.
 /// The service must supply fixed package and font directories and must run
 /// this only in the isolated worker, after checking source authorization.
-pub fn render_prepared_sources(typst: &Path, root: &Path, pieces: u32, source_numbers: &[u32], packages: Option<&Path>, fonts: Option<&Path>) -> Result<(), CoreError> {
-    if !typst.is_absolute() || !root.is_absolute() || pieces == 0 || pieces > 4000 || source_numbers.len()>pieces as usize {return Err(CoreError::Invalid);}
-    regular_file(typst)?;
-    if !fs::symlink_metadata(root).map_err(|_|CoreError::Invalid)?.file_type().is_dir() {return Err(CoreError::Invalid);}
-    for directory in [packages, fonts].into_iter().flatten() {
-        if !directory.is_absolute() || !fs::symlink_metadata(directory).map_err(|_|CoreError::Invalid)?.file_type().is_dir() {return Err(CoreError::Invalid);}
+pub fn render_prepared_sources(
+    typst: &Path,
+    root: &Path,
+    pieces: u32,
+    source_numbers: &[u32],
+    packages: Option<&Path>,
+    fonts: Option<&Path>,
+) -> Result<(), CoreError> {
+    if !typst.is_absolute()
+        || !root.is_absolute()
+        || pieces == 0
+        || pieces > 4000
+        || source_numbers.len() > pieces as usize
+    {
+        return Err(CoreError::Invalid);
     }
-    let mut unique=std::collections::BTreeSet::new();
+    regular_file(typst)?;
+    if !fs::symlink_metadata(root)
+        .map_err(|_| CoreError::Invalid)?
+        .file_type()
+        .is_dir()
+    {
+        return Err(CoreError::Invalid);
+    }
+    for directory in [packages, fonts].into_iter().flatten() {
+        if !directory.is_absolute()
+            || !fs::symlink_metadata(directory)
+                .map_err(|_| CoreError::Invalid)?
+                .file_type()
+                .is_dir()
+        {
+            return Err(CoreError::Invalid);
+        }
+    }
+    let mut unique = std::collections::BTreeSet::new();
     for &number in source_numbers {
-        if number==0 || number>pieces || !unique.insert(number) {return Err(CoreError::Invalid);}
-        let input=root.join(format!("source-{number:06}.typ"));
-        let output=root.join(format!("piece-{number:06}.pdf"));
+        if number == 0 || number > pieces || !unique.insert(number) {
+            return Err(CoreError::Invalid);
+        }
+        let input = root.join(format!("source-{number:06}.typ"));
+        let output = root.join(format!("piece-{number:06}.pdf"));
         regular_file(&input)?;
-        if !absent(&output) {return Err(CoreError::Conflict);}
-        let mut command=Command::new(typst);
-        command.arg("compile").arg("--root").arg(root).arg("--package-cache-path").arg(root.join("package-cache"));
-        if let Some(path)=packages {command.arg("--package-path").arg(path);}
-        if let Some(path)=fonts {command.arg("--ignore-system-fonts").arg("--font-path").arg(path);}
+        if !absent(&output) {
+            return Err(CoreError::Conflict);
+        }
+        let mut command = Command::new(typst);
+        command
+            .arg("compile")
+            .arg("--root")
+            .arg(root)
+            .arg("--package-cache-path")
+            .arg(root.join("package-cache"));
+        if let Some(path) = packages {
+            command.arg("--package-path").arg(path);
+        }
+        if let Some(path) = fonts {
+            command
+                .arg("--ignore-system-fonts")
+                .arg("--font-path")
+                .arg(path);
+        }
         command.arg(&input).arg(&output);
         run(command)?;
         regular_file(&output)?;
@@ -325,9 +368,17 @@ mod tests {
         let root =
             std::env::temp_dir().join(format!("bastion-measured-compose-{}", std::process::id()));
         fs::create_dir_all(&root).unwrap();
-        std::fs::write(root.join("source-000001.typ"), "#page(width: 612pt, height: 792pt)[Primera]").unwrap();
-        std::fs::write(root.join("source-000002.typ"), "#page(width: 792pt, height: 612pt)[Segunda]").unwrap();
-        render_prepared_sources(Path::new(&typst), &root, 3, &[1,2], None, None).unwrap();
+        std::fs::write(
+            root.join("source-000001.typ"),
+            "#page(width: 612pt, height: 792pt)[Primera]",
+        )
+        .unwrap();
+        std::fs::write(
+            root.join("source-000002.typ"),
+            "#page(width: 792pt, height: 612pt)[Segunda]",
+        )
+        .unwrap();
+        render_prepared_sources(Path::new(&typst), &root, 3, &[1, 2], None, None).unwrap();
         assert!(render_prepared_sources(Path::new(&typst), &root, 3, &[1], None, None).is_err());
         assert!(
             Command::new(&qpdf)
