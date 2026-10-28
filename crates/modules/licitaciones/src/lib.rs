@@ -4,6 +4,7 @@ mod attachments;
 mod lots;
 mod order;
 mod service;
+mod typst_data;
 pub use attachments::{
     Attachment, AttachmentContent, AttachmentCopy, AttachmentDelete, AttachmentList,
     AttachmentSection, AttachmentUpload,
@@ -16,6 +17,7 @@ pub use lots::{Lot, LotInput, LotItem, LotSummary};
 pub use order::{PdfOrder, PdfOrderInput, PdfOrderItem};
 use serde::{Deserialize, Serialize};
 pub use service::TenderService;
+pub use typst_data::{prepare_typst_lot_sources, TypstLotSources};
 
 pub const MAX_INPUT_BYTES: u64 = 100_000_000;
 pub const MAX_EXPEDIENT_BYTES: u64 = 1_000_000_000;
