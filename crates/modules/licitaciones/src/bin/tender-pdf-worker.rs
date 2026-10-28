@@ -24,6 +24,13 @@ fn request(bytes: &[u8]) -> Result<Request, ()> {
     }
     Ok(value)
 }
+#[cfg(any(test, target_os = "linux"))]
+fn status_is_restricted(status: &str) -> bool {
+    let field = |key: &str| status.lines().find_map(|line| line.strip_prefix(key)).map(str::trim);
+    let uid=field("Uid:").and_then(|v|v.split_whitespace().nth(1)).and_then(|v|v.parse::<u32>().ok());
+    let capabilities=field("CapEff:").and_then(|v|u64::from_str_radix(v,16).ok());
+    uid.is_some_and(|uid|uid!=0) && capabilities==Some(0) && field("NoNewPrivs:")==Some("1")
+}
 #[cfg(target_os = "linux")]
 fn network_is_private_and_nonroot() -> bool {
     let Ok(own) = std::fs::read_link("/proc/self/ns/net") else {
@@ -35,13 +42,7 @@ fn network_is_private_and_nonroot() -> bool {
     let Ok(status) = std::fs::read_to_string("/proc/self/status") else {
         return false;
     };
-    let nonroot = status
-        .lines()
-        .find_map(|line| line.strip_prefix("Uid:"))
-        .and_then(|line| line.split_whitespace().nth(1))
-        .and_then(|uid| uid.parse::<u32>().ok())
-        .is_some_and(|uid| uid != 0);
-    own != init && nonroot
+    own != init && status_is_restricted(&status)
 }
 #[cfg(not(target_os = "linux"))]
 fn network_is_private_and_nonroot() -> bool {
@@ -93,5 +94,14 @@ mod tests {
         assert!(request(br#"{"pieces":4001}"#).is_err());
         assert!(request(br#"{"pieces":1,"path":"/etc"}"#).is_err());
         assert!(request(&vec![b' '; 4097]).is_err());
+    }
+    #[test]
+    fn process_status_requires_no_privilege_or_capabilities() {
+        let good="Uid:\t1001\t1001\t1001\t1001\nCapEff:\t0000000000000000\nNoNewPrivs:\t1\n";
+        assert!(status_is_restricted(good));
+        assert!(!status_is_restricted(&good.replace("1001\t1001", "1001\t0")));
+        assert!(!status_is_restricted(&good.replace("CapEff:\t0000000000000000", "CapEff:\t0000000000000001")));
+        assert!(!status_is_restricted(&good.replace("NoNewPrivs:\t1", "NoNewPrivs:\t0")));
+        assert!(!status_is_restricted(""));
     }
 }
