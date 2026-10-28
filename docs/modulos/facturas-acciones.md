@@ -32,7 +32,7 @@ Se usa Typst mediante `DocumentService`, almacenamiento S3 privado y prefijo `fa
 
 - PDF de factura: líneas de venta, descuentos, bases/ISV, pagado/saldo y datos SAR de la instantánea emitida. Un borrador se identifica **BORRADOR — SIN EMISIÓN FISCAL**.
 - Nota de entrega: cliente, referencia, número/fecha, descripción, cantidad y notas públicas; sin precios, costos ni impuestos.
-- Recibo: requiere pagos registrados y muestra su fecha/método/referencia/importe, total pagado y saldo. Generarlo no registra otro pago ni inventa un correlativo fiscal de recibos.
+- Recibo: se puede emitir sin pagos previos, conforme al cambio solicitado el 2026-10-27. Muestra los pagos existentes cuando los hay; en caso contrario indica «Sin pagos registrados». Conserva total pagado y saldo reales. Generarlo no registra pagos, cambia el estado o asigna numeración SAR, ni inventa un correlativo fiscal de recibos.
 
 Factura y nota usan el logo compartido del Core, sin firma/sello añadidos. No se exponen notas privadas, costos, inversión ni utilidad. El texto recibido se trata como datos de JSON, no como código Typst. Se cachea por versión, contenido, plantilla y recursos de marca; cada render tiene clave propia y el archivo huérfano se limpia sin borrar el de otro generador. Los borrados de objetos siguen la política existente del servicio privado; la retención de versiones S3 sigue el pendiente operativo común.
 

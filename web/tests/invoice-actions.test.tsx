@@ -18,8 +18,9 @@ const row:InvoiceSummary={id:7,version:3,invoice_number:'000-001-01-00000001',cl
 
 test('issued invoice actions respect immutable state, payments, document readiness and permissions',async()=>{
  for(const editor of [true,false]){
+  for(const invoice of [row,{...row,paid_total:'0.00',balance:row.total}]){
   const calls:string[]=[];const api=new ApiClient('https://example.test',async(url,init={})=>{
-   calls.push(init.method??'GET');return Response.json(new URL(String(url)).pathname.endsWith('/document-readiness')?{pdf:true}:{items:[row],page:1,page_size:25,has_more:false});
+   calls.push(init.method??'GET');return Response.json(new URL(String(url)).pathname.endsWith('/document-readiness')?{pdf:true}:{items:[invoice],page:1,page_size:25,has_more:false});
   });
   const container=document.createElement('div');document.body.append(container);const root=createRoot(container);
   try{
@@ -31,6 +32,7 @@ test('issued invoice actions respect immutable state, payments, document readine
    assert.ok([5,6,7].every(index=>items[index]?.disabled===false),'document actions use read permission');
    assert.ok(calls.every(method=>method==='GET'));
   }finally{await act(async()=>root.unmount());container.remove();}
+  }
  }
 });
 

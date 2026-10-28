@@ -32,9 +32,6 @@ impl InvoiceService {
         if current.version != expected {
             return Err(CoreError::PreconditionFailed);
         }
-        if kind == "receipt" && current.payments.is_empty() {
-            return Err(CoreError::Conflict);
-        }
         let storage = DocumentService::from_environment();
         if !storage.configured() {
             return Err(CoreError::Overloaded);

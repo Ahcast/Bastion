@@ -1,6 +1,6 @@
 #let d = json("data.json")
 #let money(value) = "L " + value
-#let title = if d.kind == "delivery" { "Nota de entrega" } else if d.kind == "receipt" { "Recibo de pago" } else { "Factura" }
+#let title = if d.kind == "delivery" { "Nota de entrega" } else if d.kind == "receipt" { "Recibo" } else { "Factura" }
 #set document(title: title + " " + d.number, author: d.company.name)
 #set page(paper: "us-letter", margin: 0.5in, numbering: "1 / 1")
 #set text(font: ("Arial", "Liberation Sans", "Libertinus Serif"), size: 9pt, lang: "es")
@@ -18,9 +18,11 @@
 #v(12pt)
 #set table(inset:6pt,stroke:(bottom:0.4pt),align:(left,right))
 #if d.kind == "receipt" {
+ if d.payments.len() == 0 { [Sin pagos registrados.] } else {
  table(columns:(1fr,1fr,2fr,1fr),
  table.header(repeat:true,..("Fecha","Método","Referencia","Monto").map(x=>strong(x))),
  ..d.payments.map(p=>(p.date,p.method,p.reference,money(p.amount))).flatten())
+ }
 } else if d.kind == "delivery" {
  table(columns:(4fr,1fr),table.header(repeat:true,strong("Descripción"),strong("Cantidad")),..d.items.map(i=>(i.description,i.quantity)).flatten())
 } else {

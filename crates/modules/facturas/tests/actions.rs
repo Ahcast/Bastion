@@ -296,10 +296,15 @@ async fn mysql57_invoice_actions_numbering_payments_documents_and_preserved_orig
             .await
             .unwrap();
     assert_eq!(count, 3);
-    assert!(matches!(
-        invoices.document(2, b.id, 2, "receipt").await,
-        Err(CoreError::Conflict)
-    ));
+    let before_receipt = invoices.detail(2, b.id).await.unwrap();
+    assert!(before_receipt.payments.is_empty());
+    let receipt = invoices.document(2, b.id, 2, "receipt").await.unwrap();
+    assert!(!receipt.content_base64.is_empty());
+    let after_receipt = invoices.detail(2, b.id).await.unwrap();
+    assert_eq!(
+        serde_json::to_value(before_receipt).unwrap(),
+        serde_json::to_value(after_receipt).unwrap()
+    );
     assert!(matches!(
         invoices.document(2, a.id, 3, "invoice").await,
         Err(CoreError::PreconditionFailed)

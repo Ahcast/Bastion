@@ -78,7 +78,7 @@ paths:
         - {$ref: '#/components/parameters/Csrf'}
       responses:
         '200':
-          description: Recibo requiere pagos registrados; Borrador se identifica sin emisión fiscal
+          description: Recibo independiente de pagos previos y sin registrar pagos; Borrador se identifica sin emisión fiscal
           content:
             application/json:
               schema: {$ref: '#/components/schemas/Document'}
