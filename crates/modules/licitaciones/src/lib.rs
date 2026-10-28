@@ -3,6 +3,7 @@
 mod attachments;
 mod folio;
 mod frontmatter;
+mod image_pdf;
 mod lots;
 mod order;
 mod pagination;
