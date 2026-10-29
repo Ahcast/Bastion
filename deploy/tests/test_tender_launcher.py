@@ -1,5 +1,6 @@
 import importlib.util
 import os
+import socket
 from pathlib import Path
 import tempfile
 import unittest
@@ -37,6 +38,21 @@ class TenderLauncherValidation(unittest.TestCase):
         os.chmod(self.root, 0o755)
         with self.assertRaises(ValueError):
             launcher.check_staged(self.root, os.getuid())
+
+    def test_socket_reads_only_a_bounded_identifier_and_checks_peer(self):
+        left, right = socket.socketpair(socket.AF_UNIX, socket.SOCK_STREAM)
+        saved = os.dup(0)
+        try:
+            os.dup2(left.fileno(), 0)
+            right.sendall(b'a' * 48 + b'\n')
+            identifier, uid = launcher.socket_request()
+            self.assertEqual(identifier, 'a' * 48)
+            self.assertEqual(uid, os.getuid())
+        finally:
+            os.dup2(saved, 0)
+            os.close(saved)
+            left.close()
+            right.close()
 
     def test_rejects_oversized_worker_request(self):
         with open(self.root / 'request.json', 'wb') as f:

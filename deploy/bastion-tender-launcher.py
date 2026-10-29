@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """Privileged launcher for a single isolated tender PDF job on Lightsail.
 
-Only the Bastion service account may call this fixed executable through sudo.
-It accepts one random 48-character job identifier; no command, path, flags or
-credentials come from the request. All untrusted input runs in the worker.
+Systemd accepts one Unix-socket connection and starts this root broker. The
+kernel-provided peer credentials must identify the Bastion service account.
+Only a random 48-character job identifier is accepted; no command, path,
+flags or credentials come from the request. Untrusted input runs in the worker.
 """
 import fcntl
 import os
@@ -11,7 +12,9 @@ import pathlib
 import pwd
 import re
 import shutil
+import socket
 import stat
+import struct
 import subprocess
 import sys
 
@@ -77,10 +80,10 @@ def write_marker():
         os.close(fd)
 
 
-def launch(job_id):
+def launch(job_id, peer_uid):
     account = pwd.getpwnam('bastion')
     uid, gid = account.pw_uid, account.pw_gid
-    if os.geteuid() != 0 or os.environ.get('SUDO_UID') != str(uid):
+    if os.geteuid() != 0 or peer_uid != uid:
         raise PermissionError('invalid caller')
     if not re.fullmatch(r'[0-9a-f]{48}', job_id):
         raise ValueError('invalid identifier')
@@ -187,12 +190,32 @@ def launch(job_id):
         os.close(lock)
 
 
+def socket_request():
+    with socket.socket(fileno=os.dup(0)) as peer:
+        if peer.family != socket.AF_UNIX:
+            raise PermissionError('invalid socket')
+        credentials = peer.getsockopt(socket.SOL_SOCKET, socket.SO_PEERCRED, struct.calcsize('3i'))
+        _, uid, _ = struct.unpack('3i', credentials)
+        peer.settimeout(10)
+        data = bytearray()
+        while not data.endswith(b'\n') and len(data) <= 48:
+            chunk = peer.recv(49 - len(data))
+            if not chunk:
+                raise ValueError('incomplete request')
+            data.extend(chunk)
+        if len(data) != 49 or not data.endswith(b'\n'):
+            raise ValueError('invalid request')
+        return data[:-1].decode('ascii'), uid
+
+
 if __name__ == '__main__':
     try:
-        if len(sys.argv) != 2:
+        if len(sys.argv) != 1:
             raise ValueError('invalid arguments')
-        launch(sys.argv[1])
-        print('ok')
+        job_id, peer_uid = socket_request()
+        launch(job_id, peer_uid)
+        print('ok', flush=True)
     except Exception:
+        print('error', flush=True)
         print('No se pudo generar el PDF.', file=sys.stderr)
         sys.exit(1)

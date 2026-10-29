@@ -1,0 +1,12 @@
+[Unit]
+Description=Run one isolated Bastion tender PDF job
+
+[Service]
+Type=exec
+User=root
+ExecStart=/usr/local/libexec/bastion-tender-launcher
+StandardInput=socket
+StandardOutput=socket
+StandardError=journal
+RestrictAddressFamilies=AF_UNIX
+RuntimeMaxSec=1050
