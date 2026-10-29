@@ -5,7 +5,8 @@ use bastion_colaboracion::{
 };
 use bastion_core::{CoreError, CoreService, Database, DocumentService};
 use bastion_licitaciones::{
-    AttachmentCopy, AttachmentSection, AttachmentUpload, CopyFormInput, TenderService,
+    AttachmentCopy, AttachmentSection, AttachmentUpload, CopyFormInput, GlobalVariable,
+    GlobalVariablesInput, TenderService, TenderTemplateBundle,
 };
 use sqlx::mysql::MySqlPoolOptions;
 
@@ -233,6 +234,72 @@ async fn mysql57_tender_files_private_copies_integrity_recovery_and_budgets() {
         Err(CoreError::NotFound)
     ));
 
+    let mut variables = Vec::new();
+    for (key, kind, value) in [
+        ("nombre", VariableKind::Text, "Proveedor"),
+        ("lpn", VariableKind::Text, "LPN-1"),
+        ("inst", VariableKind::Text, "Entidad"),
+        ("dia", VariableKind::Integer, "1"),
+        ("mes", VariableKind::Text, "enero"),
+        ("year", VariableKind::Integer, "2026"),
+        ("descripcion", VariableKind::Text, "Equipo"),
+        ("lotes", VariableKind::Integer, "1"),
+        ("stylo", VariableKind::Text, "std"),
+    ] {
+        variables.push(GlobalVariable {
+            key: key.into(),
+            label: key.into(),
+            kind,
+            value: Some(serde_json::json!(value)),
+        });
+    }
+    let template_exp = service
+        .save_global_variables(
+            1,
+            template_exp.id,
+            template_exp.version,
+            GlobalVariablesInput { variables },
+            false,
+        )
+        .await
+        .unwrap();
+    let root =
+        std::env::temp_dir().join(format!("tender-stage-{}", DocumentService::object_suffix()));
+    std::fs::create_dir(&root).unwrap();
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::set_permissions(&root, std::fs::Permissions::from_mode(0o700)).unwrap();
+    }
+    let bundle = TenderTemplateBundle {
+        bid_offer: "= Oferta BID".into(),
+        std_offer: "= Oferta STD".into(),
+        bid_lot: "#import \"items1_bid.typ\": items".into(),
+        std_lot: "#import \"items1_std.typ\": items".into(),
+        functions: "#let f = 1".into(),
+    };
+    let request = service
+        .stage_pdf_inputs(
+            1,
+            template_exp.id,
+            template_exp.version,
+            root.clone(),
+            &bundle,
+        )
+        .await
+        .unwrap();
+    assert_eq!(request.pieces, 4);
+    assert_eq!(request.sources, vec![3, 4]);
+    assert_eq!(request.global_sources, vec![4]);
+    assert_eq!(
+        std::fs::read_to_string(root.join("source-000003.typ")).unwrap(),
+        "= Oferta STD"
+    );
+    assert_eq!(
+        std::fs::read_to_string(root.join("source-000004.typ")).unwrap(),
+        "= Documento\n#let nombre = \"\"\n"
+    );
+    std::fs::remove_dir_all(root).unwrap();
     let copied = service
         .copy_attachment(
             1,
