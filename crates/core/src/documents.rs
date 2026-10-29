@@ -258,6 +258,78 @@ impl DocumentService {
         .await
         .map_err(|_| CoreError::Overloaded)?
     }
+    /// Stream one authorized tender PDF into an already-open private file.
+    /// The caller provides the immutable database size and SHA-256 and owns
+    /// file cleanup; data is never collected into a large in-memory buffer.
+    pub async fn get_tender_pdf_file(
+        &self,
+        key: String,
+        mut file: fs::File,
+        expected_size: u64,
+        expected_sha256: String,
+    ) -> Result<fs::File, CoreError> {
+        if !cfg!(target_os = "linux")
+            || !key.starts_with("licitaciones/")
+            || !(5..=1_000_000_000).contains(&expected_size)
+            || expected_sha256.len() != 64
+            || !expected_sha256
+                .bytes()
+                .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
+        {
+            return Err(CoreError::Invalid);
+        }
+        validate_key(&key)?;
+        let expected = hex::decode(expected_sha256).map_err(|_| CoreError::Invalid)?;
+        let permit = storage_permit().await?;
+        let this = self.clone();
+        tokio::task::spawn_blocking(move || {
+            use std::io::{Read, Seek, SeekFrom};
+            let _permit = permit;
+            if !file.metadata().map_err(|_| CoreError::Invalid)?.is_file() {
+                return Err(CoreError::Invalid);
+            }
+            file.set_len(0).map_err(|_| CoreError::Overloaded)?;
+            file.seek(SeekFrom::Start(0))
+                .map_err(|_| CoreError::Overloaded)?;
+            let output = file.try_clone().map_err(|_| CoreError::Overloaded)?;
+            let mut command = this.aws_command()?;
+            command.args([
+                "s3",
+                "cp",
+                &format!("s3://{}/{}", this.bucket, key),
+                "-",
+                "--region",
+                &this.region,
+                "--no-progress",
+                "--only-show-errors",
+                "--no-cli-pager",
+                "--cli-connect-timeout",
+                "5",
+                "--cli-read-timeout",
+                "15",
+            ]);
+            run_bounded_download(
+                command,
+                output,
+                expected_size,
+                &expected,
+                Duration::from_secs(900),
+            )?;
+            file.seek(SeekFrom::Start(0))
+                .map_err(|_| CoreError::Overloaded)?;
+            let mut header = [0u8; 5];
+            file.read_exact(&mut header)
+                .map_err(|_| CoreError::Overloaded)?;
+            if &header != b"%PDF-" {
+                return Err(CoreError::Invalid);
+            }
+            file.seek(SeekFrom::Start(0))
+                .map_err(|_| CoreError::Overloaded)?;
+            Ok(file)
+        })
+        .await
+        .map_err(|_| CoreError::Overloaded)?
+    }
     pub async fn put_with_limit(
         &self,
         key: String,
@@ -448,7 +520,7 @@ impl DocumentService {
         .await
         .map_err(|_| CoreError::Overloaded)?
     }
-    fn storage_command(&self, operation: &str, key: &str) -> Result<Command, CoreError> {
+    fn aws_command(&self) -> Result<Command, CoreError> {
         if !self.enabled
             || !self.aws.is_absolute()
             || !self.aws.is_file()
@@ -475,6 +547,10 @@ impl DocumentService {
                 command.env(name, value);
             }
         }
+        Ok(command)
+    }
+    fn storage_command(&self, operation: &str, key: &str) -> Result<Command, CoreError> {
+        let mut command = self.aws_command()?;
         command.args([
             "s3api",
             operation,
@@ -540,6 +616,93 @@ fn bounded_read_limit(path: &Path, limit: u64) -> Result<Vec<u8>, CoreError> {
         return Err(CoreError::Invalid);
     }
     Ok(bytes)
+}
+fn run_bounded_download(
+    mut command: Command,
+    mut output: fs::File,
+    expected_size: u64,
+    expected_digest: &[u8],
+    timeout: Duration,
+) -> Result<(), CoreError> {
+    use std::io::{Read, Write};
+    command
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null());
+    let mut child = command.spawn().map_err(|_| CoreError::Overloaded)?;
+    let mut stdout = child.stdout.take().ok_or(CoreError::Overloaded)?;
+    let (send, receive) = std::sync::mpsc::sync_channel(1);
+    let reader = std::thread::spawn(move || {
+        let result = (|| -> Result<(u64, Vec<u8>), ()> {
+            let mut total = 0u64;
+            let mut hash = Sha256::new();
+            let mut buffer = vec![0u8; 256 * 1024];
+            loop {
+                let n = stdout.read(&mut buffer).map_err(|_| ())?;
+                if n == 0 {
+                    break;
+                }
+                total = total
+                    .checked_add(n as u64)
+                    .filter(|n| *n <= expected_size)
+                    .ok_or(())?;
+                output.write_all(&buffer[..n]).map_err(|_| ())?;
+                hash.update(&buffer[..n]);
+            }
+            Ok((total, hash.finalize().to_vec()))
+        })();
+        let _ = send.send(result);
+    });
+    let started = Instant::now();
+    let mut result = None;
+    let mut status = None;
+    loop {
+        if result.is_none() {
+            match receive.try_recv() {
+                Ok(value) => result = Some(value),
+                Err(std::sync::mpsc::TryRecvError::Disconnected) => result = Some(Err(())),
+                Err(std::sync::mpsc::TryRecvError::Empty) => {}
+            }
+        }
+        if result.as_ref().is_some_and(Result::is_err) {
+            let _ = child.kill();
+            let _ = child.wait();
+            let _ = reader.join();
+            return Err(CoreError::Invalid);
+        }
+        if status.is_none() {
+            status = match child.try_wait() {
+                Ok(status) => status,
+                Err(_) => {
+                    let _ = child.kill();
+                    let _ = child.wait();
+                    drop(reader);
+                    return Err(CoreError::Overloaded);
+                }
+            };
+        }
+        if let (Some(result), Some(status)) = (result.as_ref(), status.as_ref()) {
+            let _ = reader.join();
+            let (size, digest) = result.as_ref().map_err(|_| CoreError::Invalid)?;
+            return if status.success()
+                && *size == expected_size
+                && digest.as_slice() == expected_digest
+            {
+                Ok(())
+            } else {
+                Err(CoreError::Overloaded)
+            };
+        }
+        if started.elapsed() >= timeout {
+            let _ = child.kill();
+            let _ = child.wait();
+            // Dropping a thread handle avoids blocking the request on an
+            // unexpected descendant retaining the pipe after timeout.
+            drop(reader);
+            return Err(CoreError::Overloaded);
+        }
+        std::thread::sleep(Duration::from_millis(25));
+    }
 }
 fn run_file_input(
     mut command: Command,
@@ -735,6 +898,97 @@ assert base64.b64encode(h.digest()).decode()==opt('--checksum-sha256')
                 .put_tender_pdf_file(
                     "cotizaciones/123/pdf/output".into(),
                     fs::File::open(&path).unwrap()
+                )
+                .await
+                .is_err()
+        );
+        fs::remove_dir_all(root).unwrap();
+    }
+    #[cfg(target_os = "linux")]
+    #[tokio::test]
+    async fn tender_pdf_download_is_bounded_and_checks_integrity() {
+        use std::io::Read;
+        use std::os::unix::fs::PermissionsExt;
+        let root = std::env::temp_dir().join(format!(
+            "bastion-download-test-{}",
+            DocumentService::object_suffix()
+        ));
+        fs::create_dir_all(&root).unwrap();
+        let mock = root.join("aws");
+        fs::write(
+            &mock,
+            br##"#!/usr/bin/python3
+import os, sys
+a=sys.argv[1:]
+assert a[:4]==['s3','cp','s3://synthetic/licitaciones/123/pdf/output','-']
+assert '--only-show-errors' in a
+os.write(1,b'%PDF-'+b'x'*1000000)
+"##,
+        )
+        .unwrap();
+        fs::set_permissions(&mock, fs::Permissions::from_mode(0o700)).unwrap();
+        let service = DocumentService {
+            enabled: true,
+            typst: PathBuf::new(),
+            aws: mock,
+            work: root.clone(),
+            branding: None,
+            bucket: "synthetic".into(),
+            region: "us-east-1".into(),
+        };
+        let mut data = vec![b'x'; 1_000_005];
+        data[..5].copy_from_slice(b"%PDF-");
+        let digest = hex::encode(Sha256::digest(&data));
+        let open = |name: &str| {
+            fs::OpenOptions::new()
+                .read(true)
+                .write(true)
+                .create_new(true)
+                .open(root.join(name))
+                .unwrap()
+        };
+        let mut file = service
+            .get_tender_pdf_file(
+                "licitaciones/123/pdf/output".into(),
+                open("ok"),
+                data.len() as u64,
+                digest.clone(),
+            )
+            .await
+            .unwrap();
+        let mut actual = Vec::new();
+        file.read_to_end(&mut actual).unwrap();
+        assert_eq!(actual, data);
+        assert!(
+            service
+                .get_tender_pdf_file(
+                    "licitaciones/123/pdf/output".into(),
+                    open("wrong-hash"),
+                    data.len() as u64,
+                    "0".repeat(64)
+                )
+                .await
+                .is_err()
+        );
+        assert!(
+            service
+                .get_tender_pdf_file(
+                    "licitaciones/123/pdf/output".into(),
+                    open("too-long"),
+                    (data.len() - 1) as u64,
+                    digest
+                )
+                .await
+                .is_err()
+        );
+        assert!(fs::metadata(root.join("too-long")).unwrap().len() <= (data.len() - 1) as u64);
+        assert!(
+            service
+                .get_tender_pdf_file(
+                    "licitaciones/../secret".into(),
+                    open("bad-key"),
+                    data.len() as u64,
+                    "0".repeat(64)
                 )
                 .await
                 .is_err()
