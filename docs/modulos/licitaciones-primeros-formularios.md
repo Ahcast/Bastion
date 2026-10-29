@@ -44,3 +44,9 @@ La rama de desarrollo incluye un ejecutable de composición para un único traba
 En AWS el usuario no privilegiado no puede leer directamente el espacio de red de PID 1. La preparación del servicio deberá crear en cada arranque /run/bastion-tender-host-netns, propiedad de root y no modificable por el trabajador, con el identificador de ese espacio. El proceso rechaza trabajar si no puede obtener una referencia fiable; el marcador aún no se ha instalado en AWS.
 La prueba temporal de systemd en AWS con DynamicUser, PrivateNetwork, NoNewPrivileges y sin capacidades terminó correctamente y la unidad fue retirada; aún falta probar la raíz privada y el transporte por trabajo.
 El ejecutable de prueba 38b311d, verificado por SHA-256, pasó la comprobación sandbox-ok en AWS con usuario dinámico y red aislada. El marcador de prueba y los archivos temporales se eliminaron y su ausencia se verificó. El trabajador aún no está instalado ni conectado a la API.
+
+## Dependencias preparadas en AWS
+
+El 2026-10-29 se instalaron en Lightsail QPDF 12.4.2, verificado con la huella indicada arriba, `poppler-utils` con `pdfinfo` 24.02.0 y las fuentes Carlito y Liberation Serif. Los paquetes Typst fijados se instalaron en `/opt/bastion-pdf/typst-packages` con sus huellas verificadas. Se depositaron las plantillas originales proporcionadas por el usuario en un directorio privado legible por Bastion, fuera de Git; se verificaron contra los originales y se retiraron las copias temporales de transferencia. Esto no registra todavía los formularios en Colaboración ni activa la generación.
+
+La instancia cuenta con aproximadamente 1,9 GiB de memoria y no tiene swap. El aislamiento por trabajo debe imponer límites que protejan al servicio; la capacidad nominal de PDF de 1 GB no acredita que todos los documentos de ese tamaño puedan procesarse con los recursos disponibles.
