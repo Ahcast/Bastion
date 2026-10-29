@@ -1,13 +1,13 @@
 use crate::{MeasuredPiece, PagePlan, plan_pdf_pages, prepare_frontmatter_sources};
 use crate::pdf_compose::{measure_and_compose_pdf, pages, regular_file, render_prepared_sources};
 use bastion_core::CoreError;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::{collections::BTreeSet, fs, io::Write, path::Path};
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct LayoutEntry { pub key: String, pub title: String }
-#[derive(Deserialize)]
+#[derive(Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct LayoutRequest { pub expediente: String, pub lpn: String, pub institucion: String, pub entries: Vec<LayoutEntry> }
 
