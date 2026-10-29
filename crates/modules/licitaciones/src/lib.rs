@@ -10,6 +10,7 @@ mod order;
 mod pagination;
 pub mod pdf_compose;
 pub mod pdf_layout;
+mod render_plan;
 mod service;
 mod typst_data;
 pub use attachments::{
@@ -26,6 +27,7 @@ pub use globals_typst::{bind_global_typst_source, prepare_global_typst_sources};
 pub use lots::{Lot, LotInput, LotItem, LotSummary};
 pub use order::{PdfOrder, PdfOrderInput, PdfOrderItem};
 pub use pagination::{MeasuredPiece, PageConvergence, PagePlan, PageRange, plan_pdf_pages};
+pub use render_plan::{RenderPiece, RenderPlan};
 use serde::{Deserialize, Serialize};
 pub use service::TenderService;
 pub use typst_data::{TenderTypstSnapshot, TypstLotSources, prepare_typst_lot_sources};
