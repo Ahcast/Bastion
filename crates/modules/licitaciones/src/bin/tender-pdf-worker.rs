@@ -14,6 +14,8 @@ struct Request {
     pieces: u32,
     #[serde(default)]
     sources: Vec<u32>,
+    #[serde(default)]
+    global_sources: Vec<u32>,
 }
 
 fn request(bytes: &[u8]) -> Result<Request, ()> {
@@ -33,6 +35,8 @@ fn request(bytes: &[u8]) -> Result<Request, ()> {
     {
         return Err(());
     }
+    let mut globals=std::collections::BTreeSet::new();
+    if value.global_sources.iter().any(|n| !seen.contains(n) || !globals.insert(*n)) {return Err(());}
     Ok(value)
 }
 #[cfg(any(test, target_os = "linux"))]
@@ -129,6 +133,7 @@ fn perform() -> Result<u32, ()> {
         &root,
         job.pieces,
         &job.sources,
+        &job.global_sources,
         packages.as_deref(),
         fonts.as_deref(),
     )
@@ -173,6 +178,9 @@ mod tests {
         assert!(request(br#"{"pieces":2,"sources":[1,2]}"#).is_ok());
         assert!(request(br#"{"pieces":2,"sources":[1,1]}"#).is_err());
         assert!(request(br#"{"pieces":2,"sources":[3]}"#).is_err());
+        assert!(request(br#"{"pieces":2,"sources":[1,2],"global_sources":[1]}"#).is_ok());
+        assert!(request(br#"{"pieces":2,"sources":[1],"global_sources":[2]}"#).is_err());
+        assert!(request(br#"{"pieces":2,"sources":[1],"global_sources":[1,1]}"#).is_err());
     }
     #[test]
     fn process_status_requires_no_privilege_or_capabilities() {
