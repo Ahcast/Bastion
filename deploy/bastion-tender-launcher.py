@@ -154,7 +154,7 @@ def launch(job_id):
             args = ['/usr/bin/systemd-run', '--quiet', '--wait', '--collect', '--unit', unit]
             for prop in props:
                 args.extend(['--property', prop])
-            args.extend(['/bin/sh', '-c', 'exec /usr/local/libexec/bastion-tender-pdf-worker < /run/bastion-tender-job/request.json'])
+            args.extend(['/bin/sh', '-c', f'exec {WORKER} < {BIND_TARGET}/request.json'])
             try:
                 run(args, timeout=960)
             finally:
