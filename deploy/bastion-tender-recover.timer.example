@@ -1,0 +1,10 @@
+[Unit]
+Description=Periodically clean interrupted Bastion tender PDF jobs
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=5min
+Unit=bastion-tender-recover.service
+
+[Install]
+WantedBy=timers.target

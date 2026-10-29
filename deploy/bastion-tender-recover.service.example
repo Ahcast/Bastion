@@ -1,0 +1,9 @@
+[Unit]
+Description=Clean up interrupted Bastion tender PDF jobs
+After=local-fs.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/libexec/bastion-tender-recover
+NoNewPrivileges=yes
+RestrictAddressFamilies=AF_UNIX
