@@ -164,8 +164,17 @@ pub fn render_prepared_sources(
     }
     let unique: std::collections::BTreeSet<_> = source_numbers.iter().copied().collect();
     let globals: std::collections::BTreeSet<_> = global_numbers.iter().copied().collect();
-    if unique.len() != source_numbers.len() || globals.len() != global_numbers.len() || !globals.is_subset(&unique) || unique.iter().any(|n| *n == 0 || *n > pieces) { return Err(CoreError::Invalid); }
-    if !globals.is_empty() { regular_file(&root.join("globales.typ"))?; regular_file(&root.join("globales.json"))?; }
+    if unique.len() != source_numbers.len()
+        || globals.len() != global_numbers.len()
+        || !globals.is_subset(&unique)
+        || unique.iter().any(|n| *n == 0 || *n > pieces)
+    {
+        return Err(CoreError::Invalid);
+    }
+    if !globals.is_empty() {
+        regular_file(&root.join("globales.typ"))?;
+        regular_file(&root.join("globales.json"))?;
+    }
     for &number in source_numbers {
         let input = root.join(format!("source-{number:06}.typ"));
         let output = root.join(format!("piece-{number:06}.pdf"));
@@ -193,7 +202,9 @@ pub fn render_prepared_sources(
             let bound = root.join(format!("bound-{number:06}.typ"));
             bind_source_file(&input, &bound)?;
             bound
-        } else { input };
+        } else {
+            input
+        };
         command.arg(source).arg(&output);
         run(command)?;
         regular_file(&output)?;
@@ -202,16 +213,34 @@ pub fn render_prepared_sources(
 }
 fn bind_source_file(source: &Path, bound: &Path) -> Result<(), CoreError> {
     use std::io::{Read, Write};
-    let mut input=fs::File::open(source).map_err(|_|CoreError::Invalid)?;
-    let size=input.metadata().map_err(|_|CoreError::Invalid)?.len();
-    if size>100_000_000 {return Err(CoreError::Invalid);}
-    let mut output=fs::OpenOptions::new().write(true).create_new(true).open(bound).map_err(|_|CoreError::Invalid)?;
-    output.write_all(b"#import \"globales.typ\": variables\n").map_err(|_|CoreError::Overloaded)?;
-    let prefix_len=std::cmp::min(size,3) as usize;
-    let mut prefix=[0u8;3]; input.read_exact(&mut prefix[..prefix_len]).map_err(|_|CoreError::Invalid)?;
-    if prefix_len!=3 || prefix!=[0xef,0xbb,0xbf] {output.write_all(&prefix[..prefix_len]).map_err(|_|CoreError::Overloaded)?;}
-    let copied=std::io::copy(&mut input.take(100_000_001),&mut output).map_err(|_|CoreError::Overloaded)?;
-    if copied + prefix_len as u64 != size {return Err(CoreError::Invalid);}
+    let mut input = fs::File::open(source).map_err(|_| CoreError::Invalid)?;
+    let size = input.metadata().map_err(|_| CoreError::Invalid)?.len();
+    if size > 100_000_000 {
+        return Err(CoreError::Invalid);
+    }
+    let mut output = fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(bound)
+        .map_err(|_| CoreError::Invalid)?;
+    output
+        .write_all(b"#import \"globales.typ\": variables\n")
+        .map_err(|_| CoreError::Overloaded)?;
+    let prefix_len = std::cmp::min(size, 3) as usize;
+    let mut prefix = [0u8; 3];
+    input
+        .read_exact(&mut prefix[..prefix_len])
+        .map_err(|_| CoreError::Invalid)?;
+    if prefix_len != 3 || prefix != [0xef, 0xbb, 0xbf] {
+        output
+            .write_all(&prefix[..prefix_len])
+            .map_err(|_| CoreError::Overloaded)?;
+    }
+    let copied = std::io::copy(&mut input.take(100_000_001), &mut output)
+        .map_err(|_| CoreError::Overloaded)?;
+    if copied + prefix_len as u64 != size {
+        return Err(CoreError::Invalid);
+    }
     Ok(())
 }
 /// Measure all pages, create a transparent numbered overlay, and merge. This
@@ -399,7 +428,9 @@ mod tests {
         )
         .unwrap();
         render_prepared_sources(Path::new(&typst), &root, 3, &[1, 2], &[], None, None).unwrap();
-        assert!(render_prepared_sources(Path::new(&typst), &root, 3, &[1], &[], None, None).is_err());
+        assert!(
+            render_prepared_sources(Path::new(&typst), &root, 3, &[1], &[], None, None).is_err()
+        );
         assert!(
             Command::new(&qpdf)
                 .arg(root.join("piece-000001.pdf"))
@@ -432,19 +463,46 @@ mod tests {
     }
     #[test]
     fn approved_global_sources_compile_with_typed_values() {
-        let Some(bin)=std::env::var_os("BASTION_TYPST_BIN") else {return;};
-        let root=std::env::temp_dir().join(format!("bastion-worker-global-{}",std::process::id()));
+        let Some(bin) = std::env::var_os("BASTION_TYPST_BIN") else {
+            return;
+        };
+        let root =
+            std::env::temp_dir().join(format!("bastion-worker-global-{}", std::process::id()));
         fs::create_dir_all(&root).unwrap();
-        let values=vec![crate::GlobalVariable {key:"nombre".into(),label:"Nombre".into(),kind:bastion_colaboracion::VariableKind::Text,value:Some(serde_json::json!("#panic()"))},crate::GlobalVariable {key:"numero".into(),label:"Número".into(),kind:bastion_colaboracion::VariableKind::Integer,value:Some(serde_json::json!("42"))}];
-        for (name,data) in crate::prepare_global_typst_sources(&values,7).unwrap() {fs::write(root.join(name),data).unwrap();}
-        let original="\u{feff}#assert.eq(variables.numero,42)\n#assert.eq(variables.total_paginas,7)\n#variables.nombre";
-        fs::write(root.join("source-000001.typ"),original).unwrap();
-        assert!(render_prepared_sources(Path::new(&bin),&root,1,&[1],&[2],None,None).is_err());
-        render_prepared_sources(Path::new(&bin),&root,1,&[1],&[1],None,None).unwrap();
-        assert!(fs::read(root.join("piece-000001.pdf")).unwrap().starts_with(b"%PDF-"));
-        assert_eq!(fs::read_to_string(root.join("source-000001.typ")).unwrap(),original);
-        let bound=fs::read_to_string(root.join("bound-000001.typ")).unwrap();
+        let values = vec![
+            crate::GlobalVariable {
+                key: "nombre".into(),
+                label: "Nombre".into(),
+                kind: bastion_colaboracion::VariableKind::Text,
+                value: Some(serde_json::json!("#panic()")),
+            },
+            crate::GlobalVariable {
+                key: "numero".into(),
+                label: "Número".into(),
+                kind: bastion_colaboracion::VariableKind::Integer,
+                value: Some(serde_json::json!("42")),
+            },
+        ];
+        for (name, data) in crate::prepare_global_typst_sources(&values, 7).unwrap() {
+            fs::write(root.join(name), data).unwrap();
+        }
+        let original = "\u{feff}#assert.eq(variables.numero,42)\n#assert.eq(variables.total_paginas,7)\n#variables.nombre";
+        fs::write(root.join("source-000001.typ"), original).unwrap();
+        assert!(
+            render_prepared_sources(Path::new(&bin), &root, 1, &[1], &[2], None, None).is_err()
+        );
+        render_prepared_sources(Path::new(&bin), &root, 1, &[1], &[1], None, None).unwrap();
+        assert!(
+            fs::read(root.join("piece-000001.pdf"))
+                .unwrap()
+                .starts_with(b"%PDF-")
+        );
+        assert_eq!(
+            fs::read_to_string(root.join("source-000001.typ")).unwrap(),
+            original
+        );
+        let bound = fs::read_to_string(root.join("bound-000001.typ")).unwrap();
         assert!(bound.starts_with("#import \"globales.typ\": variables\n#assert"));
-        let _=fs::remove_dir_all(root);
+        let _ = fs::remove_dir_all(root);
     }
 }

@@ -35,8 +35,14 @@ fn request(bytes: &[u8]) -> Result<Request, ()> {
     {
         return Err(());
     }
-    let mut globals=std::collections::BTreeSet::new();
-    if value.global_sources.iter().any(|n| !seen.contains(n) || !globals.insert(*n)) {return Err(());}
+    let mut globals = std::collections::BTreeSet::new();
+    if value
+        .global_sources
+        .iter()
+        .any(|n| !seen.contains(n) || !globals.insert(*n))
+    {
+        return Err(());
+    }
     Ok(value)
 }
 #[cfg(any(test, target_os = "linux"))]
