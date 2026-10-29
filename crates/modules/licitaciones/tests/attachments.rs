@@ -4,7 +4,9 @@ use bastion_colaboracion::{
     VariableKind,
 };
 use bastion_core::{CoreError, CoreService, Database, DocumentService};
-use bastion_licitaciones::{AttachmentCopy, AttachmentSection, AttachmentUpload, TenderService};
+use bastion_licitaciones::{
+    AttachmentCopy, AttachmentSection, AttachmentUpload, CopyFormInput, TenderService,
+};
 use sqlx::mysql::MySqlPoolOptions;
 
 fn upload(section: AttachmentSection, name: &str, bytes: &[u8]) -> AttachmentUpload {
@@ -199,6 +201,38 @@ async fn mysql57_tender_files_private_copies_integrity_recovery_and_budgets() {
         .unwrap();
     assert_eq!(form.definition.template_source_id, Some(template.id));
     assert_eq!(form.definition.variables[0].key, "nombre");
+    let template_exp = service.create(1, "tender-template-exp01").await.unwrap();
+    let template_exp = service
+        .copy_form(
+            1,
+            template_exp.id,
+            template_exp.version,
+            "tender-template-copy01",
+            CopyFormInput {
+                source_id: form.id,
+                revision: form.revision,
+            },
+        )
+        .await
+        .unwrap();
+    let form_copy_id = template_exp.forms[0].id;
+    let captured = service
+        .render_template(1, template_exp.id, template_exp.version, form_copy_id)
+        .await
+        .unwrap();
+    assert_eq!(captured.source_id, template.id);
+    assert_eq!(captured.source, "= Documento\n#let nombre = \"\"\n");
+    assert!(matches!(
+        service
+            .render_template(1, template_exp.id, template_exp.version - 1, form_copy_id)
+            .await,
+        Err(CoreError::PreconditionFailed)
+    ));
+    assert!(matches!(
+        service.render_template(1, first.id, 2, form_copy_id).await,
+        Err(CoreError::NotFound)
+    ));
+
     let copied = service
         .copy_attachment(
             1,
