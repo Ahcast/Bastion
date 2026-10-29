@@ -350,6 +350,15 @@ impl TenderService {
         sqlx::query("UPDATE licitaciones_pdf_jobs SET cleanup_after=UTC_TIMESTAMP(6)+INTERVAL 15 MINUTE WHERE id=?").bind(&id).execute(&mut *tx).await?;
         tx.commit().await?;
         self.storage.remove_all_versions(key).await?;
+        #[cfg(target_os = "linux")]
+        {
+            let path = std::path::Path::new("/var/lib/bastion-tender/incoming").join(&id);
+            match std::fs::remove_dir_all(path) {
+                Ok(()) => {}
+                Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+                Err(_) => return Err(CoreError::Overloaded),
+            }
+        }
         sqlx::query("UPDATE licitaciones_pdf_jobs SET cleanup_pending=0,cleanup_after=NULL WHERE id=? AND cleanup_pending=1").bind(id).execute(self.database.pool()).await?;
         Ok(true)
     }
