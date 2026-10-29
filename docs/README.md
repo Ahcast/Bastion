@@ -249,3 +249,5 @@ El informe se obtuvo de una copia de frontend Angular compilado y backend Larave
 - 2026-10-28: para la composición de Licitaciones se prepara un proceso Rust separado, sin red y sin credenciales, con raíz privada y límites de recursos por trabajo. La instantánea de autorización sigue a cargo de la API; QPDF, Typst y el inspector se ejecutarán dentro del aislamiento. Es trabajo de desarrollo, sin servicio instalado ni despliegue; falta integrar y verificar el aislamiento completo. Ver [primeros formularios](modulos/licitaciones-primeros-formularios.md).
 
 - 2026-10-28: lotes BID/STD, variables y orden del expediente se desplegaron desde df7ed34, con CI, respaldo y migración 6 verificados. Generación PDF y conexión del trabajador aislado siguen pendientes. El almacenamiento temporal para un expediente de 1 GB debe estar en disco, no en la partición temporal de /run; véase docs/09-despliegue.md.
+
+- 2026-10-28: el usuario amplía el límite independiente del PDF final de Licitaciones a 1.000.000.000 bytes; el almacenamiento y la generación de ese tamaño siguen pendientes de implementación y verificación.
