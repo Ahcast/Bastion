@@ -129,6 +129,21 @@ jobs:
           tar -xJf "$RUNNER_TEMP/typst.tar.xz" --strip-components=1 -C "$RUNNER_TEMP/bastion-typst"
           echo "BASTION_TYPST_BIN=$RUNNER_TEMP/bastion-typst/typst" >> "$GITHUB_ENV"
           echo "BASTION_DOCUMENTS_WORK_DIR=$RUNNER_TEMP/bastion-documents" >> "$GITHUB_ENV"
+      - name: Install pinned QPDF for tender assembly tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fsSL https://github.com/qpdf/qpdf/releases/download/v12.4.2/qpdf-12.4.2-bin-linux-x86_64.zip -o "$RUNNER_TEMP/qpdf.zip"
+          echo "db367d897829f22c4198ce1094143c9d467bd6ee7dfabc44ba6f02056b24f8b1  $RUNNER_TEMP/qpdf.zip" | sha256sum -c -
+          unzip -q "$RUNNER_TEMP/qpdf.zip" -d "$RUNNER_TEMP/bastion-qpdf"
+          echo "BASTION_QPDF_BIN=$RUNNER_TEMP/bastion-qpdf/bin/qpdf" >> "$GITHUB_ENV"
+      - name: Install PDF inspection tool for tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq --no-install-recommends poppler-utils
+          echo "BASTION_PDFINFO_BIN=$(command -v pdfinfo)" >> "$GITHUB_ENV"
       - name: Run workspace tests
         # Shared PDF template runs with synthetic data and no S3 or SMTP credentials.
         # Each module uses an isolated disposable MySQL 5.7 database.
@@ -208,6 +223,33 @@ jobs:
             exit 1
           fi
           grep -F 'unknown command' startup-check.txt
+      - name: Build isolated tender PDF worker
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo build --release --locked --package bastion-licitaciones --bin tender-pdf-worker --target x86_64-unknown-linux-gnu
+          worker=target/x86_64-unknown-linux-gnu/release/tender-pdf-worker
+          file "$worker"
+          ldd "$worker"
+          if printf '{"pieces":1}' | env -i "$worker" > worker-check.txt 2>&1; then
+            echo "Worker must fail closed without its isolated service environment"
+            exit 1
+          fi
+          mkdir -p dist/tender-worker
+          cp "$worker" dist/tender-worker/
+          git rev-parse HEAD > dist/tender-worker/BUILD.txt
+          (cd dist/tender-worker && sha256sum tender-pdf-worker > SHA256SUMS)
+          tar -czf dist/tender-pdf-worker-linux-x86_64.tar.gz -C dist/tender-worker .
+          (cd dist && sha256sum tender-pdf-worker-linux-x86_64.tar.gz > tender-pdf-worker-linux-x86_64.tar.gz.sha256)
+      - name: Upload isolated tender PDF worker
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: tender-pdf-worker-linux-x86_64
+          path: |
+            dist/tender-pdf-worker-linux-x86_64.tar.gz
+            dist/tender-pdf-worker-linux-x86_64.tar.gz.sha256
+          if-no-files-found: error
+          retention-days: 30
       - name: Package Lightsail executable
         shell: bash
         run: |

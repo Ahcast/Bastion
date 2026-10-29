@@ -233,10 +233,12 @@ impl TenderService {
                 });
             }
         }
-        GlobalVariablesInput {
+        crate::lots::reconcile(&mut tx, id, &current.variables, &variables, false).await?;
+        let validated = GlobalVariablesInput {
             variables: variables.clone(),
-        }
-        .validate()?;
+        };
+        validated.validate()?;
+        validated.validate_form_config()?;
         sqlx::query("UPDATE licitaciones_expedientes SET variables_json=? WHERE id=?")
             .bind(serde_json::to_value(&variables).map_err(|_| CoreError::Invalid)?)
             .bind(id)
@@ -254,11 +256,21 @@ impl TenderService {
         id: u64,
         expected: u64,
         input: GlobalVariablesInput,
+        confirm_discard: bool,
     ) -> Result<Expedient, CoreError> {
         input.validate()?;
+        input.validate_form_config()?;
         let mut tx = self.begin(actor, "editar").await?;
         let current = load(&mut tx, id).await?;
         editable(&current, expected)?;
+        crate::lots::reconcile(
+            &mut tx,
+            id,
+            &current.variables,
+            &input.variables,
+            confirm_discard,
+        )
+        .await?;
         sqlx::query("UPDATE licitaciones_expedientes SET variables_json=? WHERE id=?")
             .bind(serde_json::to_value(input.variables).map_err(|_| CoreError::Invalid)?)
             .bind(id)

@@ -67,3 +67,7 @@
  .document-fields input,.document-fields select,.document-fields textarea{font-size:16px}
  .document-save button{width:100%}
 }
+.tender-order { display: grid; gap: 8px; padding-left: 28px; }
+.tender-order li { border: 1px solid var(--line); border-radius: 6px; padding: 10px 12px; }
+.tender-order li > span:first-child { display: inline-block; min-width: 50%; }
+.tender-order li .actions { display: inline-flex; margin-left: 12px; }

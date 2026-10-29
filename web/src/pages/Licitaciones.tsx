@@ -5,6 +5,8 @@ import { Dialog, Heading, Loading, Notice, Table, useCore, useLoad } from '../ui
 import { useNavigationGuard, useUnsavedChanges } from '../navigationGuard.js';
 import { DocumentSection, DocumentPagination } from '../components/DocumentWorkspace.js';
 import TenderFiles from '../components/TenderFiles.js';
+import TenderLots from '../components/TenderLots.js';
+import TenderPdfOrder from '../components/TenderPdfOrder.js';
 import { fieldValue, kindLabels, sectionLabels } from '../tenders.js';
 import type { Expedient, ExpedientSummary, GlobalVariable, FormSection, PublishedForm, TenderPage, VariableKind } from '../tenders.js';
 
@@ -42,12 +44,13 @@ function ExpedientWorkspace({ id, back }: { id: number; back: () => void }) {
     <Notice>{result.error}</Notice>{!record && !result.error && <Loading />}
     {record && <><div className="row section-tabs document-tabs" aria-label="Secciones del expediente">{tabs.map(entry => <button key={entry.id} aria-pressed={tab === entry.id} onClick={() => { void navigate(() => { setTab(entry.id); }); }}>{entry.label}</button>)}</div>
       <div className="document-details"><span className="document-metadata">{record.state === 'borrador' ? 'Borrador' : record.state} · Versión {record.version}</span><button onClick={() => { void navigate(result.reload); }}>Actualizar expediente</button></div>
-      {tab === 'resumen' ? <DocumentSection title="Contenido del expediente"><ExpedientName key={record.version} record={record} editable={Boolean(editable)} saved={value => { result.setData(value); notify("Nombre del expediente guardado."); }} reload={() => { void navigate(result.reload); }} /><div className="stack"><p>{record.forms.length} formularios incorporados. {record.forms.reduce((n, c) => n + c.missing_required.length, 0)} valores obligatorios pendientes.</p><p>Las variables se definen una sola vez en la pestaña Variables y se comparten en el expediente.</p><p>Lotes, ítems, generación PDF y adjudicación están pendientes de las siguientes etapas.</p>{moduleCan(access, 'licitaciones', 'expedientes', 'eliminar') && record.state === 'borrador' && <button className="danger" onClick={() => setDeleting(true)}>Eliminar borrador</button>}</div></DocumentSection>
-        : tab === 'pdf' ? <DocumentSection title="PDF final"><p>La generación, el índice automático, el foliado y el historial se incorporarán al completar la infraestructura documental. Todavía no hay un PDF generado.</p></DocumentSection>
+      {tab === 'resumen' ? <DocumentSection title="Contenido del expediente"><ExpedientName key={record.version} record={record} editable={Boolean(editable)} saved={value => { result.setData(value); notify("Nombre del expediente guardado."); }} reload={() => { void navigate(result.reload); }} /><div className="stack"><p>{record.forms.length} formularios incorporados. {record.forms.reduce((n, c) => n + c.missing_required.length, 0)} valores obligatorios pendientes.</p><p>Las variables se definen una sola vez en la pestaña Variables y se comparten en el expediente.</p><p>Prepara los lotes y sus ítems en Oferta económica. La generación del PDF y la adjudicación están pendientes.</p>{moduleCan(access, 'licitaciones', 'expedientes', 'eliminar') && record.state === 'borrador' && <button className="danger" onClick={() => setDeleting(true)}>Eliminar borrador</button>}</div></DocumentSection>
+        : tab === 'pdf' ? <DocumentSection title="PDF final"><TenderPdfOrder record={record} editable={Boolean(editable)} saved={result.setData} /></DocumentSection>
         : tab === 'variables' ? <DocumentSection title="Variables del expediente"><GlobalVariablesEditor key={record.version} record={record} editable={Boolean(editable)} saved={value => { result.setData(value); notify('Variables del expediente guardadas.'); }} reload={() => { void navigate(result.reload); }} /></DocumentSection>
         : <DocumentSection title={tabs.find(t => t.id === tab)?.label ?? "Formularios"} list action={editable && moduleCan(access, 'colaboracion', 'empresa', 'ver') && <button onClick={() => { void navigate(() => { setCopying(true); }); }}>Incorporar formulario</button>}>
           {!moduleCan(access, 'colaboracion', 'empresa', 'ver') && <p className="muted">Para incorporar nuevos formularios necesitas acceso a Colaboración. Las copias existentes siguen disponibles.</p>}
           {(tab === 'legal' || tab === 'tecnica') && <><TenderFiles record={record} section={tab} changed={result.setData} start={action => { void navigate(() => { action(); }); }} /><h3 className="document-subheading">Formularios</h3></>}
+          {tab === 'economica' && <TenderLots record={record} editable={Boolean(editable)} saved={result.setData} />}
           <Table columns={['Formulario', 'Revisión de origen', 'Obligatorios pendientes', 'Acción']} rows={record.forms.filter(c => c.source.definition.section === tab).map(c => [c.source.definition.title, c.source.revision, c.missing_required.length, <button onClick={() => { void navigate(() => setTab('variables')); }}>Ver variables</button>])} />
         </DocumentSection>}
       {copying && (tab === 'legal' || tab === 'economica' || tab === 'tecnica') && <CopyPicker record={record} section={tab} close={() => setCopying(false)} saved={value => { result.setData(value); setCopying(false); notify('Copia independiente incorporada.'); }} />}
@@ -81,29 +84,48 @@ function ExpedientName({ record, editable, saved, reload }: { record: Expedient;
 }
 function GlobalVariablesEditor({ record, editable, saved, reload }: { record: Expedient; editable: boolean; saved: (value: Expedient) => void; reload: () => void }) {
   const { api } = useCore();
-  const [variables, setVariables] = useState<GlobalVariable[]>(() => structuredClone(record.variables ?? []));
+  const fixed: GlobalVariable[] = [
+    {key:'lpn', label:'LPN', kind:'text', value:null}, {key:'inst', label:'Institución', kind:'text', value:null},
+    {key:'dia', label:'Día', kind:'integer', value:null}, {key:'mes', label:'Mes', kind:'text', value:null},
+    {key:'year', label:'Año', kind:'integer', value:null}, {key:'lotes', label:'Cantidad de lotes', kind:'integer', value:null},
+    {key:'stylo', label:'Estilo', kind:'text', value:null}, {key:'descripcion', label:'Descripción', kind:'text', value:null},
+  ];
+  const [variables, setVariables] = useState<GlobalVariable[]>(() => [...fixed.filter(f => !(record.variables ?? []).some(v => v.key === f.key)), ...structuredClone(record.variables ?? [])]);
+  const [discard, setDiscard] = useState<string[] | null>(null);
   const [busy, setBusy] = useState(false), [error, setError] = useState(''), [conflict, setConflict] = useState(false);
   const baseline = useRef(JSON.stringify(variables));
   useUnsavedChanges(JSON.stringify(variables) !== baseline.current, busy);
   const change = (index: number, value: Partial<GlobalVariable>) => setVariables(current => current.map((item, i) => i === index ? { ...item, ...value } : item));
-  return <form className="stack document-values" onSubmit={async event => {
-    event.preventDefault(); if (!editable || busy) return;
+  const save = async (confirmDiscard: boolean) => {
     setBusy(true); setError(''); setConflict(false);
-    try { const updated = await api.request<Expedient>(`/api/v1/licitaciones/${record.id}/variables`, { method: 'PUT', body: { variables }, ifMatch: record.version }); baseline.current = JSON.stringify(variables); saved(updated); }
-    catch (reason) { setError(message(reason)); setConflict(reason instanceof ApiError && reason.status === 412); } finally { setBusy(false); }
-  }}><p>Estas variables son compartidas por todo el expediente. En la plantilla Typst usa <code>#variables.nombre</code>, sustituyendo <code>nombre</code> por el identificador. La generación del PDF con estas variables está pendiente.</p>
+    try {
+      if (!confirmDiscard) {
+        const oldStyle = record.variables?.find(v => v.key === 'stylo')?.value ?? null;
+        const nextStyle = variables.find(v => v.key === 'stylo')?.value ?? null;
+        const nextCount = Number(variables.find(v => v.key === 'lotes')?.value ?? 0);
+        if (oldStyle !== nextStyle || Number(record.variables?.find(v => v.key === 'lotes')?.value ?? 0) > nextCount) {
+          const lots = await api.request<{numero:number;items:number}[]>(`/api/v1/licitaciones/${record.id}/lotes`);
+          const affected = lots.filter(l => l.items > 0 && (l.numero > nextCount || (oldStyle === 'bid' && nextStyle === 'std') || !nextStyle));
+          if (affected.length) { setDiscard(affected.map(l => `Lote ${l.numero}: ${l.items} ítem(s)${l.numero <= nextCount && nextStyle ? ', país de origen y transporte' : ', todos sus datos'}`)); return; }
+        }
+      }
+      const updated = await api.request<Expedient>(`/api/v1/licitaciones/${record.id}/variables`, { method: 'PUT', body: { variables, confirm_discard:confirmDiscard }, ifMatch: record.version }); baseline.current = JSON.stringify(variables); setDiscard(null); saved(updated);
+    } catch (reason) { setError(message(reason)); setConflict(reason instanceof ApiError && reason.status === 412); } finally { setBusy(false); }
+  };
+  return <form className="stack document-values" onSubmit={event => { event.preventDefault(); if (editable && !busy) void save(false); }}><p>Estas variables son compartidas por todo el expediente. En la plantilla Typst usa <code>#variables.nombre</code>, sustituyendo <code>nombre</code> por el identificador. La generación del PDF con estas variables está pendiente.</p>
     <Notice>{error}</Notice>{conflict && <button type="button" disabled={busy} onClick={reload}>Cargar versión actual</button>}
     <fieldset disabled={busy || !editable} className="document-fields">
       {variables.map((variable, index) => <fieldset className="document-variable" key={index}><legend>Variable {index + 1}</legend>
-        <label>Identificador<input value={variable.key} required pattern="[a-z][a-z0-9_]{0,63}" maxLength={64} onChange={e => change(index, { key: e.target.value })} /></label>
-        <label>Etiqueta<input value={variable.label} required maxLength={255} onChange={e => change(index, { label: e.target.value })} /></label>
-        <label>Tipo<select value={variable.kind} onChange={e => change(index, { kind: e.target.value as VariableKind, value: null })}>{Object.entries(kindLabels).map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select></label>
-        <label>Valor{variable.kind === 'boolean' ? <select value={variable.value === null ? '' : String(variable.value)} onChange={e => change(index, { value: e.target.value === '' ? null : fieldValue(variable.kind, e.target.value) })}><option value="">Sin completar</option><option value="true">Sí</option><option value="false">No</option></select> : <input type={variable.kind === 'date' ? 'date' : 'text'} value={String(variable.value ?? '')} onChange={e => change(index, { value: e.target.value === '' ? null : e.target.value })} />}</label>
-        <button type="button" onClick={() => setVariables(current => current.filter((_, i) => i !== index))}>Quitar variable</button>
+        <label>Identificador<input value={variable.key} readOnly={fixed.some(f => f.key === variable.key)} required pattern="[a-z][a-z0-9_]{0,63}" maxLength={64} onChange={e => change(index, { key: e.target.value })} /></label>
+        <label>Etiqueta<input value={variable.label} readOnly={fixed.some(f => f.key === variable.key)} required maxLength={255} onChange={e => change(index, { label: e.target.value })} /></label>
+        <label>Tipo<select disabled={fixed.some(f => f.key === variable.key && f.kind === variable.kind)} value={variable.kind} onChange={e => change(index, { kind: e.target.value as VariableKind, value: null })}>{Object.entries(kindLabels).map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select></label>
+        <label>Valor{variable.key === 'total_paginas' ? <input value="Se calculará al generar el PDF" readOnly /> : variable.key === 'mes' || variable.key === 'stylo' ? <select value={String(variable.value ?? '')} onChange={e => change(index, { value:e.target.value || null })}><option value="">Seleccionar</option>{(variable.key === 'mes' ? ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'] : ['bid','std']).map(option => <option key={option} value={option}>{option}</option>)}</select> : variable.kind === 'boolean' ? <select value={variable.value === null ? '' : String(variable.value)} onChange={e => change(index, { value: e.target.value === '' ? null : fieldValue(variable.kind, e.target.value) })}><option value="">Sin completar</option><option value="true">Sí</option><option value="false">No</option></select> : <input type={variable.kind === 'date' ? 'date' : 'text'} value={String(variable.value ?? '')} onChange={e => change(index, { value: e.target.value === '' ? null : e.target.value })} />}</label>
+        {!fixed.some(f => f.key === variable.key) && <button type="button" onClick={() => setVariables(current => current.filter((_, i) => i !== index))}>Quitar variable</button>}
       </fieldset>)}
       <button type="button" disabled={variables.length >= 100} onClick={() => setVariables(current => [...current, { key: '', label: '', kind: 'text', value: null }])}>Añadir variable</button>
       <div className="document-wide document-save"><button className="primary" type="submit" disabled={JSON.stringify(variables) === baseline.current}>{busy ? 'Guardando…' : 'Guardar variables'}</button></div>
     </fieldset>
+    <p>Total de páginas: calculado al generar el PDF.</p>{discard && <Dialog title="Confirmar descarte de datos" close={() => setDiscard(null)}><p>Se descartarán los siguientes datos:</p><ul>{discard.map(line => <li key={line}>{line}</li>)}</ul><button type="button" disabled={busy} onClick={() => { void save(true); }}>Confirmar descarte y guardar</button></Dialog>}
     {record.forms.some(form => Object.keys(form.legacy_values ?? {}).length > 0) && <div><h3>Valores anteriores por formulario</h3><p>Se conservan para consulta. Copia el valor que elijas a la variable global.</p>{record.forms.map(form => Object.entries(form.legacy_values ?? {}).map(([key, value]) => <p key={`${form.id}:${key}`}>{form.source.definition.title} · {key}: {String(value)}</p>))}</div>}
   </form>;
 }

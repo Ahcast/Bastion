@@ -109,9 +109,95 @@ paths:
               required: [variables]
               properties:
                 variables: { type: array, maxItems: 100, items: { $ref: '#/components/schemas/GlobalVariable' } }
+                confirm_discard: { type: boolean, default: false, description: Confirma la pérdida de datos de lotes por cambios en lotes o estilo. }
       responses:
         '200': { description: Expediente con variables actualizadas y ETag fuerte }
         '400': { description: Variables o valores inválidos }
+        '409': { description: El cambio requiere confirmar el descarte de datos o el expediente no está en Borrador }
+        '412': { description: Versión obsoleta }
+  /api/v1/licitaciones/{id}/lotes:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    get:
+      summary: Resumir lotes con datos guardados; requiere ver
+      responses:
+        '200':
+          description: Cantidad de ítems por lote guardado
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  required: [numero, items]
+                  properties:
+                    numero: { type: integer, minimum: 1 }
+                    items: { type: integer, minimum: 0 }
+  /api/v1/licitaciones/{id}/lotes/{numero}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+      - { name: numero, in: path, required: true, schema: { type: integer, minimum: 1, maximum: 1000 } }
+    get:
+      summary: Leer ítems y total del lote; requiere ver
+      responses:
+        '200':
+          description: Lote, total calculado y versión del expediente
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Lot' }
+        '400': { description: Lote fuera del rango o configuración incompleta }
+    put:
+      summary: Sustituir ítems del lote en Borrador; requiere editar
+      parameters:
+        - $ref: '#/components/parameters/Version'
+        - $ref: '#/components/parameters/Csrf'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [items]
+              properties:
+                items: { type: array, maxItems: 1000, items: { $ref: '#/components/schemas/LotItem' } }
+      responses:
+        '200': { description: Expediente actualizado con ETag fuerte }
+        '400': { description: Datos, montos o cantidades inválidos }
+        '403': { description: Sin permiso de edición }
+        '409': { description: Expediente fuera de Borrador }
+        '412': { description: Versión obsoleta }
+  /api/v1/licitaciones/{id}/pdf/orden:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    get:
+      summary: Leer orden de oferta, formularios, lotes con ítems y adjuntos; requiere ver
+      responses:
+        '200':
+          description: Orden calculado para la versión del expediente
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PdfOrder' }
+    put:
+      summary: Guardar el orden completo del expediente en Borrador; requiere editar
+      parameters:
+        - $ref: '#/components/parameters/Version'
+        - $ref: '#/components/parameters/Csrf'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [items]
+              properties:
+                items: { type: array, uniqueItems: true, items: { type: string } }
+      responses:
+        '200': { description: Expediente actualizado con ETag fuerte }
+        '400': { description: El orden no corresponde a los elementos actuales }
+        '403': { description: Sin permiso de edición }
+        '409': { description: Expediente fuera de Borrador }
         '412': { description: Versión obsoleta }
   /api/v1/licitaciones/{id}/formularios:
     parameters:
@@ -396,6 +482,40 @@ components:
         revision: { type: integer }
         hash: { type: string, pattern: '^[a-f0-9]{64}$' }
         definition: { $ref: '#/components/schemas/FormDefinition' }
+    LotItem:
+      type: object
+      additionalProperties: false
+      required: [descripcion, pais_origen, fecha_entrega, cantidad, unidad, transporte, precio_unitario]
+      description: Cantidades y montos se envían como cadenas decimales. En STD, pais_origen es vacío y transporte es 0.00.
+      properties:
+        descripcion: { type: string, maxLength: 4000 }
+        pais_origen: { type: string, maxLength: 255 }
+        fecha_entrega: { type: string, maxLength: 255 }
+        cantidad: { type: string, description: Hasta 12 decimales }
+        unidad: { type: string, maxLength: 255 }
+        transporte: { type: string, description: Hasta dos decimales }
+        precio_unitario: { type: string, description: Hasta dos decimales }
+    Lot:
+      type: object
+      required: [numero, items, total, version]
+      properties:
+        numero: { type: integer, minimum: 1 }
+        items: { type: array, items: { $ref: '#/components/schemas/LotItem' } }
+        total: { type: string, description: Total calculado en lempiras con dos decimales }
+        version: { type: integer, minimum: 1 }
+    PdfOrder:
+      type: object
+      required: [items, version]
+      properties:
+        version: { type: integer, minimum: 1 }
+        items:
+          type: array
+          items:
+            type: object
+            required: [key, label]
+            properties:
+              key: { type: string }
+              label: { type: string }
     GlobalVariable:
       type: object
       additionalProperties: false

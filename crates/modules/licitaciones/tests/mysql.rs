@@ -3,8 +3,8 @@ use bastion_colaboracion::{
 };
 use bastion_core::{CoreError, CoreService, Database};
 use bastion_licitaciones::{
-    CopyFormInput, GlobalVariable, GlobalVariablesInput, NameInput, PageQuery, TenderService,
-    ValuesInput,
+    CopyFormInput, GlobalVariable, GlobalVariablesInput, LotInput, LotItem, NameInput, PageQuery,
+    PdfOrderInput, TenderService, ValuesInput,
 };
 use sqlx::mysql::MySqlPoolOptions;
 
@@ -400,11 +400,13 @@ async fn mysql57_tenders_snapshots_permissions_races_receipts_and_deletion() {
         }],
     };
     assert!(matches!(
-        tenders.save_global_variables(2, exp.id, 3, input()).await,
+        tenders
+            .save_global_variables(2, exp.id, 3, input(), false)
+            .await,
         Err(CoreError::Forbidden)
     ));
     let updated = tenders
-        .save_global_variables(1, exp.id, 3, input())
+        .save_global_variables(1, exp.id, 3, input(), false)
         .await
         .unwrap();
     assert_eq!(updated.version, 4);
@@ -417,7 +419,9 @@ async fn mysql57_tenders_snapshots_permissions_races_receipts_and_deletion() {
     assert_eq!(updated.forms[0].legacy_values["dato"], "Anterior uno");
     assert_eq!(updated.forms[1].legacy_values["dato"], "Anterior dos");
     assert!(matches!(
-        tenders.save_global_variables(1, exp.id, 3, input()).await,
+        tenders
+            .save_global_variables(1, exp.id, 3, input(), false)
+            .await,
         Err(CoreError::PreconditionFailed)
     ));
     assert!(
@@ -428,4 +432,155 @@ async fn mysql57_tenders_snapshots_permissions_races_receipts_and_deletion() {
             .variables
             .is_empty()
     );
+    let config = |style: &str, count: &str| GlobalVariablesInput {
+        variables: vec![
+            GlobalVariable {
+                key: "lotes".into(),
+                label: "Lotes".into(),
+                kind: VariableKind::Integer,
+                value: Some(serde_json::json!(count)),
+            },
+            GlobalVariable {
+                key: "stylo".into(),
+                label: "Estilo".into(),
+                kind: VariableKind::Text,
+                value: Some(serde_json::json!(style)),
+            },
+        ],
+    };
+    let row = || LotItem {
+        descripcion: "Equipo".into(),
+        pais_origen: "Honduras".into(),
+        fecha_entrega: "30 días".into(),
+        cantidad: "2.5".into(),
+        unidad: "und".into(),
+        transporte: "10.00".into(),
+        precio_unitario: "100.00".into(),
+    };
+    tenders
+        .save_global_variables(1, exp.id, 4, config("bid", "2"), false)
+        .await
+        .unwrap();
+    tenders
+        .save_lot(1, exp.id, 1, 5, LotInput { items: vec![row()] })
+        .await
+        .unwrap();
+    tenders
+        .save_lot(1, exp.id, 2, 6, LotInput { items: vec![row()] })
+        .await
+        .unwrap();
+    assert_eq!(tenders.lot(1, exp.id, 1).await.unwrap().total, "297.50");
+    assert!(matches!(
+        tenders
+            .save_global_variables(1, exp.id, 7, config("std", "1"), false)
+            .await,
+        Err(CoreError::Conflict)
+    ));
+    assert_eq!(tenders.lot(1, exp.id, 2).await.unwrap().items.len(), 1);
+    tenders
+        .save_global_variables(1, exp.id, 7, config("std", "1"), true)
+        .await
+        .unwrap();
+    let lot = tenders.lot(1, exp.id, 1).await.unwrap();
+    assert_eq!(lot.total, "287.50");
+    assert!(lot.items[0].pais_origen.is_empty());
+    assert_eq!(lot.items[0].transporte, "0.00");
+    assert!(tenders.lot(1, exp.id, 2).await.is_err());
+    let order = tenders.pdf_order(1, exp.id).await.unwrap();
+    assert!(order.items.iter().any(|item| item.key == "lote:1"));
+    assert!(!order.items.iter().any(|item| item.key == "lote:2"));
+    let keys: Vec<String> = order
+        .items
+        .iter()
+        .rev()
+        .map(|item| item.key.clone())
+        .collect();
+    assert!(matches!(
+        tenders
+            .save_pdf_order(
+                1,
+                exp.id,
+                8,
+                PdfOrderInput {
+                    items: vec!["archivo:no-pertenece".into()]
+                }
+            )
+            .await,
+        Err(CoreError::Invalid)
+    ));
+    tenders
+        .save_pdf_order(
+            1,
+            exp.id,
+            8,
+            PdfOrderInput {
+                items: keys.clone(),
+            },
+        )
+        .await
+        .unwrap();
+    let after = tenders.pdf_order(1, exp.id).await.unwrap();
+    assert_eq!(
+        after
+            .items
+            .iter()
+            .map(|item| item.key.clone())
+            .collect::<Vec<_>>(),
+        keys
+    );
+    let mut ready = config("std", "1");
+    for (key, kind, value) in [
+        ("lpn", VariableKind::Text, "LPN-1"),
+        ("inst", VariableKind::Text, "Entidad"),
+        ("dia", VariableKind::Integer, "1"),
+        ("mes", VariableKind::Text, "enero"),
+        ("year", VariableKind::Integer, "2026"),
+        ("descripcion", VariableKind::Text, "Equipo"),
+        ("dato", VariableKind::Text, "Global"),
+    ] {
+        ready.variables.push(GlobalVariable {
+            key: key.into(),
+            label: key.into(),
+            kind,
+            value: Some(serde_json::json!(value)),
+        });
+    }
+    tenders
+        .save_global_variables(1, exp.id, 9, ready, false)
+        .await
+        .unwrap();
+    let template = "#import \"items1_std.typ\": items";
+    sqlx::query("DELETE FROM role_permissions WHERE role_id=2 AND module_id='licitaciones' AND capability='ver'").execute(&pool).await.unwrap();
+    assert!(matches!(
+        tenders
+            .prepare_typst_snapshot(2, exp.id, 10, 8, template)
+            .await,
+        Err(CoreError::Forbidden)
+    ));
+    assert!(matches!(
+        tenders
+            .prepare_typst_snapshot(1, exp.id, 9, 8, template)
+            .await,
+        Err(CoreError::PreconditionFailed)
+    ));
+    let snapshot = tenders
+        .prepare_typst_snapshot(1, exp.id, 10, 8, template)
+        .await
+        .unwrap();
+    assert_eq!(snapshot.expediente.version, 10);
+    assert_eq!(
+        snapshot
+            .order
+            .iter()
+            .map(|item| item.key.clone())
+            .collect::<Vec<_>>(),
+        keys
+    );
+    assert_eq!(snapshot.sources.offered_lots, vec![1]);
+    let config: serde_json::Value =
+        serde_json::from_slice(&snapshot.sources.files["config.json"]).unwrap();
+    assert_eq!(config["total_paginas"], 8);
+    let items: serde_json::Value =
+        serde_json::from_slice(&snapshot.sources.files["items1_std.json"]).unwrap();
+    assert_eq!(items[0]["descripcion"], "Equipo");
 }

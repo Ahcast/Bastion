@@ -85,7 +85,7 @@ La conversión requerida es número → letras (`number_to_words`). Español, mo
 
 ## PDF único y versiones
 
-La composición propuesta autoriza recursos, congela datos/plantillas/anexos y sus hashes, genera las piezas con Typst y combina PDF externos. Por confirmación del usuario, todas las páginas llevan foliado continuo, incluidas portada e índice; el índice es automático y apunta a las páginas reales de las secciones. Recomendación: calcular el índice con las longitudes reales de las piezas y repetir la composición si cambia su longitud, hasta un límite definido; fallar de forma controlada si no converge. Los folios se aplican sin cubrir contenido y se comprueban también con páginas externas.
+La composición propuesta autoriza recursos, congela datos/plantillas/anexos y sus hashes, genera las piezas con Typst y combina PDF externos. Por confirmación del usuario, todas las páginas llevan foliado continuo, incluidas portada e índice; el índice es automático y apunta a las páginas reales de las secciones. Recomendación: calcular el índice con las longitudes reales de las piezas y repetir la composición si cambia su longitud, hasta un límite definido; fallar de forma controlada si no converge. El usuario confirmó que los folios se colocan en el margen existente, incluso si se superponen al contenido, y se comprueban también con páginas externas.
 
 Conservar el original externo byte por byte en su objeto privado. El PDF ensamblado es un derivado: preservar el contenido visible no garantiza conservar bytes, firmas, campos interactivos, enlaces, marcadores o etiquetas de accesibilidad. Acordar qué propiedades deben conservarse y probarlas con documentos representativos; no rasterizar ni aplanar silenciosamente.
 
