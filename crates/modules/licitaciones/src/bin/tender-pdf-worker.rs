@@ -45,8 +45,12 @@ fn request(bytes: &[u8]) -> Result<Request, ()> {
     {
         return Err(());
     }
-    if let Some(layout)=&value.layout {
-        if layout.entries.len().checked_add(2)!=Some(value.pieces as usize) || value.sources.iter().any(|n|*n<3) {return Err(());}
+    if let Some(layout) = &value.layout {
+        if layout.entries.len().checked_add(2) != Some(value.pieces as usize)
+            || value.sources.iter().any(|n| *n < 3)
+        {
+            return Err(());
+        }
     }
     Ok(value)
 }
@@ -139,8 +143,19 @@ fn perform() -> Result<u32, ()> {
     let job = request(&bytes)?;
     let packages = std::env::var_os("BASTION_TYPST_PACKAGE_PATH").map(PathBuf::from);
     let fonts = std::env::var_os("BASTION_TYPST_FONT_PATH").map(PathBuf::from);
-    if let Some(layout)=&job.layout {
-        let plan=bastion_licitaciones::pdf_layout::assemble_laid_out_pdf(&typst,&pdfinfo,&qpdf,&root,layout,&job.sources,&job.global_sources,packages.as_deref(),fonts.as_deref()).map_err(|_|())?;
+    if let Some(layout) = &job.layout {
+        let plan = bastion_licitaciones::pdf_layout::assemble_laid_out_pdf(
+            &typst,
+            &pdfinfo,
+            &qpdf,
+            &root,
+            layout,
+            &job.sources,
+            &job.global_sources,
+            packages.as_deref(),
+            fonts.as_deref(),
+        )
+        .map_err(|_| ())?;
         return Ok(plan.total_pages);
     }
     bastion_licitaciones::pdf_compose::render_prepared_sources(
