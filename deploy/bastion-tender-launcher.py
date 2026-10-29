@@ -132,7 +132,7 @@ def launch(job_id):
                     if not stat.S_ISREG(info.st_mode) or info.st_uid != uid or info.st_nlink != 1:
                         raise ValueError('invalid source')
                     shutil.copyfileobj(src, dst, 256 * 1024)
-                os.chmod(target, 0o644)
+                os.chmod(target, 0o666 if name in ('config.json', 'globales.json') else 0o644)
             write_marker()
             props = [
                 'DynamicUser=yes', 'PrivateNetwork=yes', 'PrivateTmp=yes',
