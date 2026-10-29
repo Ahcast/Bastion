@@ -108,6 +108,50 @@ async fn isolated_job_generates_and_downloads_a_multipage_tiff() {
         )
         .await
         .unwrap();
+    // Isolate staging failures from broker failures, using only synthetic data.
+    let stage = std::env::temp_dir().join(format!(
+        "pdf-e2e-stage-{}",
+        bastion_core::DocumentService::object_suffix()
+    ));
+    std::fs::create_dir(&stage).unwrap();
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::set_permissions(&stage, std::fs::Permissions::from_mode(0o700)).unwrap();
+    }
+    let template_dir = std::env::var("BASTION_TENDER_TEMPLATE_DIR").unwrap();
+    let bundle = bastion_licitaciones::TenderTemplateBundle::from_private_directory(
+        std::path::Path::new(&template_dir),
+    )
+    .unwrap();
+    let prepared = service
+        .stage_pdf_inputs(1, exp.id, exp.version, stage.clone(), &bundle)
+        .await
+        .unwrap();
+    assert_eq!(prepared.conversions.len(), 1);
+    std::fs::remove_dir_all(stage).unwrap();
+    // Isolate staging failures from broker failures, using only synthetic data.
+    let stage = std::env::temp_dir().join(format!(
+        "pdf-e2e-stage-{}",
+        bastion_core::DocumentService::object_suffix()
+    ));
+    std::fs::create_dir(&stage).unwrap();
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::set_permissions(&stage, std::fs::Permissions::from_mode(0o700)).unwrap();
+    }
+    let template_dir = std::env::var("BASTION_TENDER_TEMPLATE_DIR").unwrap();
+    let bundle = bastion_licitaciones::TenderTemplateBundle::from_private_directory(
+        std::path::Path::new(&template_dir),
+    )
+    .unwrap();
+    let prepared = service
+        .stage_pdf_inputs(1, exp.id, exp.version, stage.clone(), &bundle)
+        .await
+        .unwrap();
+    assert_eq!(prepared.conversions.len(), 1);
+    std::fs::remove_dir_all(stage).unwrap();
     let job = service
         .create_pdf_job(1, exp.id, exp.version)
         .await
