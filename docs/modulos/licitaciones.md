@@ -1,5 +1,7 @@
 # Módulo: Licitaciones
 
+**Actualización del 2026-10-28:** el usuario confirma un límite de 100.000.000 bytes por archivo, 1.000.000.000 por expediente y 1.000.000.000 para el PDF final. Las cifras históricas de esta ficha quedan sustituidas por esos límites; la capacidad operativa del PDF final sigue pendiente de implementación y prueba.
+
 ## Estado, fuente y alcance de la incorporación
 
 Incorporación documental solicitada el 2026-10-27, después de contrastar la propuesta con `origin/main` en `17b95a00c7308b8d8bf6147fe3556a69a15bdad5`. Es un módulo nuevo de la arquitectura objetivo; no procede del informe Legacy ni del módulo Procesos. Posteriormente el usuario autoriza comenzar su desarrollo y precisa que desea infraestructura sin campos ni formularios precargados. El primer corte local incorpora crate, registro, migraciones, API y pantallas para expedientes y esquemas de captura versionados. Alcance exacto y pendientes en [infraestructura inicial](licitaciones-infraestructura.md) y [OpenAPI](licitaciones.openapi.yaml). No acredita despliegue ni módulo completo.

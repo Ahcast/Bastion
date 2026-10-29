@@ -29,7 +29,7 @@ pub use typst_data::{TenderTypstSnapshot, TypstLotSources, prepare_typst_lot_sou
 
 pub const MAX_INPUT_BYTES: u64 = 100_000_000;
 pub const MAX_EXPEDIENT_BYTES: u64 = 1_000_000_000;
-pub const MAX_FINAL_PDF_BYTES: u64 = 500_000_000;
+pub const MAX_FINAL_PDF_BYTES: u64 = 1_000_000_000;
 
 /// Independent budgets; revisions count until an explicit retention policy exists.
 pub fn validate_input_budget(retained_bytes: u64, actual_bytes: u64) -> Result<u64, CoreError> {
@@ -292,8 +292,8 @@ mod tests {
         assert!(validate_input_budget(0, 100_000_001).is_err());
         assert!(validate_input_budget(u64::MAX, 1).is_err());
         assert!(validate_input_budget(0, 0).is_err());
-        assert!(validate_final_pdf_budget(500_000_000).is_ok());
-        assert!(validate_final_pdf_budget(500_000_001).is_err());
+        assert!(validate_final_pdf_budget(1_000_000_000).is_ok());
+        assert!(validate_final_pdf_budget(1_000_000_001).is_err());
     }
     #[test]
     fn global_variables_are_typed_unique_and_inert() {
