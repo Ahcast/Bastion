@@ -183,6 +183,81 @@ impl DocumentService {
     pub async fn put(&self, key: String, bytes: Vec<u8>) -> Result<(), CoreError> {
         self.put_with_limit(key, bytes, MAX_STORAGE_BYTES).await
     }
+    /// Upload a previously authorized PDF through an already-open regular file.
+    /// The S3 SHA-256 checksum rejects changes to the file during transfer.
+    /// The caller owns lifecycle, authorization, and cleanup of the object.
+    pub async fn put_tender_pdf_file(
+        &self,
+        key: String,
+        file: fs::File,
+    ) -> Result<(u64, String), CoreError> {
+        if !cfg!(target_os = "linux") || !key.starts_with("licitaciones/") {
+            return Err(CoreError::Invalid);
+        }
+        validate_key(&key)?;
+        let permit = storage_permit().await?;
+        let this = self.clone();
+        tokio::task::spawn_blocking(move || {
+            use base64::{Engine as _, engine::general_purpose::STANDARD};
+            use std::io::{Read, Seek, SeekFrom};
+            let _permit = permit;
+            let mut file = file;
+            let metadata = file.metadata().map_err(|_| CoreError::Invalid)?;
+            let size = metadata.len();
+            if !metadata.is_file() || !(5..=1_000_000_000).contains(&size) {
+                return Err(CoreError::Invalid);
+            }
+            file.seek(SeekFrom::Start(0))
+                .map_err(|_| CoreError::Invalid)?;
+            let mut header = [0u8; 5];
+            file.read_exact(&mut header)
+                .map_err(|_| CoreError::Invalid)?;
+            if &header != b"%PDF-" {
+                return Err(CoreError::Invalid);
+            }
+            file.seek(SeekFrom::Start(0))
+                .map_err(|_| CoreError::Invalid)?;
+            let mut hash = Sha256::new();
+            let mut total = 0u64;
+            let mut buffer = vec![0u8; 256 * 1024];
+            loop {
+                let n = file.read(&mut buffer).map_err(|_| CoreError::Overloaded)?;
+                if n == 0 {
+                    break;
+                }
+                total = total.checked_add(n as u64).ok_or(CoreError::Invalid)?;
+                if total > size {
+                    return Err(CoreError::Invalid);
+                }
+                hash.update(&buffer[..n]);
+            }
+            if total != size || file.metadata().map_err(|_| CoreError::Invalid)?.len() != size {
+                return Err(CoreError::Invalid);
+            }
+            let digest = hash.finalize();
+            let hex = hex::encode(&digest);
+            let checksum = STANDARD.encode(&digest);
+            file.seek(SeekFrom::Start(0))
+                .map_err(|_| CoreError::Invalid)?;
+            let mut command = this.storage_command("put-object", &key)?;
+            command.args([
+                "--body",
+                "/dev/stdin",
+                "--content-length",
+                &size.to_string(),
+                "--checksum-algorithm",
+                "SHA256",
+                "--checksum-sha256",
+                &checksum,
+                "--server-side-encryption",
+                "AES256",
+            ]);
+            run_file_input(command, file, Duration::from_secs(600))?;
+            Ok((size, hex))
+        })
+        .await
+        .map_err(|_| CoreError::Overloaded)?
+    }
     pub async fn put_with_limit(
         &self,
         key: String,
@@ -466,6 +541,37 @@ fn bounded_read_limit(path: &Path, limit: u64) -> Result<Vec<u8>, CoreError> {
     }
     Ok(bytes)
 }
+fn run_file_input(
+    mut command: Command,
+    input: fs::File,
+    timeout: Duration,
+) -> Result<(), CoreError> {
+    command
+        .stdin(Stdio::from(input))
+        .stdout(Stdio::null())
+        .stderr(Stdio::null());
+    let mut child = command.spawn().map_err(|_| CoreError::Overloaded)?;
+    let started = Instant::now();
+    loop {
+        match child.try_wait() {
+            Ok(Some(status)) => {
+                return if status.success() {
+                    Ok(())
+                } else {
+                    Err(CoreError::Overloaded)
+                };
+            }
+            Ok(None) if started.elapsed() < timeout => {
+                std::thread::sleep(Duration::from_millis(25))
+            }
+            _ => {
+                let _ = child.kill();
+                let _ = child.wait();
+                return Err(CoreError::Overloaded);
+            }
+        }
+    }
+}
 fn run(command: Command, timeout: Duration) -> Result<(), CoreError> {
     run_output(command, timeout, None)
 }
@@ -545,5 +651,94 @@ mod tests {
         ] {
             assert!(validate_key(value).is_err(), "{value}");
         }
+    }
+    #[cfg(target_os = "linux")]
+    #[tokio::test]
+    async fn tender_pdf_upload_streams_and_checks_bytes_without_large_allocations() {
+        use std::os::unix::fs::PermissionsExt;
+        let root = std::env::temp_dir().join(format!(
+            "bastion-stream-test-{}",
+            DocumentService::object_suffix()
+        ));
+        fs::create_dir_all(&root).unwrap();
+        let mock = root.join("aws");
+        fs::write(
+            &mock,
+            br##"#!/usr/bin/python3
+import sys, hashlib, base64
+args=sys.argv[1:]
+def opt(name): return args[args.index(name)+1]
+assert args[:2]==['s3api','put-object']
+assert opt('--body')=='/dev/stdin' and opt('--server-side-encryption')=='AES256'
+assert opt('--checksum-algorithm')=='SHA256' and opt('--key')=='licitaciones/123/pdf/output'
+h=hashlib.sha256(); length=0; first=b''
+body=open(opt('--body'),'rb')
+while True:
+ chunk=body.read(65536)
+ if not chunk:break
+ if not first:first=chunk[:5]
+ length+=len(chunk);h.update(chunk)
+assert first==b'%PDF-' and length==int(opt('--content-length'))
+assert base64.b64encode(h.digest()).decode()==opt('--checksum-sha256')
+"##,
+        )
+        .unwrap();
+        fs::set_permissions(&mock, fs::Permissions::from_mode(0o700)).unwrap();
+        let service = DocumentService {
+            enabled: true,
+            typst: PathBuf::new(),
+            aws: mock,
+            work: root.clone(),
+            branding: None,
+            bucket: "synthetic".into(),
+            region: "us-east-1".into(),
+        };
+        let path = root.join("document.pdf");
+        let mut content = vec![b'x'; 2_000_000];
+        content[..5].copy_from_slice(b"%PDF-");
+        fs::write(&path, &content).unwrap();
+        let (size, hash) = service
+            .put_tender_pdf_file(
+                "licitaciones/123/pdf/output".into(),
+                fs::File::open(&path).unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(size, content.len() as u64);
+        assert_eq!(hash, hex::encode(Sha256::digest(&content)));
+        let invalid = root.join("invalid.pdf");
+        fs::write(&invalid, b"not a pdf").unwrap();
+        assert!(
+            service
+                .put_tender_pdf_file(
+                    "licitaciones/123/pdf/output".into(),
+                    fs::File::open(&invalid).unwrap()
+                )
+                .await
+                .is_err()
+        );
+        let big = root.join("big.pdf");
+        let file = fs::File::create(&big).unwrap();
+        file.set_len(1_000_000_001).unwrap();
+        drop(file);
+        assert!(
+            service
+                .put_tender_pdf_file(
+                    "licitaciones/123/pdf/output".into(),
+                    fs::File::open(&big).unwrap()
+                )
+                .await
+                .is_err()
+        );
+        assert!(
+            service
+                .put_tender_pdf_file(
+                    "cotizaciones/123/pdf/output".into(),
+                    fs::File::open(&path).unwrap()
+                )
+                .await
+                .is_err()
+        );
+        fs::remove_dir_all(root).unwrap();
     }
 }
