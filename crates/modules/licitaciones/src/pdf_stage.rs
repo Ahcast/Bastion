@@ -19,6 +19,61 @@ pub struct TenderTemplateBundle {
     pub functions: String,
 }
 
+impl TenderTemplateBundle {
+    /// Read the fixed first-group templates from a root-owned, non-writable
+    /// deployment directory. No template path comes from an API request.
+    pub fn from_private_directory(root: &Path) -> Result<Self, CoreError> {
+        #[cfg(not(target_os = "linux"))]
+        {
+            let _ = root;
+            return Err(CoreError::Invalid);
+        }
+        #[cfg(target_os = "linux")]
+        {
+            use std::{io::Read, os::unix::fs::MetadataExt};
+            if !root.is_absolute()
+                || fs::canonicalize(root).map_err(|_| CoreError::Invalid)? != root
+            {
+                return Err(CoreError::Invalid);
+            }
+            for path in root.ancestors() {
+                let meta = fs::symlink_metadata(path).map_err(|_| CoreError::Invalid)?;
+                if !meta.file_type().is_dir() || meta.uid() != 0 || meta.mode() & 0o022 != 0 {
+                    return Err(CoreError::Invalid);
+                }
+            }
+            let read = |name: &str| -> Result<String, CoreError> {
+                let path = root.join(name);
+                let meta = fs::symlink_metadata(&path).map_err(|_| CoreError::Invalid)?;
+                if !meta.file_type().is_file()
+                    || meta.uid() != 0
+                    || meta.mode() & 0o022 != 0
+                    || meta.len() > 2_000_000
+                {
+                    return Err(CoreError::Invalid);
+                }
+                let mut bytes = Vec::new();
+                fs::File::open(path)
+                    .map_err(|_| CoreError::Invalid)?
+                    .take(2_000_001)
+                    .read_to_end(&mut bytes)
+                    .map_err(|_| CoreError::Invalid)?;
+                if bytes.len() > 2_000_000 {
+                    return Err(CoreError::Invalid);
+                }
+                String::from_utf8(bytes).map_err(|_| CoreError::Invalid)
+            };
+            Ok(Self {
+                bid_offer: read("carta-de-oferta.typ")?,
+                std_offer: read("presentacion-de-oferta.typ")?,
+                bid_lot: read("lote1-bid.typ")?,
+                std_lot: read("lote1-std.typ")?,
+                functions: read("funciones.typ")?,
+            })
+        }
+    }
+}
+
 #[derive(Serialize)]
 pub struct WorkerRequest {
     pub pieces: u32,
