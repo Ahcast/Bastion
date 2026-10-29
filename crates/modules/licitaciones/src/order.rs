@@ -45,6 +45,17 @@ pub(crate) async fn candidates(
             .into(),
         });
     }
+    for key in &exp.initial_forms {
+        let label = match key.as_str() {
+            "integridad" => "Declaración de integridad",
+            "oferente" => "Información sobre el oferente",
+            _ => return Err(CoreError::Invalid),
+        };
+        items.push(PdfOrderItem {
+            key: format!("inicial:{key}"),
+            label: label.into(),
+        });
+    }
     for form in &exp.forms {
         items.push(PdfOrderItem {
             key: format!("formulario:{}", form.id),

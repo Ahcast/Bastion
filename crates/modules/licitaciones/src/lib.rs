@@ -86,6 +86,13 @@ pub struct Expedient {
     pub forms: Vec<FormCopy>,
     #[serde(default)]
     pub variables: Vec<GlobalVariable>,
+    #[serde(default)]
+    pub initial_forms: Vec<String>,
+}
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct InitialFormsInput {
+    pub forms: Vec<String>,
 }
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]

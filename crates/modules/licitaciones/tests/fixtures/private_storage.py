@@ -3,6 +3,13 @@
 from pathlib import Path
 import json,shutil,sys,tempfile
 args=sys.argv[1:]
+if args[:2]==['s3','cp']:
+ assert len(args)>=4 and args[2].startswith('s3://bastion-synthetic-tender-files-test/licitaciones/') and args[3]=='-'
+ key=args[2].split('bastion-synthetic-tender-files-test/',1)[1]
+ assert all(p not in ('','.','..') for p in key.split('/'))
+ target=Path(tempfile.gettempdir())/'bastion-synthetic-tender-files-test'/key
+ with target.open('rb') as source:shutil.copyfileobj(source,sys.stdout.buffer,256*1024)
+ raise SystemExit(0)
 def option(name):return args[args.index(name)+1]
 assert args[0]=='s3api' and option('--bucket')=='bastion-synthetic-tender-files-test'
 operation=args[1]

@@ -27,6 +27,10 @@ pub enum RenderPiece {
         number: u32,
         id: String,
     },
+    InitialForm {
+        number: u32,
+        kind: String,
+    },
 }
 pub struct RenderPlan {
     pub layout: LayoutRequest,
@@ -64,6 +68,16 @@ impl TenderTypstSnapshot {
                 RenderPiece::Offer {
                     number,
                     style: style.into(),
+                }
+            } else if let Some(kind) = item.key.strip_prefix("inicial:") {
+                if !matches!(kind, "integridad" | "oferente")
+                    || !self.expediente.initial_forms.iter().any(|v| v == kind)
+                {
+                    return Err(CoreError::Invalid);
+                }
+                RenderPiece::InitialForm {
+                    number,
+                    kind: kind.into(),
                 }
             } else if let Some(raw) = item.key.strip_prefix("formulario:") {
                 let form_id = raw.parse::<u64>().map_err(|_| CoreError::Invalid)?;
@@ -119,6 +133,11 @@ impl TenderTypstSnapshot {
         }
         if !seen.contains("oferta")
             || self
+                .expediente
+                .initial_forms
+                .iter()
+                .any(|kind| !seen.contains(format!("inicial:{kind}").as_str()))
+            || self
                 .sources
                 .offered_lots
                 .iter()
@@ -163,6 +182,7 @@ mod tests {
                 state: "borrador".into(),
                 forms: vec![],
                 variables,
+                initial_forms: vec![],
             },
             order: vec![
                 PdfOrderItem {

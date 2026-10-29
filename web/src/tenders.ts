@@ -6,7 +6,7 @@ export interface GlobalVariable { key: string; label: string; kind: VariableKind
 export interface PublishedForm { id: number; revision: number; hash: string; definition: FormDefinition }
 export type FormValues = Record<string, string | boolean>;
 export interface FormCopy { id: number; source: PublishedForm; values: FormValues; legacy_values?: FormValues; missing_required: string[] }
-export interface Expedient { id: number; name: string; version: number; state: string; forms: FormCopy[]; variables?: GlobalVariable[] }
+export interface Expedient { id: number; name: string; version: number; state: string; forms: FormCopy[]; variables?: GlobalVariable[]; initial_forms?: string[] }
 export interface ExpedientSummary { id: number; name: string; version: number; state: string }
 export interface TenderPage<T> { items: T[]; page: number; page_size: number; has_more: boolean }
 export const sectionLabels: Record<FormSection, string> = { legal: 'Documentación legal', economica: 'Oferta económica', tecnica: 'Especificaciones técnicas' };

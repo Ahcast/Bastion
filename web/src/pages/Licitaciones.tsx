@@ -44,12 +44,12 @@ function ExpedientWorkspace({ id, back }: { id: number; back: () => void }) {
     <Notice>{result.error}</Notice>{!record && !result.error && <Loading />}
     {record && <><div className="row section-tabs document-tabs" aria-label="Secciones del expediente">{tabs.map(entry => <button key={entry.id} aria-pressed={tab === entry.id} onClick={() => { void navigate(() => { setTab(entry.id); }); }}>{entry.label}</button>)}</div>
       <div className="document-details"><span className="document-metadata">{record.state === 'borrador' ? 'Borrador' : record.state} · Versión {record.version}</span><button onClick={() => { void navigate(result.reload); }}>Actualizar expediente</button></div>
-      {tab === 'resumen' ? <DocumentSection title="Contenido del expediente"><ExpedientName key={record.version} record={record} editable={Boolean(editable)} saved={value => { result.setData(value); notify("Nombre del expediente guardado."); }} reload={() => { void navigate(result.reload); }} /><div className="stack"><p>{record.forms.length} formularios incorporados. {record.forms.reduce((n, c) => n + c.missing_required.length, 0)} valores obligatorios pendientes.</p><p>Las variables se definen una sola vez en la pestaña Variables y se comparten en el expediente.</p><p>Prepara los lotes y sus ítems en Oferta económica y genera el documento desde PDF final.</p>{moduleCan(access, 'licitaciones', 'expedientes', 'eliminar') && record.state === 'borrador' && <button className="danger" onClick={() => setDeleting(true)}>Eliminar borrador</button>}</div></DocumentSection>
+      {tab === 'resumen' ? <DocumentSection title="Contenido del expediente"><ExpedientName key={record.version} record={record} editable={Boolean(editable)} saved={value => { result.setData(value); notify("Nombre del expediente guardado."); }} reload={() => { void navigate(result.reload); }} /><div className="stack"><p>{record.forms.length + (record.initial_forms?.length ?? 0)} formularios incorporados. {record.forms.reduce((n, c) => n + c.missing_required.length, 0)} valores obligatorios pendientes.</p><p>Las variables se definen una sola vez en la pestaña Variables y se comparten en el expediente.</p><p>Prepara los lotes y sus ítems en Oferta económica y genera el documento desde PDF final.</p>{moduleCan(access, 'licitaciones', 'expedientes', 'eliminar') && record.state === 'borrador' && <button className="danger" onClick={() => setDeleting(true)}>Eliminar borrador</button>}</div></DocumentSection>
         : tab === 'pdf' ? <DocumentSection title="PDF final"><TenderPdfOrder record={record} editable={Boolean(editable)} saved={result.setData} /></DocumentSection>
         : tab === 'variables' ? <DocumentSection title="Variables del expediente"><GlobalVariablesEditor key={record.version} record={record} editable={Boolean(editable)} saved={value => { result.setData(value); notify('Variables del expediente guardadas.'); }} reload={() => { void navigate(result.reload); }} /></DocumentSection>
         : <DocumentSection title={tabs.find(t => t.id === tab)?.label ?? "Formularios"} list action={editable && moduleCan(access, 'colaboracion', 'empresa', 'ver') && <button onClick={() => { void navigate(() => { setCopying(true); }); }}>Incorporar formulario</button>}>
           {!moduleCan(access, 'colaboracion', 'empresa', 'ver') && <p className="muted">Para incorporar nuevos formularios necesitas acceso a Colaboración. Las copias existentes siguen disponibles.</p>}
-          {(tab === 'legal' || tab === 'tecnica') && <><TenderFiles record={record} section={tab} changed={result.setData} start={action => { void navigate(() => { action(); }); }} /><h3 className="document-subheading">Formularios</h3></>}
+          {(tab === 'legal' || tab === 'tecnica') && <><TenderFiles record={record} section={tab} changed={result.setData} start={action => { void navigate(() => { action(); }); }} /><h3 className="document-subheading">Formularios</h3>{tab === 'legal' && <InitialForms key={record.version} record={record} editable={Boolean(editable)} saved={result.setData} />}</>}
           {tab === 'economica' && <TenderLots record={record} editable={Boolean(editable)} saved={result.setData} />}
           <Table columns={['Formulario', 'Revisión de origen', 'Obligatorios pendientes', 'Acción']} rows={record.forms.filter(c => c.source.definition.section === tab).map(c => [c.source.definition.title, c.source.revision, c.missing_required.length, <button onClick={() => { void navigate(() => setTab('variables')); }}>Ver variables</button>])} />
         </DocumentSection>}
@@ -57,6 +57,18 @@ function ExpedientWorkspace({ id, back }: { id: number; back: () => void }) {
       {deleting && <DeleteExpedient record={record} close={() => setDeleting(false)} deleted={back} />}
     </>}
   </>;
+}
+function InitialForms({ record, editable, saved }: { record: Expedient; editable: boolean; saved: (value: Expedient) => void }) {
+  const { api } = useCore();
+  const options = [{ key:'integridad', label:'Declaración de integridad' }, { key:'oferente', label:'Información sobre el oferente' }];
+  const [selected, setSelected] = useState<string[]>(record.initial_forms ?? []), [busy, setBusy] = useState(false), [error, setError] = useState('');
+  const baseline = useRef(JSON.stringify(selected));
+  const dirty = JSON.stringify(selected) !== baseline.current;
+  useUnsavedChanges(dirty, busy);
+  return <section className="stack"><p>Selecciona los formularios iniciales que deseas incluir en este expediente.</p><Notice>{error}</Notice>
+    {options.map(option => <label className="checkbox" key={option.key}><input type="checkbox" checked={selected.includes(option.key)} disabled={!editable || busy} onChange={event => { const checked=event.currentTarget.checked; setSelected(current => options.filter(item => item.key === option.key ? checked : current.includes(item.key)).map(item => item.key)); }} />{option.label}</label>)}
+    {editable && <button type="button" disabled={!dirty || busy} onClick={async () => { setBusy(true); setError(''); try { const value=await api.request<Expedient>(`/api/v1/licitaciones/${record.id}/pdf/formularios-iniciales`, { method:'PUT', ifMatch:record.version, body:{forms:selected} }); baseline.current=JSON.stringify(selected); saved(value); } catch (reason) { setError(message(reason)); } finally { setBusy(false); } }}>{busy ? 'Guardando…' : 'Guardar selección'}</button>}
+  </section>;
 }
 function ExpedientName({ record, editable, saved, reload }: { record: Expedient; editable: boolean; saved: (value: Expedient) => void; reload: () => void }) {
   const { api } = useCore();

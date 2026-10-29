@@ -17,6 +17,8 @@ pub struct TenderTemplateBundle {
     pub bid_lot: String,
     pub std_lot: String,
     pub functions: String,
+    pub legal_integridad: String,
+    pub legal_oferente: String,
 }
 
 impl TenderTemplateBundle {
@@ -69,6 +71,8 @@ impl TenderTemplateBundle {
                 bid_lot: read("lote1-bid.typ")?,
                 std_lot: read("lote1-std.typ")?,
                 functions: read("funciones.typ")?,
+                legal_integridad: read("dj-integridad.typ")?,
+                legal_oferente: read("informacion_sobre_el_oferente.typ")?,
             })
         }
     }
@@ -195,6 +199,21 @@ impl TenderService {
                         .ok_or(CoreError::Invalid)?;
                     create(&root, &format!("source-{number:06}.typ"), data.clone()).await?;
                     source_numbers.push(*number);
+                }
+                RenderPiece::InitialForm { number, kind } => {
+                    let source = match kind.as_str() {
+                        "integridad" => &bundle.legal_integridad,
+                        "oferente" => &bundle.legal_oferente,
+                        _ => return Err(CoreError::Invalid),
+                    };
+                    create(
+                        &root,
+                        &format!("source-{number:06}.typ"),
+                        source.as_bytes().to_vec(),
+                    )
+                    .await?;
+                    source_numbers.push(*number);
+                    global_numbers.push(*number);
                 }
                 RenderPiece::Form {
                     number, form_id, ..

@@ -1,7 +1,7 @@
 use super::*;
 use bastion_licitaciones::{
-    CopyFormInput, DeleteInput, EmptyInput, Expedient, GlobalVariablesInput, LotInput, NameInput,
-    PageQuery, PdfOrderInput, ValuesInput,
+    CopyFormInput, DeleteInput, EmptyInput, Expedient, GlobalVariablesInput, InitialFormsInput,
+    LotInput, NameInput, PageQuery, PdfOrderInput, ValuesInput,
 };
 
 pub(super) fn routes(state: ApiState) -> Router<ApiState> {
@@ -24,6 +24,10 @@ pub(super) fn routes(state: ApiState) -> Router<ApiState> {
         .route(
             "/api/v1/licitaciones/{id}/pdf/orden",
             get(pdf_order).put(save_pdf_order),
+        )
+        .route(
+            "/api/v1/licitaciones/{id}/pdf/formularios-iniciales",
+            axum::routing::put(save_initial_forms),
         )
         .route("/api/v1/licitaciones/{id}/pdf/generar", post(generate_pdf))
         .route("/api/v1/licitaciones/{id}/pdf/ultimo", get(latest_pdf))
@@ -455,6 +459,20 @@ async fn save_lot(
     state
         .licitaciones
         .save_lot(user.id, id, numero, expected(&headers)?, input)
+        .await
+        .map(response)
+        .map_err(ApiError)
+}
+async fn save_initial_forms(
+    State(state): State<ApiState>,
+    headers: axum::http::HeaderMap,
+    Path(id): Path<u64>,
+    Json(input): Json<InitialFormsInput>,
+) -> Result<Response, ApiError> {
+    let user = actor(&state, &headers).await?;
+    state
+        .licitaciones
+        .save_initial_forms(user.id, id, expected(&headers)?, input)
         .await
         .map(response)
         .map_err(ApiError)

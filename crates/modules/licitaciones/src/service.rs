@@ -282,6 +282,37 @@ impl TenderService {
         tx.commit().await?;
         Ok(result)
     }
+    pub async fn save_initial_forms(
+        &self,
+        actor: u64,
+        id: u64,
+        expected: u64,
+        input: InitialFormsInput,
+    ) -> Result<Expedient, CoreError> {
+        let mut seen = std::collections::BTreeSet::new();
+        if input.forms.iter().any(|key| {
+            !matches!(key.as_str(), "integridad" | "oferente") || !seen.insert(key.as_str())
+        }) {
+            return Err(CoreError::Invalid);
+        }
+        let mut tx = self.begin(actor, "editar").await?;
+        let current = load(&mut tx, id).await?;
+        editable(&current, expected)?;
+        if current.initial_forms == input.forms {
+            tx.commit().await?;
+            return Ok(current);
+        }
+        sqlx::query("UPDATE licitaciones_expedientes SET initial_forms_json=? WHERE id=?")
+            .bind(serde_json::to_value(input.forms).map_err(|_| CoreError::Invalid)?)
+            .bind(id)
+            .execute(&mut *tx)
+            .await?;
+        bump(&mut tx, actor, id, expected).await?;
+        let result = load(&mut tx, id).await?;
+        event(&mut tx, actor, "pdf.forms", id, result.version).await?;
+        tx.commit().await?;
+        Ok(result)
+    }
     pub async fn delete(
         &self,
         actor: u64,
@@ -387,6 +418,23 @@ pub(crate) async fn load(tx: &mut Transaction<'_, MySql>, id: u64) -> Result<Exp
             missing_required,
         });
     }
+    let initial_json: Option<serde_json::Value> =
+        sqlx::query_scalar("SELECT initial_forms_json FROM licitaciones_expedientes WHERE id=?")
+            .bind(id)
+            .fetch_one(&mut **tx)
+            .await?;
+    let initial_forms: Vec<String> = initial_json
+        .map(serde_json::from_value)
+        .transpose()
+        .map_err(|_| CoreError::Invalid)?
+        .unwrap_or_default();
+    let mut seen = std::collections::BTreeSet::new();
+    if initial_forms
+        .iter()
+        .any(|key| !matches!(key.as_str(), "integridad" | "oferente") || !seen.insert(key))
+    {
+        return Err(CoreError::Invalid);
+    }
     Ok(Expedient {
         id: e.id,
         name: e.name,
@@ -394,6 +442,7 @@ pub(crate) async fn load(tx: &mut Transaction<'_, MySql>, id: u64) -> Result<Exp
         state: e.state,
         forms,
         variables,
+        initial_forms,
     })
 }
 async fn receipt(

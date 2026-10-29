@@ -18,3 +18,5 @@ CREATE TABLE licitaciones_pdf_jobs (
     FOREIGN KEY (expediente_id) REFERENCES licitaciones_expedientes(id),
     FOREIGN KEY (actor_id) REFERENCES users(id)
 ) ENGINE=InnoDB;
+
+ALTER TABLE licitaciones_expedientes ADD COLUMN initial_forms_json JSON NULL;

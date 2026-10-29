@@ -6,7 +6,7 @@ use bastion_colaboracion::{
 use bastion_core::{CoreError, CoreService, Database, DocumentService};
 use bastion_licitaciones::{
     AttachmentCopy, AttachmentSection, AttachmentUpload, CopyFormInput, GlobalVariable,
-    GlobalVariablesInput, TenderService, TenderTemplateBundle,
+    GlobalVariablesInput, InitialFormsInput, TenderService, TenderTemplateBundle,
 };
 use sqlx::mysql::MySqlPoolOptions;
 
@@ -263,6 +263,31 @@ async fn mysql57_tender_files_private_copies_integrity_recovery_and_budgets() {
         )
         .await
         .unwrap();
+    assert!(matches!(
+        service
+            .save_initial_forms(
+                1,
+                template_exp.id,
+                template_exp.version,
+                InitialFormsInput {
+                    forms: vec!["no-existe".into()]
+                }
+            )
+            .await,
+        Err(CoreError::Invalid)
+    ));
+    let template_exp = service
+        .save_initial_forms(
+            1,
+            template_exp.id,
+            template_exp.version,
+            InitialFormsInput {
+                forms: vec!["integridad".into(), "oferente".into()],
+            },
+        )
+        .await
+        .unwrap();
+    assert_eq!(template_exp.initial_forms, vec!["integridad", "oferente"]);
     let root =
         std::env::temp_dir().join(format!("tender-stage-{}", DocumentService::object_suffix()));
     std::fs::create_dir(&root).unwrap();
@@ -277,6 +302,8 @@ async fn mysql57_tender_files_private_copies_integrity_recovery_and_budgets() {
         bid_lot: "#import \"items1_bid.typ\": items".into(),
         std_lot: "#import \"items1_std.typ\": items".into(),
         functions: "#let f = 1".into(),
+        legal_integridad: "= Integridad".into(),
+        legal_oferente: "= Oferente".into(),
     };
     let request = service
         .stage_pdf_inputs(
@@ -288,18 +315,51 @@ async fn mysql57_tender_files_private_copies_integrity_recovery_and_budgets() {
         )
         .await
         .unwrap();
-    assert_eq!(request.pieces, 4);
-    assert_eq!(request.sources, vec![3, 4]);
-    assert_eq!(request.global_sources, vec![4]);
+    assert_eq!(request.pieces, 6);
+    assert_eq!(request.sources, vec![3, 4, 5, 6]);
+    assert_eq!(request.global_sources, vec![4, 5, 6]);
+    assert_eq!(
+        std::fs::read_to_string(root.join("source-000004.typ")).unwrap(),
+        "= Integridad"
+    );
+    assert_eq!(
+        std::fs::read_to_string(root.join("source-000005.typ")).unwrap(),
+        "= Oferente"
+    );
     assert_eq!(
         std::fs::read_to_string(root.join("source-000003.typ")).unwrap(),
         "= Oferta STD"
     );
     assert_eq!(
-        std::fs::read_to_string(root.join("source-000004.typ")).unwrap(),
+        std::fs::read_to_string(root.join("source-000006.typ")).unwrap(),
         "= Documento\n#let nombre = \"\"\n"
     );
     std::fs::remove_dir_all(root).unwrap();
+    // Simulate a completed job in isolated storage and verify that download
+    // remains tied to current expediente and collaboration permissions.
+    use sha2::{Digest, Sha256};
+    use std::io::Read;
+    let pdf_job = service
+        .create_pdf_job(1, template_exp.id, template_exp.version)
+        .await
+        .unwrap();
+    let pdf_key = format!("licitaciones/{}/pdf/{}.pdf", template_exp.id, pdf_job.id);
+    DocumentService::from_environment()
+        .put_with_limit(pdf_key, pdf.to_vec(), 20_000_000)
+        .await
+        .unwrap();
+    let pdf_hash = format!("{:x}", Sha256::digest(pdf));
+    let refs = serde_json::json!([[original_id, Sha256::digest(pdf).to_vec()]]);
+    sqlx::query("UPDATE licitaciones_pdf_jobs SET state='ready',byte_size=?,sha256=?,references_json=? WHERE id=?")
+        .bind(pdf.len() as u64).bind(pdf_hash).bind(refs).bind(&pdf_job.id).execute(&pool).await.unwrap();
+    let (mut output, size) = service
+        .download_pdf_job(1, template_exp.id, &pdf_job.id)
+        .await
+        .unwrap();
+    let mut result = Vec::new();
+    output.read_to_end(&mut result).unwrap();
+    assert_eq!(result, pdf);
+    assert_eq!(size, pdf.len() as u64);
     let copied = service
         .copy_attachment(
             1,
@@ -352,6 +412,12 @@ async fn mysql57_tender_files_private_copies_integrity_recovery_and_budgets() {
         Err(CoreError::PreconditionFailed)
     ));
     library.delete(1, original_id, original_id).await.unwrap();
+    assert!(
+        service
+            .download_pdf_job(1, template_exp.id, &pdf_job.id)
+            .await
+            .is_err()
+    );
     let missing = service.attachments(1, first.id).await.unwrap();
     let missing = missing
         .items
@@ -494,6 +560,11 @@ async fn mysql57_tender_files_private_copies_integrity_recovery_and_budgets() {
             .await,
         Err(CoreError::Invalid)
     ));
+    service
+        .delete(1, template_exp.id, template_exp.version, template_exp.id)
+        .await
+        .unwrap();
+    while service.clean_one_pdf_job().await.unwrap() {}
     service.delete(1, first.id, 4, first.id).await.unwrap();
     service.delete(1, second.id, 2, second.id).await.unwrap();
     while service.clean_one_attachment().await.unwrap() {}
