@@ -50,7 +50,7 @@ pub fn prepare_typst_lot_sources(
     }
     data.insert("lotes".into(), json!(count));
     data.insert("total_paginas".into(), json!(total_pages));
-    let mut files = BTreeMap::new();
+    let mut files = crate::globals_typst::prepare_global_typst_sources(variables, total_pages)?;
     files.insert(
         "config.json".into(),
         serde_json::to_vec(&data).map_err(|_| CoreError::Invalid)?,
