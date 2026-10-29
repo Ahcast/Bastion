@@ -17,6 +17,7 @@ bastion-ordenes-compra = { path = "../modules/ordenes_compra" }
 bastion-gastos = { path = "../modules/gastos" }
 bastion-cotizaciones = { path = "../modules/cotizaciones" }
 bastion-procesos = { path = "../modules/procesos" }
+futures-core = "0.3"
 base64.workspace = true
 chrono.workspace = true
 ipnet.workspace = true

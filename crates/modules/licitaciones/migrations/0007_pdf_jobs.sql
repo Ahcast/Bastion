@@ -1,0 +1,20 @@
+CREATE TABLE licitaciones_pdf_jobs (
+    id CHAR(48) CHARACTER SET ascii COLLATE ascii_bin NOT NULL PRIMARY KEY,
+    expediente_id BIGINT UNSIGNED NOT NULL,
+    actor_id BIGINT UNSIGNED NOT NULL,
+    expediente_version BIGINT UNSIGNED NOT NULL,
+    state VARCHAR(16) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+    object_key VARCHAR(250) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+    byte_size BIGINT UNSIGNED NULL,
+    sha256 CHAR(64) CHARACTER SET ascii COLLATE ascii_bin NULL,
+    references_json JSON NULL,
+    cleanup_pending BOOLEAN NOT NULL DEFAULT FALSE,
+    cleanup_after DATETIME(6) NULL,
+    created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    updated_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    KEY licitaciones_pdf_queue (state, created_at),
+    KEY licitaciones_pdf_expediente (expediente_id, created_at),
+    KEY licitaciones_pdf_cleanup (cleanup_pending, updated_at),
+    FOREIGN KEY (expediente_id) REFERENCES licitaciones_expedientes(id),
+    FOREIGN KEY (actor_id) REFERENCES users(id)
+) ENGINE=InnoDB;

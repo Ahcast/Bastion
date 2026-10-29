@@ -330,6 +330,32 @@ impl DocumentService {
         .await
         .map_err(|_| CoreError::Overloaded)?
     }
+    /// Download to an unlinked private temporary file. On Unix the open handle
+    /// remains readable while disk space is reclaimed as soon as it is closed.
+    pub async fn open_tender_pdf(
+        &self,
+        key: String,
+        expected_size: u64,
+        expected_sha256: String,
+    ) -> Result<fs::File, CoreError> {
+        if !cfg!(target_os = "linux") {
+            return Err(CoreError::Invalid);
+        }
+        let directory = self.directory()?;
+        let path = directory.0.join("pdf");
+        let file = fs::OpenOptions::new()
+            .read(true)
+            .write(true)
+            .create_new(true)
+            .open(&path)
+            .map_err(|_| CoreError::Overloaded)?;
+        let file = self
+            .get_tender_pdf_file(key, file, expected_size, expected_sha256)
+            .await?;
+        fs::remove_file(path).map_err(|_| CoreError::Overloaded)?;
+        drop(directory);
+        Ok(file)
+    }
     pub async fn put_with_limit(
         &self,
         key: String,

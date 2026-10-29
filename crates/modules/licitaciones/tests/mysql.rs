@@ -583,4 +583,32 @@ async fn mysql57_tenders_snapshots_permissions_races_receipts_and_deletion() {
     let items: serde_json::Value =
         serde_json::from_slice(&snapshot.sources.files["items1_std.json"]).unwrap();
     assert_eq!(items[0]["descripcion"], "Equipo");
+    assert!(matches!(
+        tenders.create_pdf_job(1, exp.id, 9).await,
+        Err(CoreError::PreconditionFailed)
+    ));
+    let job = tenders.create_pdf_job(1, exp.id, 10).await.unwrap();
+    assert_eq!(job.state, "queued");
+    let repeated = tenders.create_pdf_job(1, exp.id, 10).await.unwrap();
+    assert_eq!(job.id, repeated.id);
+    assert_eq!(
+        tenders
+            .pdf_job(1, exp.id, &job.id)
+            .await
+            .unwrap()
+            .expediente_version,
+        10
+    );
+    assert!(matches!(
+        tenders.pdf_job(1, exp.id, "../../bad").await,
+        Err(CoreError::Invalid)
+    ));
+    tenders.delete(1, exp.id, 10, exp.id).await.unwrap();
+    let state: (String, bool) =
+        sqlx::query_as("SELECT state,cleanup_pending FROM licitaciones_pdf_jobs WHERE id=?")
+            .bind(&job.id)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!(state, ("failed".into(), true));
 }

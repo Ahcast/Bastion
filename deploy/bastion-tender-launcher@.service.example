@@ -9,4 +9,4 @@ StandardInput=socket
 StandardOutput=socket
 StandardError=journal
 RestrictAddressFamilies=AF_UNIX
-RuntimeMaxSec=1050
+RuntimeMaxSec=1800

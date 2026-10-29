@@ -123,6 +123,20 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
         .synchronize_release(config.licitaciones_allowed)
         .await?;
     if tender_files_ready {
+        let tender_pdf = tender_files.clone();
+        if bastion_licitaciones::TenderService::pdf_generation_enabled() {
+            tokio::spawn(async move {
+                loop {
+                    if tender_pdf.process_one_pdf_job().await.is_err() {
+                        tracing::error!("tender PDF worker failed");
+                    }
+                    if tender_pdf.clean_one_pdf_job().await.is_err() {
+                        tracing::error!("tender PDF cleanup failed");
+                    }
+                    tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+                }
+            });
+        }
         tokio::spawn(async move {
             loop {
                 if tender_files.clean_one_attachment().await.is_err() {

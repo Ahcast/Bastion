@@ -47,6 +47,11 @@ export class ApiClient {
     }
     return data as T;
   }
+  /** A top-level authenticated GET lets the browser stream a large download. */
+  downloadHref(path: string): string {
+    if (!path.startsWith('/api/v1/') || path.startsWith('//')) throw new Error('Ruta de descarga inválida.');
+    return this.base + path;
+  }
   async download(path: string): Promise<Blob> {
     let response: Response;
     try {

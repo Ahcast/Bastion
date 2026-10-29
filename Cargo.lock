@@ -194,6 +194,7 @@ dependencies = [
  "bastion-proveedores",
  "bastion-reportes",
  "chrono",
+ "futures-core",
  "ipnet",
  "rand 0.8.8",
  "serde",
@@ -329,9 +330,9 @@ name = "bastion-licitaciones"
 version = "0.1.0"
 dependencies = [
  "base64 0.22.1",
- "chrono",
  "bastion-colaboracion",
  "bastion-core",
+ "chrono",
  "serde",
  "serde_json",
  "sha2 0.10.9",

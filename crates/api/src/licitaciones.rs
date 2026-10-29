@@ -25,6 +25,9 @@ pub(super) fn routes(state: ApiState) -> Router<ApiState> {
             "/api/v1/licitaciones/{id}/pdf/orden",
             get(pdf_order).put(save_pdf_order),
         )
+        .route("/api/v1/licitaciones/{id}/pdf/generar", post(generate_pdf))
+        .route("/api/v1/licitaciones/{id}/pdf/ultimo", get(latest_pdf))
+        .route("/api/v1/licitaciones/{id}/pdf/trabajos/{job}", get(pdf_job))
         .route(
             "/api/v1/licitaciones/{id}/formularios/{copy_id}/valores",
             axum::routing::put(values),
@@ -50,6 +53,10 @@ fn file_routes(state: ApiState) -> Router<ApiState> {
         .route(
             "/api/v1/licitaciones/{id}/archivos/{attachment}/download",
             get(download_file),
+        )
+        .route(
+            "/api/v1/licitaciones/{id}/pdf/trabajos/{job}/archivo",
+            get(download_final_pdf),
         )
         .route(
             "/api/v1/licitaciones/{id}/archivos/{attachment}",
@@ -99,6 +106,76 @@ async fn file_guard(State(state): State<ApiState>, request: Request, next: Next)
         Err(_) => ApiError(CoreError::Overloaded).into_response(),
     }
 }
+struct PdfStream {
+    inner: tokio::fs::File,
+    _permit: tokio::sync::SemaphorePermit<'static>,
+}
+impl futures_core::Stream for PdfStream {
+    type Item = Result<axum::body::Bytes, std::io::Error>;
+    fn poll_next(
+        mut self: std::pin::Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>,
+    ) -> std::task::Poll<Option<Self::Item>> {
+        let mut bytes = vec![0u8; 64 * 1024];
+        let mut buffer = tokio::io::ReadBuf::new(&mut bytes);
+        match tokio::io::AsyncRead::poll_read(std::pin::Pin::new(&mut self.inner), cx, &mut buffer)
+        {
+            std::task::Poll::Pending => std::task::Poll::Pending,
+            std::task::Poll::Ready(Err(error)) => std::task::Poll::Ready(Some(Err(error))),
+            std::task::Poll::Ready(Ok(())) => {
+                let count = buffer.filled().len();
+                if count == 0 {
+                    return std::task::Poll::Ready(None);
+                }
+                bytes.truncate(count);
+                std::task::Poll::Ready(Some(Ok(axum::body::Bytes::from(bytes))))
+            }
+        }
+    }
+}
+async fn download_final_pdf(
+    State(state): State<ApiState>,
+    headers: axum::http::HeaderMap,
+    Path((id, job)): Path<(u64, String)>,
+) -> Result<Response, ApiError> {
+    let user = actor(&state, &headers).await?;
+    let permit = super::LARGE_FILE_SLOTS
+        .try_acquire()
+        .map_err(|_| ApiError(CoreError::Overloaded))?;
+    let (file, size) = state
+        .licitaciones
+        .download_pdf_job(user.id, id, &job)
+        .await
+        .map_err(ApiError)?;
+    let body = PdfStream {
+        inner: tokio::fs::File::from_std(file),
+        _permit: permit,
+    };
+    let mut response = Response::new(axum::body::Body::from_stream(body));
+    let headers = response.headers_mut();
+    headers.insert(
+        axum::http::header::CONTENT_TYPE,
+        HeaderValue::from_static("application/pdf"),
+    );
+    headers.insert(
+        axum::http::header::CONTENT_DISPOSITION,
+        HeaderValue::from_static("attachment; filename=\"licitacion.pdf\""),
+    );
+    headers.insert(
+        axum::http::header::CACHE_CONTROL,
+        HeaderValue::from_static("private, no-store"),
+    );
+    headers.insert(
+        axum::http::header::X_CONTENT_TYPE_OPTIONS,
+        HeaderValue::from_static("nosniff"),
+    );
+    headers.insert(
+        axum::http::header::CONTENT_LENGTH,
+        HeaderValue::from_str(&size.to_string()).map_err(|_| ApiError(CoreError::Invalid))?,
+    );
+    Ok(response)
+}
+
 async fn files(
     State(state): State<ApiState>,
     headers: axum::http::HeaderMap,
@@ -382,6 +459,50 @@ async fn save_lot(
         .map(response)
         .map_err(ApiError)
 }
+async fn generate_pdf(
+    State(state): State<ApiState>,
+    headers: axum::http::HeaderMap,
+    Path(id): Path<u64>,
+    Json(_input): Json<EmptyInput>,
+) -> Result<Response, ApiError> {
+    if !bastion_licitaciones::TenderService::pdf_generation_enabled() {
+        return Err(ApiError(CoreError::NotFound));
+    }
+    let user = actor(&state, &headers).await?;
+    let job = state
+        .licitaciones
+        .create_pdf_job(user.id, id, expected(&headers)?)
+        .await
+        .map_err(ApiError)?;
+    Ok((StatusCode::ACCEPTED, Json(job)).into_response())
+}
+async fn latest_pdf(
+    State(state): State<ApiState>,
+    headers: axum::http::HeaderMap,
+    Path(id): Path<u64>,
+) -> Result<Json<Option<bastion_licitaciones::PdfJob>>, ApiError> {
+    let user = actor(&state, &headers).await?;
+    state
+        .licitaciones
+        .latest_pdf_job(user.id, id)
+        .await
+        .map(Json)
+        .map_err(ApiError)
+}
+async fn pdf_job(
+    State(state): State<ApiState>,
+    headers: axum::http::HeaderMap,
+    Path((id, job)): Path<(u64, String)>,
+) -> Result<Json<bastion_licitaciones::PdfJob>, ApiError> {
+    let user = actor(&state, &headers).await?;
+    state
+        .licitaciones
+        .pdf_job(user.id, id, &job)
+        .await
+        .map(Json)
+        .map_err(ApiError)
+}
+
 async fn pdf_order(
     State(state): State<ApiState>,
     headers: axum::http::HeaderMap,

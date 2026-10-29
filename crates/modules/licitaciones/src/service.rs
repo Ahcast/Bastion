@@ -297,6 +297,8 @@ impl TenderService {
         editable(&current, expected)?;
         bump(&mut tx, actor, id, expected).await?;
         crate::attachments::enqueue_expedient_deletion(&mut tx, id).await?;
+        sqlx::query("UPDATE licitaciones_pdf_jobs SET state=IF(state='ready','expired','failed'),cleanup_pending=1,cleanup_after=NULL,updated_at=UTC_TIMESTAMP(6) WHERE expediente_id=? AND state IN ('ready','queued')")
+            .bind(id).execute(&mut *tx).await?;
         sqlx::query("UPDATE licitaciones_expedientes SET deleted_at=UTC_TIMESTAMP(6) WHERE id=?")
             .bind(id)
             .execute(&mut *tx)

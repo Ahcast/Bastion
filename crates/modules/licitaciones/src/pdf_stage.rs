@@ -80,6 +80,8 @@ pub struct WorkerRequest {
     pub sources: Vec<u32>,
     pub global_sources: Vec<u32>,
     pub layout: LayoutRequest,
+    #[serde(skip)]
+    pub(crate) reference_checks: Vec<(u64, Vec<u8>)>,
 }
 
 fn private_empty_root(root: &Path) -> Result<(), CoreError> {
@@ -272,6 +274,7 @@ impl TenderService {
             sources: source_numbers,
             global_sources: global_numbers,
             layout: plan.layout,
+            reference_checks: referenced,
         })
     }
 }
