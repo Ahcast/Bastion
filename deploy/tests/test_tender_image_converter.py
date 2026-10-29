@@ -2,13 +2,19 @@ import importlib.util
 from pathlib import Path
 import tempfile
 import unittest
-from PIL import Image
+try:
+    from PIL import Image
+except ModuleNotFoundError:
+    Image = None
 
-spec = importlib.util.spec_from_file_location('converter', Path(__file__).parents[1] / 'bastion-tender-image-converter.py')
-converter = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(converter)
+converter = None
+if Image is not None:
+    spec = importlib.util.spec_from_file_location('converter', Path(__file__).parents[1] / 'bastion-tender-image-converter.py')
+    converter = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(converter)
 
 
+@unittest.skipIf(Image is None, 'Pillow is installed in the PDF integration job')
 class TenderImageConversion(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
