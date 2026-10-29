@@ -3,6 +3,7 @@
 mod attachments;
 mod folio;
 mod frontmatter;
+mod globals_typst;
 mod image_pdf;
 mod lots;
 mod order;
@@ -20,6 +21,7 @@ use bastion_colaboracion::{
 use bastion_core::CoreError;
 pub use folio::{FolioPage, parse_pdfinfo_pages, prepare_folio_sources};
 pub use frontmatter::prepare_frontmatter_sources;
+pub use globals_typst::{bind_global_typst_source, prepare_global_typst_sources};
 pub use lots::{Lot, LotInput, LotItem, LotSummary};
 pub use order::{PdfOrder, PdfOrderInput, PdfOrderItem};
 pub use pagination::{MeasuredPiece, PageConvergence, PagePlan, PageRange, plan_pdf_pages};
