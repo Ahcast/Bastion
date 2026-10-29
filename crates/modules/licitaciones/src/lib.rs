@@ -9,6 +9,7 @@ mod lots;
 mod order;
 mod pagination;
 pub mod pdf_compose;
+pub mod pdf_layout;
 mod service;
 mod typst_data;
 pub use attachments::{

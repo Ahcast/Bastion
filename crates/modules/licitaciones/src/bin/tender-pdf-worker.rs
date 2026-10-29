@@ -16,10 +16,12 @@ struct Request {
     sources: Vec<u32>,
     #[serde(default)]
     global_sources: Vec<u32>,
+    #[serde(default)]
+    layout: Option<bastion_licitaciones::pdf_layout::LayoutRequest>,
 }
 
 fn request(bytes: &[u8]) -> Result<Request, ()> {
-    if bytes.len() > 65536 {
+    if bytes.len() > 2_000_000 {
         return Err(());
     }
     let value: Request = serde_json::from_slice(bytes).map_err(|_| ())?;
@@ -42,6 +44,9 @@ fn request(bytes: &[u8]) -> Result<Request, ()> {
         .any(|n| !seen.contains(n) || !globals.insert(*n))
     {
         return Err(());
+    }
+    if let Some(layout)=&value.layout {
+        if layout.entries.len().checked_add(2)!=Some(value.pieces as usize) || value.sources.iter().any(|n|*n<3) {return Err(());}
     }
     Ok(value)
 }
@@ -128,12 +133,16 @@ fn perform() -> Result<u32, ()> {
     let mut bytes = Vec::new();
     io::stdin()
         .lock()
-        .take(65537)
+        .take(2_000_001)
         .read_to_end(&mut bytes)
         .map_err(|_| ())?;
     let job = request(&bytes)?;
     let packages = std::env::var_os("BASTION_TYPST_PACKAGE_PATH").map(PathBuf::from);
     let fonts = std::env::var_os("BASTION_TYPST_FONT_PATH").map(PathBuf::from);
+    if let Some(layout)=&job.layout {
+        let plan=bastion_licitaciones::pdf_layout::assemble_laid_out_pdf(&typst,&pdfinfo,&qpdf,&root,layout,&job.sources,&job.global_sources,packages.as_deref(),fonts.as_deref()).map_err(|_|())?;
+        return Ok(plan.total_pages);
+    }
     bastion_licitaciones::pdf_compose::render_prepared_sources(
         &typst,
         &root,
@@ -180,13 +189,16 @@ mod tests {
         assert!(request(br#"{"pieces":0}"#).is_err());
         assert!(request(br#"{"pieces":4001}"#).is_err());
         assert!(request(br#"{"pieces":1,"path":"/etc"}"#).is_err());
-        assert!(request(&vec![b' '; 65537]).is_err());
+        assert!(request(&vec![b' '; 2_000_001]).is_err());
         assert!(request(br#"{"pieces":2,"sources":[1,2]}"#).is_ok());
         assert!(request(br#"{"pieces":2,"sources":[1,1]}"#).is_err());
         assert!(request(br#"{"pieces":2,"sources":[3]}"#).is_err());
         assert!(request(br#"{"pieces":2,"sources":[1,2],"global_sources":[1]}"#).is_ok());
         assert!(request(br#"{"pieces":2,"sources":[1],"global_sources":[2]}"#).is_err());
         assert!(request(br#"{"pieces":2,"sources":[1],"global_sources":[1,1]}"#).is_err());
+        assert!(request(br#"{"pieces":3,"sources":[3],"global_sources":[3],"layout":{"expediente":"E","lpn":"L","institucion":"I","entries":[{"key":"form:1","title":"F"}]}}"#).is_ok());
+        assert!(request(br#"{"pieces":3,"sources":[2],"layout":{"expediente":"E","lpn":"L","institucion":"I","entries":[{"key":"form:1","title":"F"}]}}"#).is_err());
+        assert!(request(br#"{"pieces":3,"layout":{"expediente":"E","lpn":"L","institucion":"I","entries":[]}}"#).is_err());
     }
     #[test]
     fn process_status_requires_no_privilege_or_capabilities() {

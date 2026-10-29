@@ -48,7 +48,7 @@ fn run(mut command: Command) -> Result<String, CoreError> {
         }
     }
 }
-fn regular_file(path: &Path) -> Result<(), CoreError> {
+pub(crate) fn regular_file(path: &Path) -> Result<(), CoreError> {
     let meta = fs::symlink_metadata(path).map_err(|_| CoreError::Invalid)?;
     if !meta.file_type().is_file() {
         return Err(CoreError::Invalid);
@@ -58,7 +58,7 @@ fn regular_file(path: &Path) -> Result<(), CoreError> {
 fn absent(path: &Path) -> bool {
     matches!(fs::symlink_metadata(path), Err(ref e) if e.kind() == std::io::ErrorKind::NotFound)
 }
-fn pages(qpdf: &Path, file: &Path) -> Result<u32, CoreError> {
+pub(crate) fn pages(qpdf: &Path, file: &Path) -> Result<u32, CoreError> {
     regular_file(file)?;
     let mut command = Command::new(qpdf);
     command.arg("--show-npages").arg(file);
