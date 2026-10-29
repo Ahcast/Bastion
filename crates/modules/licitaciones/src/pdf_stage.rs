@@ -79,6 +79,7 @@ pub struct WorkerRequest {
     pub pieces: u32,
     pub sources: Vec<u32>,
     pub global_sources: Vec<u32>,
+    pub conversions: Vec<u32>,
     pub layout: LayoutRequest,
     #[serde(skip)]
     pub(crate) reference_checks: Vec<(u64, Vec<u8>)>,
@@ -171,6 +172,7 @@ impl TenderService {
         create(&root, "funciones.typ", bundle.functions.as_bytes().to_vec()).await?;
         let mut source_numbers = Vec::new();
         let mut global_numbers = Vec::new();
+        let mut conversions = Vec::new();
         let mut referenced = Vec::<(u64, Vec<u8>)>::new();
         let mut total = 0u64;
         for piece in &plan.pieces {
@@ -236,6 +238,10 @@ impl TenderService {
                             return Err(CoreError::Invalid);
                         }
                         create(&root, &format!("piece-{number:06}.pdf"), file.bytes).await?;
+                    } else if matches!(file.mime.as_str(), "image/bmp" | "image/tiff") {
+                        create(&root, &format!("attachment-{number:06}.bin"), file.bytes).await?;
+                        source_numbers.push(*number);
+                        conversions.push(*number);
                     } else if matches!(
                         file.mime.as_str(),
                         "image/png" | "image/jpeg" | "image/gif" | "image/webp"
@@ -273,6 +279,7 @@ impl TenderService {
             pieces: u32::try_from(plan.pieces.len()).map_err(|_| CoreError::Invalid)? + 2,
             sources: source_numbers,
             global_sources: global_numbers,
+            conversions,
             layout: plan.layout,
             reference_checks: referenced,
         })

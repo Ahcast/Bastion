@@ -6,6 +6,45 @@ pub const IMAGE_PAGE_TYPST: &str = r#"#set page(paper: "us-letter", margin: (x: 
 #align(center + horizon)[#image("attachment.bin", width: 100%, height: 100%, fit: "contain")]
 "#;
 
+/// Convert selected BMP/TIFF files only inside the isolated worker.
+pub fn convert_prepared_images(
+    root: &std::path::Path,
+    converter: &std::path::Path,
+    numbers: &[u32],
+) -> Result<(), bastion_core::CoreError> {
+    use bastion_core::CoreError;
+    use std::{collections::BTreeSet, fs, process::Command};
+    if !root.is_absolute()
+        || !converter.is_absolute()
+        || !fs::symlink_metadata(root)
+            .map_err(|_| CoreError::Invalid)?
+            .file_type()
+            .is_dir()
+    {
+        return Err(CoreError::Invalid);
+    }
+    crate::pdf_compose::regular_file(converter)?;
+    let mut seen = BTreeSet::new();
+    for n in numbers {
+        if !(3..=4000).contains(n) || !seen.insert(*n) {
+            return Err(CoreError::Invalid);
+        }
+        crate::pdf_compose::regular_file(&root.join(format!("attachment-{n:06}.bin")))?;
+        if fs::symlink_metadata(root.join(format!("source-{n:06}.typ"))).is_ok() {
+            return Err(CoreError::Conflict);
+        }
+        let mut command = Command::new("/usr/bin/python3");
+        command
+            .arg("-I")
+            .arg(converter)
+            .arg(root)
+            .arg(n.to_string());
+        crate::pdf_compose::run(command)?;
+        crate::pdf_compose::regular_file(&root.join(format!("source-{n:06}.typ")))?;
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

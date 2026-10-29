@@ -4,7 +4,7 @@ mod attachments;
 mod folio;
 mod frontmatter;
 mod globals_typst;
-mod image_pdf;
+pub mod image_pdf;
 mod lots;
 mod order;
 mod pagination;

@@ -11,7 +11,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-fn run(mut command: Command) -> Result<String, CoreError> {
+pub(crate) fn run(mut command: Command) -> Result<String, CoreError> {
     command
         .env_clear()
         .stdin(Stdio::null())

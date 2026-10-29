@@ -152,6 +152,7 @@ def launch(job_id, peer_uid):
                 f'Environment=BASTION_QPDF_BIN={QPDF}',
                 f'Environment=BASTION_TYPST_PACKAGE_PATH={PACKAGES}',
                 'Environment=BASTION_TYPST_FONT_PATH=/usr/share/fonts',
+                'Environment=BASTION_TENDER_IMAGE_CONVERTER=/usr/local/libexec/bastion-tender-image-converter',
                 'UnsetEnvironment=AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_SESSION_TOKEN AWS_PROFILE AWS_SHARED_CREDENTIALS_FILE AWS_CONFIG_FILE AWS_CONTAINER_CREDENTIALS_FULL_URI AWS_CONTAINER_CREDENTIALS_RELATIVE_URI',
             ]
             args = ['/usr/bin/systemd-run', '--quiet', '--wait', '--collect', '--unit', unit]

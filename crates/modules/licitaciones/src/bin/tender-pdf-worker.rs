@@ -17,6 +17,8 @@ struct Request {
     #[serde(default)]
     global_sources: Vec<u32>,
     #[serde(default)]
+    conversions: Vec<u32>,
+    #[serde(default)]
     layout: Option<bastion_licitaciones::pdf_layout::LayoutRequest>,
 }
 
@@ -42,6 +44,14 @@ fn request(bytes: &[u8]) -> Result<Request, ()> {
         .global_sources
         .iter()
         .any(|n| !seen.contains(n) || !globals.insert(*n))
+    {
+        return Err(());
+    }
+    let mut conversions = std::collections::BTreeSet::new();
+    if value
+        .conversions
+        .iter()
+        .any(|n| !seen.contains(n) || globals.contains(n) || *n < 3 || !conversions.insert(*n))
     {
         return Err(());
     }
@@ -143,6 +153,15 @@ fn perform() -> Result<u32, ()> {
     let job = request(&bytes)?;
     let packages = std::env::var_os("BASTION_TYPST_PACKAGE_PATH").map(PathBuf::from);
     let fonts = std::env::var_os("BASTION_TYPST_FONT_PATH").map(PathBuf::from);
+    if !job.conversions.is_empty() {
+        let converter = trusted_path("BASTION_TENDER_IMAGE_CONVERTER")?;
+        bastion_licitaciones::image_pdf::convert_prepared_images(
+            &root,
+            &converter,
+            &job.conversions,
+        )
+        .map_err(|_| ())?;
+    }
     if let Some(layout) = &job.layout {
         let plan = bastion_licitaciones::pdf_layout::assemble_laid_out_pdf(
             &typst,
@@ -214,6 +233,13 @@ mod tests {
         assert!(request(br#"{"pieces":3,"sources":[3],"global_sources":[3],"layout":{"expediente":"E","lpn":"L","institucion":"I","entries":[{"key":"form:1","title":"F"}]}}"#).is_ok());
         assert!(request(br#"{"pieces":3,"sources":[2],"layout":{"expediente":"E","lpn":"L","institucion":"I","entries":[{"key":"form:1","title":"F"}]}}"#).is_err());
         assert!(request(br#"{"pieces":3,"layout":{"expediente":"E","lpn":"L","institucion":"I","entries":[]}}"#).is_err());
+        assert!(request(br#"{"pieces":3,"sources":[3],"conversions":[3]}"#).is_ok());
+        assert!(request(br#"{"pieces":3,"sources":[3],"conversions":[3,3]}"#).is_err());
+        assert!(
+            request(br#"{"pieces":3,"sources":[3],"global_sources":[3],"conversions":[3]}"#)
+                .is_err()
+        );
+        assert!(request(br#"{"pieces":3,"sources":[2],"conversions":[2]}"#).is_err());
     }
     #[test]
     fn process_status_requires_no_privilege_or_capabilities() {

@@ -142,10 +142,12 @@ jobs:
         run: |
           set -euo pipefail
           sudo apt-get update -qq
-          sudo apt-get install -y -qq --no-install-recommends poppler-utils
+          sudo apt-get install -y -qq --no-install-recommends poppler-utils python3-pil
           echo "BASTION_PDFINFO_BIN=$(command -v pdfinfo)" >> "$GITHUB_ENV"
       - name: Verify tender launcher input validation
         run: python3 -m unittest discover -s deploy/tests -p test_tender_launcher.py
+      - name: Verify tender image conversion
+        run: /usr/bin/python3 -m unittest discover -s deploy/tests -p test_tender_image_converter.py
       - name: Run workspace tests
         # Shared PDF template runs with synthetic data and no S3 or SMTP credentials.
         # Each module uses an isolated disposable MySQL 5.7 database.
