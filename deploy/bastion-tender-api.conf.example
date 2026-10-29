@@ -1,0 +1,5 @@
+[Service]
+# Installed only after the broker socket, worker, converter and migration exist.
+ReadWritePaths=/var/lib/bastion-tender/incoming
+Environment=BASTION_TENDER_PDF_ENABLED=true
+Environment=BASTION_TENDER_TEMPLATE_DIR=/opt/bastion-pdf/private-templates-20261029

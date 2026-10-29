@@ -27,6 +27,12 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
         tracing::info!("database connection verified with TLS VerifyIdentity (SELECT 1)");
         return Ok(());
     }
+    if command == "migrate-licitaciones" {
+        let migrator = Database::connect_lazy(&DatabaseConfig::migrator_from_env()?);
+        bastion_licitaciones::TenderService::migrate(&migrator).await?;
+        tracing::info!("tender migrations completed; other module schemas unchanged");
+        return Ok(());
+    }
     if command == "migrate-facturas" {
         let migrator = Database::connect_lazy(&DatabaseConfig::migrator_from_env()?);
         bastion_facturas::InvoiceService::migrate(&migrator).await?;

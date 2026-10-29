@@ -257,7 +257,10 @@ impl TenderService {
                             return Err(CoreError::Invalid);
                         }
                         create(&root, &format!("piece-{number:06}.pdf"), file.bytes).await?;
-                    } else if matches!(file.mime.as_str(), "image/bmp" | "image/tiff") {
+                    } else if matches!(
+                        file.mime.as_str(),
+                        "image/bmp" | "image/x-ms-bmp" | "image/tiff"
+                    ) {
                         create(&root, &format!("attachment-{number:06}.bin"), file.bytes).await?;
                         source_numbers.push(*number);
                         conversions.push(*number);
