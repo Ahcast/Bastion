@@ -15,7 +15,7 @@ mod service;
 mod typst_data;
 pub use attachments::{
     Attachment, AttachmentContent, AttachmentCopy, AttachmentDelete, AttachmentList,
-    AttachmentSection, AttachmentUpload,
+    AttachmentSection, AttachmentUpload, RenderAttachment,
 };
 use bastion_colaboracion::{
     FormDefinition, FormSection, FormValues, FormVariable, PublishedForm, VariableKind,

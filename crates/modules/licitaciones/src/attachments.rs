@@ -67,6 +67,12 @@ pub struct AttachmentContent {
     pub content_base64: String,
 }
 
+pub struct RenderAttachment {
+    pub filename: String,
+    pub mime: String,
+    pub bytes: Vec<u8>,
+}
+
 impl AttachmentUpload {
     pub fn decode(self) -> Result<(AttachmentSection, String, Vec<u8>), CoreError> {
         if self.content_base64.len() > (MAX_INPUT_BYTES as usize).div_ceil(3) * 4 {
@@ -342,9 +348,46 @@ impl TenderService {
         file: &str,
         preview: bool,
     ) -> Result<AttachmentContent, CoreError> {
+        let content = self
+            .read_attachment_bytes(actor, id, file, preview, None)
+            .await?;
+        Ok(AttachmentContent {
+            filename: content.filename,
+            mime: content.mime,
+            content_base64: STANDARD.encode(content.bytes),
+        })
+    }
+
+    /// Obtain bytes for rendering only while the requested expediente version
+    /// remains current. Access and collaboration permissions are rechecked.
+    pub async fn render_attachment(
+        &self,
+        actor: u64,
+        id: u64,
+        expected_version: u64,
+        file: &str,
+    ) -> Result<RenderAttachment, CoreError> {
+        self.read_attachment_bytes(actor, id, file, true, Some(expected_version))
+            .await
+    }
+
+    /// Read a single authorized attachment for a fixed expediente version.
+    /// Collaboration references are fetched through the existing library service
+    /// and remain references; neither their source nor the object is copied.
+    pub(crate) async fn read_attachment_bytes(
+        &self,
+        actor: u64,
+        id: u64,
+        file: &str,
+        preview: bool,
+        expected_version: Option<u64>,
+    ) -> Result<RenderAttachment, CoreError> {
         attachment_id(file)?;
         let mut tx = self.begin(actor, "ver").await?;
-        load(&mut tx, id).await?;
+        let expedient = load(&mut tx, id).await?;
+        if expected_version.is_some_and(|v| v != expedient.version) {
+            return Err(CoreError::PreconditionFailed);
+        }
         let record:Attachment=sqlx::query_as("SELECT id,section,filename,mime,byte_size,LOWER(HEX(sha256)) AS sha256,source_id,LOWER(HEX(source_sha256)) AS source_sha256,(object_key IS NULL) AS is_reference,created_at FROM licitaciones_archivos WHERE id=? AND expediente_id=?").bind(file).bind(id).fetch_optional(&mut *tx).await?.ok_or(CoreError::NotFound)?;
         let key: Option<String> = sqlx::query_scalar(
             "SELECT object_key FROM licitaciones_archivos WHERE id=? AND expediente_id=?",
@@ -372,6 +415,9 @@ impl TenderService {
         }
         let mut tx = self.begin(actor, "ver").await?;
         let expedient = load(&mut tx, id).await?;
+        if expected_version.is_some_and(|v| v != expedient.version) {
+            return Err(CoreError::PreconditionFailed);
+        }
         let current: Option<Option<String>> = sqlx::query_scalar(
             "SELECT object_key FROM licitaciones_archivos WHERE id=? AND expediente_id=?",
         )
@@ -405,14 +451,14 @@ impl TenderService {
         )
         .await?;
         tx.commit().await?;
-        Ok(AttachmentContent {
+        Ok(RenderAttachment {
             filename: record.filename,
             mime: if preview {
                 record.mime
             } else {
                 "application/octet-stream".into()
             },
-            content_base64: STANDARD.encode(bytes),
+            bytes,
         })
     }
     pub async fn remove_attachment(

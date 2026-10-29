@@ -130,6 +130,20 @@ async fn mysql57_tender_files_private_copies_integrity_recovery_and_budgets() {
             .content_base64,
         STANDARD.encode(pdf)
     );
+    let staged = service
+        .render_attachment(1, first.id, 2, &file.id)
+        .await
+        .unwrap();
+    assert_eq!(staged.bytes, pdf);
+    assert_eq!(staged.mime, "application/pdf");
+    assert!(matches!(
+        service.render_attachment(1, first.id, 1, &file.id).await,
+        Err(CoreError::PreconditionFailed)
+    ));
+    assert!(matches!(
+        service.render_attachment(1, second.id, 1, &file.id).await,
+        Err(CoreError::NotFound)
+    ));
     let original = library
         .upload(
             1,
@@ -225,6 +239,17 @@ async fn mysql57_tender_files_private_copies_integrity_recovery_and_budgets() {
             .content_base64,
         STANDARD.encode(pdf)
     );
+    let staged = service
+        .render_attachment(1, first.id, 3, &copied_file.id)
+        .await
+        .unwrap();
+    assert_eq!(staged.bytes, pdf);
+    assert!(matches!(
+        service
+            .render_attachment(1, first.id, 2, &copied_file.id)
+            .await,
+        Err(CoreError::PreconditionFailed)
+    ));
     library.delete(1, original_id, original_id).await.unwrap();
     let missing = service.attachments(1, first.id).await.unwrap();
     let missing = missing
