@@ -206,7 +206,10 @@ pub fn render_prepared_sources(
             input
         };
         command.arg(source).arg(&output);
-        run(command)?;
+        run(command).map_err(|err| {
+            eprintln!("No se pudo compilar el componente {number} del PDF.");
+            err
+        })?;
         regular_file(&output)?;
     }
     Ok(())

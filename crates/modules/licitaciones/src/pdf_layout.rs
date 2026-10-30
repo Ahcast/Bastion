@@ -160,7 +160,10 @@ pub fn assemble_laid_out_pdf(
     let mut index_guess = 1u32;
     let mut seen = BTreeSet::new();
     for _ in 0..8 {
-        update_total(root, total_guess)?;
+        update_total(root, total_guess).map_err(|err| {
+            eprintln!("No se pudo actualizar el total de páginas.");
+            err
+        })?;
         render_prepared_sources(
             typst,
             root,
@@ -170,7 +173,10 @@ pub fn assemble_laid_out_pdf(
             packages,
             fonts,
         )?;
-        let cover_pages = pages(qpdf, &root.join("piece-000001.pdf"))?;
+        let cover_pages = pages(qpdf, &root.join("piece-000001.pdf")).map_err(|err| {
+            eprintln!("No se pudo medir la portada.");
+            err
+        })?;
         let mut counts = Vec::with_capacity(request.entries.len());
         for (i, e) in request.entries.iter().enumerate() {
             let n = u32::try_from(i).map_err(|_| CoreError::Invalid)? + 3;
@@ -196,7 +202,11 @@ pub fn assemble_laid_out_pdf(
             return Err(CoreError::Invalid);
         }
         if actual_index == index_guess && final_plan.total_pages == total_guess {
-            let actual = measure_and_compose_pdf(typst, pdfinfo, qpdf, root, pieces)?;
+            let actual =
+                measure_and_compose_pdf(typst, pdfinfo, qpdf, root, pieces).map_err(|err| {
+                    eprintln!("No se pudo unir y foliar el PDF.");
+                    err
+                })?;
             if actual != final_plan.total_pages {
                 return Err(CoreError::Invalid);
             }
