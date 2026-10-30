@@ -103,9 +103,18 @@ pub fn assemble_laid_out_pdf(
     {
         return Err(CoreError::Invalid);
     }
-    regular_file(typst)?;
-    regular_file(pdfinfo)?;
-    regular_file(qpdf)?;
+    regular_file(typst).map_err(|err| {
+        eprintln!("Compilador PDF inaccesible.");
+        err
+    })?;
+    regular_file(pdfinfo).map_err(|err| {
+        eprintln!("Inspector PDF inaccesible.");
+        err
+    })?;
+    regular_file(qpdf).map_err(|err| {
+        eprintln!("Combinador PDF inaccesible.");
+        err
+    })?;
     let pieces = u32::try_from(request.entries.len())
         .map_err(|_| CoreError::Invalid)?
         .checked_add(2)
@@ -150,10 +159,19 @@ pub fn assemble_laid_out_pdf(
         &empty,
     )?;
     for (name, bytes) in &front {
-        create_file(&root.join(name), bytes)?;
+        create_file(&root.join(name), bytes).map_err(|err| {
+            eprintln!("No se pudo preparar la portada o el índice.");
+            err
+        })?;
     }
-    create_file(&root.join("source-000001.typ"), &front["portada.typ"])?;
-    create_file(&root.join("source-000002.typ"), &front["indice.typ"])?;
+    create_file(&root.join("source-000001.typ"), &front["portada.typ"]).map_err(|err| {
+        eprintln!("No se pudo preparar la portada.");
+        err
+    })?;
+    create_file(&root.join("source-000002.typ"), &front["indice.typ"]).map_err(|err| {
+        eprintln!("No se pudo preparar el índice.");
+        err
+    })?;
     let mut all_sources = vec![1];
     all_sources.extend_from_slice(source_numbers);
     let mut total_guess = 1u32;
