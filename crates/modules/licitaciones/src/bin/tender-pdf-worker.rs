@@ -160,7 +160,10 @@ fn perform() -> Result<u32, ()> {
             &converter,
             &job.conversions,
         )
-        .map_err(|_| ())?;
+        .map_err(|_| {
+            eprintln!("Falló la conversión de imagen.");
+            ()
+        })?;
     }
     if let Some(layout) = &job.layout {
         let plan = bastion_licitaciones::pdf_layout::assemble_laid_out_pdf(
@@ -174,7 +177,10 @@ fn perform() -> Result<u32, ()> {
             packages.as_deref(),
             fonts.as_deref(),
         )
-        .map_err(|_| ())?;
+        .map_err(|_| {
+            eprintln!("Falló la composición del expediente.");
+            ()
+        })?;
         return Ok(plan.total_pages);
     }
     bastion_licitaciones::pdf_compose::render_prepared_sources(

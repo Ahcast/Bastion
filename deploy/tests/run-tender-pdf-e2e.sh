@@ -44,6 +44,7 @@ s=s.replace("pwd.getpwnam('bastion')", f"pwd.getpwnam('{sys.argv[1]}')")
 s=s.replace('CAPACITY = 5 * 1024**3', 'CAPACITY = 64 * 1024**2')
 s=s.replace("    except Exception:\n        print('error', flush=True)", "    except Exception as exc:\n        print(type(exc).__name__ + ': ' + str(exc), file=sys.stderr)\n        print('error', flush=True)")
 s=s.replace("stderr=subprocess.DEVNULL,\n                          timeout=timeout", "stderr=None,\n                          timeout=timeout")
+s=s.replace('StandardError=null', 'StandardError=journal')
 s=s.replace('Environment=BASTION_TYPST_BIN=/usr/local/bin/typst', f'Environment=BASTION_TYPST_BIN={sys.argv[2]}')
 print(s,end='')
 PY
