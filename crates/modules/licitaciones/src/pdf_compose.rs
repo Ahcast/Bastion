@@ -159,6 +159,7 @@ pub fn render_prepared_sources(
                 .file_type()
                 .is_dir()
         {
+            eprintln!("Directorio de fuentes o paquetes inaccesible.");
             return Err(CoreError::Invalid);
         }
     }
@@ -169,6 +170,7 @@ pub fn render_prepared_sources(
         || !globals.is_subset(&unique)
         || unique.iter().any(|n| *n == 0 || *n > pieces)
     {
+        eprintln!("Relación de fuentes del PDF inválida.");
         return Err(CoreError::Invalid);
     }
     if !globals.is_empty() {
@@ -178,7 +180,10 @@ pub fn render_prepared_sources(
     for &number in source_numbers {
         let input = root.join(format!("source-{number:06}.typ"));
         let output = root.join(format!("piece-{number:06}.pdf"));
-        regular_file(&input)?;
+        regular_file(&input).map_err(|err| {
+            eprintln!("Falta la fuente del componente {number}.");
+            err
+        })?;
         if !absent(&output) {
             return Err(CoreError::Conflict);
         }
@@ -200,7 +205,10 @@ pub fn render_prepared_sources(
         }
         let source = if globals.contains(&number) {
             let bound = root.join(format!("bound-{number:06}.typ"));
-            bind_source_file(&input, &bound)?;
+            bind_source_file(&input, &bound).map_err(|err| {
+                eprintln!("No se pudieron vincular las variables del componente {number}.");
+                err
+            })?;
             bound
         } else {
             input

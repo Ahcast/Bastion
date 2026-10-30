@@ -129,6 +129,7 @@ pub fn assemble_laid_out_pdf(
         || !globals.is_subset(&source_set)
         || source_set.iter().any(|n| *n < 3 || *n > pieces)
     {
+        eprintln!("Fuentes del PDF incompatibles con el orden.");
         return Err(CoreError::Invalid);
     }
     let mut keys = BTreeSet::new();
@@ -139,16 +140,21 @@ pub fn assemble_laid_out_pdf(
             || e.title.chars().count() > 1000
             || !keys.insert(&e.key)
     }) {
+        eprintln!("Orden del PDF inválido.");
         return Err(CoreError::Invalid);
     }
     for n in 3..=pieces {
         let path = root.join(format!("piece-{n:06}.pdf"));
         if source_set.contains(&n) {
             if fs::symlink_metadata(path).is_ok() {
+                eprintln!("La salida del componente {n} ya existe.");
                 return Err(CoreError::Conflict);
             }
         } else {
-            regular_file(&path)?;
+            regular_file(&path).map_err(|err| {
+                eprintln!("Falta el PDF del componente {n}.");
+                err
+            })?;
         }
     }
     let empty = plan_pdf_pages(1, 1, &[])?;
@@ -157,7 +163,11 @@ pub fn assemble_laid_out_pdf(
         &request.lpn,
         &request.institucion,
         &empty,
-    )?;
+    )
+    .map_err(|err| {
+        eprintln!("Datos de portada inválidos.");
+        err
+    })?;
     for (name, bytes) in &front {
         create_file(&root.join(name), bytes).map_err(|err| {
             eprintln!("No se pudo preparar la portada o el índice.");
@@ -190,7 +200,11 @@ pub fn assemble_laid_out_pdf(
             global_numbers,
             packages,
             fonts,
-        )?;
+        )
+        .map_err(|err| {
+            eprintln!("No se pudieron preparar las fuentes del PDF.");
+            err
+        })?;
         let cover_pages = pages(qpdf, &root.join("piece-000001.pdf")).map_err(|err| {
             eprintln!("No se pudo medir la portada.");
             err
