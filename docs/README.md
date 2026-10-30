@@ -251,3 +251,5 @@ El informe se obtuvo de una copia de frontend Angular compilado y backend Larave
 - 2026-10-28: lotes BID/STD, variables y orden del expediente se desplegaron desde df7ed34, con CI, respaldo y migración 6 verificados. Generación PDF y conexión del trabajador aislado siguen pendientes. El almacenamiento temporal para un expediente de 1 GB debe estar en disco, no en la partición temporal de /run; véase docs/09-despliegue.md.
 
 - 2026-10-28: el usuario amplía el límite independiente del PDF final de Licitaciones a 1.000.000.000 bytes; el almacenamiento y la generación de ese tamaño siguen pendientes de implementación y verificación.
+
+- 2026-10-29: la integración del PDF de Licitaciones se prepara como cola persistente con versión del expediente, trabajador aislado y socket local autenticado por credenciales del sistema. El almacenamiento privado existente conserva el resultado; la descarga verifica tamaño, huella, versión y permisos de referencias. Los dos formularios legales iniciales se seleccionan por expediente. El despliegue y la verificación integral siguen pendientes.

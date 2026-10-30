@@ -1,8 +1,8 @@
 openapi: 3.1.0
 info:
-  title: Infraestructura de Licitaciones y biblioteca de formularios
-  version: 0.1.0
-  description: Sin formularios ni campos de negocio precargados. Ver licitaciones-infraestructura.md para límites, autorización y pendientes.
+  title: Licitaciones y biblioteca de formularios
+  version: 0.2.0
+  description: Incluye la preparación de PDF; su disponibilidad depende del despliegue y la habilitación del trabajador.
 security:
   - session: []
 paths:
@@ -199,6 +199,88 @@ paths:
         '403': { description: Sin permiso de edición }
         '409': { description: Expediente fuera de Borrador }
         '412': { description: Versión obsoleta }
+  /api/v1/licitaciones/{id}/pdf/formularios-iniciales:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+      - $ref: '#/components/parameters/Version'
+      - $ref: '#/components/parameters/Csrf'
+    put:
+      summary: Seleccionar los formularios iniciales del expediente; requiere editar
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [forms]
+              properties:
+                forms: { type: array, uniqueItems: true, maxItems: 2, items: { type: string, enum: [integridad, oferente] } }
+      responses:
+        '200': { description: Expediente actualizado con ETag fuerte }
+        '400': { description: Selección inválida }
+        '403': { description: Sin permiso de edición }
+        '412': { description: Versión obsoleta }
+  /api/v1/licitaciones/{id}/pdf/generar:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+      - $ref: '#/components/parameters/Version'
+      - $ref: '#/components/parameters/Csrf'
+    post:
+      summary: Encolar la generación de la versión actual; requiere editar
+      description: Las solicitudes repetidas para la misma versión devuelven el trabajo activo. El trabajador debe estar habilitado.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, additionalProperties: false }
+      responses:
+        '202':
+          description: Trabajo encolado o ya activo
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PdfJob' }
+        '404': { description: Generación no habilitada o expediente no disponible }
+        '409': { description: Hay un trabajo activo de otra versión }
+        '412': { description: Versión obsoleta }
+  /api/v1/licitaciones/{id}/pdf/ultimo:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    get:
+      summary: Consultar el trabajo PDF más reciente; requiere ver
+      responses:
+        '200':
+          description: Trabajo o null si no existe
+          content:
+            application/json:
+              schema: { anyOf: [{ $ref: '#/components/schemas/PdfJob' }, { type: 'null' }] }
+  /api/v1/licitaciones/{id}/pdf/trabajos/{job}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+      - $ref: '#/components/parameters/PdfJobId'
+    get:
+      summary: Consultar el estado de un trabajo; requiere ver
+      responses:
+        '200':
+          description: Estado del trabajo
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PdfJob' }
+        '404': { description: Trabajo no disponible }
+  /api/v1/licitaciones/{id}/pdf/trabajos/{job}/archivo:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+      - $ref: '#/components/parameters/PdfJobId'
+    get:
+      summary: Descargar el PDF actual verificado; requiere ver y acceso a las referencias
+      responses:
+        '200':
+          description: PDF privado transmitido con tamaño máximo de 1.000.000.000 bytes
+          content:
+            application/pdf:
+              schema: { type: string, format: binary }
+        '404': { description: Trabajo no disponible }
+        '412': { description: El expediente cambió desde la generación }
   /api/v1/licitaciones/{id}/formularios:
     parameters:
       - $ref: '#/components/parameters/Id'
@@ -427,6 +509,7 @@ components:
     Id: { name: id, in: path, required: true, schema: { type: integer, minimum: 1 } }
     Page: { name: page, in: query, schema: { type: integer, minimum: 1, maximum: 10000, default: 1 } }
     PageSize: { name: page_size, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 25 } }
+    PdfJobId: { name: job, in: path, required: true, schema: { type: string, pattern: '^[a-f0-9]{48}$' } }
     Version: { name: If-Match, in: header, required: true, schema: { type: string, pattern: '^"[1-9][0-9]*"$' } }
     Idempotency: { name: Idempotency-Key, in: header, required: true, schema: { type: string, pattern: '^[A-Za-z0-9_-]{16,128}$' } }
     Csrf: { name: X-CSRF-Token, in: header, required: true, schema: { type: string } }
@@ -503,6 +586,17 @@ components:
         items: { type: array, items: { $ref: '#/components/schemas/LotItem' } }
         total: { type: string, description: Total calculado en lempiras con dos decimales }
         version: { type: integer, minimum: 1 }
+    PdfJob:
+      type: object
+      required: [id, expediente_id, expediente_version, state, byte_size, created_at, updated_at]
+      properties:
+        id: { type: string, pattern: '^[a-f0-9]{48}$' }
+        expediente_id: { type: integer }
+        expediente_version: { type: integer }
+        state: { type: string, enum: [queued, running, uploading, ready, failed, expired] }
+        byte_size: { type: [integer, 'null'], maximum: 1000000000 }
+        created_at: { type: string }
+        updated_at: { type: string }
     PdfOrder:
       type: object
       required: [items, version]
@@ -543,6 +637,7 @@ components:
         state: { type: string, enum: [borrador] }
         forms: { type: array, items: { $ref: '#/components/schemas/FormCopy' } }
         variables: { type: array, maxItems: 100, items: { $ref: '#/components/schemas/GlobalVariable' } }
+        initial_forms: { type: array, uniqueItems: true, items: { type: string, enum: [integridad, oferente] } }
         name: { type: string, maxLength: 255, description: Vacío mientras no se asigne; independiente del ID técnico. }
     ExpedientPage:
       type: object

@@ -172,3 +172,7 @@ Recomendación de etapas: (1) contratos e infraestructura de biblioteca con inco
 | Settings concretos y alcance; versión/compatibilidad del módulo | Registro y criterio de configuración completa. |
 
 Se conservan en la fuente los detalles candidatos de diseño. Cualquier respuesta posterior se registra aquí y en los contratos afectados antes de implementar.
+
+### PDF final y formularios iniciales: implementación en verificación
+
+La rama de integración agrega la selección por expediente de «Declaración de integridad» e «Información sobre el oferente», sin publicar los originales privados en Git. Oferta BID/STD, lotes ofertados, formularios de Colaboración y adjuntos se ordenan juntos; las referencias se vuelven a autorizar antes de publicar y descargar el PDF. Una cola persistente coordina el trabajador aislado mediante un socket local y almacena el resultado privado. BMP y TIFF se convierten dentro del aislamiento, conservando las páginas TIFF. El límite del PDF final es independiente y asciende a 1.000.000.000 bytes. La publicación y la verificación integral aún están pendientes; la capacidad no debe considerarse activa hasta completar el despliegue.
