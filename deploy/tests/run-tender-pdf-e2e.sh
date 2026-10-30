@@ -15,6 +15,7 @@ for path in "$base" "$opt" "$socket" "$unit" "$bind" "$launcher" "$worker" "$con
 cleanup() {
   sudo systemctl stop bastion-tender-launcher.socket >/dev/null 2>&1 || true
   sudo systemctl stop 'bastion-tender-launcher@*.service' >/dev/null 2>&1 || true
+  sudo systemctl stop 'bastion-tender-????????????????????????????????????????????????.service' >/dev/null 2>&1 || true
   sudo rm -f -- "$socket" "$unit" "$launcher" "$worker" "$converter"
   sudo systemctl daemon-reload >/dev/null 2>&1 || true
   if test -d "$base/private"; then
@@ -69,7 +70,9 @@ PY
 sudo systemctl daemon-reload
 sudo systemctl start bastion-tender-launcher.socket
 export BASTION_TENDER_TEMPLATE_DIR="$opt/test-templates"
-if ! if ! cargo test --locked --package bastion-licitaciones --test pdf_e2e -- --nocapture; then
+stat -c "%a %u %g %n" / /opt "$opt" "$opt/test-templates" "$opt/test-templates/"*.typ
+readlink -f "$opt/test-templates"
+if ! if ! timeout 180s cargo test --locked --package bastion-licitaciones --test pdf_e2e -- --nocapture; then
   sudo journalctl --no-pager -n 80 -u 'bastion-tender-launcher@*.service' -u 'bastion-tender-*.service' || true
   exit 1
 fi; then
