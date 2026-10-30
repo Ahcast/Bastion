@@ -2,7 +2,7 @@ use bastion_colaboracion::{CollaborationService, VariableKind};
 use bastion_core::{CoreService, Database};
 use bastion_licitaciones::{
     AttachmentSection, AttachmentUpload, GlobalVariable, GlobalVariablesInput, InitialFormsInput,
-    LotInput, LotItem, TenderService,
+    LotInput, LotItem, NameInput, TenderService,
 };
 use sqlx::mysql::MySqlPoolOptions;
 use std::io::Read;
@@ -34,6 +34,17 @@ async fn isolated_job_generates_and_downloads_a_multipage_tiff() {
         .await
         .unwrap();
     let exp = service.create(1, "pdf-e2e-expediente01").await.unwrap();
+    let exp = service
+        .rename(
+            1,
+            exp.id,
+            exp.version,
+            NameInput {
+                name: "Expediente de prueba".into(),
+            },
+        )
+        .await
+        .unwrap();
     let variables = [
         ("lpn", VariableKind::Text, "LPN-PRUEBA"),
         ("inst", VariableKind::Text, "Entidad"),
