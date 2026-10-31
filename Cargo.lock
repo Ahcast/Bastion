@@ -343,6 +343,17 @@ dependencies = [
 [[package]]
 name = "bastion-mcp"
 version = "0.1.0"
+dependencies = [
+ "base64 0.22.1",
+ "bastion-core",
+ "chrono",
+ "rand 0.8.8",
+ "sha2 0.10.9",
+ "sqlx",
+ "subtle",
+ "tokio",
+ "url",
+]
 
 [[package]]
 name = "bastion-ordenes-compra"

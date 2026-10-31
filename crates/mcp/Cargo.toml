@@ -4,3 +4,14 @@ version.workspace = true
 edition.workspace = true
 
 [dependencies]
+base64.workspace = true
+chrono.workspace = true
+rand.workspace = true
+sha2.workspace = true
+sqlx.workspace = true
+subtle.workspace = true
+url.workspace = true
+
+[dev-dependencies]
+bastion-core = { path = "../core", features = ["test-support"] }
+tokio.workspace = true
