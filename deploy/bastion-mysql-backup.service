@@ -1,0 +1,19 @@
+[Unit]
+Description=Bastion daily MySQL backup
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=bastion
+EnvironmentFile=/etc/bastion/backend.env
+LoadCredential=mysql-password:/etc/bastion/mysql-password
+LoadCredential=mysql-ca.pem:/etc/bastion/mysql-ca.pem
+LoadCredential=aws-s3-credentials:/etc/bastion/aws-s3-credentials
+ExecStart=/usr/bin/python3 /usr/local/libexec/bastion-mysql-backup.py
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+TimeoutStartSec=2h
+

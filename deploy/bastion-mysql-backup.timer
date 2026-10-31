@@ -1,0 +1,11 @@
+[Unit]
+Description=Daily Bastion MySQL backup at 5 PM Honduras time
+
+[Timer]
+OnCalendar=*-*-* 17:00:00 America/Tegucigalpa
+Persistent=true
+Unit=bastion-mysql-backup.service
+
+[Install]
+WantedBy=timers.target
+
