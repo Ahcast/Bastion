@@ -86,7 +86,7 @@ class Engine:
         deadline = time.monotonic() + 8
         while True:
             if time.monotonic() >= deadline: raise RuntimeError('History request timed out')
-            args = ['s3api', 'list-objects-v2', '--bucket', BUCKET, '--prefix', 'backups/bastion-backup-', '--max-keys', '1000']
+            args = ['s3api', 'list-objects-v2', '--bucket', BUCKET, '--prefix', 'backups/bastion-backup-', '--max-keys', '1000', '--no-paginate']
             if token: args += ['--continuation-token', token]
             page = json.loads(self.aws(args, operation_timeout=max(1,deadline-time.monotonic())).stdout)
             for obj in page.get('Contents', []):
@@ -141,7 +141,7 @@ class Engine:
         plan = restore_plan(manifest)
         if shutil.disk_usage(self.root).free < sum(x['size'] for x in manifest['files']) + 1024**3:
             raise ValueError('Insufficient space for restoration')
-        summary = f"Se reemplazará la base principal completa: facturas, cotizaciones, órdenes, usuarios, roles, permisos y configuración; {len(plan['local_files'])} archivos locales y {len(plan['s3_objects'])} objetos de S3. Los objetos operativos posteriores al respaldo se retirarán. Se cerrarán todas las sesiones. No se reemplaza código ni backups/."
+        summary = f"Respaldo del {manifest.get('created_utc', '')}. Se reemplazará la base principal completa: facturas, cotizaciones, órdenes, usuarios, roles, permisos y configuración; {len(plan['local_files'])} archivos locales y {len(plan['s3_objects'])} objetos de S3. Los objetos operativos posteriores al respaldo se retirarán. Se cerrarán todas las sesiones. No se reemplaza código ni backups/."
         return (manifest, plan) if details else summary
 
     @contextlib.contextmanager
@@ -289,8 +289,8 @@ class Engine:
                         try:
                             shutil.copyfileobj(source, process.stdin, 1024 * 1024)
                         finally:
-                            process.stdin.close()
-                            watchdog.cancel()
+                            try: process.stdin.close()
+                            finally: watchdog.cancel()
                         if process.wait(timeout=7200): raise RuntimeError('Database restoration failed')
                 subprocess.run(['mysql', *options, '--binary-mode=1', self.cfg['MYSQL_DATABASE'], '-e', 'UPDATE sessions SET revoked_at=UTC_TIMESTAMP(6) WHERE revoked_at IS NULL; UPDATE trusted_devices SET revoked_at=UTC_TIMESTAMP(6) WHERE revoked_at IS NULL;'], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=120)
                 for item in plan['local_files']:

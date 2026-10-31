@@ -13,7 +13,7 @@ def inventory(aws_env):
         while True:
             args = ['aws', 's3api', 'list-objects-v2', '--bucket', BUCKET,
                     '--prefix', prefix, '--max-keys', '1000', '--region', 'us-east-1',
-                    '--no-cli-pager', '--output', 'json']
+                    '--no-cli-pager', '--no-paginate', '--output', 'json']
             if token:
                 args += ['--continuation-token', token]
             result = subprocess.run(args, env=aws_env, capture_output=True, check=True)

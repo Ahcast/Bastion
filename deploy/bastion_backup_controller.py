@@ -75,6 +75,11 @@ class Controller:
         return {'accepted': True, 'job_id': job}
 
     def prepare(self, actor, path, progress):
+        with self.lock:
+            for old_path, in self.db.execute('SELECT path FROM prepared WHERE actor=?', (actor,)).fetchall():
+                candidate = Path(old_path)
+                if candidate != path and candidate.parent == self.root: candidate.unlink(missing_ok=True)
+            self.db.execute('DELETE FROM prepared WHERE actor=?', (actor,)); self.db.commit()
         try:
             summary = self.engine.inspect(path, progress)
             digest = self.engine.digest(path)
@@ -82,10 +87,6 @@ class Controller:
             path.unlink(missing_ok=True)
             raise
         with self.lock:
-            for old_path, in self.db.execute('SELECT path FROM prepared WHERE actor=?', (actor,)).fetchall():
-                candidate = Path(old_path)
-                if candidate != path and candidate.parent == self.root: candidate.unlink(missing_ok=True)
-            self.db.execute('DELETE FROM prepared WHERE actor=?', (actor,))
             self.db.execute('INSERT INTO prepared VALUES(?,?,?,?,?,?)', (uuid.uuid4().hex, actor, str(path), digest, summary, now()))
             self.db.commit()
 
@@ -110,6 +111,11 @@ class Controller:
             if action == 'prepare_s3':
                 key = self.engine.valid_key(request.get('key'))
                 def prepare(progress):
+                    with self.lock:
+                        for previous, in self.db.execute('SELECT path FROM prepared WHERE actor=?',(actor,)).fetchall():
+                            candidate = Path(previous)
+                            if candidate.parent == self.root: candidate.unlink(missing_ok=True)
+                        self.db.execute('DELETE FROM prepared WHERE actor=?',(actor,)); self.db.commit()
                     path = self.root / (uuid.uuid4().hex + '.zip')
                     try:
                         self.engine.retrieve(key, path)
