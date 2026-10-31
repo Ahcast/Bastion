@@ -1,3 +1,5 @@
+use std::collections::BTreeSet;
+
 use bastion_core::Database;
 use bastion_mcp::{MysqlOauthStore, StoreError, revoke_user_grants_in_transaction};
 use sqlx::mysql::MySqlPoolOptions;
@@ -114,4 +116,38 @@ async fn mysql57_revoke_is_owned_audited_and_transactional() {
     let audit_count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM audit_events WHERE actor_id=? AND action='oauth.client.revoke' AND target_id=?").bind(admin).bind(client.to_string()).fetch_one(&pool).await.unwrap();
     assert_eq!(active, 0);
     assert_eq!(audit_count, 1);
+
+    let scoped_client = sqlx::query("INSERT INTO oauth_clients (client_id,client_id_hash,display_name,metadata_hash,enabled,created_at,updated_at) VALUES ('scoped-client',UNHEX(SHA2('scoped-client',256)),'Scoped client',UNHEX(SHA2('metadata',256)),1,UTC_TIMESTAMP(6),UTC_TIMESTAMP(6))").execute(&pool).await.unwrap().last_insert_id();
+    let both = BTreeSet::from(["read".to_owned(), "write".to_owned()]);
+    let read_only = BTreeSet::from(["read".to_owned()]);
+    assert!(matches!(
+        store
+            .replace_client_scopes(user, scoped_client, &both)
+            .await,
+        Err(StoreError::Forbidden)
+    ));
+    store
+        .replace_client_scopes(admin, scoped_client, &both)
+        .await
+        .unwrap();
+    let read_grant = sqlx::query("INSERT INTO oauth_grants (user_id,client_id,resource_uri,scopes_json,issued_at,expires_at) VALUES (?,?,'https://example.invalid/mcp',JSON_ARRAY('read'),UTC_TIMESTAMP(6),UTC_TIMESTAMP(6)+INTERVAL 1 DAY)").bind(user).bind(scoped_client).execute(&pool).await.unwrap().last_insert_id();
+    let write_grant = sqlx::query("INSERT INTO oauth_grants (user_id,client_id,resource_uri,scopes_json,issued_at,expires_at) VALUES (?,?,'https://example.invalid/mcp',JSON_ARRAY('write'),UTC_TIMESTAMP(6),UTC_TIMESTAMP(6)+INTERVAL 1 DAY)").bind(other).bind(scoped_client).execute(&pool).await.unwrap().last_insert_id();
+    store
+        .replace_client_scopes(admin, scoped_client, &read_only)
+        .await
+        .unwrap();
+    let kept: Option<chrono::NaiveDateTime> =
+        sqlx::query_scalar("SELECT revoked_at FROM oauth_grants WHERE id=?")
+            .bind(read_grant)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    let removed: Option<chrono::NaiveDateTime> =
+        sqlx::query_scalar("SELECT revoked_at FROM oauth_grants WHERE id=?")
+            .bind(write_grant)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert!(kept.is_none());
+    assert!(removed.is_some());
 }
