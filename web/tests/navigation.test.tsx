@@ -9,7 +9,7 @@ const ordinary: Access = { is_system_administrator: false, modules: [], permissi
 test('main navigation groups all account and administration screens under Ajustes', () => {
   const admin = { ...ordinary, is_system_administrator: true };
   assert.deepEqual(mainNavigation(admin).map(entry => entry.id), ['inicio', 'ajustes']);
-  assert.deepEqual(settingsSections(admin).map(entry => entry.label), ['Mi cuenta', 'Personas', 'Usuarios', 'Roles y permisos', 'Core']);
+  assert.deepEqual(settingsSections(admin).map(entry => entry.label), ['Mi cuenta', 'Personas', 'Usuarios', 'Roles y permisos', 'Core', 'Respaldos y restauración']);
   const markup = renderToStaticMarkup(<SettingsNavigation access={admin} section="personas" select={() => {}} />);
   assert.ok(markup.includes('aria-label="Secciones de Ajustes"'));
   assert.ok(markup.includes('aria-current="page">Personas'));
@@ -18,7 +18,7 @@ test('ordinary users can reach Ajustes and Mi cuenta without administrative sect
   assert.deepEqual(mainNavigation(ordinary).map(entry => entry.id), ['inicio', 'ajustes']);
   assert.deepEqual(settingsSections(ordinary).map(entry => entry.id), ['cuenta']);
   const markup = renderToStaticMarkup(<SettingsNavigation access={ordinary} section="cuenta" select={() => {}} />);
-  for (const restricted of ['Personas', 'Usuarios', 'Roles y permisos', '>Core<']) assert.ok(!markup.includes(restricted));
+  for (const restricted of ['Personas', 'Usuarios', 'Roles y permisos', '>Core<', 'Respaldos y restauración']) assert.ok(!markup.includes(restricted));
 });
 test('Personas keeps its read permission and enabled modules remain in main navigation', () => {
   const access: Access = { ...ordinary, modules: [{ module_id: 'procesos', display_name: 'Procesos' }], permissions: [{ module_id: 'core', scope_key: 'personas', capability: 'ver' }] };
