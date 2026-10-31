@@ -155,15 +155,27 @@ class Engine:
             yield ['--defaults-extra-file=' + str(path), '--ssl-mode=VERIFY_IDENTITY', '--ssl-ca=/etc/bastion/mysql-ca.pem']
 
     @contextlib.contextmanager
-    def maintenance(self, restart_on_error=True):
+    def maintenance(self, restart_on_error=True, progress=None):
         services = ['bastion-tender-recover.timer', 'bastion-tender-launcher.socket', 'bastion-tender-recover.service', 'bastion-scout-control.service', 'bastion.service']
-        active = [s for s in services if subprocess.run(['systemctl', 'is-active', '--quiet', s]).returncode == 0]
-        running = subprocess.run(['systemctl', 'list-units', '--state=running', '--no-legend', 'bastion-tender-launcher@*.service'], capture_output=True, check=True).stdout
-        if running.strip(): raise RuntimeError('Tender job running; retry after completion')
         success = False
         self.mutating = False
         with Path('/var/lib/bastion-scout/pipeline.lock').open('a+b') as lock:
-            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            deadline = time.monotonic() + 7200
+            while True:
+                try:
+                    fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                    break
+                except BlockingIOError:
+                    if time.monotonic() > deadline: raise RuntimeError('Scout no terminó dentro del plazo; la aplicación sigue operativa.')
+                    if progress: progress('Esperando a que Scout termine, sin interrumpir la aplicación')
+                    time.sleep(30)
+            while True:
+                running = subprocess.run(['systemctl','list-units','--state=running','--no-legend','bastion-tender-launcher@*.service'],capture_output=True,check=True,timeout=30).stdout
+                if not running.strip(): break
+                if time.monotonic() > deadline: raise RuntimeError('Hay documentos en procesamiento; se reintentará la copia.')
+                if progress: progress('Esperando a que terminen los documentos en procesamiento')
+                time.sleep(30)
+            active = [s for s in services if subprocess.run(['systemctl', 'is-active', '--quiet', s],timeout=30).returncode == 0]
             (self.root / 'maintenance.json').write_text(json.dumps({'services': active, 'restart_on_error': True}))
             try:
                 for service in active: subprocess.run(['systemctl', 'stop', service], check=True, timeout=120)
@@ -185,7 +197,7 @@ class Engine:
         marker = self.root / 'maintenance.json'
         if (self.root / 'maintenance-required').exists() or (marker.exists() and not json.loads(marker.read_text()).get('restart_on_error')):
             raise RuntimeError('Resolve interrupted restoration before creating another backup')
-        with self.maintenance():
+        with self.maintenance(progress=progress):
             return self.snapshot(progress)
 
     def snapshot(self, progress):
@@ -267,7 +279,7 @@ class Engine:
 
     def restore(self, path, progress, fresh=False):
         manifest, plan = self.inspect(path, progress, details=True)
-        with self.maintenance(restart_on_error=False):
+        with self.maintenance(restart_on_error=False, progress=progress):
             progress('Creando punto de recuperación previo')
             if fresh:
                 with self.mysql_options() as options:
@@ -282,7 +294,7 @@ class Engine:
             state_path.write_text(json.dumps(state))
             with zipfile.ZipFile(path) as archive, self.mysql_options() as options:
                 with archive.open('databases/main.sql') as source:
-                    with subprocess.Popen(['mysql', *options, '--binary-mode=1', self.cfg['MYSQL_DATABASE']], stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL) as process:
+                    with subprocess.Popen(['mysql', *options, '--binary-mode=1', '--local-infile=0', self.cfg['MYSQL_DATABASE']], stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL) as process:
                         import threading
                         watchdog = threading.Timer(7200, process.kill)
                         watchdog.daemon = True; watchdog.start()

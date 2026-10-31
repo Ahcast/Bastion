@@ -12,6 +12,7 @@ export default function BackupSettings() {
   const { api, access, notify } = useCore();
   const data = useLoad(signal => api.request<Status>(endpoint, { signal }));
   const [busy, setBusy] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<number | null>(null);
   useEffect(() => { const timer = setInterval(data.reload, data.data?.busy ? 15_000 : 60_000); return () => clearInterval(timer); }, [data.data?.busy]);
   async function run(body: Record<string, unknown>) {
     setBusy(true);
@@ -31,6 +32,7 @@ export default function BackupSettings() {
     if (!file.name.toLowerCase().endsWith('.zip')) { notify('Selecciona un archivo ZIP de Bastion.'); return; }
     setBusy(true);
     let uploadToken = '';
+    setUploadProgress(0);
     try {
       const result = await api.request<{ token: string }>(endpoint, { method: 'POST', body: { action: 'upload_begin', size: file.size } });
       uploadToken = result.token;
@@ -38,18 +40,20 @@ export default function BackupSettings() {
         const bytes = new Uint8Array(await file.slice(offset, offset + 393216).arrayBuffer());
         let encoded = ''; for (const byte of bytes) encoded += String.fromCharCode(byte);
         await api.request(endpoint, { method: 'POST', body: { action: 'upload_chunk', token: result.token, offset, data: btoa(encoded) } });
+        setUploadProgress(Math.min(100, Math.round((offset + bytes.length) / file.size * 100)));
       }
       await api.request(endpoint, { method: 'POST', body: { action: 'upload_finish', token: result.token } });
       uploadToken = '';
       data.reload();
     } catch (error) { if (uploadToken) await api.request(endpoint, { method: 'POST', body: { action: 'upload_abort', token: uploadToken } }).catch(() => {}); notify(message(error)); }
-    finally { setBusy(false); }
+    finally { setBusy(false); setUploadProgress(null); }
   }
   if (!access.is_system_administrator) return <Notice>Solo administradores pueden administrar respaldos.</Notice>;
   const status = data.data, disabled = busy || Boolean(status?.busy) || !status?.available;
   return <><Heading title="Respaldos y restauración" description="Copias de datos persistentes, documentos y recuperación administrativa." />
     <Notice>{data.error}</Notice>
     <Notice>{status?.history_error}</Notice>
+    {uploadProgress !== null && <p role="status">Subiendo ZIP: {uploadProgress}%</p>}
     <section className="card"><p>Servicio: {status?.available ? 'Disponible' : 'No disponible'}</p><p>Programación: todos los días a las 5:00 p. m. de Honduras.</p><p>Último ZIP: {status?.history[0]?.date ?? 'Sin respaldo integral disponible'}</p><p>Próxima ejecución: {status?.next_run ?? 'Consultando…'}</p><p>Durante la copia o restauración se activa mantenimiento y puede interrumpirse la conexión. El proceso continúa en el servidor.</p>
       <button disabled={disabled} onClick={() => void run({ action: 'backup' })}>Crear respaldo ahora</button>
       <button disabled={busy} onClick={data.reload}>Actualizar</button>
