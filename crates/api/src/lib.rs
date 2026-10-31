@@ -29,6 +29,7 @@ use tower_http::{
 };
 use url::Url;
 
+mod backups;
 mod clientes;
 mod colaboracion;
 mod cotizaciones;
@@ -403,6 +404,7 @@ pub fn router(
         .merge(gastos::routes(api_state.clone()))
         .merge(reportes::routes(api_state.clone()))
         .merge(licitaciones::routes(api_state.clone()))
+        .merge(backups::routes())
         .fallback(not_found)
         .with_state(api_state)
         .layer(middleware::from_fn(problem_details))

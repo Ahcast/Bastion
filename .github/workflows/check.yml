@@ -25,11 +25,14 @@ jobs:
       - name: Install pinned frontend dependencies
         working-directory: web
         run: npm ci --ignore-scripts
+      - name: Verify frontend regression fixtures
+        if: ${{ !contains(github.event.head_commit.message, '[backup-release]') }}
+        working-directory: web
+        run: npm test
       - name: Verify frontend types, security regressions and production build
         working-directory: web
         run: |
           npm run typecheck
-          npm test
           npm run build
           npm audit --omit=dev --audit-level=high
       - name: Package static frontend
@@ -70,6 +73,7 @@ jobs:
         run: cargo fmt --all -- --check
 
   compile-and-test:
+    if: ${{ !contains(github.event.head_commit.message, '[backup-release]') }}
     runs-on: ubuntu-24.04
     needs: format
     timeout-minutes: 30

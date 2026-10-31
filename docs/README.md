@@ -255,3 +255,8 @@ El informe se obtuvo de una copia de frontend Angular compilado y backend Larave
 - 2026-10-29: la integración del PDF de Licitaciones se prepara como cola persistente con versión del expediente, trabajador aislado y socket local autenticado por credenciales del sistema. El almacenamiento privado existente conserva el resultado; la descarga verifica tamaño, huella, versión y permisos de referencias. Los dos formularios legales iniciales se seleccionan por expediente. El despliegue y la verificación integral siguen pendientes.
 
 - 2026-10-29: `d6e82df` despliega la cola y el trabajador de PDF de Licitaciones en AWS y el frontend en Bluehost, con CI integral aprobado, respaldo, restauración de prueba de 85 tablas y migración 7. El backend y los servicios aislados están activos y los recursos públicos se verificaron por HTTPS. Quedan pendientes la prueba autenticada del flujo real y la medición cercana al límite de 1 GB. Ver [despliegue](09-despliegue.md).
+
+
+## Respaldo integral de datos
+
+El Core centraliza la administración de copias y recuperación mediante un trabajador privado persistente en AWS. Se conserva frontend Bluehost y MySQL Bluehost. Véase [alcance, recuperación y límites](18-respaldo-mysql.md).

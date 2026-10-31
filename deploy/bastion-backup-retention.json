@@ -1,0 +1,18 @@
+{
+  "Rules": [
+    {
+      "ID": "BastionManagedZip30Days",
+      "Status": "Enabled",
+      "Filter": { "Prefix": "backups/bastion-backup-" },
+      "Expiration": { "Days": 30 },
+      "NoncurrentVersionExpiration": { "NoncurrentDays": 1 },
+      "AbortIncompleteMultipartUpload": { "DaysAfterInitiation": 1 }
+    },
+    {
+      "ID": "BastionManagedZipExpiredMarkers",
+      "Status": "Enabled",
+      "Filter": { "Prefix": "backups/bastion-backup-" },
+      "Expiration": { "ExpiredObjectDeleteMarker": true }
+    }
+  ]
+}

@@ -906,6 +906,44 @@ impl CoreAdmin {
         Ok(())
     }
 
+    pub async fn authorize_backup_request(
+        &self,
+        actor: u64,
+        action: Option<&str>,
+    ) -> Result<(), CoreError> {
+        self.require_admin(actor).await?;
+        if let Some(action) = action {
+            if ![
+                "backup",
+                "download",
+                "prepare_s3",
+                "upload_begin",
+                "upload_finish",
+                "upload_abort",
+                "discard",
+                "restore",
+            ]
+            .contains(&action)
+            {
+                return Err(CoreError::Invalid);
+            }
+            let mut tx = self.database.pool.begin().await?;
+            self.require_system_administrator_in_transaction(&mut tx, actor)
+                .await?;
+            audit_tx(
+                &mut tx,
+                Some(actor),
+                "core",
+                "backup.request",
+                "backup",
+                Some(action.to_owned()),
+            )
+            .await?;
+            tx.commit().await?;
+        }
+        Ok(())
+    }
+
     pub async fn get_core_settings(&self, actor: u64) -> Result<Vec<SettingRecord>, CoreError> {
         self.require_admin(actor).await?;
         sqlx::query_as::<_,SettingRecord>("SELECT module_id,scope_key,setting_key,schema_version,value_json,updated_at FROM settings WHERE module_id='core' AND scope_key='global' ORDER BY setting_key").fetch_all(&self.database.pool).await.map_err(Into::into)

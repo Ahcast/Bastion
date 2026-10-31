@@ -1,0 +1,28 @@
+[Unit]
+Description=Bastion persistent data backup and restoration controller
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+Group=bastion
+UMask=0077
+Environment=PYTHONDONTWRITEBYTECODE=1
+RuntimeDirectory=bastion-backup
+RuntimeDirectoryMode=0750
+StateDirectory=bastion-backup
+StateDirectoryMode=0700
+ExecStart=/usr/bin/python3 /usr/local/libexec/bastion-backup/bastion_backup_controller.py
+Restart=on-failure
+RestartSec=10
+TimeoutStopSec=30
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+ReadWritePaths=/var/lib/bastion-backup /var/lib/bastion-scout /var/lib/bastion-scout-control /usr/local/share/bastion/branding /etc/bastion
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+
+[Install]
+WantedBy=multi-user.target
