@@ -31,3 +31,12 @@ Una recuperación preparada muestra el alcance y caduca en una hora. La confirma
 No se almacenan contraseñas, claves IAM ni secretos de infraestructura en GitHub o en el ZIP. Los permisos IAM deben limitarse a los prefijos usados. No se crean cuentas ni registros de negocio de prueba.
 
 Los commits marcados [backup-release] ejecutan compilación Linux, formato, tipos, build web y análisis estático, sin crear fixtures, cuentas o datos de prueba. Los demás commits conservan la suite habitual.
+
+
+## Publicación verificada del 2026-10-30
+
+Código instalado en AWS y Bluehost: `879342c5c76a78fb65c13e2ac8ee82a2f57f964f`. [Compilación Linux](https://github.com/Ahcast/Bastion/actions/runs/41160804555) y [verificación del frontend y formato](https://github.com/Ahcast/Bastion/actions/runs/41160804605) correctas, sin fixtures de usuarios. Paquetes, procedencia y manifiestos verificados; 45 recursos públicos cotejados por HTTPS. Readiness 200 y endpoint de respaldos sin sesión 401. Se preservaron configuración, módulos, datos de negocio y assets anteriores; sin migraciones de dominio.
+
+El servicio permanente creó `backups/bastion-backup-2026-10-30-204701.zip`: 40.493.747 bytes, una exportación MySQL, diez archivos locales (incluidas las SQLite de Scout/control) y cuarenta objetos operativos S3. Se validaron inventario, checksums, firma y preparación tanto desde S3 como mediante recepción por bloques del ZIP real. El archivo y la clave de recuperación rechazaron acceso anónimo (403). Las preparaciones, subidas, cachés y paquetes temporales se retiraron. No se ejecutó la restauración destructiva ni se crearon cuentas o registros de negocio de prueba.
+
+El temporizador existente inicia a las 17:00 America/Tegucigalpa. Se configuró el ciclo de vida del prefijo reservado de ZIP a 30 días y un día adicional para versiones no actuales; los demás prefijos y las claves de recuperación quedan fuera de esas reglas. La primera copia automática por horario queda pendiente de su hora programada; la ejecución manual del mismo servicio terminó correctamente.
