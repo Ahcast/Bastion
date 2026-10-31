@@ -1,0 +1,49 @@
+name: MCP MySQL checks
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'crates/mcp/**'
+      - 'crates/core/**'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - '.github/workflows/mcp-check.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'crates/mcp/**'
+      - 'crates/core/**'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - '.github/workflows/mcp-check.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  mysql57:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    services:
+      mysql:
+        image: mysql:5.7
+        env:
+          MYSQL_ALLOW_EMPTY_PASSWORD: 'yes'
+          MYSQL_DATABASE: bastion_mcp_test
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=12
+    env:
+      BASTION_MCP_TEST_URL: mysql://root@127.0.0.1:3306/bastion_mcp_test?ssl-mode=disabled
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8
+        with:
+          toolchain: 1.99.1
+      - name: Test MCP against disposable MySQL 5.7
+        run: cargo test --locked --package bastion-mcp
