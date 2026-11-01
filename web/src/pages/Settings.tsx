@@ -10,21 +10,22 @@ import type { Access } from '../types.js';
 import { settingsSections } from '../navigation.js';
 import type { SettingsSection } from '../navigation.js';
 const Account = lazy(() => import('./Account.js'));
+const McpClients = lazy(() => import('./McpClients.js'));
 const People = lazy(() => import('./People.js'));
 const Users = lazy(() => import('./Users.js'));
 const Roles = lazy(() => import('./Roles.js'));
 const ProcessSettings = lazy(() => import('./ProcessSettings.js'));
 const SupplierSettings = lazy(() => import('./Proveedores.js').then(module => ({ default: module.SupplierSettings })));
 const TenderSettings = lazy(() => import('./Licitaciones.js').then(module => ({ default: module.TenderSettings })));
-export function SettingsNavigation({ access, section, select }: { access: Access; section: SettingsSection; select: (section: SettingsSection) => void }) {
-  return <nav className="settings-navigation" aria-label="Secciones de Ajustes">{settingsSections(access).map(entry => <button key={entry.id} aria-current={section === entry.id ? 'page' : undefined} onClick={() => select(entry.id)}>{entry.label}</button>)}</nav>;
+export function SettingsNavigation({ access, section, select, mcpEnabled = false }: { access: Access; section: SettingsSection; select: (section: SettingsSection) => void; mcpEnabled?: boolean }) {
+  return <nav className="settings-navigation" aria-label="Secciones de Ajustes">{settingsSections(access, mcpEnabled).map(entry => <button key={entry.id} aria-current={section === entry.id ? 'page' : undefined} onClick={() => select(entry.id)}>{entry.label}</button>)}</nav>;
 }
 const OrderSettings = lazy(() => import('./OrdenesCompra.js').then(module => ({ default: module.OrderSettings })));
 const ExpenseSettings = lazy(() => import('./Gastos.js').then(module => ({ default: module.ExpenseSettings })));
-export default function Settings({ section, select }: { section: SettingsSection; select: (section: SettingsSection) => void }) {
-  const { access } = useCore();
-  const selected = settingsSections(access).find(entry => entry.id === section) ?? { id: 'cuenta', label: 'Mi cuenta' };
-  return <section aria-label="Ajustes"><div className="settings-location"><span>Ajustes</span><span aria-hidden="true"> / </span><strong>{selected.label}</strong></div><SettingsNavigation access={access} section={selected.id} select={select} /><div key={selected.id}><Suspense fallback={<Loading />}>{selected.id === 'respaldos' ? <BackupSettings /> : selected.id === 'colaboracion' ? <CollaborationSettings /> : selected.id === 'personas' ? <People /> : selected.id === 'usuarios' ? <Users /> : selected.id === 'roles' ? <Roles /> : selected.id === 'core' ? <CoreSettings /> : selected.id === 'clientes' ? <ClientSettings /> : selected.id === 'proveedores' ? <SupplierSettings /> : selected.id === 'ordenes_compra' ? <OrderSettings /> : selected.id === 'cotizaciones' ? <QuoteSettings /> : selected.id === 'facturas' ? <InvoiceSettings /> : selected.id === 'gastos' ? <ExpenseSettings /> : selected.id === 'reportes' ? <ReportSettings /> : selected.id === 'licitaciones' ? <TenderSettings /> : selected.id === 'procesos' ? <ProcessSettings /> : <Account />}</Suspense></div></section>;
+export default function Settings({ section, select, mcpEnabled = false }: { section: SettingsSection; select: (section: SettingsSection) => void; mcpEnabled?: boolean }) {
+  const { api, access } = useCore();
+  const selected = settingsSections(access, mcpEnabled).find(entry => entry.id === section) ?? { id: 'cuenta', label: 'Mi cuenta' };
+  return <section aria-label="Ajustes"><div className="settings-location"><span>Ajustes</span><span aria-hidden="true"> / </span><strong>{selected.label}</strong></div><SettingsNavigation access={access} section={selected.id} select={select} mcpEnabled={mcpEnabled} /><div key={selected.id}><Suspense fallback={<Loading />}>{selected.id === 'mcp' ? <McpClients api={api} isAdministrator={access.is_system_administrator} /> : selected.id === 'respaldos' ? <BackupSettings /> : selected.id === 'colaboracion' ? <CollaborationSettings /> : selected.id === 'personas' ? <People /> : selected.id === 'usuarios' ? <Users /> : selected.id === 'roles' ? <Roles /> : selected.id === 'core' ? <CoreSettings /> : selected.id === 'clientes' ? <ClientSettings /> : selected.id === 'proveedores' ? <SupplierSettings /> : selected.id === 'ordenes_compra' ? <OrderSettings /> : selected.id === 'cotizaciones' ? <QuoteSettings /> : selected.id === 'facturas' ? <InvoiceSettings /> : selected.id === 'gastos' ? <ExpenseSettings /> : selected.id === 'reportes' ? <ReportSettings /> : selected.id === 'licitaciones' ? <TenderSettings /> : selected.id === 'procesos' ? <ProcessSettings /> : <Account />}</Suspense></div></section>;
 }
 function CoreSettings() {
   const { navigate } = useNavigationGuard();

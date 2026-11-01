@@ -14,6 +14,11 @@ test('main navigation groups all account and administration screens under Ajuste
   assert.ok(markup.includes('aria-label="Secciones de Ajustes"'));
   assert.ok(markup.includes('aria-current="page">Personas'));
 });
+
+test('MCP settings are hidden unless explicitly enabled', () => {
+  assert.equal(settingsSections(ordinary).some(entry => entry.id === 'mcp'), false);
+  assert.equal(settingsSections(ordinary, true).some(entry => entry.id === 'mcp'), true);
+});
 test('ordinary users can reach Ajustes and Mi cuenta without administrative sections', () => {
   assert.deepEqual(mainNavigation(ordinary).map(entry => entry.id), ['inicio', 'ajustes']);
   assert.deepEqual(settingsSections(ordinary).map(entry => entry.id), ['cuenta']);
