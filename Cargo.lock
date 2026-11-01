@@ -378,7 +378,11 @@ version = "0.1.0"
 dependencies = [
  "axum",
  "bastion-core",
+ "bastion-cotizaciones",
+ "bastion-facturas",
  "bastion-mcp",
+ "bastion-mcp-core",
+ "bastion-ordenes-compra",
  "chrono",
  "serde",
  "serde_json",

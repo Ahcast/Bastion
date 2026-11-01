@@ -67,7 +67,7 @@ Preferir operaciones concretas de dominio y respuestas estructuradas. Consultas 
 
 ## Exposición inicial derivada del informe
 
-Decisión del usuario: la primera versión permitirá consultas de cotizaciones, facturas y órdenes de compra. Se preparan listados paginados y consulta por identificador, exclusivamente de lectura, sujetos al permiso Core `documentos/ver`, al módulo activo y al consentimiento OAuth correspondiente. El registro propuesto permanece deshabilitado hasta implementar y verificar los manejadores, límites por solicitud, autorización por objeto y auditoría. Las acciones de modificación requieren una decisión posterior.
+Decisión del usuario: la primera versión permitirá consultas de cotizaciones, facturas y órdenes de compra. Se preparan listados paginados y consulta por identificador, exclusivamente de lectura, sujetos al permiso Core `documentos/ver`, al módulo activo y al consentimiento OAuth correspondiente. Un router de pruebas conecta el registro y adaptador a los servicios de dominio con cuotas y auditoría de inicio y resultado; permanece deshabilitado hasta completar la integración, auditoría de expiraciones, autorización vigente durante cada llamada y pruebas de extremo a extremo. Las acciones de modificación requieren una decisión posterior.
 
 Posibles capacidades incluyen buscar/listar documentos, consultar detalles y reportes, crear/actualizar órdenes/cotizaciones/facturas, registrar pagos, administrar archivos y revisar procesos. Son candidatas, no una autorización automática. Cada herramienta se mapea a `ver`, `editar` (incluye crear/actualizar) o `eliminar`, se limita por recurso/tenant y declara su riesgo/confirmación. La matriz efectiva del usuario o cliente MCP se verifica en servidor.
 

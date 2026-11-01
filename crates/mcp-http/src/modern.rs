@@ -17,6 +17,7 @@ use bastion_mcp::{
     TransportError, dispatch_discovery, dispatch_legacy, extract_request_id,
     validate_legacy_message, validate_modern_request,
 };
+use bastion_mcp_core::{DraftReadExecutor, ReadToolError};
 use serde_json::{Value, json};
 use sqlx::MySqlPool;
 use tokio::sync::Semaphore;
@@ -42,6 +43,12 @@ impl DraftRequest {
             Self::Legacy(r) => r.id.as_ref(),
         }
     }
+    fn params(&self) -> &Value {
+        match self {
+            Self::Modern(r) => &r.params,
+            Self::Legacy(r) => &r.params,
+        }
+    }
 }
 
 #[derive(Clone)]
@@ -52,6 +59,7 @@ pub struct DraftMcpState<P> {
     challenge: HeaderValue,
     origins: BTreeSet<String>,
     registry: Arc<ToolRegistry>,
+    read_executor: Option<Arc<DraftReadExecutor>>,
     quota: MysqlQuota,
     discovery_quota: ToolQuota,
     slots: Arc<Semaphore>,
@@ -116,11 +124,19 @@ impl<P> DraftMcpState<P> {
             challenge,
             origins,
             registry,
+            read_executor: None,
             quota,
             discovery_quota,
             slots: Arc::new(Semaphore::new(max_concurrent)),
             timeout,
         })
+    }
+
+    /// Draft integration only. A production route also needs edge protection,
+    /// OAuth consent, terminal audit on timeout, and interoperable clients.
+    pub fn with_read_executor(mut self, executor: Arc<DraftReadExecutor>) -> Self {
+        self.read_executor = Some(executor);
+        self
     }
 }
 
@@ -213,6 +229,250 @@ async fn audit(
     sqlx::query("INSERT INTO audit_events (actor_id,module_id,action,target_type,target_id,result,details_json,created_at) VALUES (?,'core',?,'mcp',NULL,?,JSON_OBJECT('correlation_id',?,'client_id',?,'grant_id',?),UTC_TIMESTAMP(6))")
         .bind(actor).bind(action).bind(result).bind(request_id).bind(client).bind(grant).execute(pool).await?;
     Ok(())
+}
+
+async fn audit_tool(
+    pool: &MySqlPool,
+    actor: u64,
+    client: u64,
+    grant: u64,
+    request_id: &str,
+    module: &str,
+    tool: &str,
+    object_id: Option<u64>,
+    result: &str,
+) -> Result<(), sqlx::Error> {
+    sqlx::query("INSERT INTO audit_events (actor_id,module_id,action,target_type,target_id,result,details_json,created_at) VALUES (?,?,'mcp.tool.call','mcp_tool',?,?,JSON_OBJECT('correlation_id',?,'client_id',?,'grant_id',?,'object_id',?),UTC_TIMESTAMP(6))")
+        .bind(actor).bind(module).bind(tool).bind(result).bind(request_id).bind(client).bind(grant).bind(object_id).execute(pool).await?;
+    Ok(())
+}
+
+async fn execute_read_tool<P>(
+    state: &DraftMcpState<P>,
+    access: &bastion_mcp::AuthenticatedAccess,
+    request: &DraftRequest,
+    correlation: &str,
+) -> Response {
+    let Some(id) = request.id() else {
+        return (StatusCode::ACCEPTED, [(CACHE_CONTROL, "no-store")]).into_response();
+    };
+    let Some(name) = request
+        .params()
+        .get("name")
+        .and_then(Value::as_str)
+        .filter(|name| !name.is_empty() && name.len() <= 128)
+    else {
+        return protocol_error(
+            StatusCode::BAD_REQUEST,
+            -32602,
+            "Invalid params",
+            Some(id.clone()),
+            None,
+        );
+    };
+    let args = request
+        .params()
+        .get("arguments")
+        .cloned()
+        .unwrap_or_else(|| json!({}));
+    if !args.is_object() {
+        return protocol_error(
+            StatusCode::BAD_REQUEST,
+            -32602,
+            "Invalid params",
+            Some(id.clone()),
+            None,
+        );
+    }
+    let Some(executor) = &state.read_executor else {
+        return protocol_error(
+            StatusCode::SERVICE_UNAVAILABLE,
+            -32603,
+            "Temporarily unavailable",
+            Some(id.clone()),
+            None,
+        );
+    };
+    let modules:Vec<String> = match sqlx::query_scalar("SELECT module_id FROM module_registry WHERE included_in_release=1 AND environment_allowed=1 AND enabled=1").fetch_all(&state.pool).await {
+        Ok(value)=>value, Err(_)=>return protocol_error(StatusCode::SERVICE_UNAVAILABLE,-32603,"Temporarily unavailable",Some(id.clone()),None),
+    };
+    let enabled = modules.into_iter().collect();
+    let Some(tool) = state.registry.find_visible(name, access, &enabled, false) else {
+        if audit(
+            &state.pool,
+            access.user_id,
+            access.client_id,
+            access.grant_id,
+            correlation,
+            "mcp.tool.denied",
+            "denied",
+        )
+        .await
+        .is_err()
+        {
+            return protocol_error(
+                StatusCode::SERVICE_UNAVAILABLE,
+                -32603,
+                "Temporarily unavailable",
+                Some(id.clone()),
+                None,
+            );
+        }
+        return protocol_error(
+            StatusCode::NOT_FOUND,
+            -32601,
+            "Tool unavailable",
+            Some(id.clone()),
+            None,
+        );
+    };
+    let object_id = args.get("id").and_then(Value::as_u64);
+    match state
+        .quota
+        .charge(
+            access.user_id,
+            access.client_id,
+            &tool.name,
+            state.discovery_quota,
+        )
+        .await
+    {
+        Ok(()) => {}
+        Err(QuotaError::Limited {
+            retry_after_seconds,
+        }) => {
+            if audit_tool(
+                &state.pool,
+                access.user_id,
+                access.client_id,
+                access.grant_id,
+                correlation,
+                &tool.module_id,
+                &tool.name,
+                object_id,
+                "limited",
+            )
+            .await
+            .is_err()
+            {
+                return protocol_error(
+                    StatusCode::SERVICE_UNAVAILABLE,
+                    -32603,
+                    "Temporarily unavailable",
+                    Some(id.clone()),
+                    None,
+                );
+            }
+            let mut response = protocol_error(
+                StatusCode::TOO_MANY_REQUESTS,
+                -32603,
+                "Rate limit exceeded",
+                Some(id.clone()),
+                None,
+            );
+            if let Ok(value) = HeaderValue::from_str(&retry_after_seconds.to_string()) {
+                response.headers_mut().insert(RETRY_AFTER, value);
+            }
+            return response;
+        }
+        Err(_) => {
+            return protocol_error(
+                StatusCode::SERVICE_UNAVAILABLE,
+                -32603,
+                "Temporarily unavailable",
+                Some(id.clone()),
+                None,
+            );
+        }
+    }
+    if audit_tool(
+        &state.pool,
+        access.user_id,
+        access.client_id,
+        access.grant_id,
+        correlation,
+        &tool.module_id,
+        &tool.name,
+        object_id,
+        "started",
+    )
+    .await
+    .is_err()
+    {
+        return protocol_error(
+            StatusCode::SERVICE_UNAVAILABLE,
+            -32603,
+            "Temporarily unavailable",
+            Some(id.clone()),
+            None,
+        );
+    }
+    let result = tokio::time::timeout(
+        Duration::from_millis(tool.max_duration_ms),
+        executor.call(access, &tool.name, args),
+    )
+    .await;
+    let (result_label, output) = match result {
+        Ok(Ok(value)) => {
+            let text = match serde_json::to_string(&value) {
+                Ok(text) => text,
+                Err(_) => {
+                    return protocol_error(
+                        StatusCode::SERVICE_UNAVAILABLE,
+                        -32603,
+                        "Temporarily unavailable",
+                        Some(id.clone()),
+                        None,
+                    );
+                }
+            };
+            let output = json!({"jsonrpc":"2.0","id":id,"result":{"content":[{"type":"text","text":text}],"structuredContent":value,"isError":false}});
+            if serde_json::to_vec(&output).map_or(true, |data| data.len() > tool.max_response_bytes)
+            {
+                ("error", None)
+            } else {
+                ("success", Some(output))
+            }
+        }
+        Ok(Err(ReadToolError::Invalid)) => ("denied", None),
+        Ok(Err(ReadToolError::Denied | ReadToolError::NotFound)) => ("denied", None),
+        Ok(Err(ReadToolError::Limited)) => ("limited", None),
+        _ => ("error", None),
+    };
+    if audit_tool(
+        &state.pool,
+        access.user_id,
+        access.client_id,
+        access.grant_id,
+        correlation,
+        &tool.module_id,
+        &tool.name,
+        object_id,
+        result_label,
+    )
+    .await
+    .is_err()
+    {
+        return protocol_error(
+            StatusCode::SERVICE_UNAVAILABLE,
+            -32603,
+            "Temporarily unavailable",
+            Some(id.clone()),
+            None,
+        );
+    }
+    match output {
+        Some(output) => {
+            (StatusCode::OK, [(CACHE_CONTROL, "no-store")], Json(output)).into_response()
+        }
+        None => protocol_error(
+            StatusCode::BAD_REQUEST,
+            -32000,
+            "Tool request could not be completed",
+            Some(id.clone()),
+            None,
+        ),
+    }
 }
 
 async fn mcp<P>(State(state): State<DraftMcpState<P>>, headers: HeaderMap, body: Bytes) -> Response
@@ -400,6 +660,9 @@ where
             };
         }
     };
+    if request.method() == "tools/call" {
+        return execute_read_tool(state, &access, &request, &request_id).await;
+    }
     let (bucket, action) = match request.method() {
         "server/discover" => ("server.discover", "mcp.discover"),
         "tools/list" => ("tools.list", "mcp.tools.list"),
