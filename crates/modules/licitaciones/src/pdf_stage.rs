@@ -17,8 +17,8 @@ pub struct TenderTemplateBundle {
     pub bid_lot: String,
     pub std_lot: String,
     pub functions: String,
-    pub legal_integridad: String,
-    pub legal_oferente: String,
+    pub legal_integridad: Option<String>,
+    pub legal_oferente: Option<String>,
 }
 
 impl TenderTemplateBundle {
@@ -65,14 +65,21 @@ impl TenderTemplateBundle {
                 }
                 String::from_utf8(bytes).map_err(|_| CoreError::Invalid)
             };
+            let read_optional = |name: &str| -> Result<Option<String>, CoreError> {
+                match fs::symlink_metadata(root.join(name)) {
+                    Ok(_) => read(name).map(Some),
+                    Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(None),
+                    Err(_) => Err(CoreError::Invalid),
+                }
+            };
             Ok(Self {
                 bid_offer: read("carta-de-oferta.typ")?,
                 std_offer: read("presentacion-de-oferta.typ")?,
                 bid_lot: read("lote1-bid.typ")?,
                 std_lot: read("lote1-std.typ")?,
                 functions: read("funciones.typ")?,
-                legal_integridad: read("dj-integridad.typ")?,
-                legal_oferente: read("informacion_sobre_el_oferente.typ")?,
+                legal_integridad: read_optional("dj-integridad.typ")?,
+                legal_oferente: read_optional("informacion_sobre_el_oferente.typ")?,
             })
         }
     }
@@ -205,7 +212,9 @@ impl TenderService {
                         "integridad" => &bundle.legal_integridad,
                         "oferente" => &bundle.legal_oferente,
                         _ => return Err(CoreError::Invalid),
-                    };
+                    }
+                    .as_ref()
+                    .ok_or(CoreError::NotFound)?;
                     create(
                         &root,
                         &format!("source-{number:06}.typ"),

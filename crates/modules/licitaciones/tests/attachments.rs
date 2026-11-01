@@ -32,6 +32,9 @@ async fn mysql57_tender_files_private_copies_integrity_recovery_and_budgets() {
     db.migrate().await.unwrap();
     CollaborationService::migrate(&db).await.unwrap();
     TenderService::migrate(&db).await.unwrap();
+    // Exercise compatibility with an older deployment's installed legal files.
+    sqlx::query("INSERT INTO licitaciones_formularios_instalados (form_key,enabled) VALUES ('integridad',TRUE),('oferente',TRUE)")
+        .execute(&pool).await.unwrap();
     sqlx::query(
         "INSERT INTO persons (id,full_name) VALUES (1,'Synthetic admin'),(2,'Synthetic reader')",
     )
@@ -302,8 +305,8 @@ async fn mysql57_tender_files_private_copies_integrity_recovery_and_budgets() {
         bid_lot: "#import \"items1_bid.typ\": items".into(),
         std_lot: "#import \"items1_std.typ\": items".into(),
         functions: "#let f = 1".into(),
-        legal_integridad: "= Integridad".into(),
-        legal_oferente: "= Oferente".into(),
+        legal_integridad: Some("= Integridad".into()),
+        legal_oferente: Some("= Oferente".into()),
     };
     let request = service
         .stage_pdf_inputs(
@@ -561,7 +564,27 @@ async fn mysql57_tender_files_private_copies_integrity_recovery_and_budgets() {
         Err(CoreError::Invalid)
     ));
     service
-        .delete(1, template_exp.id, template_exp.version, template_exp.id)
+        .delete_published_template(1, form.id, form.revision)
+        .await
+        .unwrap();
+    let after_delete = service.detail(1, template_exp.id).await.unwrap();
+    assert!(after_delete.forms.is_empty());
+    assert_eq!(after_delete.version, template_exp.version + 1);
+    let state: String = sqlx::query_scalar("SELECT state FROM colaboracion_files WHERE id=?")
+        .bind(template.id)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!(state, "deleting");
+    while library.clean_one().await.unwrap() {}
+    let state: String = sqlx::query_scalar("SELECT state FROM colaboracion_files WHERE id=?")
+        .bind(template.id)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!(state, "deleted");
+    service
+        .delete(1, template_exp.id, after_delete.version, template_exp.id)
         .await
         .unwrap();
     while service.clean_one_pdf_job().await.unwrap() {}

@@ -16,6 +16,14 @@ pub(super) fn routes(state: ApiState) -> Router<ApiState> {
             axum::routing::put(set_installed_form),
         )
         .route(
+            "/api/v1/licitaciones/plantillas/{id}",
+            axum::routing::delete(delete_published_template),
+        )
+        .route(
+            "/api/v1/licitaciones/plantillas",
+            axum::routing::delete(delete_all_legal_templates),
+        )
+        .route(
             "/api/v1/licitaciones/{id}",
             get(detail).patch(rename).delete(remove),
         )
@@ -397,6 +405,46 @@ async fn set_installed_form(
         .await
         .map_err(ApiError)?;
     Ok(StatusCode::NO_CONTENT)
+}
+#[derive(serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+struct DeleteTemplateInput {
+    expected_revision: u64,
+}
+async fn delete_published_template(
+    State(state): State<ApiState>,
+    headers: axum::http::HeaderMap,
+    Path(id): Path<u64>,
+    Json(input): Json<DeleteTemplateInput>,
+) -> Result<StatusCode, ApiError> {
+    let user = actor(&state, &headers).await?;
+    state
+        .licitaciones
+        .delete_published_template(user.id, id, input.expected_revision)
+        .await
+        .map_err(ApiError)?;
+    Ok(StatusCode::NO_CONTENT)
+}
+#[derive(serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+struct DeleteAllTemplatesInput {
+    confirm: bool,
+}
+async fn delete_all_legal_templates(
+    State(state): State<ApiState>,
+    headers: axum::http::HeaderMap,
+    Json(input): Json<DeleteAllTemplatesInput>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    if !input.confirm {
+        return Err(ApiError(CoreError::Invalid));
+    }
+    let user = actor(&state, &headers).await?;
+    let count = state
+        .licitaciones
+        .delete_all_legal_templates(user.id)
+        .await
+        .map_err(ApiError)?;
+    Ok(Json(serde_json::json!({"deleted":count})))
 }
 async fn copy_form(
     State(state): State<ApiState>,
