@@ -6,6 +6,7 @@ use axum::{
         HeaderName, HeaderValue, Method,
         header::{ACCEPT, AUTHORIZATION, CONTENT_TYPE},
     },
+    middleware,
 };
 use bastion_core::CoreService;
 use bastion_cotizaciones::QuoteService;
@@ -20,7 +21,7 @@ use url::Url;
 
 use crate::{
     ClientMetadataSource, DraftAuthorizationState, DraftClientRequestState, DraftConsentState,
-    DraftMcpState, DraftMetadataIntegrity, DraftOauthMetadata, TokenEndpoint,
+    DraftMcpState, DraftMetadataIntegrity, DraftOauthMetadata, DraftPerimeter, TokenEndpoint,
     draft_authorization_router, draft_client_request_router, draft_consent_router,
     draft_mcp_router, draft_oauth_metadata_router, draft_token_router,
 };
@@ -37,6 +38,7 @@ pub struct DraftCompositionConfig {
     pub max_concurrent: usize,
     pub max_metadata_fetches: usize,
     pub request_timeout: Duration,
+    pub perimeter: DraftPerimeter,
 }
 #[derive(Debug)]
 pub struct DraftCompositionError;
@@ -165,5 +167,11 @@ pub fn compose_draft_router<F: ClientMetadataSource>(
         ))
         .layer(client_cors);
     let discovery = draft_oauth_metadata_router(metadata).layer(discovery_cors);
-    Ok(browser.merge(protocol).merge(discovery))
+    Ok(browser
+        .merge(protocol)
+        .merge(discovery)
+        .layer(middleware::from_fn_with_state(
+            config.perimeter,
+            crate::perimeter::perimeter_guard,
+        )))
 }

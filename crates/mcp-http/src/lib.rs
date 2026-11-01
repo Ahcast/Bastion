@@ -8,6 +8,7 @@ mod metadata_fetch;
 mod metadata_integrity;
 mod modern;
 mod oauth_metadata;
+mod perimeter;
 pub use authorization_http::{DraftAuthorizationState, draft_authorization_router};
 pub use client_requests_http::{
     ClientMetadataSource, DraftClientRequestState, draft_client_request_router,
@@ -18,6 +19,7 @@ pub use metadata_fetch::{DraftMetadataFetcher, MetadataFetchError};
 pub use metadata_integrity::{DraftMetadataIntegrity, MetadataIntegrity, MetadataIntegrityError};
 pub use modern::{DraftMcpState, McpConfigurationError, ReadToolExecutor, draft_mcp_router};
 pub use oauth_metadata::{DraftOauthMetadata, OauthMetadataError, draft_oauth_metadata_router};
+pub use perimeter::DraftPerimeter;
 
 use std::{collections::BTreeSet, sync::Arc};
 

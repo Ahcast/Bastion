@@ -125,8 +125,14 @@ async fn mysql57_full_draft_oauth_to_tool_rechecks_permissions_and_replay() {
         max_concurrent: 4,
         max_metadata_fetches: 2,
         request_timeout: Duration::from_secs(10),
+        perimeter: bastion_mcp_http::DraftPerimeter::new(vec![], Duration::from_secs(60), 100, 100)
+            .unwrap(),
     };
-    let router = compose_draft_router(core, config, fetcher).unwrap();
+    let router = compose_draft_router(core, config, fetcher)
+        .unwrap()
+        .layer(axum::Extension(axum::extract::ConnectInfo(
+            "192.0.2.1:1234".parse::<std::net::SocketAddr>().unwrap(),
+        )));
     let mut form = url::form_urlencoded::Serializer::new(String::new());
     form.append_pair("response_type", "code")
         .append_pair("client_id", client)

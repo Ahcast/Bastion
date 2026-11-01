@@ -57,8 +57,14 @@ async fn mysql57_composed_draft_separates_browser_and_client_cors() {
         max_concurrent: 4,
         max_metadata_fetches: 2,
         request_timeout: Duration::from_secs(10),
+        perimeter: bastion_mcp_http::DraftPerimeter::new(vec![], Duration::from_secs(60), 100, 100)
+            .unwrap(),
     };
-    let router = compose_draft_router(core, config, NoFetch).unwrap();
+    let router = compose_draft_router(core, config, NoFetch)
+        .unwrap()
+        .layer(axum::Extension(axum::extract::ConnectInfo(
+            "192.0.2.1:1234".parse::<std::net::SocketAddr>().unwrap(),
+        )));
     let metadata = Request::builder()
         .uri("/.well-known/oauth-protected-resource/mcp")
         .header(ORIGIN, "https://other.example.invalid")
