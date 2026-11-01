@@ -84,8 +84,8 @@ async fn mysql57_mcp_http_authenticates_filters_limits_and_audits() {
         pool.clone(),
         ActorQuota {
             window_seconds: 60,
-            user_total: 2,
-            client_total: 2,
+            user_total: 4,
+            client_total: 4,
         },
     )
     .unwrap();
@@ -156,6 +156,34 @@ async fn mysql57_mcp_http_authenticates_filters_limits_and_audits() {
         serde_json::from_slice(&to_bytes(error.into_body(), 8192).await.unwrap()).unwrap();
     assert_eq!(json["id"], 7);
     assert_eq!(json["error"]["code"], -32020);
+    let legacy_init = Request::builder().method("POST").uri("/mcp")
+        .header(CONTENT_TYPE, "application/json").header(ACCEPT, "application/json, text/event-stream")
+        .header(AUTHORIZATION, format!("Bearer {}", access.expose()))
+        .body(Body::from(json!({"jsonrpc":"2.0","id":8,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"client","version":"1"}}}).to_string())).unwrap();
+    let response = router.clone().oneshot(legacy_init).await.unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    let json: serde_json::Value =
+        serde_json::from_slice(&to_bytes(response.into_body(), 8192).await.unwrap()).unwrap();
+    assert_eq!(json["result"]["protocolVersion"], "2025-11-25");
+    let legacy_notification = Request::builder()
+        .method("POST")
+        .uri("/mcp")
+        .header(CONTENT_TYPE, "application/json")
+        .header(ACCEPT, "application/json, text/event-stream")
+        .header("mcp-protocol-version", "2025-11-25")
+        .header(AUTHORIZATION, format!("Bearer {}", access.expose()))
+        .body(Body::from(
+            json!({"jsonrpc":"2.0","method":"notifications/initialized"}).to_string(),
+        ))
+        .unwrap();
+    let response = router.clone().oneshot(legacy_notification).await.unwrap();
+    assert_eq!(response.status(), StatusCode::ACCEPTED);
+    assert!(
+        to_bytes(response.into_body(), 8192)
+            .await
+            .unwrap()
+            .is_empty()
+    );
     let response = router
         .clone()
         .oneshot(request("server/discover"))

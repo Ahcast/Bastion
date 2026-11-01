@@ -12,9 +12,10 @@ use axum::{
     routing::post,
 };
 use bastion_mcp::{
-    Credential, DiscoveryError, ExchangePolicy, ModernHeaders, MysqlQuota, MysqlTokenExchange,
-    QuotaError, ToolQuota, ToolRegistry, TransportError, dispatch_discovery, extract_request_id,
-    validate_modern_request,
+    Credential, DiscoveryError, ExchangePolicy, LegacyDispatch, LegacyMessage, ModernHeaders,
+    ModernRequest, MysqlQuota, MysqlTokenExchange, QuotaError, ToolQuota, ToolRegistry,
+    TransportError, dispatch_discovery, dispatch_legacy, extract_request_id,
+    validate_legacy_message, validate_modern_request,
 };
 use serde_json::{Value, json};
 use sqlx::MySqlPool;
@@ -22,6 +23,26 @@ use tokio::sync::Semaphore;
 use url::Url;
 
 const MAX_BODY: usize = 64 * 1024;
+
+enum DraftRequest {
+    Modern(ModernRequest),
+    Legacy(LegacyMessage),
+}
+
+impl DraftRequest {
+    fn method(&self) -> &str {
+        match self {
+            Self::Modern(r) => &r.method,
+            Self::Legacy(r) => &r.method,
+        }
+    }
+    fn id(&self) -> Option<&Value> {
+        match self {
+            Self::Modern(r) => Some(&r.id),
+            Self::Legacy(r) => r.id.as_ref(),
+        }
+    }
+}
 
 #[derive(Clone)]
 pub struct DraftMcpState<P> {
@@ -298,6 +319,12 @@ where
             single(headers, "mcp-protocol-version").map_err(|_| TransportError::HeaderMismatch)?;
         let method = single(headers, "mcp-method").map_err(|_| TransportError::HeaderMismatch)?;
         let name = single(headers, "mcp-name").map_err(|_| TransportError::HeaderMismatch)?;
+        if !accepts(headers, "application/json") || !accepts(headers, "text/event-stream") {
+            return Err(TransportError::Unacceptable);
+        }
+        if version == Some("2025-11-25") || version.is_none() {
+            return validate_legacy_message(version, body).map(DraftRequest::Legacy);
+        }
         validate_modern_request(
             &ModernHeaders {
                 origin,
@@ -310,6 +337,7 @@ where
             &state.origins,
             body,
         )
+        .map(DraftRequest::Modern)
     };
     let request = match parsed() {
         Ok(request) => request,
@@ -351,7 +379,9 @@ where
                         -32022,
                         "Unsupported protocol version",
                         id,
-                        Some(json!({"supported":["2026-07-28"],"requested":requested})),
+                        Some(
+                            json!({"supported":["2026-07-28","2025-11-25"],"requested":requested}),
+                        ),
                     )
                 }
                 TransportError::Unacceptable => protocol_error(
@@ -370,9 +400,12 @@ where
             };
         }
     };
-    let (bucket, action) = match request.method.as_str() {
+    let (bucket, action) = match request.method() {
         "server/discover" => ("server.discover", "mcp.discover"),
         "tools/list" => ("tools.list", "mcp.tools.list"),
+        "initialize" => ("initialize", "mcp.initialize"),
+        "notifications/initialized" => ("notification", "mcp.notification"),
+        "ping" => ("ping", "mcp.ping"),
         _ => ("unsupported", "mcp.unsupported"),
     };
     match state
@@ -423,23 +456,35 @@ where
         }
     }
     let modules:Vec<String>=match sqlx::query_scalar("SELECT module_id FROM module_registry WHERE included_in_release=1 AND environment_allowed=1 AND enabled=1").fetch_all(&state.pool).await {Ok(modules)=>modules,Err(_)=>return rpc_error(StatusCode::SERVICE_UNAVAILABLE,-32603,"Temporarily unavailable")};
-    let result = dispatch_discovery(
-        &request,
-        &access,
-        &state.registry,
-        &modules.into_iter().collect(),
-        false,
-    );
-    let (status, body, result_label): (StatusCode, Value, &str) = match result {
-        Ok(value) => (StatusCode::OK, value, "success"),
+    let enabled_modules = modules.into_iter().collect();
+    let result = match &request {
+        DraftRequest::Modern(request) => {
+            dispatch_discovery(request, &access, &state.registry, &enabled_modules, false).map(Some)
+        }
+        DraftRequest::Legacy(request) => {
+            dispatch_legacy(request, &access, &state.registry, &enabled_modules).map(|response| {
+                match response {
+                    LegacyDispatch::Response(value) => Some(value),
+                    LegacyDispatch::AcceptedNotification => None,
+                }
+            })
+        }
+    };
+    let (status, body, result_label): (StatusCode, Option<Value>, &str) = match result {
+        Ok(Some(value)) => (StatusCode::OK, Some(value), "success"),
+        Ok(None) => (StatusCode::ACCEPTED, None, "success"),
         Err(DiscoveryError::InvalidParams) => (
             StatusCode::BAD_REQUEST,
-            json!({"jsonrpc":"2.0","id":request.id,"error":{"code":-32602,"message":"Invalid params"}}),
+            Some(
+                json!({"jsonrpc":"2.0","id":request.id(),"error":{"code":-32602,"message":"Invalid params"}}),
+            ),
             "denied",
         ),
         Err(DiscoveryError::MethodNotFound) => (
             StatusCode::NOT_FOUND,
-            json!({"jsonrpc":"2.0","id":request.id,"error":{"code":-32601,"message":"Method not found"}}),
+            Some(
+                json!({"jsonrpc":"2.0","id":request.id(),"error":{"code":-32601,"message":"Method not found"}}),
+            ),
             "denied",
         ),
     };
@@ -461,5 +506,8 @@ where
             "Temporarily unavailable",
         );
     }
-    (status, [(CACHE_CONTROL, "no-store")], Json(body)).into_response()
+    match body {
+        Some(body) => (status, [(CACHE_CONTROL, "no-store")], Json(body)).into_response(),
+        None => (status, [(CACHE_CONTROL, "no-store")]).into_response(),
+    }
 }
