@@ -70,6 +70,17 @@ test('a newly selected lot cannot be edited with the previous lot response', asy
     assert.ok([...container.querySelectorAll('button')].some(button=>button.textContent==='Añadir ítem'));
   } finally { await act(async()=>root.unmount());container.remove(); }
 });
+test('lot-only save is blocked while style or lot count is a draft', async () => {
+  const api = new ApiClient('https://example.test', async () => Response.json({numero:1,items:[],total:'0.00',version:1}));
+  const draft = { ...record, variables: record.variables!.map(v => v.key === 'stylo' ? {...v,value:'std'} : v) };
+  const container=document.createElement('div'); document.body.append(container); const root=createRoot(container);
+  try {
+    await act(async()=>root.render(<NavigationGuardProvider><CoreContext.Provider value={{api,access,notify:()=>{}}}><TenderLots record={draft} latest={()=>record} editable saved={()=>{}} /></CoreContext.Provider></NavigationGuardProvider>));
+    await act(async()=>[...container.querySelectorAll('button')].find(b=>b.textContent==='Añadir ítem')!.click());
+    assert.equal([...container.querySelectorAll('button')].find(b=>b.textContent==='Guardar lote')?.disabled,true);
+    assert.ok(container.textContent?.includes('Guardar expediente'));
+  } finally { await act(async()=>root.unmount());container.remove(); }
+});
 test('reducing lots asks for confirmation and identifies the data to discard', async () => {
   const writes: RequestInit[] = [];
   const api = new ApiClient('https://example.test', async (url,init={}) => {
