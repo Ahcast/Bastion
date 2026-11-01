@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react';
+import type { ReactNode } from 'react';
 import { message } from '../api.js';
 import { moduleCan } from '../types.js';
 import { Dialog, Heading, Loading, Notice, Table, useCore, useLoad } from '../ui.js';
@@ -9,17 +10,17 @@ import type { FormDefinition, FormSection, PublishedForm, TenderPage } from '../
 import type { CollaborationFile, FilePage } from '../collaboration.js';
 import { fileBase64 } from '../collaboration.js';
 
-export default function FormLibrary({ settings = false }: { settings?: boolean }) {
+export default function FormLibrary({ settings = false, installedRows = [] }: { settings?: boolean; installedRows?: ReactNode[][] }) {
   const { api, access, notify } = useCore();
   const [page, setPage] = useState(1), [editing, setEditing] = useState<PublishedForm | 'new' | null>(null);
   const [removing, setRemoving] = useState<PublishedForm | null>(null), [busy, setBusy] = useState(false), [error, setError] = useState('');
   const allowed = moduleCan(access, 'colaboracion', 'empresa', 'ver');
   const result = useLoad(signal => allowed ? api.request<TenderPage<PublishedForm>>(`/api/v1/colaboracion/formularios?page=${page}`, { signal }) : Promise.resolve(null), [page, allowed]);
-  if (!allowed) return <Notice>No tienes lectura sobre la biblioteca de empresa.</Notice>;
-  return <div className="document-workspace"><Heading title={settings ? 'Formularios y declaraciones Typst' : 'Biblioteca de formularios'} description="Incorpora cada formulario cuando lo necesites. Las variables y sus valores se definen en cada expediente." action={access.is_system_administrator && <button className="primary" onClick={() => setEditing('new')}>Nuevo formulario</button>} />
-    <DocumentSection title="Formularios publicados" metadata={result.data ? `${result.data.items.length} en esta página` : undefined} list>
+  if (!allowed && !settings) return <Notice>No tienes lectura sobre la biblioteca de empresa.</Notice>;
+  return <div className="document-workspace"><Heading title={settings ? 'Archivos Typst' : 'Biblioteca de formularios'} description="Las variables y sus valores se definen en cada expediente." action={allowed && access.is_system_administrator && <button className="primary" onClick={() => setEditing('new')}>{settings ? 'Agregar archivo Typst' : 'Nuevo formulario'}</button>} />
+    <DocumentSection title={settings ? 'Archivos disponibles' : 'Formularios publicados'} metadata={result.data ? `${result.data.items.length} de biblioteca en esta página` : undefined} list>
     <Notice>{error || result.error}</Notice>
-    {result.data ? <><Table columns={['Formulario', 'Bloque', 'Revisión', 'Acción']} rows={result.data.items.map(form => [form.definition.title, sectionLabels[form.definition.section], form.revision, access.is_system_administrator ? <div className="actions"><button onClick={() => setEditing(form)}>Nueva revisión</button><button className="danger" onClick={() => setRemoving(form)}>Quitar del catálogo</button></div> : 'Publicado'])} /><DocumentPagination page={page} hasMore={result.data.has_more} change={setPage} /></> : !result.error && <Loading />}
+    {result.data || !allowed || result.error ? <><Table columns={['Archivo', 'Sección', 'Estado / revisión', 'Acción']} rows={[...installedRows, ...(result.data?.items ?? []).map(form => [form.definition.title, sectionLabels[form.definition.section], form.revision, access.is_system_administrator ? <div className="actions"><button onClick={() => setEditing(form)}>Nueva revisión</button><button className="danger" onClick={() => setRemoving(form)}>Quitar del catálogo</button></div> : 'Publicado'])]} />{result.data && <DocumentPagination page={page} hasMore={result.data.has_more} change={setPage} />}</> : <Loading />}
     <p className="document-note">Selecciona un archivo .typ de Colaboración o súbelo desde tu PC. Las variables se crean en cada expediente.</p>
     </DocumentSection>
     {editing && <SchemaEditor initial={editing === 'new' ? null : editing} close={() => setEditing(null)} saved={() => { setEditing(null); result.reload(); notify('Esquema aprobado y publicado.'); }} />}
