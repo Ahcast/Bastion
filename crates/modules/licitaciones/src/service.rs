@@ -209,8 +209,12 @@ impl TenderService {
         let mut tx = self.begin(actor, "eliminar").await?;
         let current = load(&mut tx, id).await?;
         editable(&current, expected)?;
-        let removed = sqlx::query("DELETE FROM licitaciones_formularios WHERE expediente_id=? AND id=?")
-            .bind(id).bind(copy_id).execute(&mut *tx).await?;
+        let removed =
+            sqlx::query("DELETE FROM licitaciones_formularios WHERE expediente_id=? AND id=?")
+                .bind(id)
+                .bind(copy_id)
+                .execute(&mut *tx)
+                .await?;
         if removed.rows_affected() != 1 {
             return Err(CoreError::NotFound);
         }
