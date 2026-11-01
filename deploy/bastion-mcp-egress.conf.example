@@ -1,0 +1,5 @@
+# Install as /etc/systemd/system/bastion.service.d/mcp-egress.conf only after
+# validating the guard, existing connectivity and rollback procedure.
+[Unit]
+Requires=bastion-mcp-egress.service
+After=bastion-mcp-egress.service

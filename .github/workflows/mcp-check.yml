@@ -4,6 +4,8 @@ on:
   push:
     branches: [main]
     paths:
+      - 'deploy/bastion-mcp-egress*'
+      - 'tests/test_mcp_egress.py'
       - 'tests/mcp-client/**'
       - 'apps/server/**'
       - 'crates/mcp/**'
@@ -16,6 +18,8 @@ on:
   pull_request:
     branches: [main]
     paths:
+      - 'deploy/bastion-mcp-egress*'
+      - 'tests/test_mcp_egress.py'
       - 'tests/mcp-client/**'
       - 'apps/server/**'
       - 'crates/mcp/**'
@@ -61,5 +65,7 @@ jobs:
       - name: Install pinned MCP SDK
         working-directory: tests/mcp-client
         run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Test egress guard safety and rollback
+        run: python3 tests/test_mcp_egress.py
       - name: Test MCP against disposable MySQL 5.7
         run: cargo test --locked --package bastion-mcp --package bastion-mcp-core --package bastion-mcp-http --package bastion-server

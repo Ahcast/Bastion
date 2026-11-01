@@ -1,0 +1,11 @@
+[Unit]
+Description=Bastion MCP restricted egress guard
+Before=bastion.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/libexec/bastion-mcp-egress.py
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target
