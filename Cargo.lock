@@ -358,6 +358,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "bastion-mcp-core"
+version = "0.1.0"
+dependencies = [
+ "bastion-core",
+ "bastion-mcp",
+ "sqlx",
+ "tokio",
+]
+
+[[package]]
 name = "bastion-ordenes-compra"
 version = "0.1.0"
 dependencies = [

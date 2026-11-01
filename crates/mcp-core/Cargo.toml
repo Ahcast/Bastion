@@ -1,0 +1,13 @@
+[package]
+name = "bastion-mcp-core"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+bastion-core = { path = "../core" }
+bastion-mcp = { path = "../mcp" }
+sqlx.workspace = true
+
+[dev-dependencies]
+bastion-core = { path = "../core", features = ["test-support"] }
+tokio.workspace = true
