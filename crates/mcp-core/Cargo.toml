@@ -6,6 +6,11 @@ edition.workspace = true
 [dependencies]
 bastion-core = { path = "../core" }
 bastion-mcp = { path = "../mcp" }
+bastion-cotizaciones = { path = "../modules/cotizaciones" }
+bastion-facturas = { path = "../modules/facturas" }
+bastion-ordenes-compra = { path = "../modules/ordenes_compra" }
+serde.workspace = true
+serde_json.workspace = true
 sqlx.workspace = true
 
 [dev-dependencies]

@@ -362,7 +362,11 @@ name = "bastion-mcp-core"
 version = "0.1.0"
 dependencies = [
  "bastion-core",
+ "bastion-cotizaciones",
+ "bastion-facturas",
  "bastion-mcp",
+ "bastion-ordenes-compra",
+ "serde",
  "serde_json",
  "sqlx",
  "tokio",
