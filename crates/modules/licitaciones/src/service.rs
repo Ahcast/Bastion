@@ -330,11 +330,20 @@ impl TenderService {
         self.admin
             .require_system_administrator_in_transaction(&mut tx, actor)
             .await?;
-        let existing: Option<bool> = sqlx::query_scalar("SELECT enabled FROM licitaciones_formularios_instalados WHERE form_key=? FOR UPDATE")
-            .bind(key).fetch_optional(&mut *tx).await?;
+        let existing: Option<bool> = sqlx::query_scalar(
+            "SELECT enabled FROM licitaciones_formularios_instalados WHERE form_key=? FOR UPDATE",
+        )
+        .bind(key)
+        .fetch_optional(&mut *tx)
+        .await?;
         if existing.ok_or(CoreError::NotFound)? != enabled {
-            sqlx::query("UPDATE licitaciones_formularios_instalados SET enabled=? WHERE form_key=?")
-                .bind(enabled).bind(key).execute(&mut *tx).await?;
+            sqlx::query(
+                "UPDATE licitaciones_formularios_instalados SET enabled=? WHERE form_key=?",
+            )
+            .bind(enabled)
+            .bind(key)
+            .execute(&mut *tx)
+            .await?;
             CoreAdmin::record_domain_event(
                 &mut tx,
                 actor,
