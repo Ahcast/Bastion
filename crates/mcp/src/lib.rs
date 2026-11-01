@@ -29,7 +29,7 @@ pub use dns_policy::{DnsPolicyError, PublicDnsCandidates, validate_public_dns_ca
 pub use exchange::{
     CodeRecord, ExchangeError, RefreshRecord, validate_code_exchange, validate_refresh_exchange,
 };
-pub use legacy::{LegacyMessage, validate_legacy_message};
+pub use legacy::{LegacyDispatch, LegacyMessage, dispatch_legacy, validate_legacy_message};
 pub use metadata::{
     ClientMetadata, MetadataError, validate_client_metadata, validate_redirect_uri,
 };

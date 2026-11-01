@@ -30,7 +30,7 @@ Se prepara el canje transaccional de códigos y la rotación de refresh tokens p
 
 El router HTTP MCP en preparación permanece aislado de la aplicación activa. Integra validación de bearer y permisos vigentes, límites, auditoría y descubrimiento con un registro de herramientas controlado por el servidor. Aún no ejecuta herramientas de dominio ni constituye una versión desplegable: faltan descubrimiento OAuth, consentimiento en la interfaz, protección por IP, compatibilidad entre clientes y pruebas completas de extremo a extremo.
 
-También se prepara, sin ruta activa, un validador del formato JSON-RPC de MCP 2025-11-25 para clientes anteriores. No realiza la negociación de versiones, inicialización, autenticación ni despacho; la compatibilidad todavía requiere integración y pruebas con clientes reales.
+También se preparan, sin ruta activa, la validación JSON-RPC y respuestas de inicialización y listado MCP 2025-11-25 para clientes anteriores. No ejecutan autenticación ni herramientas de negocio; la compatibilidad todavía requiere negociación de versiones, integración HTTP y pruebas con clientes reales.
 
 Los documentos de descubrimiento OAuth se preparan a partir de direcciones HTTPS canónicas configuradas por el servidor, con metadatos para recurso y emisor. Un router aislado atiende sus rutas well-known para pruebas; no está conectado a la aplicación activa. No se anuncia compatibilidad CIMD hasta contar con obtención segura de metadatos y autorización completa.
 

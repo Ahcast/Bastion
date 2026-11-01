@@ -1,8 +1,12 @@
 use serde::Deserialize;
 use serde_json::{Value, json};
+use std::collections::BTreeSet;
 
-use crate::TransportError;
 use crate::transport::StrictValue;
+use crate::{
+    AuthenticatedAccess, DiscoveryError, ModernRequest, ToolRegistry, TransportError,
+    dispatch_discovery,
+};
 
 const VERSION: &str = "2025-11-25";
 const MAX_BODY: usize = 64 * 1024;
@@ -11,6 +15,47 @@ pub struct LegacyMessage {
     pub id: Option<Value>,
     pub method: String,
     pub params: Value,
+}
+
+pub enum LegacyDispatch {
+    Response(Value),
+    AcceptedNotification,
+}
+
+/// Pure legacy lifecycle/discovery responses. The caller must authenticate,
+/// limit and audit first; this function does not execute business tools or
+/// register an HTTP route. It holds no protocol session state.
+pub fn dispatch_legacy(
+    message: &LegacyMessage,
+    access: &AuthenticatedAccess,
+    registry: &ToolRegistry,
+    enabled_modules: &BTreeSet<String>,
+) -> Result<LegacyDispatch, DiscoveryError> {
+    let Some(id) = message.id.as_ref() else {
+        return Ok(LegacyDispatch::AcceptedNotification);
+    };
+    let response = match message.method.as_str() {
+        "initialize" => {
+            json!({"jsonrpc":"2.0","id":id,"result":{"protocolVersion":VERSION,"capabilities":{"tools":{"listChanged":false}},"serverInfo":{"name":"Bastion","version":env!("CARGO_PKG_VERSION")}}})
+        }
+        "ping" => json!({"jsonrpc":"2.0","id":id,"result":{}}),
+        "tools/list" => {
+            let request = ModernRequest {
+                id: id.clone(),
+                method: "tools/list".into(),
+                params: message.params.clone(),
+            };
+            let mut response =
+                dispatch_discovery(&request, access, registry, enabled_modules, false)?;
+            if let Some(result) = response.get_mut("result").and_then(Value::as_object_mut) {
+                result.remove("resultType");
+                result.remove("_meta");
+            }
+            response
+        }
+        _ => return Err(DiscoveryError::MethodNotFound),
+    };
+    Ok(LegacyDispatch::Response(response))
 }
 
 /// Validates only the envelope for the 2025-11-25 profile. The HTTP boundary
@@ -116,5 +161,67 @@ mod tests {
         ] {
             assert!(validate_legacy_message(Some(VERSION), body).is_err());
         }
+    }
+
+    #[test]
+    fn legacy_lifecycle_lists_only_visible_tools_and_accepts_notifications() {
+        use crate::{ToolDescriptor, ToolRisk};
+        let scopes = BTreeSet::from(["read".to_owned()]);
+        let registry = ToolRegistry::new(
+            vec![ToolDescriptor {
+                name: "fixture.read".into(),
+                module_id: "fixture".into(),
+                description: "Fixture".into(),
+                required_scope: "read".into(),
+                input_schema: json!({"type":"object"}),
+                output_schema: None,
+                risk: ToolRisk::ReadOnly,
+                idempotent: true,
+                max_response_bytes: 1024,
+                max_duration_ms: 1000,
+            }],
+            &scopes,
+        )
+        .unwrap();
+        let access = AuthenticatedAccess {
+            user_id: 1,
+            client_id: 2,
+            grant_id: 3,
+            scopes,
+        };
+        let modules = BTreeSet::from(["fixture".to_owned()]);
+        let init = validate_legacy_message(None, br#"{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"client","version":"1"}}}"#).unwrap();
+        let LegacyDispatch::Response(initialized) =
+            dispatch_legacy(&init, &access, &registry, &modules).unwrap()
+        else {
+            panic!("expected response");
+        };
+        assert_eq!(initialized["result"]["protocolVersion"], VERSION);
+        let list = validate_legacy_message(
+            Some(VERSION),
+            br#"{"jsonrpc":"2.0","id":2,"method":"tools/list"}"#,
+        )
+        .unwrap();
+        let LegacyDispatch::Response(visible) =
+            dispatch_legacy(&list, &access, &registry, &modules).unwrap()
+        else {
+            panic!("expected response");
+        };
+        assert_eq!(visible["result"]["tools"][0]["name"], "fixture.read");
+        let LegacyDispatch::Response(hidden) =
+            dispatch_legacy(&list, &access, &registry, &BTreeSet::new()).unwrap()
+        else {
+            panic!("expected response");
+        };
+        assert!(hidden["result"]["tools"].as_array().unwrap().is_empty());
+        let notification = validate_legacy_message(
+            Some(VERSION),
+            br#"{"jsonrpc":"2.0","method":"notifications/initialized"}"#,
+        )
+        .unwrap();
+        assert!(matches!(
+            dispatch_legacy(&notification, &access, &registry, &modules),
+            Ok(LegacyDispatch::AcceptedNotification)
+        ));
     }
 }
