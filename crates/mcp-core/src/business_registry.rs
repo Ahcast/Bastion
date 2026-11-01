@@ -46,7 +46,7 @@ pub fn draft_read_tool_registry() -> Result<ToolRegistry, RegistryError> {
             name:format!("{module}.consultar"),module_id:module.into(),
             description:format!("Consultar una de las {label} por su identificador, sujeto a los permisos del usuario."),
             required_scope:scope,
-            input_schema:json!({"type":"object","properties":{"id":{"type":"integer","minimum":1,"maximum":9007199254740991}},"required":["id"],"additionalProperties":false}),
+            input_schema:json!({"type":"object","properties":{"id":{"type":"integer","minimum":1,"maximum":9007199254740991_u64}},"required":["id"],"additionalProperties":false}),
             output_schema:None,risk:ToolRisk::ReadOnly,idempotent:true,max_response_bytes:262144,max_duration_ms:10000,
         });
     }
