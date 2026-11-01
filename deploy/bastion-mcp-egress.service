@@ -1,7 +1,5 @@
 [Unit]
 Description=Bastion MCP restricted egress guard
-Requires=ufw.service
-After=ufw.service
 Before=bastion.service
 
 [Service]

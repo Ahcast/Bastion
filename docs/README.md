@@ -257,6 +257,8 @@ El informe se obtuvo de una copia de frontend Angular compilado y backend Larave
 - 2026-10-29: `d6e82df` despliega la cola y el trabajador de PDF de Licitaciones en AWS y el frontend en Bluehost, con CI integral aprobado, respaldo, restauración de prueba de 85 tablas y migración 7. El backend y los servicios aislados están activos y los recursos públicos se verificaron por HTTPS. Quedan pendientes la prueba autenticada del flujo real y la medición cercana al límite de 1 GB. Ver [despliegue](09-despliegue.md).
 
 
+- 2026-11-01: para el perímetro de salida MCP se prepara una tabla nftables independiente por UID, porque UFW está deshabilitado en AWS. Se conserva la política general del firewall y se verifican bloqueo, conectividad permitida y reversión en una red aislada. Véase [MCP](06-mcp.md).
+
 ## Respaldo integral de datos
 
 El Core centraliza la administración de copias y recuperación mediante un trabajador privado persistente en AWS. Se conserva frontend Bluehost y MySQL Bluehost. Véase [alcance, recuperación y límites](18-respaldo-mysql.md).
