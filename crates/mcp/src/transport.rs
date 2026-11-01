@@ -178,7 +178,7 @@ fn decode_name(value: &str) -> Option<String> {
 
 // Reject duplicate keys at every JSON depth so that an intermediary and the
 // server cannot interpret different method, version or argument values.
-struct StrictValue(Value);
+pub(crate) struct StrictValue(pub(crate) Value);
 impl<'de> Deserialize<'de> for StrictValue {
     fn deserialize<D: Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
         d.deserialize_any(StrictVisitor)
