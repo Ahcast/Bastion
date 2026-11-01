@@ -73,6 +73,7 @@ impl<S: ConsentPolicy, P: ExchangePolicy> MysqlConsent<S, P> {
     ) -> Result<PendingConsent, ConsentError> {
         if configured_resource.is_empty()
             || request.resource != configured_resource
+            || crate::validate_redirect_uri(&request.redirect_uri).is_err()
             || request.client_id.len() > 2048
             || request.redirect_uri.len() > 2048
             || request.scopes.is_empty()
@@ -178,6 +179,7 @@ impl<S: ConsentPolicy, P: ExchangePolicy> MysqlConsent<S, P> {
             || consumed.is_some()
             || expires <= now
             || resource != configured_resource
+            || crate::validate_redirect_uri(&redirect).is_err()
         {
             return Err(ConsentError::InvalidRequest);
         }

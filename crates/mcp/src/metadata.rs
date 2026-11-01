@@ -103,7 +103,7 @@ pub fn validate_client_metadata(
     }
     let mut redirects = BTreeSet::new();
     for uri in document.redirect_uris {
-        validate_redirect(&uri)?;
+        validate_redirect_uri(&uri)?;
         if !redirects.insert(uri) {
             return Err(MetadataError::InvalidRedirect);
         }
@@ -142,7 +142,9 @@ fn validate_client_identifier(value: &str) -> Result<(), MetadataError> {
     Ok(())
 }
 
-fn validate_redirect(value: &str) -> Result<(), MetadataError> {
+/// Validate registered redirect destinations and reject query parameters that
+/// would make an authorization response ambiguous after appending its fields.
+pub fn validate_redirect_uri(value: &str) -> Result<(), MetadataError> {
     if value.len() > MAX_URI_BYTES || value.chars().any(char::is_control) {
         return Err(MetadataError::InvalidRedirect);
     }
@@ -159,6 +161,12 @@ fn validate_redirect(value: &str) -> Result<(), MetadataError> {
     if authority.contains('@')
         || parsed.host().is_none()
         || parsed.fragment().is_some()
+        || parsed.query_pairs().any(|(key, _)| {
+            matches!(
+                key.as_ref(),
+                "code" | "state" | "iss" | "error" | "error_description" | "error_uri"
+            )
+        })
         || !(parsed.scheme() == "https" || (parsed.scheme() == "http" && loopback))
     {
         return Err(MetadataError::InvalidRedirect);
@@ -198,6 +206,21 @@ mod tests {
 
     #[test]
     fn rejects_unsafe_or_ambiguous_metadata() {
+        assert!(validate_redirect_uri("https://client.example/callback?next=home").is_ok());
+        for key in [
+            "code",
+            "%63ode",
+            "state",
+            "iss",
+            "error",
+            "error_uri",
+            "error_description",
+        ] {
+            assert_eq!(
+                validate_redirect_uri(&format!("https://client.example/callback?{key}=value")),
+                Err(MetadataError::InvalidRedirect)
+            );
+        }
         for value in [
             "http://client.example/doc",
             "https://client.example",

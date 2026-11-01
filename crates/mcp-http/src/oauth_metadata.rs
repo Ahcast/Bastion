@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use axum::{Json, Router, extract::State, http::header::CACHE_CONTROL, routing::get};
+use bastion_mcp::{ConsentResult, validate_redirect_uri};
 use serde_json::{Value, json};
 use url::Url;
 
@@ -105,6 +106,23 @@ impl DraftOauthMetadata {
     pub fn authorization_server(&self) -> Value {
         json!({"issuer": self.issuer, "authorization_endpoint": self.authorization_endpoint, "token_endpoint": self.token_endpoint, "response_types_supported": ["code"], "grant_types_supported": ["authorization_code", "refresh_token"], "token_endpoint_auth_methods_supported": ["none"], "code_challenge_methods_supported": ["S256"]})
     }
+
+    /// Only call after the transactional consent flow has returned the
+    /// registered, exactly matched redirect URI. Do not log the returned URL:
+    /// it contains a short-lived authorization code and optional state.
+    pub fn success_redirect(&self, consent: ConsentResult) -> Result<String, OauthMetadataError> {
+        validate_redirect_uri(&consent.redirect_uri).map_err(|_| OauthMetadataError)?;
+        let mut target = Url::parse(&consent.redirect_uri).map_err(|_| OauthMetadataError)?;
+        {
+            let mut query = target.query_pairs_mut();
+            query.append_pair("code", &consent.code.expose());
+            query.append_pair("iss", &self.issuer);
+            if let Some(state) = consent.state {
+                query.append_pair("state", &state);
+            }
+        }
+        Ok(target.into())
+    }
 }
 
 /// Draft router; do not mount or advertise until the authorization endpoint,
@@ -149,6 +167,7 @@ mod tests {
         body::{Body, to_bytes},
         http::{Request, StatusCode},
     };
+    use bastion_mcp::Credential;
     use tower::ServiceExt;
 
     fn metadata(
@@ -268,5 +287,46 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(missing.status(), StatusCode::NOT_FOUND);
+    }
+
+    #[test]
+    fn successful_redirect_encodes_state_and_issuer_without_ambiguity() {
+        let doc = metadata(
+            "https://example.invalid/mcp",
+            "https://example.invalid/oauth",
+            "https://example.invalid/oauth/authorize",
+            "https://example.invalid/oauth/token",
+        )
+        .unwrap();
+        let code = Credential::generate().unwrap();
+        let expected = code.expose();
+        let response = doc
+            .success_redirect(ConsentResult {
+                code,
+                redirect_uri: "https://client.invalid/callback?original=yes".into(),
+                state: Some("a&code=fake".into()),
+            })
+            .unwrap();
+        let parsed = Url::parse(&response).unwrap();
+        let pairs: std::collections::BTreeMap<_, _> = parsed.query_pairs().into_owned().collect();
+        assert_eq!(pairs.get("original").unwrap(), "yes");
+        assert_eq!(pairs.get("code").unwrap(), &expected);
+        assert_eq!(pairs.get("iss").unwrap(), "https://example.invalid/oauth");
+        assert_eq!(pairs.get("state").unwrap(), "a&code=fake");
+        for redirect in [
+            "https://client.invalid/cb?%63ode=fake",
+            "https://client.invalid/cb?iss=fake",
+            "https://client.invalid/cb#fragment",
+            "http://client.invalid/cb",
+        ] {
+            assert!(
+                doc.success_redirect(ConsentResult {
+                    code: Credential::generate().unwrap(),
+                    redirect_uri: redirect.into(),
+                    state: None
+                })
+                .is_err()
+            );
+        }
     }
 }
