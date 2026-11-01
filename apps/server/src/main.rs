@@ -46,6 +46,12 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
         tracing::info!("invoice migrations completed; other module schemas unchanged");
         return Ok(());
     }
+    if command == "migrate-core" {
+        let migrator = Database::connect_lazy(&DatabaseConfig::migrator_from_env()?);
+        migrator.migrate().await?;
+        tracing::info!("Core migrations completed; module schemas unchanged");
+        return Ok(());
+    }
     if command == "migrate" {
         let migrator = Database::connect_lazy(&DatabaseConfig::migrator_from_env()?);
         migrator.migrate().await?;
