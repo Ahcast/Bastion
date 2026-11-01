@@ -66,6 +66,24 @@ impl ClientRequestStore {
         Self { pool }
     }
 
+    /// Check a browser session before expensive work such as metadata fetch.
+    /// A later mutation must independently revalidate it in its transaction.
+    pub async fn authorize_session<S: ConsentPolicy>(
+        &self,
+        policy: &S,
+        session: &str,
+        admin: bool,
+    ) -> Result<(), ClientRequestError> {
+        let mut tx = self.pool.begin().await?;
+        let identity = policy
+            .session(&mut tx, session)
+            .await?
+            .ok_or(ClientRequestError::Forbidden)?;
+        if admin && sqlx::query_scalar::<_,u64>("SELECT u.id FROM users u JOIN roles r ON r.id=u.role_id WHERE u.id=? AND u.status='active' AND r.system_key='system_administrator' FOR UPDATE").bind(identity.user_id).fetch_optional(&mut *tx).await?.is_none(){return Err(ClientRequestError::Forbidden);}
+        tx.commit().await?;
+        Ok(())
+    }
+
     /// List only the authenticated user's requests, with a bounded cursor.
     pub async fn list_own(
         &self,

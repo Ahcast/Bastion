@@ -35,6 +35,7 @@ pub enum MetadataFetchError {
 /// connects directly to a validated address, verifies TLS for the original
 /// hostname and never uses proxy settings or follows redirects. Do not expose
 /// it before network egress rules and adversarial end-to-end tests are in place.
+#[derive(Clone)]
 pub struct DraftMetadataFetcher {
     tls: Arc<ClientConfig>,
     timeout: Duration,

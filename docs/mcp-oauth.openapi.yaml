@@ -6,6 +6,50 @@ info:
     Contrato en preparación. Ninguna ruta se anuncia ni habilita hasta completar
     consentimiento, autorización vigente, auditoría, límites y verificación.
 paths:
+  /oauth/clients/request:
+    post:
+      summary: Solicitar revisión de un cliente MCP — borrador aislado
+      description: Requiere sesión, origen y CSRF; obtiene y valida metadatos y no crea grants.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [client_id, scopes]
+              properties:
+                client_id: { type: string, maxLength: 2048 }
+                scopes: { type: array, minItems: 1, maxItems: 64, items: { type: string } }
+              additionalProperties: false
+      responses:
+        '200': { description: Solicitud pendiente de revisión. }
+        '400': { description: Cliente o alcances inválidos. }
+        '403': { description: Sesión, origen o CSRF rechazados. }
+        '409': { description: Solicitud en conflicto o cliente ya autorizado. }
+        '429': { description: Límite de concurrencia alcanzado. }
+        '503': { description: Servicio temporalmente indisponible. }
+  /oauth/clients/mine:
+    post:
+      summary: Consultar solicitudes propias — borrador aislado
+      responses:
+        '200': { description: Página de solicitudes del usuario. }
+        '403': { description: Sesión, origen o CSRF rechazados. }
+  /oauth/clients/pending:
+    post:
+      summary: Consultar cola administrativa — borrador aislado
+      responses:
+        '200': { description: Página de solicitudes pendientes. }
+        '403': { description: Requiere administrador con sesión vigente. }
+  /oauth/clients/review:
+    post:
+      summary: Aprobar o rechazar una solicitud — borrador aislado
+      description: Revalida la sesión de administrador y, para aprobar, vuelve a obtener la ficha exacta del cliente.
+      responses:
+        '200': { description: Solicitud revisada; no concede datos a usuarios. }
+        '400': { description: Solicitud o ficha inválida. }
+        '403': { description: Requiere administrador con sesión vigente. }
+        '409': { description: Solicitud o ficha en conflicto. }
+        '503': { description: Servicio temporalmente indisponible. }
   /oauth/consent/begin:
     post:
       summary: Preparar consentimiento en la sesión del usuario — borrador

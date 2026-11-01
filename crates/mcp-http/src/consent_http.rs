@@ -97,7 +97,7 @@ enum Decision {
     Deny,
 }
 
-fn response(status: StatusCode, body: serde_json::Value) -> Response {
+pub(crate) fn response(status: StatusCode, body: serde_json::Value) -> Response {
     (
         status,
         [
@@ -110,16 +110,17 @@ fn response(status: StatusCode, body: serde_json::Value) -> Response {
     )
         .into_response()
 }
-fn error(status: StatusCode) -> Response {
+pub(crate) fn error(status: StatusCode) -> Response {
     response(status, json!({"error":"request_not_completed"}))
 }
 
-async fn browser_session<P>(
-    state: &DraftConsentState<P>,
+pub(crate) async fn browser_session(
+    core: &CoreService,
+    origin: &str,
     headers: &HeaderMap,
 ) -> Result<String, StatusCode> {
     if headers.get_all(ORIGIN).iter().count() != 1
-        || headers.get(ORIGIN).and_then(|h| h.to_str().ok()) != Some(state.origin.as_str())
+        || headers.get(ORIGIN).and_then(|h| h.to_str().ok()) != Some(origin)
     {
         return Err(StatusCode::FORBIDDEN);
     }
@@ -173,7 +174,7 @@ async fn browser_session<P>(
     {
         return Err(StatusCode::FORBIDDEN);
     }
-    match state.core.csrf_matches(session, csrf).await {
+    match core.csrf_matches(session, csrf).await {
         Ok(true) => Ok(session.to_owned()),
         Ok(false) => Err(StatusCode::FORBIDDEN),
         Err(_) => Err(StatusCode::SERVICE_UNAVAILABLE),
@@ -196,7 +197,7 @@ async fn begin<P>(
 where
     P: ExchangePolicy + Clone + Send + Sync + 'static,
 {
-    let session = match browser_session(&state, &headers).await {
+    let session = match browser_session(&state.core, &state.origin, &headers).await {
         Ok(value) => value,
         Err(status) => return error(status),
     };
@@ -231,7 +232,7 @@ async fn decision<P>(
 where
     P: ExchangePolicy + Clone + Send + Sync + 'static,
 {
-    let session = match browser_session(&state, &headers).await {
+    let session = match browser_session(&state.core, &state.origin, &headers).await {
         Ok(value) => value,
         Err(status) => return error(status),
     };

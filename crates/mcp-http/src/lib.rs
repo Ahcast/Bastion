@@ -1,9 +1,13 @@
 #![forbid(unsafe_code)]
 
+mod client_requests_http;
 mod consent_http;
 mod metadata_fetch;
 mod modern;
 mod oauth_metadata;
+pub use client_requests_http::{
+    ClientMetadataSource, DraftClientRequestState, draft_client_request_router,
+};
 pub use consent_http::{DraftConsentState, draft_consent_router};
 pub use metadata_fetch::{DraftMetadataFetcher, MetadataFetchError};
 pub use modern::{DraftMcpState, McpConfigurationError, draft_mcp_router};
