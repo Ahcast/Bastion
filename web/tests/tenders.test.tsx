@@ -179,6 +179,27 @@ test('settings remove a published Typst form without deleting its source file', 
   } finally { await act(async () => root.unmount()); container.remove(); }
 });
 
+test('settings upload a Typst file and select it for the new form', async () => {
+  Object.defineProperty(globalThis, 'FileReader', { configurable:true, value:window.FileReader });
+  let uploaded: {filename:string;content_base64:string;scope:string} | undefined;
+  const api = new ApiClient('https://example.test', async (url, init = {}) => {
+    const path = new URL(String(url)).pathname;
+    if (path === '/api/v1/colaboracion' && init.method === 'POST') { uploaded = JSON.parse(String(init.body)); assert.ok(new Headers(init.headers).get('idempotency-key')); return Response.json({id:7,filename:'formulario.typ',mime:'text/plain'}); }
+    return Response.json({items:[], page:1, page_size:25, has_more:false});
+  });
+  const admin: Access = { ...access, is_system_administrator:true, modules:[{module_id:'colaboracion',display_name:'Colaboración'}] };
+  const container=document.createElement('div'); document.body.append(container); const root=createRoot(container);
+  try {
+    await act(async()=>root.render(<NavigationGuardProvider><CoreContext.Provider value={{api, access:admin, notify:()=>{}}}><FormLibrary settings /></CoreContext.Provider></NavigationGuardProvider>));
+    await act(async()=>[...container.querySelectorAll('button')].find(b=>b.textContent==='Nuevo formulario')!.click());
+    const dialog=document.body.querySelector('[role="dialog"]')!; const input=dialog.querySelector<HTMLInputElement>('input[type="file"]')!;
+    const file=new window.File(['#variables.nombre'], 'formulario.typ', {type:'text/plain'}); Object.defineProperty(input, 'files', {configurable:true, value:[file]});
+    await act(async()=>{input.dispatchEvent(new Event('change',{bubbles:true})); await window.happyDOM.waitUntilComplete();});
+    assert.equal(uploaded?.filename,'formulario.typ'); assert.equal(uploaded?.scope,'empresa'); assert.equal(Buffer.from(uploaded!.content_base64,'base64').toString(),'#variables.nombre');
+    assert.ok(dialog.textContent?.includes('archivo #7'));
+  } finally { await act(async()=>root.unmount()); container.remove(); delete (globalThis as {FileReader?:unknown}).FileReader; }
+});
+
 test('expedient names persist with a version, keep text on conflicts and update headings and lists', async () => {
   let record: Expedient = { id: 9, name: '', version: 1, state: 'borrador', forms: [] };
   let conflict = true;
