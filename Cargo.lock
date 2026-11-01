@@ -385,6 +385,7 @@ dependencies = [
  "bastion-ordenes-compra",
  "bytes",
  "chrono",
+ "hmac 0.12.1",
  "http-body-util",
  "hyper",
  "hyper-util",

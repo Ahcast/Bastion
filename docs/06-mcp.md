@@ -12,7 +12,7 @@ El workflow `MCP MySQL checks` ejecuta las pruebas sobre una base MySQL 5.7 dese
 
 ## Modelo de operación
 
-El router HTTP MCP en preparación permanece aislado de la aplicación activa. Integra validación de bearer y permisos vigentes, límites, auditoría y descubrimiento; permite probar consultas de dominio autorizadas. No constituye una versión desplegable: incluye un límite local por IP en el proceso, pero aún requiere límites compartidos en el ingreso entre réplicas, compatibilidad entre clientes y verificaciones operativas.
+El router HTTP MCP en preparación permanece aislado de la aplicación activa. Integra validación de bearer y permisos vigentes, límites, auditoría y descubrimiento; permite probar consultas de dominio autorizadas. No constituye una versión desplegable: incluye un límite local por IP y prepara una cuota compartida en MySQL entre instancias, con direcciones protegidas mediante HMAC. Su clave y activación aún requieren configuración y verificación; también faltan controles en el proxy, compatibilidad entre clientes y verificaciones operativas.
 
 Se prepara una composición aislada que reúne los routers y separa CORS con credenciales para el frontend de Bastion del CORS sin credenciales para clientes MCP. El inicio HTTP de autorización, el canje de tokens y cada invocación MCP vuelven a comprobar la ficha del cliente y deniegan la solicitud si no se puede validar. No se registra en el servidor activo; aún faltan límites de perímetro, redacción de parámetros en logs del proxy y validación integral antes de publicarla.
 

@@ -67,6 +67,7 @@ pub fn compose_draft_router<F: ClientMetadataSource>(
         || resource.origin() != issuer.origin()
         || authorization.path() != "/oauth/authorize"
         || token.path() != "/oauth/token"
+        || !config.perimeter.has_shared_limit()
         || config.tool_quota.user_tool == 0
         || config.tool_quota.client_tool == 0
     {

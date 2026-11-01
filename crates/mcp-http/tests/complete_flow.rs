@@ -126,6 +126,8 @@ async fn mysql57_full_draft_oauth_to_tool_rechecks_permissions_and_replay() {
         max_metadata_fetches: 2,
         request_timeout: Duration::from_secs(10),
         perimeter: bastion_mcp_http::DraftPerimeter::new(vec![], Duration::from_secs(60), 100, 100)
+            .unwrap()
+            .with_shared(pool.clone(), [37; 32], 60, 100)
             .unwrap(),
     };
     let router = compose_draft_router(core, config, fetcher)

@@ -4,7 +4,11 @@ use axum::{
     middleware::Next,
     response::{IntoResponse, Response},
 };
+use hmac::{Hmac, Mac};
 use ipnet::IpNet;
+use sha2::Sha256;
+use sqlx::MySqlPool;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::{
     collections::HashMap,
     net::{IpAddr, SocketAddr},
@@ -21,6 +25,7 @@ pub struct DraftPerimeter {
     limit: u32,
     capacity: usize,
     entries: Arc<Mutex<HashMap<IpAddr, (Instant, u32)>>>,
+    shared: Option<SharedPerimeter>,
 }
 impl DraftPerimeter {
     pub fn new(proxies: Vec<IpNet>, window: Duration, limit: u32, capacity: usize) -> Option<Self> {
@@ -38,7 +43,36 @@ impl DraftPerimeter {
             limit,
             capacity,
             entries: Arc::new(Mutex::new(HashMap::new())),
+            shared: None,
         })
+    }
+    /// The HMAC key must be a secret shared across all instances of this
+    /// deployment. Rotating it starts fresh quota buckets.
+    pub fn with_shared(
+        mut self,
+        pool: MySqlPool,
+        key: [u8; 32],
+        window_seconds: u32,
+        limit: u32,
+    ) -> Option<Self> {
+        if key.iter().all(|byte| *byte == 0)
+            || !(1..=3600).contains(&window_seconds)
+            || limit == 0
+            || limit > 1_000_000
+        {
+            return None;
+        }
+        self.shared = Some(SharedPerimeter {
+            pool,
+            key,
+            window_seconds,
+            limit,
+            ticks: Arc::new(AtomicU64::new(0)),
+        });
+        Some(self)
+    }
+    pub(crate) fn has_shared_limit(&self) -> bool {
+        self.shared.is_some()
     }
     fn client_ip(&self, request: &Request) -> Option<IpAddr> {
         let peer = request
@@ -105,6 +139,39 @@ impl DraftPerimeter {
         true
     }
 }
+#[derive(Clone)]
+struct SharedPerimeter {
+    pool: MySqlPool,
+    key: [u8; 32],
+    window_seconds: u32,
+    limit: u32,
+    ticks: Arc<AtomicU64>,
+}
+impl SharedPerimeter {
+    async fn admit(&self, ip: IpAddr) -> Result<bool, sqlx::Error> {
+        let mut mac = Hmac::<Sha256>::new_from_slice(&self.key).expect("HMAC accepts 32-byte keys");
+        mac.update(b"bastion/mcp/perimeter-ip/v1\0");
+        mac.update(ip.to_string().as_bytes());
+        let hash = mac.finalize().into_bytes();
+        // Bounded incremental cleanup of old buckets. Keeping at least two
+        // hours avoids deleting an active bucket for any supported window.
+        if self.ticks.fetch_add(1, Ordering::Relaxed) % 128 == 0 {
+            sqlx::query("DELETE FROM oauth_perimeter_quotas WHERE window_start < UTC_TIMESTAMP(6)-INTERVAL 2 HOUR LIMIT 100")
+                .execute(&self.pool).await?;
+        }
+        let mut tx = self.pool.begin().await?;
+        sqlx::query("INSERT INTO oauth_perimeter_quotas (client_hash,window_start,requests) VALUES (?,UTC_TIMESTAMP(6),1) ON DUPLICATE KEY UPDATE requests=IF(window_start<=UTC_TIMESTAMP(6)-INTERVAL ? SECOND,1,LEAST(requests+1,?)),window_start=IF(window_start<=UTC_TIMESTAMP(6)-INTERVAL ? SECOND,UTC_TIMESTAMP(6),window_start)")
+            .bind(hash.as_slice()).bind(self.window_seconds).bind(self.limit + 1).bind(self.window_seconds).execute(&mut *tx).await?;
+        let count: u32 = sqlx::query_scalar(
+            "SELECT requests FROM oauth_perimeter_quotas WHERE client_hash=? FOR UPDATE",
+        )
+        .bind(hash.as_slice())
+        .fetch_one(&mut *tx)
+        .await?;
+        tx.commit().await?;
+        Ok(count <= self.limit)
+    }
+}
 pub async fn perimeter_guard(
     State(guard): State<DraftPerimeter>,
     request: Request,
@@ -113,8 +180,16 @@ pub async fn perimeter_guard(
     let Some(ip) = guard.client_ip(&request) else {
         return StatusCode::BAD_REQUEST.into_response();
     };
+    let ip = ip.to_canonical();
     if !guard.admit(ip) {
         return StatusCode::TOO_MANY_REQUESTS.into_response();
+    }
+    if let Some(shared) = &guard.shared {
+        match shared.admit(ip).await {
+            Ok(true) => {}
+            Ok(false) => return StatusCode::TOO_MANY_REQUESTS.into_response(),
+            Err(_) => return StatusCode::SERVICE_UNAVAILABLE.into_response(),
+        }
     }
     next.run(request).await
 }

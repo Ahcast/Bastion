@@ -19,7 +19,7 @@ pub use metadata_fetch::{DraftMetadataFetcher, MetadataFetchError};
 pub use metadata_integrity::{DraftMetadataIntegrity, MetadataIntegrity, MetadataIntegrityError};
 pub use modern::{DraftMcpState, McpConfigurationError, ReadToolExecutor, draft_mcp_router};
 pub use oauth_metadata::{DraftOauthMetadata, OauthMetadataError, draft_oauth_metadata_router};
-pub use perimeter::DraftPerimeter;
+pub use perimeter::{DraftPerimeter, perimeter_guard};
 
 use std::{collections::BTreeSet, sync::Arc};
 

@@ -35,7 +35,7 @@ async fn mysql57_composed_draft_separates_browser_and_client_cors() {
         .connect(&url)
         .await
         .unwrap();
-    let db = Database::from_test_pool(pool);
+    let db = Database::from_test_pool(pool.clone());
     db.migrate().await.unwrap();
     let core = CoreService::new(db, Credential::generate().unwrap().expose(), [31; 32]).unwrap();
     let config = DraftCompositionConfig {
@@ -58,6 +58,8 @@ async fn mysql57_composed_draft_separates_browser_and_client_cors() {
         max_metadata_fetches: 2,
         request_timeout: Duration::from_secs(10),
         perimeter: bastion_mcp_http::DraftPerimeter::new(vec![], Duration::from_secs(60), 100, 100)
+            .unwrap()
+            .with_shared(pool.clone(), [37; 32], 60, 100)
             .unwrap(),
     };
     let router = compose_draft_router(core, config, NoFetch)
