@@ -1,12 +1,20 @@
 use super::*;
 use bastion_licitaciones::{
     CopyFormInput, DeleteInput, EmptyInput, Expedient, GlobalVariablesInput, InitialFormsInput,
-    LotInput, NameInput, PageQuery, PdfOrderInput, ValuesInput,
+    InstalledFormUpdate, LotInput, NameInput, PageQuery, PdfOrderInput, ValuesInput,
 };
 
 pub(super) fn routes(state: ApiState) -> Router<ApiState> {
     Router::new()
         .route("/api/v1/licitaciones", get(list).post(create))
+        .route(
+            "/api/v1/licitaciones/plantillas-instaladas",
+            get(installed_forms),
+        )
+        .route(
+            "/api/v1/licitaciones/plantillas-instaladas/{key}",
+            axum::routing::put(set_installed_form),
+        )
         .route(
             "/api/v1/licitaciones/{id}",
             get(detail).patch(rename).delete(remove),
@@ -363,6 +371,32 @@ async fn rename(
         .await
         .map(response)
         .map_err(ApiError)
+}
+async fn installed_forms(
+    State(state): State<ApiState>,
+    headers: axum::http::HeaderMap,
+) -> Result<Json<Vec<bastion_licitaciones::InstalledForm>>, ApiError> {
+    let user = actor(&state, &headers).await?;
+    state
+        .licitaciones
+        .installed_forms(user.id)
+        .await
+        .map(Json)
+        .map_err(ApiError)
+}
+async fn set_installed_form(
+    State(state): State<ApiState>,
+    headers: axum::http::HeaderMap,
+    Path(key): Path<String>,
+    Json(input): Json<InstalledFormUpdate>,
+) -> Result<StatusCode, ApiError> {
+    let user = actor(&state, &headers).await?;
+    state
+        .licitaciones
+        .set_installed_form(user.id, &key, input.enabled)
+        .await
+        .map_err(ApiError)?;
+    Ok(StatusCode::NO_CONTENT)
 }
 async fn copy_form(
     State(state): State<ApiState>,
