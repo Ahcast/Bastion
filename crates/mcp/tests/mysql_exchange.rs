@@ -78,6 +78,18 @@ async fn mysql57_code_exchange_is_atomic_and_replay_revokes_grant() {
     assert_eq!(unused, 1);
     let exchange = MysqlTokenExchange::new(pool.clone(), FixturePolicy(true));
     let tokens = exchange.redeem_code(&request).await.unwrap();
+    assert!(
+        exchange
+            .authenticate_access(&tokens.access_token, "https://example.invalid/mcp")
+            .await
+            .is_ok()
+    );
+    assert!(matches!(
+        denied
+            .authenticate_access(&tokens.access_token, "https://example.invalid/mcp")
+            .await,
+        Err(TokenExchangeError::InvalidGrant)
+    ));
     assert!((1..=900).contains(&tokens.expires_in));
     let stored: i64 = sqlx::query_scalar(
         "SELECT COUNT(*) FROM oauth_access_tokens WHERE grant_id=? AND token_hash=?",
@@ -104,6 +116,12 @@ async fn mysql57_code_exchange_is_atomic_and_replay_revokes_grant() {
             .await
             .unwrap();
     assert!(revoked.is_some());
+    assert!(matches!(
+        exchange
+            .authenticate_access(&tokens.access_token, "https://example.invalid/mcp")
+            .await,
+        Err(TokenExchangeError::InvalidGrant)
+    ));
 
     let refresh_grant = sqlx::query("INSERT INTO oauth_grants (user_id,client_id,resource_uri,scopes_json,issued_at,expires_at) VALUES (?,?,'https://example.invalid/mcp',JSON_ARRAY('read'),UTC_TIMESTAMP(6)-INTERVAL 1 SECOND,UTC_TIMESTAMP(6)+INTERVAL 1 DAY)").bind(user).bind(client).execute(&pool).await.unwrap().last_insert_id();
     let refresh = Credential::generate().unwrap();

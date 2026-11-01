@@ -5,7 +5,8 @@ use sqlx::{MySql, MySqlPool, Transaction, types::Json};
 
 use crate::{
     CodeRecord, Credential, CredentialKind, ExchangeError, GrantState, RefreshRecord,
-    S256Challenge, TokenParameters, validate_code_exchange, validate_refresh_exchange,
+    S256Challenge, TokenParameters, TokenWindow, validate_code_exchange, validate_refresh_exchange,
+    validate_token_window,
 };
 
 /// Trusted Core adapter. It must recheck every requested scope against current
@@ -35,6 +36,14 @@ pub struct IssuedTokens {
     pub scopes: BTreeSet<String>,
 }
 
+/// Server-resolved identity, never taken from a request body or token claims.
+pub struct AuthenticatedAccess {
+    pub user_id: u64,
+    pub client_id: u64,
+    pub grant_id: u64,
+    pub scopes: BTreeSet<String>,
+}
+
 #[derive(Debug)]
 pub enum TokenExchangeError {
     InvalidGrant,
@@ -51,6 +60,100 @@ impl From<sqlx::Error> for TokenExchangeError {
 impl<P: ExchangePolicy> MysqlTokenExchange<P> {
     pub fn new(pool: MySqlPool, policy: P) -> Self {
         Self { pool, policy }
+    }
+
+    /// Revalidate a bearer token and its current grant on every invocation.
+    /// Per-object authorization, quota and audit must still run at the tool.
+    pub async fn authenticate_access(
+        &self,
+        token: &Credential,
+        expected_resource: &str,
+    ) -> Result<AuthenticatedAccess, TokenExchangeError> {
+        if expected_resource.is_empty() {
+            return Err(TokenExchangeError::InvalidGrant);
+        }
+        let digest = token.digest(CredentialKind::AccessToken);
+        let mut tx = self.pool.begin().await?;
+        let grant_id = sqlx::query_scalar::<_, u64>(
+            "SELECT grant_id FROM oauth_access_tokens WHERE token_hash=?",
+        )
+        .bind(digest.as_slice())
+        .fetch_optional(&mut *tx)
+        .await?
+        .ok_or(TokenExchangeError::InvalidGrant)?;
+        let (user_id, client_id) = sqlx::query_as::<_, (u64, u64)>(
+            "SELECT user_id,client_id FROM oauth_grants WHERE id=?",
+        )
+        .bind(grant_id)
+        .fetch_optional(&mut *tx)
+        .await?
+        .ok_or(TokenExchangeError::InvalidGrant)?;
+        let status =
+            sqlx::query_scalar::<_, String>("SELECT status FROM users WHERE id=? FOR UPDATE")
+                .bind(user_id)
+                .fetch_optional(&mut *tx)
+                .await?
+                .ok_or(TokenExchangeError::InvalidGrant)?;
+        let (enabled,metadata,approved,method):(bool,Vec<u8>,Option<Vec<u8>>,String)=sqlx::query_as("SELECT enabled,metadata_hash,approved_metadata_hash,token_auth_method FROM oauth_clients WHERE id=? FOR UPDATE")
+            .bind(client_id).fetch_optional(&mut *tx).await?.ok_or(TokenExchangeError::InvalidGrant)?;
+        let (resource,Json(grant_scopes),issued,expires,revoked):(String,Json<Vec<String>>,NaiveDateTime,NaiveDateTime,Option<NaiveDateTime>)=sqlx::query_as("SELECT resource_uri,scopes_json,issued_at,expires_at,revoked_at FROM oauth_grants WHERE id=? AND user_id=? AND client_id=? FOR UPDATE")
+            .bind(grant_id).bind(user_id).bind(client_id).fetch_optional(&mut *tx).await?.ok_or(TokenExchangeError::InvalidGrant)?;
+        let (Json(token_scopes),token_issued,token_expires):(Json<Vec<String>>,NaiveDateTime,NaiveDateTime)=sqlx::query_as("SELECT scopes_json,issued_at,expires_at FROM oauth_access_tokens WHERE token_hash=? AND grant_id=? FOR UPDATE")
+            .bind(digest.as_slice()).bind(grant_id).fetch_optional(&mut *tx).await?.ok_or(TokenExchangeError::InvalidGrant)?;
+        let now: NaiveDateTime = sqlx::query_scalar("SELECT UTC_TIMESTAMP(6)")
+            .fetch_one(&mut *tx)
+            .await?;
+        let ceiling: BTreeSet<String> = sqlx::query_scalar::<_, String>(
+            "SELECT scope_name FROM oauth_client_scopes WHERE client_id=?",
+        )
+        .bind(client_id)
+        .fetch_all(&mut *tx)
+        .await?
+        .into_iter()
+        .collect();
+        let granted: BTreeSet<String> = grant_scopes.iter().cloned().collect();
+        let effective: BTreeSet<String> = token_scopes.iter().cloned().collect();
+        if resource != expected_resource
+            || method != "none"
+            || granted.len() != grant_scopes.len()
+            || effective.len() != token_scopes.len()
+            || effective.is_empty()
+            || !effective.is_subset(&granted)
+        {
+            return Err(TokenExchangeError::InvalidGrant);
+        }
+        let state = GrantState {
+            issued_at: issued.and_utc().timestamp(),
+            expires_at: expires.and_utc().timestamp(),
+            revoked: revoked.is_some(),
+            user_active: status == "active",
+            client_approved: enabled,
+            client_metadata_approved: approved.as_deref() == Some(metadata.as_slice()),
+            credentials_current: true,
+            granted_scopes: &granted,
+            client_max_scopes: &ceiling,
+            current_user_scopes: &granted,
+        };
+        let window = TokenWindow {
+            issued_at: token_issued.and_utc().timestamp(),
+            expires_at: token_expires.and_utc().timestamp(),
+        };
+        validate_token_window(&state, &window, now.and_utc().timestamp())
+            .map_err(|_| TokenExchangeError::InvalidGrant)?;
+        if !self
+            .policy
+            .authorize(&mut tx, user_id, client_id, &effective)
+            .await?
+        {
+            return Err(TokenExchangeError::InvalidGrant);
+        }
+        tx.commit().await?;
+        Ok(AuthenticatedAccess {
+            user_id,
+            client_id,
+            grant_id,
+            scopes: effective,
+        })
     }
 
     /// Only public clients with an explicitly approved `none` method are

@@ -152,6 +152,19 @@ async fn mysql57_consent_is_session_bound_rechecks_metadata_and_requires_permiss
         verifier: "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk".into(),
     };
     let tokens = exchange.redeem_code(&token_request).await.unwrap();
+    let identity = exchange
+        .authenticate_access(&tokens.access_token, &request.resource)
+        .await
+        .unwrap();
+    assert_eq!(identity.user_id, user);
+    assert_eq!(identity.client_id, client);
+    assert_eq!(identity.scopes, scopes);
+    assert!(matches!(
+        exchange
+            .authenticate_access(&tokens.access_token, "https://example.invalid/other")
+            .await,
+        Err(TokenExchangeError::InvalidGrant)
+    ));
     let refresh = TokenParameters::RefreshToken {
         client_id: client_uri.into(),
         resource: request.resource.clone(),
@@ -163,6 +176,12 @@ async fn mysql57_consent_is_session_bound_rechecks_metadata_and_requires_permiss
         .execute(&pool)
         .await
         .unwrap();
+    assert!(matches!(
+        exchange
+            .authenticate_access(&tokens.access_token, &request.resource)
+            .await,
+        Err(TokenExchangeError::InvalidGrant)
+    ));
     assert!(matches!(
         exchange.rotate_refresh(&refresh).await,
         Err(TokenExchangeError::InvalidGrant)
