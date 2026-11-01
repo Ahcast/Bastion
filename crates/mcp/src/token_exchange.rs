@@ -12,17 +12,17 @@ use crate::{
 /// Trusted Core adapter. It must recheck every requested scope against current
 /// user, role, module and object-independent policy using this transaction.
 /// There is intentionally no permissive default implementation.
-#[allow(async_fn_in_trait)]
 pub trait ExchangePolicy {
-    async fn authorize(
+    fn authorize(
         &self,
         tx: &mut Transaction<'_, MySql>,
         user_id: u64,
         client_id: u64,
         scopes: &BTreeSet<String>,
-    ) -> Result<bool, sqlx::Error>;
+    ) -> impl std::future::Future<Output = Result<bool, sqlx::Error>> + Send;
 }
 
+#[derive(Clone)]
 pub struct MysqlTokenExchange<P> {
     pool: MySqlPool,
     policy: P,

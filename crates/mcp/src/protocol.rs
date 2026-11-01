@@ -100,6 +100,14 @@ pub fn parse_token_parameters(
         return Err(ProtocolError::InvalidRequest);
     }
     let parameters = parse_form(body)?;
+    // This implementation currently supports only public clients. Never
+    // silently downgrade a request that attempts client authentication.
+    if ["client_secret", "client_assertion", "client_assertion_type"]
+        .iter()
+        .any(|key| parameters.contains_key(*key))
+    {
+        return Err(ProtocolError::InvalidRequest);
+    }
     let required = |key: &str| -> Result<&str, ProtocolError> {
         parameters
             .get(key)

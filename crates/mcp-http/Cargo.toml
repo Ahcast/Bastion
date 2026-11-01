@@ -1,0 +1,17 @@
+[package]
+name = "bastion-mcp-http"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+axum.workspace = true
+bastion-mcp = { path = "../mcp" }
+serde.workspace = true
+sqlx.workspace = true
+
+[dev-dependencies]
+bastion-core = { path = "../core", features = ["test-support"] }
+chrono.workspace = true
+serde_json.workspace = true
+tokio.workspace = true
+tower = { version = "0.5", features = ["util"] }

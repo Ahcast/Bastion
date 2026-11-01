@@ -369,6 +369,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "bastion-mcp-http"
+version = "0.1.0"
+dependencies = [
+ "axum",
+ "bastion-core",
+ "bastion-mcp",
+ "chrono",
+ "serde",
+ "serde_json",
+ "sqlx",
+ "tokio",
+ "tower",
+]
+
+[[package]]
 name = "bastion-ordenes-compra"
 version = "0.1.0"
 dependencies = [

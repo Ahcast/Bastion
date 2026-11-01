@@ -6,6 +6,7 @@ on:
     paths:
       - 'crates/mcp/**'
       - 'crates/mcp-core/**'
+      - 'crates/mcp-http/**'
       - 'crates/core/**'
       - 'Cargo.toml'
       - 'Cargo.lock'
@@ -15,6 +16,7 @@ on:
     paths:
       - 'crates/mcp/**'
       - 'crates/mcp-core/**'
+      - 'crates/mcp-http/**'
       - 'crates/core/**'
       - 'Cargo.toml'
       - 'Cargo.lock'
@@ -48,4 +50,4 @@ jobs:
         with:
           toolchain: 1.99.1
       - name: Test MCP against disposable MySQL 5.7
-        run: cargo test --locked --package bastion-mcp --package bastion-mcp-core
+        run: cargo test --locked --package bastion-mcp --package bastion-mcp-core --package bastion-mcp-http
