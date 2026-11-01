@@ -1,6 +1,7 @@
 #![forbid(unsafe_code)]
 
 mod client_approval;
+mod client_requests;
 mod consent;
 mod credential;
 mod discovery;
@@ -19,6 +20,7 @@ mod transport;
 mod validity;
 
 pub use client_approval::{ApprovedClientStore, ClientApprovalError};
+pub use client_requests::{ClientRequestError, ClientRequestStore, ReviewDecision};
 pub use consent::{
     ConsentError, ConsentIdentity, ConsentPolicy, ConsentResult, DeniedConsent, MysqlConsent,
     PendingConsent,

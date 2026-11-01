@@ -38,6 +38,8 @@ Se preparan las respuestas de aprobación y rechazo al URI registrado, incluyend
 
 Un router de consentimiento aislado prepara y decide solicitudes mediante sesión del Core, origen exacto y CSRF ligado a la sesión. La decisión vuelve a comprobar cliente, redirección y permisos, y sus respuestas prohíben caché. La pantalla preliminar exige revisar la solicitud y elegir explícitamente. Ninguna de estas piezas está conectada a la aplicación activa: faltan navegación, CORS, límites de perímetro y pruebas completas de interoperabilidad antes de exponerlas.
 
+Se prepara el registro transaccional de solicitudes de clientes y su revisión por un Administrador del sistema. Cada solicitud queda ligada al hash de la ficha y a los alcances solicitados; aprobarla no crea grants de usuario. La migración 7 agrega esa referencia y no debe aplicarse sin el respaldo y la revisión habituales. La vista en Ajustes, la entrega de correo y la conexión a las rutas siguen pendientes.
+
 ```mermaid
 flowchart LR
     Agent[Cliente IA/MCP] --> Host[Servidor MCP del core]
