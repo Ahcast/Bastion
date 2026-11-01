@@ -2,8 +2,8 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use bastion_core::{CoreAdmin, CoreError};
-use bastion_mcp::ExchangePolicy;
+use bastion_core::{CoreAdmin, CoreError, oauth_session_in_transaction};
+use bastion_mcp::{ConsentIdentity, ConsentPolicy, ExchangePolicy};
 use sqlx::{MySql, Transaction};
 
 /// A Core permission required by a registered MCP scope. Values come only
@@ -20,6 +20,23 @@ pub struct PermissionRequirement {
 pub struct CoreScopePolicy {
     core: CoreAdmin,
     registry: BTreeMap<String, Vec<PermissionRequirement>>,
+}
+
+pub struct CoreConsentPolicy;
+
+impl ConsentPolicy for CoreConsentPolicy {
+    async fn session(
+        &self,
+        tx: &mut Transaction<'_, MySql>,
+        token: &str,
+    ) -> Result<Option<ConsentIdentity>, sqlx::Error> {
+        Ok(oauth_session_in_transaction(tx, token)
+            .await?
+            .map(|identity| ConsentIdentity {
+                user_id: identity.user_id,
+                session_id: identity.session_id,
+            }))
+    }
 }
 
 impl CoreScopePolicy {

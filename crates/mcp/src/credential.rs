@@ -7,6 +7,7 @@ pub struct Credential([u8; 32]);
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum CredentialKind {
+    ConsentRequest,
     AuthorizationCode,
     AccessToken,
     RefreshToken,
@@ -51,6 +52,7 @@ impl Credential {
     /// A purpose-separated lookup digest. Store this value, never the secret.
     pub fn digest(&self, kind: CredentialKind) -> [u8; 32] {
         let prefix: &[u8] = match kind {
+            CredentialKind::ConsentRequest => b"bastion/oauth/consent/v1\0",
             CredentialKind::AuthorizationCode => b"bastion/oauth/code/v1\0",
             CredentialKind::AccessToken => b"bastion/oauth/access/v1\0",
             CredentialKind::RefreshToken => b"bastion/oauth/refresh/v1\0",

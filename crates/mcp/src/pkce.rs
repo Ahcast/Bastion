@@ -14,6 +14,9 @@ pub enum PkceError {
 }
 
 impl S256Challenge {
+    pub fn encode(&self) -> String {
+        URL_SAFE_NO_PAD.encode(self.0)
+    }
     /// Accept only canonical, unpadded base64url encoding of a SHA-256 digest.
     pub fn parse(encoded: &str) -> Result<Self, PkceError> {
         if encoded.len() != 43 {

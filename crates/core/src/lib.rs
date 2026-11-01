@@ -5,6 +5,7 @@ mod config;
 mod dashboard;
 mod database;
 mod documents;
+mod oauth_session;
 mod sar;
 mod service;
 
@@ -16,6 +17,7 @@ pub use config::{AppConfig, ConfigError, DatabaseConfig};
 pub use dashboard::{DashboardPeriod, DashboardPoint, DashboardQuery, DashboardWindow};
 pub use database::Database;
 pub use documents::{DocumentCompany, DocumentService, MAX_PRIVATE_FILE_BYTES};
+pub use oauth_session::{OAuthSessionIdentity, oauth_session_in_transaction};
 pub use sar::{SarSettings, SarSettingsRecord, SarStatus};
 pub use service::{
     AccessCatalog, AuthCookies, AuthenticatedUser, BootstrapBegin, BootstrapComplete, BusinessMail,

@@ -10,4 +10,5 @@ sqlx.workspace = true
 
 [dev-dependencies]
 bastion-core = { path = "../core", features = ["test-support"] }
+serde_json.workspace = true
 tokio.workspace = true

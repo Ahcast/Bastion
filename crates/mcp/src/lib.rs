@@ -1,6 +1,7 @@
 #![forbid(unsafe_code)]
 
 mod client_approval;
+mod consent;
 mod credential;
 mod exchange;
 mod metadata;
@@ -12,6 +13,9 @@ mod token_exchange;
 mod validity;
 
 pub use client_approval::{ApprovedClientStore, ClientApprovalError};
+pub use consent::{
+    ConsentError, ConsentIdentity, ConsentPolicy, ConsentResult, MysqlConsent, PendingConsent,
+};
 pub use credential::{Credential, CredentialError, CredentialKind};
 pub use exchange::{
     CodeRecord, ExchangeError, RefreshRecord, validate_code_exchange, validate_refresh_exchange,
