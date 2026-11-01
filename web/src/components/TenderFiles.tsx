@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import type { ReactNode } from 'react';
 import { ApiError, message } from '../api.js';
 import { Dialog, Loading, Notice, Table, useCore, useLoad } from '../ui.js';
 import { moduleCan } from '../types.js';
@@ -11,7 +12,7 @@ import { encodeTenderFile, maxTenderFileBytes, tenderContentBlob, tenderFileAcce
 import type { AttachmentSection, TenderAttachment, TenderAttachments } from '../tenderAttachments.js';
 import type { Expedient } from '../tenders.js';
 
-export default function TenderFiles({ record, section, changed, start }: { record: Expedient; section: AttachmentSection; changed: (value: Expedient) => void; start: (action: () => void) => void }) {
+export default function TenderFiles({ record, section, changed, start, extraRows = [], extraAction }: { record: Expedient; section: AttachmentSection; changed: (value: Expedient) => void; start: (action: () => void) => void; extraRows?: ReactNode[][]; extraAction?: ReactNode }) {
   const { api, access } = useCore();
   const [upload, setUpload] = useState(false), [library, setLibrary] = useState(false), [removing, setRemoving] = useState<TenderAttachment | null>(null);
   const [error, setError] = useState(''), [busy, setBusy] = useState(false), [preview, setPreview] = useState<{ url: string; title: string } | null>(null);
@@ -33,9 +34,9 @@ export default function TenderFiles({ record, section, changed, start }: { recor
       }
     } catch (reason) { viewer?.close(); setError(message(reason)); } finally { setBusy(false); }
   };
-  return <div className="tender-files"><div className="document-section-heading"><h3>Archivos del expediente</h3>{editable && <div className="actions"><button disabled={busy} onClick={() => start(() => setUpload(true))}>Subir desde mi PC</button>{collaborationCan(access) && <button disabled={busy} onClick={() => start(() => setLibrary(true))}>Seleccionar de Colaboración</button>}</div>}</div>
+  return <div className="tender-files"><div className="document-section-heading"><h3>Archivos del expediente</h3>{editable && <div className="actions"><button disabled={busy} onClick={() => start(() => setUpload(true))}>Subir desde mi PC</button>{collaborationCan(access) && <button disabled={busy} onClick={() => start(() => setLibrary(true))}>Seleccionar de Colaboración</button>}{extraAction}</div>}</div>
     <p className="document-note">PDF e imágenes, hasta 100 MB por archivo y 1 GB por expediente. Los archivos de Colaboración se referencian al original.</p><Notice>{error || result.error}</Notice>
-    {result.data ? <><Table columns={['Archivo','Tamaño','Origen','Acciones']} rows={result.data.items.filter(f => f.section === section).map(file => [file.filename,tenderSize(file.byte_size),file.is_reference ? 'Referencia de Colaboración' : file.source_id ? 'Copia anterior' : 'PC',<div className="actions">{file.available && file.mime !== 'image/tiff' && <button disabled={busy} onClick={() => { void read(file,true); }}>Ver</button>}{file.available && <button disabled={busy} onClick={() => { void read(file,false); }}>Descargar</button>}{canRemove && <button className="danger" disabled={busy} onClick={() => start(() => setRemoving(file))}>Quitar archivo</button>}</div>])} /><p className="document-note">Espacio retenido en el expediente: {tenderSize(result.data.retained_bytes)} de 1 GB.</p></> : !result.error && <Loading />}
+    {result.data ? <><Table columns={['Archivo','Tamaño','Origen','Acciones']} rows={[...result.data.items.filter(f => f.section === section).map(file => [file.filename,tenderSize(file.byte_size),file.is_reference ? 'Referencia de Colaboración' : file.source_id ? 'Copia anterior' : 'PC',<div className="actions">{file.available && file.mime !== 'image/tiff' && <button disabled={busy} onClick={() => { void read(file,true); }}>Ver</button>}{file.available && <button disabled={busy} onClick={() => { void read(file,false); }}>Descargar</button>}{canRemove && <button className="danger" disabled={busy} onClick={() => start(() => setRemoving(file))}>Quitar archivo</button>}</div>]), ...extraRows]} /><p className="document-note">Espacio retenido en el expediente: {tenderSize(result.data.retained_bytes)} de 1 GB.</p></> : !result.error && <Loading />}
     {upload && <UploadFiles record={record} section={section} changed={changed} close={() => setUpload(false)} />}
     {library && <LibraryFiles record={record} section={section} changed={value => { changed(value); setLibrary(false); }} close={() => setLibrary(false)} />}
     {removing && <RemoveFile record={record} file={removing} changed={value => { changed(value); setRemoving(null); }} close={() => setRemoving(null)} />}
