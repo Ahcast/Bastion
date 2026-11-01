@@ -638,17 +638,52 @@ async fn mysql57_tenders_snapshots_permissions_races_receipts_and_deletion() {
         .await
         .unwrap();
     assert!(matches!(
-        library.archive_form(2, archived.id, archived.revision).await,
+        library
+            .archive_form(2, archived.id, archived.revision)
+            .await,
         Err(CoreError::Forbidden)
     ));
-    assert!(matches!(library.archive_form(1, archived.id, archived.revision + 1).await, Err(CoreError::PreconditionFailed)));
-    library.archive_form(1, archived.id, archived.revision).await.unwrap();
-    assert!(
-        !library.list_forms(1, 1, 100).await.unwrap().items.iter().any(|f| f.id == archived.id)
-    );
-    assert!(tenders.detail(1, draft.id).await.unwrap().forms.iter().any(|f| f.source.id == archived.id));
     assert!(matches!(
-        tenders.copy_form(1, draft.id, copy.version, "archive-test-copy-02", CopyFormInput { source_id: archived.id, revision: archived.revision }).await,
+        library
+            .archive_form(1, archived.id, archived.revision + 1)
+            .await,
+        Err(CoreError::PreconditionFailed)
+    ));
+    library
+        .archive_form(1, archived.id, archived.revision)
+        .await
+        .unwrap();
+    assert!(
+        !library
+            .list_forms(1, 1, 100)
+            .await
+            .unwrap()
+            .items
+            .iter()
+            .any(|f| f.id == archived.id)
+    );
+    assert!(
+        tenders
+            .detail(1, draft.id)
+            .await
+            .unwrap()
+            .forms
+            .iter()
+            .any(|f| f.source.id == archived.id)
+    );
+    assert!(matches!(
+        tenders
+            .copy_form(
+                1,
+                draft.id,
+                copy.version,
+                "archive-test-copy-02",
+                CopyFormInput {
+                    source_id: archived.id,
+                    revision: archived.revision
+                }
+            )
+            .await,
         Err(CoreError::NotFound)
     ));
     let removed = tenders
