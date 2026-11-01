@@ -1,7 +1,7 @@
 use std::collections::BTreeSet;
 
 use sha2::{Digest, Sha256};
-use sqlx::{MySqlPool, types::Json};
+use sqlx::{MySql, MySqlPool, QueryBuilder, types::Json};
 
 use crate::ClientMetadata;
 
@@ -32,6 +32,22 @@ pub struct ClientRequestStore {
     pool: MySqlPool,
 }
 
+#[derive(serde::Serialize)]
+pub struct ClientRequestSummary {
+    pub id: u64,
+    pub client_name: String,
+    pub client_id: String,
+    pub scopes: Vec<String>,
+    pub status: String,
+    pub created_at: chrono::NaiveDateTime,
+}
+
+#[derive(serde::Serialize)]
+pub struct ClientRequestPage {
+    pub items: Vec<ClientRequestSummary>,
+    pub next_before: Option<u64>,
+}
+
 fn valid_scopes(scopes: &BTreeSet<String>, registered: &BTreeSet<String>) -> bool {
     !scopes.is_empty()
         && scopes.len() <= 64
@@ -48,6 +64,93 @@ fn valid_scopes(scopes: &BTreeSet<String>, registered: &BTreeSet<String>) -> boo
 impl ClientRequestStore {
     pub fn new(pool: MySqlPool) -> Self {
         Self { pool }
+    }
+
+    /// List only the authenticated user's requests, with a bounded cursor.
+    pub async fn list_own(
+        &self,
+        user: u64,
+        before: Option<u64>,
+    ) -> Result<ClientRequestPage, ClientRequestError> {
+        self.list(user, before, false).await
+    }
+
+    /// Review queue is restricted to active system administrators.
+    pub async fn list_pending(
+        &self,
+        actor: u64,
+        before: Option<u64>,
+    ) -> Result<ClientRequestPage, ClientRequestError> {
+        self.list(actor, before, true).await
+    }
+
+    async fn list(
+        &self,
+        actor: u64,
+        before: Option<u64>,
+        admin: bool,
+    ) -> Result<ClientRequestPage, ClientRequestError> {
+        if before == Some(0) {
+            return Err(ClientRequestError::Invalid);
+        }
+        let mut tx = self.pool.begin().await?;
+        let authorized = if admin {
+            sqlx::query_scalar::<_,u64>("SELECT u.id FROM users u JOIN roles r ON r.id=u.role_id WHERE u.id=? AND u.status='active' AND r.system_key='system_administrator' FOR UPDATE").bind(actor).fetch_optional(&mut *tx).await?
+        } else {
+            sqlx::query_scalar::<_, u64>(
+                "SELECT id FROM users WHERE id=? AND status='active' FOR UPDATE",
+            )
+            .bind(actor)
+            .fetch_optional(&mut *tx)
+            .await?
+        };
+        if authorized.is_none() {
+            return Err(ClientRequestError::Forbidden);
+        }
+        let mut query = QueryBuilder::<MySql>::new(
+            "SELECT r.id,c.display_name,c.client_id,r.requested_scopes,r.status,r.created_at FROM oauth_client_requests r JOIN oauth_clients c ON c.id=r.client_id WHERE ",
+        );
+        if admin {
+            query.push("r.status='pending'");
+        } else {
+            query.push("r.user_id=").push_bind(actor);
+        }
+        if let Some(before) = before {
+            query.push(" AND r.id<").push_bind(before);
+        }
+        query.push(" ORDER BY r.id DESC LIMIT 51");
+        let rows: Vec<(
+            u64,
+            String,
+            String,
+            Json<Vec<String>>,
+            String,
+            chrono::NaiveDateTime,
+        )> = query.build_query_as().fetch_all(&mut *tx).await?;
+        let has_more = rows.len() > 50;
+        let items: Vec<_> = rows
+            .into_iter()
+            .take(50)
+            .map(
+                |(id, client_name, client_id, Json(scopes), status, created_at)| {
+                    ClientRequestSummary {
+                        id,
+                        client_name,
+                        client_id,
+                        scopes,
+                        status,
+                        created_at,
+                    }
+                },
+            )
+            .collect();
+        let next_before = if has_more {
+            items.last().map(|item| item.id)
+        } else {
+            None
+        };
+        tx.commit().await?;
+        Ok(ClientRequestPage { items, next_before })
     }
 
     /// An authenticated user requests review of a validated document; no

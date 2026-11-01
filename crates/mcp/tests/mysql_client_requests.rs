@@ -66,6 +66,29 @@ async fn mysql57_client_requests_require_admin_and_never_create_user_grants() {
         .submit(user, &metadata, &quote, &registered)
         .await
         .unwrap();
+    assert!(matches!(
+        store.list_pending(user, None).await,
+        Err(ClientRequestError::Forbidden)
+    ));
+    assert!(store.list_own(admin, None).await.unwrap().items.is_empty());
+    assert!(
+        store
+            .list_own(user, None)
+            .await
+            .unwrap()
+            .items
+            .iter()
+            .any(|item| item.id == request)
+    );
+    assert!(
+        store
+            .list_pending(admin, None)
+            .await
+            .unwrap()
+            .items
+            .iter()
+            .any(|item| item.id == request)
+    );
     assert_eq!(
         store
             .submit(user, &metadata, &quote, &registered)
@@ -117,6 +140,15 @@ async fn mysql57_client_requests_require_admin_and_never_create_user_grants() {
         )
         .await
         .unwrap();
+    assert!(
+        !store
+            .list_pending(admin, None)
+            .await
+            .unwrap()
+            .items
+            .iter()
+            .any(|item| item.id == request)
+    );
     let (enabled, approved): (bool, bool) = sqlx::query_as(
         "SELECT enabled,approved_metadata_hash=metadata_hash FROM oauth_clients WHERE client_id=?",
     )
