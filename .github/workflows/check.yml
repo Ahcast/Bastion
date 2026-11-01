@@ -2,7 +2,7 @@ name: Core checks
 
 on:
   push:
-    branches: [main]
+    branches: [main, codex/licitaciones-frontend-release-20261101]
   pull_request:
     branches: [main]
 
