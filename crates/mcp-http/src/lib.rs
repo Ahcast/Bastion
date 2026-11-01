@@ -16,7 +16,7 @@ pub use composition::{DraftCompositionConfig, DraftCompositionError, compose_dra
 pub use consent_http::{DraftConsentState, draft_consent_router};
 pub use metadata_fetch::{DraftMetadataFetcher, MetadataFetchError};
 pub use metadata_integrity::{DraftMetadataIntegrity, MetadataIntegrity, MetadataIntegrityError};
-pub use modern::{DraftMcpState, McpConfigurationError, draft_mcp_router};
+pub use modern::{DraftMcpState, McpConfigurationError, ReadToolExecutor, draft_mcp_router};
 pub use oauth_metadata::{DraftOauthMetadata, OauthMetadataError, draft_oauth_metadata_router};
 
 use std::{collections::BTreeSet, sync::Arc};

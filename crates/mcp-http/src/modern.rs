@@ -1,4 +1,10 @@
-use std::{collections::BTreeSet, sync::Arc, time::Duration};
+use std::{
+    collections::BTreeSet,
+    future::Future,
+    pin::Pin,
+    sync::{Arc, Mutex},
+    time::Duration,
+};
 
 use crate::{MetadataIntegrity, MetadataIntegrityError};
 use axum::{
@@ -25,6 +31,38 @@ use tokio::sync::Semaphore;
 use url::Url;
 
 const MAX_BODY: usize = 64 * 1024;
+
+struct PendingAudit {
+    actor: u64,
+    client: u64,
+    grant: u64,
+    correlation: String,
+    module: String,
+    tool: String,
+    object_id: Option<u64>,
+}
+type AuditSlot = Arc<Mutex<Option<PendingAudit>>>;
+
+/// Only server-owned executors may be registered. They receive an already
+/// authenticated delegation and must recheck domain permissions.
+pub trait ReadToolExecutor: Send + Sync {
+    fn call<'a>(
+        &'a self,
+        access: &'a bastion_mcp::AuthenticatedAccess,
+        tool: &'a str,
+        arguments: Value,
+    ) -> Pin<Box<dyn Future<Output = Result<Value, ReadToolError>> + Send + 'a>>;
+}
+impl ReadToolExecutor for DraftReadExecutor {
+    fn call<'a>(
+        &'a self,
+        access: &'a bastion_mcp::AuthenticatedAccess,
+        tool: &'a str,
+        arguments: Value,
+    ) -> Pin<Box<dyn Future<Output = Result<Value, ReadToolError>> + Send + 'a>> {
+        Box::pin(DraftReadExecutor::call(self, access, tool, arguments))
+    }
+}
 
 enum DraftRequest {
     Modern(ModernRequest),
@@ -60,7 +98,7 @@ pub struct DraftMcpState<P> {
     challenge: HeaderValue,
     origins: BTreeSet<String>,
     registry: Arc<ToolRegistry>,
-    read_executor: Option<Arc<DraftReadExecutor>>,
+    read_executor: Option<Arc<dyn ReadToolExecutor>>,
     integrity: Option<Arc<dyn MetadataIntegrity>>,
     quota: MysqlQuota,
     discovery_quota: ToolQuota,
@@ -136,8 +174,8 @@ impl<P> DraftMcpState<P> {
     }
 
     /// Draft integration only. A production route also needs edge protection,
-    /// OAuth consent, terminal audit on timeout, and interoperable clients.
-    pub fn with_read_executor(mut self, executor: Arc<DraftReadExecutor>) -> Self {
+    /// perimeter protection and interoperable clients.
+    pub fn with_read_executor(mut self, executor: Arc<dyn ReadToolExecutor>) -> Self {
         self.read_executor = Some(executor);
         self
     }
@@ -259,6 +297,7 @@ async fn execute_read_tool<P>(
     access: &bastion_mcp::AuthenticatedAccess,
     request: &DraftRequest,
     correlation: &str,
+    audit_slot: &AuditSlot,
 ) -> Response {
     let Some(id) = request.id() else {
         let charged = state
@@ -503,37 +542,39 @@ async fn execute_read_tool<P>(
             None,
         );
     }
+    *audit_slot.lock().unwrap_or_else(|error| error.into_inner()) = Some(PendingAudit {
+        actor: access.user_id,
+        client: access.client_id,
+        grant: access.grant_id,
+        correlation: correlation.to_owned(),
+        module: tool.module_id.clone(),
+        tool: tool.name.clone(),
+        object_id,
+    });
     let result = tokio::time::timeout(
         Duration::from_millis(tool.max_duration_ms),
         executor.call(access, &tool.name, args),
     )
     .await;
     let (result_label, output) = match result {
-        Ok(Ok(value)) => {
-            let text = match serde_json::to_string(&value) {
-                Ok(text) => text,
-                Err(_) => {
-                    return protocol_error(
-                        StatusCode::SERVICE_UNAVAILABLE,
-                        -32603,
-                        "Temporarily unavailable",
-                        Some(id.clone()),
-                        None,
-                    );
+        Ok(Ok(value)) => match serde_json::to_string(&value) {
+            Ok(text) => {
+                let output = json!({"jsonrpc":"2.0","id":id,"result":{"content":[{"type":"text","text":text}],"structuredContent":value,"isError":false}});
+                if serde_json::to_vec(&output)
+                    .map_or(true, |data| data.len() > tool.max_response_bytes)
+                {
+                    ("error", None)
+                } else {
+                    ("success", Some(output))
                 }
-            };
-            let output = json!({"jsonrpc":"2.0","id":id,"result":{"content":[{"type":"text","text":text}],"structuredContent":value,"isError":false}});
-            if serde_json::to_vec(&output).map_or(true, |data| data.len() > tool.max_response_bytes)
-            {
-                ("error", None)
-            } else {
-                ("success", Some(output))
             }
-        }
+            Err(_) => ("error", None),
+        },
         Ok(Err(ReadToolError::Invalid)) => ("denied", None),
         Ok(Err(ReadToolError::Denied | ReadToolError::NotFound)) => ("denied", None),
         Ok(Err(ReadToolError::Limited)) => ("limited", None),
-        _ => ("error", None),
+        Ok(Err(_)) => ("error", None),
+        Err(_) => ("timeout", None),
     };
     if audit_tool(
         &state.pool,
@@ -557,6 +598,10 @@ async fn execute_read_tool<P>(
             None,
         );
     }
+    audit_slot
+        .lock()
+        .unwrap_or_else(|error| error.into_inner())
+        .take();
     match output {
         Some(output) => {
             (StatusCode::OK, [(CACHE_CONTROL, "no-store")], Json(output)).into_response()
@@ -582,17 +627,46 @@ where
             "Temporarily unavailable",
         );
     };
-    match tokio::time::timeout(state.timeout, handle(&state, &headers, &body)).await {
+    let audit_slot: AuditSlot = Arc::new(Mutex::new(None));
+    match tokio::time::timeout(state.timeout, handle(&state, &headers, &body, &audit_slot)).await {
         Ok(response) => response,
-        Err(_) => rpc_error(
-            StatusCode::SERVICE_UNAVAILABLE,
-            -32603,
-            "Temporarily unavailable",
-        ),
+        Err(_) => {
+            let pending = audit_slot
+                .lock()
+                .unwrap_or_else(|error| error.into_inner())
+                .take();
+            if let Some(pending) = pending {
+                let _ = tokio::time::timeout(
+                    Duration::from_secs(2),
+                    audit_tool(
+                        &state.pool,
+                        pending.actor,
+                        pending.client,
+                        pending.grant,
+                        &pending.correlation,
+                        &pending.module,
+                        &pending.tool,
+                        pending.object_id,
+                        "timeout",
+                    ),
+                )
+                .await;
+            }
+            rpc_error(
+                StatusCode::SERVICE_UNAVAILABLE,
+                -32603,
+                "Temporarily unavailable",
+            )
+        }
     }
 }
 
-async fn handle<P>(state: &DraftMcpState<P>, headers: &HeaderMap, body: &[u8]) -> Response
+async fn handle<P>(
+    state: &DraftMcpState<P>,
+    headers: &HeaderMap,
+    body: &[u8],
+    audit_slot: &AuditSlot,
+) -> Response
 where
     P: ExchangePolicy + Clone + Send + Sync + 'static,
 {
@@ -779,7 +853,7 @@ where
         }
     };
     if request.method() == "tools/call" {
-        return execute_read_tool(state, &access, &request, &request_id).await;
+        return execute_read_tool(state, &access, &request, &request_id, audit_slot).await;
     }
     let (bucket, action) = match request.method() {
         "server/discover" => ("server.discover", "mcp.discover"),
