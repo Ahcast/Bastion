@@ -21,6 +21,9 @@ async fn isolated_job_generates_and_downloads_a_multipage_tiff() {
     db.migrate().await.unwrap();
     CollaborationService::migrate(&db).await.unwrap();
     TenderService::migrate(&db).await.unwrap();
+    // Keep a synthetic legacy form to verify existing rendering compatibility.
+    sqlx::query("INSERT INTO licitaciones_formularios_instalados (form_key,enabled) VALUES ('integridad',TRUE)")
+        .execute(&pool).await.unwrap();
     sqlx::query("INSERT INTO persons (id,full_name) VALUES (1,'Synthetic admin')")
         .execute(&pool)
         .await

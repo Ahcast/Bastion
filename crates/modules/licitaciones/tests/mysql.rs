@@ -611,6 +611,58 @@ async fn mysql57_tenders_snapshots_permissions_races_receipts_and_deletion() {
             .await
             .unwrap();
     assert_eq!(state, ("failed".into(), true));
+    let to_delete = library
+        .publish_form(
+            1,
+            "delete-template-publish-01",
+            PublishFormInput {
+                form_id: None,
+                expected_revision: None,
+                definition: definition("Formulario a eliminar"),
+            },
+        )
+        .await
+        .unwrap();
+    let affected = tenders
+        .create(1, "delete-template-create-01")
+        .await
+        .unwrap();
+    let affected = tenders
+        .copy_form(
+            1,
+            affected.id,
+            affected.version,
+            "delete-template-copy-01",
+            CopyFormInput {
+                source_id: to_delete.id,
+                revision: to_delete.revision,
+            },
+        )
+        .await
+        .unwrap();
+    assert!(matches!(
+        tenders
+            .delete_published_template(1, to_delete.id, to_delete.revision + 1)
+            .await,
+        Err(CoreError::PreconditionFailed)
+    ));
+    tenders
+        .delete_published_template(1, to_delete.id, to_delete.revision)
+        .await
+        .unwrap();
+    let after = tenders.detail(1, affected.id).await.unwrap();
+    assert!(after.forms.is_empty());
+    assert_eq!(after.version, affected.version + 1);
+    assert!(
+        !library
+            .list_forms(1, 1, 100)
+            .await
+            .unwrap()
+            .items
+            .iter()
+            .any(|form| form.id == to_delete.id)
+    );
+
     let archived = library
         .publish_form(
             1,
@@ -691,6 +743,10 @@ async fn mysql57_tenders_snapshots_permissions_races_receipts_and_deletion() {
         .await
         .unwrap();
     assert!(removed.forms.is_empty());
+    assert!(tenders.installed_forms(1).await.unwrap().is_empty());
+    // Historical compatibility when an older installation still exposes a key.
+    sqlx::query("INSERT INTO licitaciones_formularios_instalados (form_key,enabled) VALUES ('integridad',TRUE)")
+        .execute(&pool).await.unwrap();
     let selected = tenders
         .save_initial_forms(
             1,
@@ -751,4 +807,29 @@ async fn mysql57_tenders_snapshots_permissions_races_receipts_and_deletion() {
         .set_installed_form(1, "integridad", true)
         .await
         .unwrap();
+    let mut economic = definition("Oferta conservada");
+    economic.section = FormSection::Economica;
+    let economic = library
+        .publish_form(
+            1,
+            "keep-economic-form01",
+            PublishFormInput {
+                form_id: None,
+                expected_revision: None,
+                definition: economic,
+            },
+        )
+        .await
+        .unwrap();
+    tenders.delete_all_legal_templates(1).await.unwrap();
+    assert!(
+        library
+            .list_forms(1, 1, 100)
+            .await
+            .unwrap()
+            .items
+            .iter()
+            .any(|form| form.id == economic.id)
+    );
+    assert!(tenders.detail(1, draft.id).await.unwrap().forms.is_empty());
 }

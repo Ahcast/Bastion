@@ -2,7 +2,7 @@ name: Core checks
 
 on:
   push:
-    branches: [main, codex/licitaciones-release-20261101]
+    branches: [main, codex/licitaciones-typst-backend-release-20261101]
   pull_request:
     branches: [main]
 
