@@ -27,8 +27,11 @@ async fn mysql57_mcp_notifications_are_queued_once_and_track_delivery() {
         .last_insert_id();
     let admin = sqlx::query("INSERT INTO users (person_id,role_id,email,status) VALUES (?,?,'mcp-mail-fixture@example.invalid','active')").bind(person).bind(admin_role).execute(&pool).await.unwrap().last_insert_id();
     assert!(core.queue_one_mcp_notification(admin).await.is_err());
+    assert!(!core.mcp_notification_sender_ready(admin).await.unwrap());
+    assert!(core.database().core_schema_matches().await.unwrap());
     // This opaque fixture is never decrypted or sent; it is not a password.
     sqlx::query("INSERT INTO user_smtp_credentials (user_id,smtp_email,password_ciphertext) VALUES (?,'mcp-mail-fixture@example.invalid',?)").bind(admin).bind(Credential::generate().unwrap().expose().as_bytes()).execute(&pool).await.unwrap();
+    assert!(core.mcp_notification_sender_ready(admin).await.unwrap());
     // Drain other isolated test notices before checking concurrency on our row.
     for _ in 0..200 {
         if !core.queue_one_mcp_notification(admin).await.unwrap() {

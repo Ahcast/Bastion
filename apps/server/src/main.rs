@@ -5,6 +5,7 @@ use bastion_core::{AppConfig, CoreService, Database, DatabaseConfig};
 use tokio::net::TcpListener;
 use tracing_subscriber::EnvFilter;
 
+mod mcp_config;
 mod scout_import;
 
 #[tokio::main]
@@ -61,6 +62,10 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
     }
     let config = AppConfig::from_env()?;
     let mcp_notification_sender = mcp_notification_sender_from_env()?;
+    let mcp_deployment = mcp_config::McpDeployment::from_env()?;
+    if mcp_deployment.is_some() && mcp_notification_sender.is_none() {
+        return Err(std::io::Error::other("MCP requires an explicit notification sender").into());
+    }
     let scout_config = scout_import::ScoutImportConfig::from_env()?;
     let scout_csv_path = scout_config.csv_path.clone();
     if scout_config.enabled && !config.procesos_allowed {
@@ -79,6 +84,20 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
     .with_public_app_origin(app_origin.clone())
     .with_local_scout_import(scout_config.enabled);
     core.check_ready().await?;
+    if mcp_deployment.is_some() {
+        if !core.database().core_schema_matches().await? {
+            return Err(std::io::Error::other("MCP requires matching Core migrations").into());
+        }
+        if !core
+            .mcp_notification_sender_ready(mcp_notification_sender.expect("checked above"))
+            .await?
+        {
+            return Err(std::io::Error::other(
+                "MCP notification sender is not an active administrator with SMTP credentials",
+            )
+            .into());
+        }
+    }
     bastion_procesos::ProcessService::new(core.database(), core.admin())
         .synchronize_release(config.procesos_allowed)
         .await?;
@@ -233,7 +252,18 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
             }
         });
     }
-    let app = router(core, app_origin, config.trusted_proxy_cidrs, scout_csv_path)?;
+    let mcp_router = match mcp_deployment {
+        Some(mcp) => Some(mcp.router(
+            core.clone(),
+            app_origin.clone(),
+            config.trusted_proxy_cidrs.clone(),
+        )?),
+        None => None,
+    };
+    let mut app = router(core, app_origin, config.trusted_proxy_cidrs, scout_csv_path)?;
+    if let Some(mcp_router) = mcp_router {
+        app = app.merge(mcp_router);
+    }
     let listener = TcpListener::bind(config.listen_addr).await?;
     let local_addr: SocketAddr = listener.local_addr()?;
     tracing::info!(%local_addr, "Bastion Core server listening");

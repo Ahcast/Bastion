@@ -4,6 +4,7 @@ on:
   push:
     branches: [main]
     paths:
+      - 'apps/server/**'
       - 'crates/mcp/**'
       - 'crates/mcp-core/**'
       - 'crates/mcp-http/**'
@@ -14,6 +15,7 @@ on:
   pull_request:
     branches: [main]
     paths:
+      - 'apps/server/**'
       - 'crates/mcp/**'
       - 'crates/mcp-core/**'
       - 'crates/mcp-http/**'
@@ -50,4 +52,4 @@ jobs:
         with:
           toolchain: 1.99.1
       - name: Test MCP against disposable MySQL 5.7
-        run: cargo test --locked --package bastion-mcp --package bastion-mcp-core --package bastion-mcp-http
+        run: cargo test --locked --package bastion-mcp --package bastion-mcp-core --package bastion-mcp-http --package bastion-server

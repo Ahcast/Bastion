@@ -1335,6 +1335,12 @@ impl CoreService {
         }
     }
 
+    /// Check the operator-selected sender without reading SMTP credentials.
+    pub async fn mcp_notification_sender_ready(&self, sender_id: u64) -> Result<bool, CoreError> {
+        let sender: Option<u64> = sqlx::query_scalar("SELECT u.id FROM users u JOIN roles r ON r.id=u.role_id JOIN user_smtp_credentials c ON c.user_id=u.id WHERE u.id=? AND u.status='active' AND r.system_key='system_administrator'")
+            .bind(sender_id).fetch_optional(&self.database.pool).await?;
+        Ok(sender.is_some())
+    }
     /// Transfer one MCP notice to the existing encrypted outbox. The sender is
     /// explicitly configured by the operator and must remain an active system
     /// administrator with SMTP credentials. This does not send mail itself.

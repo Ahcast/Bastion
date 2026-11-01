@@ -13,6 +13,11 @@ bastion-document-flows = { path = "../../crates/document-flows" }
 axum.workspace = true
 bastion-api = { path = "../../crates/api" }
 bastion-core = { path = "../../crates/core" }
+bastion-mcp = { path = "../../crates/mcp" }
+bastion-mcp-http = { path = "../../crates/mcp-http" }
+base64.workspace = true
+ipnet.workspace = true
+url.workspace = true
 bastion-clientes = { path = "../../crates/modules/clientes" }
 bastion-proveedores = { path = "../../crates/modules/proveedores" }
 bastion-colaboracion = { path = "../../crates/modules/colaboracion" }
@@ -26,3 +31,8 @@ tokio.workspace = true
 tracing.workspace = true
 tracing-subscriber.workspace = true
 bastion-reportes = { path = "../../crates/modules/reportes" }
+
+[dev-dependencies]
+bastion-core = { path = "../../crates/core", features = ["test-support"] }
+sqlx.workspace = true
+tower = { version = "0.5", features = ["util"] }

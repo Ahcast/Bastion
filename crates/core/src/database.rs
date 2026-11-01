@@ -46,6 +46,21 @@ impl Database {
         sqlx::migrate!("./migrations").run(&self.pool).await
     }
 
+    /// Read-only verification before exposing OAuth endpoints. Never performs DDL.
+    pub async fn core_schema_matches(&self) -> Result<bool, sqlx::Error> {
+        let rows: Vec<(i64, Vec<u8>, bool)> =
+            sqlx::query_as("SELECT version,checksum,success FROM _sqlx_migrations")
+                .fetch_all(&self.pool)
+                .await?;
+        let migrations = sqlx::migrate!("./migrations");
+        Ok(migrations.iter().all(|expected| {
+            rows.iter().any(|(version, checksum, success)| {
+                *version == expected.version
+                    && *success
+                    && checksum.as_slice() == expected.checksum.as_ref()
+            })
+        }))
+    }
     pub async fn check_ready(&self) -> Result<(), sqlx::Error> {
         sqlx::query_scalar::<_, i32>("SELECT 1")
             .fetch_one(&self.pool)

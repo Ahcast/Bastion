@@ -463,6 +463,7 @@ name = "bastion-server"
 version = "0.1.0"
 dependencies = [
  "axum",
+ "base64 0.22.1",
  "bastion-api",
  "bastion-clientes",
  "bastion-colaboracion",
@@ -472,14 +473,20 @@ dependencies = [
  "bastion-facturas",
  "bastion-gastos",
  "bastion-licitaciones",
+ "bastion-mcp",
+ "bastion-mcp-http",
  "bastion-ordenes-compra",
  "bastion-procesos",
  "bastion-proveedores",
  "bastion-reportes",
  "dotenvy",
+ "ipnet",
+ "sqlx",
  "tokio",
+ "tower",
  "tracing",
  "tracing-subscriber",
+ "url",
 ]
 
 [[package]]
