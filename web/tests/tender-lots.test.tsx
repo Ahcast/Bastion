@@ -57,6 +57,19 @@ test('lot drafts survive changing the selected lot', async () => {
     assert.equal(container.querySelector('textarea')?.value,'Equipo');
   } finally { await act(async()=>root.unmount()); container.remove(); }
 });
+test('a newly selected lot cannot be edited with the previous lot response', async () => {
+  let finish: ((value:Response)=>void) | undefined;
+  const api = new ApiClient('https://example.test', async url => { const number=Number(new URL(String(url)).pathname.split('/').at(-1)); if(number===2) return new Promise<Response>(resolve=>{finish=resolve;}); return Response.json({numero:1,items:[],total:'0.00',version:1}); });
+  const container=document.createElement('div'); document.body.append(container); const root=createRoot(container);
+  try {
+    await act(async()=>root.render(<NavigationGuardProvider><CoreContext.Provider value={{api,access,notify:()=>{}}}><TenderLots record={record} editable saved={()=>{}} /></CoreContext.Provider></NavigationGuardProvider>));
+    const select=container.querySelector('select')!;
+    await act(async()=>{select.value='2';select.dispatchEvent(new Event('change',{bubbles:true}));});
+    assert.ok(![...container.querySelectorAll('button')].some(button=>button.textContent==='Añadir ítem'));
+    await act(async()=>{finish!(Response.json({numero:2,items:[],total:'0.00',version:1}));});
+    assert.ok([...container.querySelectorAll('button')].some(button=>button.textContent==='Añadir ítem'));
+  } finally { await act(async()=>root.unmount());container.remove(); }
+});
 test('reducing lots asks for confirmation and identifies the data to discard', async () => {
   const writes: RequestInit[] = [];
   const api = new ApiClient('https://example.test', async (url,init={}) => {
