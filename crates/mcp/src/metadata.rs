@@ -171,6 +171,14 @@ mod tests {
             validate_client_metadata(ID, ID, 302, VALID).err(),
             Some(MetadataError::InvalidResponse)
         );
+        let mut changed = VALID.to_vec();
+        changed.push(b' ');
+        assert_ne!(
+            doc.document_hash,
+            validate_client_metadata(ID, ID, 200, &changed)
+                .unwrap()
+                .document_hash
+        );
     }
 
     #[test]
@@ -209,6 +217,16 @@ mod tests {
                 "\"client_name\":\"Example\"",
                 "\"client_name\":\"Example\",\"client_name\":\"Other\"",
                 MetadataError::InvalidDocument,
+            ),
+            (
+                "\"client_id\":\"https://client.example/metadata.json\"",
+                "\"client_id\":\"https://client.example/metadata.json\",\"client_id\":\"https://other.example/metadata.json\"",
+                MetadataError::InvalidDocument,
+            ),
+            (
+                "\"token_endpoint_auth_method\":\"none\"",
+                "\"token_endpoint_auth_method\":\"none\",\"client_secret\":null",
+                MetadataError::UnsupportedAuthentication,
             ),
         ] {
             assert_eq!(
