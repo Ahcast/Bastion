@@ -8,6 +8,7 @@ mod metadata;
 mod pkce;
 mod policy;
 mod protocol;
+mod quota;
 mod storage;
 mod token_exchange;
 mod transport;
@@ -30,6 +31,7 @@ pub use protocol::{
     AuthorizationParameters, ProtocolError, TokenParameters, parse_authorization_parameters,
     parse_token_parameters,
 };
+pub use quota::{ActorQuota, MysqlQuota, QuotaError, ToolQuota};
 pub use storage::{MysqlOauthStore, StoreError, revoke_user_grants_in_transaction};
 pub use token_exchange::{
     AuthenticatedAccess, ExchangePolicy, IssuedTokens, MysqlTokenExchange, TokenExchangeError,
