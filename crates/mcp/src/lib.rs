@@ -31,7 +31,8 @@ pub use exchange::{
 };
 pub use legacy::{LegacyDispatch, LegacyMessage, dispatch_legacy, validate_legacy_message};
 pub use metadata::{
-    ClientMetadata, MetadataError, validate_client_metadata, validate_redirect_uri,
+    ClientMetadata, MetadataError, validate_client_identifier, validate_client_metadata,
+    validate_redirect_uri,
 };
 pub use pkce::{PkceError, S256Challenge};
 pub use policy::{
