@@ -1,17 +1,29 @@
 use super::*;
 use bastion_licitaciones::{
     CopyFormInput, DeleteInput, EmptyInput, Expedient, GlobalVariablesInput, InitialFormsInput,
-    LotInput, NameInput, PageQuery, PdfOrderInput, ValuesInput,
+    InstalledFormUpdate, LotInput, NameInput, PageQuery, PdfOrderInput, ValuesInput,
 };
 
 pub(super) fn routes(state: ApiState) -> Router<ApiState> {
     Router::new()
         .route("/api/v1/licitaciones", get(list).post(create))
         .route(
+            "/api/v1/licitaciones/plantillas-instaladas",
+            get(installed_forms),
+        )
+        .route(
+            "/api/v1/licitaciones/plantillas-instaladas/{key}",
+            axum::routing::put(set_installed_form),
+        )
+        .route(
             "/api/v1/licitaciones/{id}",
             get(detail).patch(rename).delete(remove),
         )
         .route("/api/v1/licitaciones/{id}/formularios", post(copy_form))
+        .route(
+            "/api/v1/licitaciones/{id}/formularios/{copy_id}",
+            axum::routing::delete(remove_form),
+        )
         .route(
             "/api/v1/licitaciones/{id}/variables",
             axum::routing::put(global_variables),
@@ -360,6 +372,32 @@ async fn rename(
         .map(response)
         .map_err(ApiError)
 }
+async fn installed_forms(
+    State(state): State<ApiState>,
+    headers: axum::http::HeaderMap,
+) -> Result<Json<Vec<bastion_licitaciones::InstalledForm>>, ApiError> {
+    let user = actor(&state, &headers).await?;
+    state
+        .licitaciones
+        .installed_forms(user.id)
+        .await
+        .map(Json)
+        .map_err(ApiError)
+}
+async fn set_installed_form(
+    State(state): State<ApiState>,
+    headers: axum::http::HeaderMap,
+    Path(key): Path<String>,
+    Json(input): Json<InstalledFormUpdate>,
+) -> Result<StatusCode, ApiError> {
+    let user = actor(&state, &headers).await?;
+    state
+        .licitaciones
+        .set_installed_form(user.id, &key, input.enabled)
+        .await
+        .map_err(ApiError)?;
+    Ok(StatusCode::NO_CONTENT)
+}
 async fn copy_form(
     State(state): State<ApiState>,
     headers: axum::http::HeaderMap,
@@ -376,6 +414,23 @@ async fn copy_form(
             single_header(&headers, "idempotency-key")?,
             input,
         )
+        .await
+        .map(response)
+        .map_err(ApiError)
+}
+async fn remove_form(
+    State(state): State<ApiState>,
+    headers: axum::http::HeaderMap,
+    Path((id, copy_id)): Path<(u64, u64)>,
+    Json(input): Json<DeleteInput>,
+) -> Result<Response, ApiError> {
+    if input.confirm_id != copy_id {
+        return Err(ApiError(CoreError::Invalid));
+    }
+    let user = actor(&state, &headers).await?;
+    state
+        .licitaciones
+        .remove_form(user.id, id, copy_id, expected(&headers)?)
         .await
         .map(response)
         .map_err(ApiError)

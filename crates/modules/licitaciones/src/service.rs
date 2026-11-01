@@ -199,6 +199,31 @@ impl TenderService {
         tx.commit().await?;
         Ok(result)
     }
+    pub async fn remove_form(
+        &self,
+        actor: u64,
+        id: u64,
+        copy_id: u64,
+        expected: u64,
+    ) -> Result<Expedient, CoreError> {
+        let mut tx = self.begin(actor, "eliminar").await?;
+        let current = load(&mut tx, id).await?;
+        editable(&current, expected)?;
+        let removed =
+            sqlx::query("DELETE FROM licitaciones_formularios WHERE expediente_id=? AND id=?")
+                .bind(id)
+                .bind(copy_id)
+                .execute(&mut *tx)
+                .await?;
+        if removed.rows_affected() != 1 {
+            return Err(CoreError::NotFound);
+        }
+        bump(&mut tx, actor, id, expected).await?;
+        let result = load(&mut tx, id).await?;
+        event(&mut tx, actor, "form.remove", id, result.version).await?;
+        tx.commit().await?;
+        Ok(result)
+    }
     pub async fn save_values(
         &self,
         actor: u64,
@@ -282,6 +307,56 @@ impl TenderService {
         tx.commit().await?;
         Ok(result)
     }
+    pub async fn installed_forms(&self, actor: u64) -> Result<Vec<InstalledForm>, CoreError> {
+        let mut tx = self.begin(actor, "ver").await?;
+        let result = sqlx::query_as::<_, InstalledForm>(
+            "SELECT form_key,enabled FROM licitaciones_formularios_instalados ORDER BY form_key",
+        )
+        .fetch_all(&mut *tx)
+        .await?;
+        tx.commit().await?;
+        Ok(result)
+    }
+    pub async fn set_installed_form(
+        &self,
+        actor: u64,
+        key: &str,
+        enabled: bool,
+    ) -> Result<(), CoreError> {
+        if !matches!(key, "integridad" | "oferente") {
+            return Err(CoreError::Invalid);
+        }
+        let mut tx = self.begin(actor, "editar").await?;
+        self.admin
+            .require_system_administrator_in_transaction(&mut tx, actor)
+            .await?;
+        let existing: Option<bool> = sqlx::query_scalar(
+            "SELECT enabled FROM licitaciones_formularios_instalados WHERE form_key=? FOR UPDATE",
+        )
+        .bind(key)
+        .fetch_optional(&mut *tx)
+        .await?;
+        if existing.ok_or(CoreError::NotFound)? != enabled {
+            sqlx::query(
+                "UPDATE licitaciones_formularios_instalados SET enabled=? WHERE form_key=?",
+            )
+            .bind(enabled)
+            .bind(key)
+            .execute(&mut *tx)
+            .await?;
+            CoreAdmin::record_domain_event(
+                &mut tx,
+                actor,
+                "licitaciones",
+                "form.installed.configure",
+                key,
+                serde_json::json!({"enabled":enabled}),
+            )
+            .await?;
+        }
+        tx.commit().await?;
+        Ok(())
+    }
     pub async fn save_initial_forms(
         &self,
         actor: u64,
@@ -298,6 +373,15 @@ impl TenderService {
         let mut tx = self.begin(actor, "editar").await?;
         let current = load(&mut tx, id).await?;
         editable(&current, expected)?;
+        for key in &input.forms {
+            if !current.initial_forms.contains(key) {
+                let enabled: Option<bool> = sqlx::query_scalar("SELECT enabled FROM licitaciones_formularios_instalados WHERE form_key=? FOR UPDATE")
+                    .bind(key).fetch_optional(&mut *tx).await?;
+                if enabled != Some(true) {
+                    return Err(CoreError::NotFound);
+                }
+            }
+        }
         if current.initial_forms == input.forms {
             tx.commit().await?;
             return Ok(current);

@@ -27,6 +27,10 @@ fn form_routes(state: ApiState) -> Router<ApiState> {
             "/api/v1/colaboracion/formularios",
             get(list_forms).post(publish_form),
         )
+        .route(
+            "/api/v1/colaboracion/formularios/{id}",
+            axum::routing::delete(archive_form),
+        )
         .layer(RequestBodyLimitLayer::new(256 * 1024))
         .route_layer(middleware::from_fn_with_state(state, form_guard))
 }
@@ -64,6 +68,25 @@ async fn publish_form(
         .await
         .map(|value| (StatusCode::CREATED, Json(value)))
         .map_err(ApiError)
+}
+#[derive(serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ArchiveFormInput {
+    expected_revision: u64,
+}
+async fn archive_form(
+    State(state): State<ApiState>,
+    headers: axum::http::HeaderMap,
+    Path(id): Path<u64>,
+    Json(input): Json<ArchiveFormInput>,
+) -> Result<StatusCode, ApiError> {
+    let user = actor(&state, &headers).await?;
+    state
+        .colaboracion
+        .archive_form(user.id, id, input.expected_revision)
+        .await
+        .map_err(ApiError)?;
+    Ok(StatusCode::NO_CONTENT)
 }
 async fn guard(State(state): State<ApiState>, request: Request, next: Next) -> Response {
     match tokio::time::timeout(Duration::from_secs(120), async {

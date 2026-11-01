@@ -34,6 +34,12 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
         tracing::info!("tender migrations completed; other module schemas unchanged");
         return Ok(());
     }
+    if command == "migrate-colaboracion" {
+        let migrator = Database::connect_lazy(&DatabaseConfig::migrator_from_env()?);
+        bastion_colaboracion::CollaborationService::migrate(&migrator).await?;
+        tracing::info!("collaboration migrations completed; other module schemas unchanged");
+        return Ok(());
+    }
     if command == "migrate-facturas" {
         let migrator = Database::connect_lazy(&DatabaseConfig::migrator_from_env()?);
         bastion_facturas::InvoiceService::migrate(&migrator).await?;

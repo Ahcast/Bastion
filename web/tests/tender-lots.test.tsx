@@ -43,6 +43,44 @@ test('PDF order can be changed with accessible controls and saved', async () => 
     assert.deepEqual(JSON.parse(String(writes[0]!.body)),{items:['lote:1','oferta']});
   } finally { await act(async()=>root.unmount());container.remove(); }
 });
+test('lot drafts survive changing the selected lot', async () => {
+  const api = new ApiClient('https://example.test', async url => { const number = Number(new URL(String(url)).pathname.split('/').at(-1)); return Response.json({numero:number, items:[], total:'0.00', version:1}); });
+  const container=document.createElement('div'); document.body.append(container); const root=createRoot(container);
+  try {
+    await act(async()=>root.render(<NavigationGuardProvider><CoreContext.Provider value={{api,access,notify:()=>{}}}><TenderLots record={record} editable saved={()=>{}} /></CoreContext.Provider></NavigationGuardProvider>));
+    await act(async()=>[...container.querySelectorAll('button')].find(b=>b.textContent==='Añadir ítem')!.click());
+    const description=container.querySelector('textarea')!; const setter=Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype,'value')!.set!;
+    await act(async()=>{setter.call(description,'Equipo');description.dispatchEvent(new Event('input',{bubbles:true}));});
+    const select=container.querySelector('select')!;
+    await act(async()=>{select.value='2';select.dispatchEvent(new Event('change',{bubbles:true}));});
+    await act(async()=>{select.value='1';select.dispatchEvent(new Event('change',{bubbles:true}));});
+    assert.equal(container.querySelector('textarea')?.value,'Equipo');
+  } finally { await act(async()=>root.unmount()); container.remove(); }
+});
+test('a newly selected lot cannot be edited with the previous lot response', async () => {
+  let finish: ((value:Response)=>void) | undefined;
+  const api = new ApiClient('https://example.test', async url => { const number=Number(new URL(String(url)).pathname.split('/').at(-1)); if(number===2) return new Promise<Response>(resolve=>{finish=resolve;}); return Response.json({numero:1,items:[],total:'0.00',version:1}); });
+  const container=document.createElement('div'); document.body.append(container); const root=createRoot(container);
+  try {
+    await act(async()=>root.render(<NavigationGuardProvider><CoreContext.Provider value={{api,access,notify:()=>{}}}><TenderLots record={record} editable saved={()=>{}} /></CoreContext.Provider></NavigationGuardProvider>));
+    const select=container.querySelector('select')!;
+    await act(async()=>{select.value='2';select.dispatchEvent(new Event('change',{bubbles:true}));});
+    assert.ok(![...container.querySelectorAll('button')].some(button=>button.textContent==='Añadir ítem'));
+    await act(async()=>{finish!(Response.json({numero:2,items:[],total:'0.00',version:1}));});
+    assert.ok([...container.querySelectorAll('button')].some(button=>button.textContent==='Añadir ítem'));
+  } finally { await act(async()=>root.unmount());container.remove(); }
+});
+test('lot-only save is blocked while style or lot count is a draft', async () => {
+  const api = new ApiClient('https://example.test', async () => Response.json({numero:1,items:[],total:'0.00',version:1}));
+  const draft = { ...record, variables: record.variables!.map(v => v.key === 'stylo' ? {...v,value:'std'} : v) };
+  const container=document.createElement('div'); document.body.append(container); const root=createRoot(container);
+  try {
+    await act(async()=>root.render(<NavigationGuardProvider><CoreContext.Provider value={{api,access,notify:()=>{}}}><TenderLots record={draft} latest={()=>record} editable saved={()=>{}} /></CoreContext.Provider></NavigationGuardProvider>));
+    await act(async()=>[...container.querySelectorAll('button')].find(b=>b.textContent==='Añadir ítem')!.click());
+    assert.equal([...container.querySelectorAll('button')].find(b=>b.textContent==='Guardar lote')?.disabled,true);
+    assert.ok(container.textContent?.includes('Guardar expediente'));
+  } finally { await act(async()=>root.unmount());container.remove(); }
+});
 test('reducing lots asks for confirmation and identifies the data to discard', async () => {
   const writes: RequestInit[] = [];
   const api = new ApiClient('https://example.test', async (url,init={}) => {
@@ -62,7 +100,7 @@ test('reducing lots asks for confirmation and identifies the data to discard', a
     const input=[...row.querySelectorAll<HTMLInputElement>('input')].find(x=>x.parentElement?.textContent?.startsWith('Valor'))!;
     const setter=Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,'value')!.set!;
     await act(async()=>{setter.call(input,'1');input.dispatchEvent(new Event('input',{bubbles:true}));});
-    await act(async()=>container.querySelector('form')!.dispatchEvent(new Event('submit',{bubbles:true,cancelable:true})));
+    await act(async()=>container.querySelector('form.document-values')!.dispatchEvent(new Event('submit',{bubbles:true,cancelable:true})));
     const dialog=document.body.querySelector('[role="dialog"]')!;assert.ok(dialog.textContent?.includes('Lote 2: 3 ítem'));assert.equal(writes.length,0);
     await click('Confirmar descarte y guardar',dialog);
     assert.equal(JSON.parse(String(writes[0]!.body)).confirm_discard,true);

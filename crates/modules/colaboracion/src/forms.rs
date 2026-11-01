@@ -171,7 +171,7 @@ impl CollaborationService {
         self.admin
             .authorize_in_transaction(&mut tx, actor, "colaboracion", "empresa", "ver")
             .await?;
-        let rows:Vec<(u64,u64,String,serde_json::Value)>=sqlx::query_as("SELECT v.form_id,v.revision,v.content_hash,v.definition_json FROM colaboracion_formularios f JOIN colaboracion_formulario_versiones v ON v.form_id=f.id AND v.revision=f.current_revision ORDER BY f.id DESC LIMIT ? OFFSET ?")
+        let rows:Vec<(u64,u64,String,serde_json::Value)>=sqlx::query_as("SELECT v.form_id,v.revision,v.content_hash,v.definition_json FROM colaboracion_formularios f JOIN colaboracion_formulario_versiones v ON v.form_id=f.id AND v.revision=f.current_revision WHERE f.archived_at IS NULL ORDER BY f.id DESC LIMIT ? OFFSET ?")
             .bind(size+1).bind((page-1)*size).fetch_all(&mut *tx).await?;
         let has_more = rows.len() > size as usize;
         let items = rows
@@ -202,7 +202,7 @@ impl CollaborationService {
         self.admin
             .authorize_in_transaction(tx, actor, "colaboracion", "empresa", "ver")
             .await?;
-        let (hash,value):(String,serde_json::Value)=sqlx::query_as("SELECT content_hash,definition_json FROM colaboracion_formulario_versiones WHERE form_id=? AND revision=?")
+        let (hash,value):(String,serde_json::Value)=sqlx::query_as("SELECT v.content_hash,v.definition_json FROM colaboracion_formulario_versiones v JOIN colaboracion_formularios f ON f.id=v.form_id WHERE v.form_id=? AND v.revision=? AND f.archived_at IS NULL")
             .bind(id).bind(revision).fetch_optional(&mut **tx).await?.ok_or(CoreError::NotFound)?;
         decode(id, revision, hash, value)
     }
@@ -252,7 +252,7 @@ impl CollaborationService {
             }
             (Some(id), Some(expected)) if id > 0 && expected > 0 => {
                 let current: u64 = sqlx::query_scalar(
-                    "SELECT current_revision FROM colaboracion_formularios WHERE id=? FOR UPDATE",
+                    "SELECT current_revision FROM colaboracion_formularios WHERE id=? AND archived_at IS NULL FOR UPDATE",
                 )
                 .bind(id)
                 .fetch_optional(&mut *tx)
@@ -293,6 +293,36 @@ impl CollaborationService {
         .await?;
         tx.commit().await?;
         Ok(result)
+    }
+    pub async fn archive_form(&self, actor: u64, id: u64, expected: u64) -> Result<(), CoreError> {
+        if id == 0 || expected == 0 {
+            return Err(CoreError::Invalid);
+        }
+        let mut tx = self.begin().await?;
+        self.admin
+            .require_system_administrator_in_transaction(&mut tx, actor)
+            .await?;
+        let current: Option<u64> = sqlx::query_scalar("SELECT current_revision FROM colaboracion_formularios WHERE id=? AND archived_at IS NULL FOR UPDATE")
+            .bind(id).fetch_optional(&mut *tx).await?;
+        if current.ok_or(CoreError::NotFound)? != expected {
+            return Err(CoreError::PreconditionFailed);
+        }
+        let result = sqlx::query("UPDATE colaboracion_formularios SET archived_at=UTC_TIMESTAMP(6) WHERE id=? AND archived_at IS NULL")
+            .bind(id).execute(&mut *tx).await?;
+        if result.rows_affected() != 1 {
+            return Err(CoreError::NotFound);
+        }
+        CoreAdmin::record_domain_event(
+            &mut tx,
+            actor,
+            "colaboracion",
+            "form.archive",
+            &id.to_string(),
+            serde_json::json!({}),
+        )
+        .await?;
+        tx.commit().await?;
+        Ok(())
     }
 }
 fn decode(

@@ -3,8 +3,8 @@ use bastion_colaboracion::{
 };
 use bastion_core::{CoreError, CoreService, Database};
 use bastion_licitaciones::{
-    CopyFormInput, GlobalVariable, GlobalVariablesInput, LotInput, LotItem, NameInput, PageQuery,
-    PdfOrderInput, TenderService, ValuesInput,
+    CopyFormInput, GlobalVariable, GlobalVariablesInput, InitialFormsInput, LotInput, LotItem,
+    NameInput, PageQuery, PdfOrderInput, TenderService, ValuesInput,
 };
 use sqlx::mysql::MySqlPoolOptions;
 
@@ -611,4 +611,144 @@ async fn mysql57_tenders_snapshots_permissions_races_receipts_and_deletion() {
             .await
             .unwrap();
     assert_eq!(state, ("failed".into(), true));
+    let archived = library
+        .publish_form(
+            1,
+            "archive-test-publish-01",
+            PublishFormInput {
+                form_id: None,
+                expected_revision: None,
+                definition: definition("Formulario a retirar"),
+            },
+        )
+        .await
+        .unwrap();
+    let draft = tenders.create(1, "archive-test-create-01").await.unwrap();
+    let copy = tenders
+        .copy_form(
+            1,
+            draft.id,
+            draft.version,
+            "archive-test-copy-01",
+            CopyFormInput {
+                source_id: archived.id,
+                revision: archived.revision,
+            },
+        )
+        .await
+        .unwrap();
+    assert!(matches!(
+        library
+            .archive_form(2, archived.id, archived.revision)
+            .await,
+        Err(CoreError::Forbidden)
+    ));
+    assert!(matches!(
+        library
+            .archive_form(1, archived.id, archived.revision + 1)
+            .await,
+        Err(CoreError::PreconditionFailed)
+    ));
+    library
+        .archive_form(1, archived.id, archived.revision)
+        .await
+        .unwrap();
+    assert!(
+        !library
+            .list_forms(1, 1, 100)
+            .await
+            .unwrap()
+            .items
+            .iter()
+            .any(|f| f.id == archived.id)
+    );
+    assert!(
+        tenders
+            .detail(1, draft.id)
+            .await
+            .unwrap()
+            .forms
+            .iter()
+            .any(|f| f.source.id == archived.id)
+    );
+    assert!(matches!(
+        tenders
+            .copy_form(
+                1,
+                draft.id,
+                copy.version,
+                "archive-test-copy-02",
+                CopyFormInput {
+                    source_id: archived.id,
+                    revision: archived.revision
+                }
+            )
+            .await,
+        Err(CoreError::NotFound)
+    ));
+    let removed = tenders
+        .remove_form(1, draft.id, copy.forms[0].id, copy.version)
+        .await
+        .unwrap();
+    assert!(removed.forms.is_empty());
+    let selected = tenders
+        .save_initial_forms(
+            1,
+            draft.id,
+            removed.version,
+            InitialFormsInput {
+                forms: vec!["integridad".into()],
+            },
+        )
+        .await
+        .unwrap();
+    assert!(matches!(
+        tenders.set_installed_form(2, "integridad", false).await,
+        Err(CoreError::Forbidden)
+    ));
+    tenders
+        .set_installed_form(1, "integridad", false)
+        .await
+        .unwrap();
+    assert!(
+        tenders
+            .detail(1, draft.id)
+            .await
+            .unwrap()
+            .initial_forms
+            .contains(&"integridad".into())
+    );
+    let other = tenders.create(1, "installed-forms-test-01").await.unwrap();
+    assert!(matches!(
+        tenders
+            .save_initial_forms(
+                1,
+                other.id,
+                other.version,
+                InitialFormsInput {
+                    forms: vec!["integridad".into()]
+                }
+            )
+            .await,
+        Err(CoreError::NotFound)
+    ));
+    assert_eq!(
+        tenders
+            .save_initial_forms(
+                1,
+                draft.id,
+                selected.version,
+                InitialFormsInput {
+                    forms: vec!["integridad".into()]
+                }
+            )
+            .await
+            .unwrap()
+            .version,
+        selected.version
+    );
+    tenders
+        .set_installed_form(1, "integridad", true)
+        .await
+        .unwrap();
 }

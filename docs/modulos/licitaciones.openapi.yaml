@@ -36,6 +36,34 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/Expedient' }
         '409': { description: Clave reutilizada con otro cuerpo }
+  /api/v1/licitaciones/plantillas-instaladas:
+    get:
+      summary: Consultar disponibilidad de las declaraciones instaladas; requiere ver
+      responses:
+        '200': { description: Lista de identificadores y estado de disponibilidad }
+  /api/v1/licitaciones/plantillas-instaladas/{key}:
+    parameters:
+      - name: key
+        in: path
+        required: true
+        schema: { type: string, enum: [integridad, oferente] }
+    put:
+      summary: Retirar o restaurar una declaración instalada; exclusivo del Administrador
+      parameters:
+        - $ref: '#/components/parameters/Csrf'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [enabled]
+              properties:
+                enabled: { type: boolean }
+      responses:
+        '204': { description: Estado actualizado; se conservan los expedientes existentes }
+        '403': { description: Requiere administrador del sistema }
   /api/v1/licitaciones/{id}:
     parameters:
       - $ref: '#/components/parameters/Id'
@@ -309,6 +337,36 @@ paths:
               schema: { $ref: '#/components/schemas/Expedient' }
         '409': { description: Clave reutilizada o expediente bloqueado }
         '412': { description: Versión obsoleta }
+  /api/v1/licitaciones/{id}/formularios/{copy_id}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+      - name: copy_id
+        in: path
+        required: true
+        schema: { type: integer, minimum: 1 }
+    delete:
+      summary: Quitar una copia del expediente Borrador; requiere eliminar
+      parameters:
+        - $ref: '#/components/parameters/Version'
+        - $ref: '#/components/parameters/Csrf'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [confirm_id]
+              properties:
+                confirm_id: { type: integer, minimum: 1 }
+      responses:
+        '200':
+          description: Expediente actualizado con ETag fuerte
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Expedient' }
+        '404': { description: Copia no disponible }
+        '412': { description: Versión obsoleta }
   /api/v1/licitaciones/{id}/formularios/{copy_id}/valores:
     parameters:
       - $ref: '#/components/parameters/Id'
@@ -383,6 +441,28 @@ paths:
         '403': { description: Un rol personalizado no publica aunque tenga editar o comodín }
         '409': { description: Clave reutilizada con otro cuerpo }
         '412': { description: Revisión anterior cambió }
+  /api/v1/colaboracion/formularios/{id}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    delete:
+      summary: Retirar formulario del catálogo; exclusivo del Administrador del sistema
+      parameters:
+        - $ref: '#/components/parameters/Csrf'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [expected_revision]
+              properties:
+                expected_revision: { type: integer, minimum: 1 }
+      responses:
+        '204': { description: Retirado; se conservan las copias existentes }
+        '403': { description: Requiere administrador del sistema }
+        '404': { description: Formulario no disponible }
+        '412': { description: Revisión obsoleta }
   /api/v1/licitaciones/{id}/archivos:
     parameters:
       - $ref: '#/components/parameters/Id'
