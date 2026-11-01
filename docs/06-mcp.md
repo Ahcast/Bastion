@@ -12,6 +12,8 @@ La migración 3 del Core incorpora el esquema OAuth; aún no se ha aplicado en A
 
 El workflow independiente `MCP MySQL checks` prepara una base MySQL 5.7 desechable para las pruebas de persistencia. No usar el URL de la base operativa como `BASTION_MCP_TEST_URL`.
 
+Se prepara el canje transaccional de códigos para clientes públicos: bloquea usuario, cliente, grant y código; verifica vínculos y PKCE; consume el código y guarda únicamente hashes de tokens con auditoría. Un reuso confirmado revoca el grant. La migración 4 exige configurar explícitamente el método de autenticación del cliente. El canje requiere un adaptador de políticas del Core y no tiene implementación permisiva por defecto; aún faltan ese adaptador, la rotación efectiva de refresh tokens, el consentimiento y las rutas. El código y sus pruebas requieren validación en CI antes de considerarse verificados.
+
 ## Modelo de operación
 
 ```mermaid

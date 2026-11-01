@@ -1,0 +1,182 @@
+use std::collections::BTreeSet;
+
+use chrono::{Duration, NaiveDateTime};
+use sqlx::{MySql, MySqlPool, Transaction, types::Json};
+
+use crate::{
+    CodeRecord, Credential, CredentialKind, ExchangeError, GrantState, S256Challenge,
+    TokenParameters, validate_code_exchange,
+};
+
+/// Trusted Core adapter. It must recheck every requested scope against current
+/// user, role, module and object-independent policy using this transaction.
+/// There is intentionally no permissive default implementation.
+#[allow(async_fn_in_trait)]
+pub trait ExchangePolicy {
+    async fn authorize(
+        &self,
+        tx: &mut Transaction<'_, MySql>,
+        user_id: u64,
+        client_id: u64,
+        scopes: &BTreeSet<String>,
+    ) -> Result<bool, sqlx::Error>;
+}
+
+pub struct MysqlTokenExchange<P> {
+    pool: MySqlPool,
+    policy: P,
+}
+
+/// Secrets have no Debug or Clone implementation and must not be logged.
+pub struct IssuedTokens {
+    pub access_token: Credential,
+    pub refresh_token: Credential,
+    pub expires_in: u64,
+    pub scopes: BTreeSet<String>,
+}
+
+#[derive(Debug)]
+pub enum TokenExchangeError {
+    InvalidGrant,
+    Unavailable,
+    Database(sqlx::Error),
+}
+
+impl From<sqlx::Error> for TokenExchangeError {
+    fn from(value: sqlx::Error) -> Self {
+        Self::Database(value)
+    }
+}
+
+impl<P: ExchangePolicy> MysqlTokenExchange<P> {
+    pub fn new(pool: MySqlPool, policy: P) -> Self {
+        Self { pool, policy }
+    }
+
+    /// Only public clients with an explicitly approved `none` method are
+    /// accepted here. This must be called only by a bounded token endpoint.
+    /// User, client, grant and code remain locked until tokens and audit commit.
+    pub async fn redeem_code(
+        &self,
+        request: &TokenParameters,
+    ) -> Result<IssuedTokens, TokenExchangeError> {
+        let TokenParameters::AuthorizationCode { code, .. } = request else {
+            return Err(TokenExchangeError::InvalidGrant);
+        };
+        let digest = code.digest(CredentialKind::AuthorizationCode);
+        let mut tx = self.pool.begin().await?;
+        let grant_id = sqlx::query_scalar::<_, u64>(
+            "SELECT grant_id FROM oauth_authorization_codes WHERE code_hash=?",
+        )
+        .bind(digest.as_slice())
+        .fetch_optional(&mut *tx)
+        .await?
+        .ok_or(TokenExchangeError::InvalidGrant)?;
+        let (user_id, client_pk) = sqlx::query_as::<_, (u64, u64)>(
+            "SELECT user_id,client_id FROM oauth_grants WHERE id=?",
+        )
+        .bind(grant_id)
+        .fetch_optional(&mut *tx)
+        .await?
+        .ok_or(TokenExchangeError::InvalidGrant)?;
+        // Match Core security mutations: lock user before its grants. Client
+        // administrative mutations lock the client before its grants.
+        let user_status =
+            sqlx::query_scalar::<_, String>("SELECT status FROM users WHERE id=? FOR UPDATE")
+                .bind(user_id)
+                .fetch_optional(&mut *tx)
+                .await?
+                .ok_or(TokenExchangeError::InvalidGrant)?;
+        let (client_id, enabled, metadata, approved, auth_method): (String,bool,Vec<u8>,Option<Vec<u8>>,String) = sqlx::query_as("SELECT client_id,enabled,metadata_hash,approved_metadata_hash,token_auth_method FROM oauth_clients WHERE id=? FOR UPDATE")
+            .bind(client_pk).fetch_optional(&mut *tx).await?.ok_or(TokenExchangeError::InvalidGrant)?;
+        let (resource, Json(scopes_vec), issued, expires, revoked): (String,Json<Vec<String>>,NaiveDateTime,NaiveDateTime,Option<NaiveDateTime>) = sqlx::query_as("SELECT resource_uri,scopes_json,issued_at,expires_at,revoked_at FROM oauth_grants WHERE id=? AND user_id=? AND client_id=? FOR UPDATE")
+            .bind(grant_id).bind(user_id).bind(client_pk).fetch_optional(&mut *tx).await?.ok_or(TokenExchangeError::InvalidGrant)?;
+        let (redirect, challenge, code_issued, code_expires, consumed): (String,String,NaiveDateTime,NaiveDateTime,Option<NaiveDateTime>) = sqlx::query_as("SELECT redirect_uri,challenge,issued_at,expires_at,consumed_at FROM oauth_authorization_codes WHERE code_hash=? AND grant_id=? FOR UPDATE")
+            .bind(digest.as_slice()).bind(grant_id).fetch_optional(&mut *tx).await?.ok_or(TokenExchangeError::InvalidGrant)?;
+        let now: NaiveDateTime = sqlx::query_scalar("SELECT UTC_TIMESTAMP(6)")
+            .fetch_one(&mut *tx)
+            .await?;
+        let ceiling: BTreeSet<String> = sqlx::query_scalar::<_, String>(
+            "SELECT scope_name FROM oauth_client_scopes WHERE client_id=?",
+        )
+        .bind(client_pk)
+        .fetch_all(&mut *tx)
+        .await?
+        .into_iter()
+        .collect();
+        let scopes: BTreeSet<String> = scopes_vec.iter().cloned().collect();
+        if scopes.len() != scopes_vec.len() || auth_method != "none" {
+            return Err(TokenExchangeError::InvalidGrant);
+        }
+        let state = GrantState {
+            issued_at: issued.and_utc().timestamp(),
+            expires_at: expires.and_utc().timestamp(),
+            revoked: revoked.is_some(),
+            user_active: user_status == "active",
+            client_approved: enabled,
+            client_metadata_approved: approved.as_deref() == Some(metadata.as_slice()),
+            credentials_current: true,
+            granted_scopes: &scopes,
+            client_max_scopes: &ceiling,
+            current_user_scopes: &scopes,
+        };
+        let challenge =
+            S256Challenge::parse(&challenge).map_err(|_| TokenExchangeError::InvalidGrant)?;
+        let record = CodeRecord {
+            digest,
+            client_id: &client_id,
+            redirect_uri: &redirect,
+            resource: &resource,
+            challenge: &challenge,
+            issued_at: code_issued.and_utc().timestamp(),
+            expires_at: code_expires.and_utc().timestamp(),
+            consumed: consumed.is_some(),
+        };
+        match validate_code_exchange(request, &record, &state, now.and_utc().timestamp()) {
+            Err(ExchangeError::Replay) => {
+                let changed = sqlx::query("UPDATE oauth_grants SET revoked_at=?,revocation_reason='code_replay' WHERE id=? AND revoked_at IS NULL")
+                    .bind(now).bind(grant_id).execute(&mut *tx).await?.rows_affected();
+                if changed != 0 {
+                    sqlx::query("INSERT INTO audit_events (actor_id,module_id,action,target_type,target_id,result,created_at) VALUES (?,'core','oauth.code.replay','oauth_grant',?,'denied',?)")
+                        .bind(user_id).bind(grant_id.to_string()).bind(now).execute(&mut *tx).await?;
+                }
+                tx.commit().await?;
+                return Err(TokenExchangeError::InvalidGrant);
+            }
+            Err(_) => return Err(TokenExchangeError::InvalidGrant),
+            Ok(()) => {}
+        }
+        if !self
+            .policy
+            .authorize(&mut tx, user_id, client_pk, &scopes)
+            .await?
+        {
+            return Err(TokenExchangeError::InvalidGrant);
+        }
+        let access = Credential::generate().map_err(|_| TokenExchangeError::Unavailable)?;
+        let refresh = Credential::generate().map_err(|_| TokenExchangeError::Unavailable)?;
+        let access_expiry = std::cmp::min(now + Duration::minutes(15), expires);
+        let expires_in = (access_expiry - now).num_seconds();
+        if expires_in <= 0 {
+            return Err(TokenExchangeError::InvalidGrant);
+        }
+        let used = sqlx::query("UPDATE oauth_authorization_codes SET consumed_at=? WHERE code_hash=? AND consumed_at IS NULL")
+            .bind(now).bind(digest.as_slice()).execute(&mut *tx).await?.rows_affected();
+        if used != 1 {
+            return Err(TokenExchangeError::InvalidGrant);
+        }
+        sqlx::query("INSERT INTO oauth_access_tokens (grant_id,token_hash,scopes_json,issued_at,expires_at) VALUES (?,?,?,?,?)")
+            .bind(grant_id).bind(access.digest(CredentialKind::AccessToken).as_slice()).bind(Json(scopes_vec)).bind(now).bind(access_expiry).execute(&mut *tx).await?;
+        sqlx::query("INSERT INTO oauth_refresh_tokens (grant_id,token_hash,issued_at,expires_at) VALUES (?,?,?,?)")
+            .bind(grant_id).bind(refresh.digest(CredentialKind::RefreshToken).as_slice()).bind(now).bind(expires).execute(&mut *tx).await?;
+        sqlx::query("INSERT INTO audit_events (actor_id,module_id,action,target_type,target_id,result,created_at) VALUES (?,'core','oauth.code.exchange','oauth_grant',?,'success',?)")
+            .bind(user_id).bind(grant_id.to_string()).bind(now).execute(&mut *tx).await?;
+        tx.commit().await?;
+        Ok(IssuedTokens {
+            access_token: access,
+            refresh_token: refresh,
+            expires_in: expires_in as u64,
+            scopes,
+        })
+    }
+}

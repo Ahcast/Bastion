@@ -7,6 +7,7 @@ mod pkce;
 mod policy;
 mod protocol;
 mod storage;
+mod token_exchange;
 mod validity;
 
 pub use credential::{Credential, CredentialError, CredentialKind};
@@ -23,6 +24,7 @@ pub use protocol::{
     parse_token_parameters,
 };
 pub use storage::{MysqlOauthStore, StoreError, revoke_user_grants_in_transaction};
+pub use token_exchange::{ExchangePolicy, IssuedTokens, MysqlTokenExchange, TokenExchangeError};
 pub use validity::{GrantState, TokenWindow, ValidityError, validate_token_window};
 
 // MCP transport stays disabled until OAuth consent, delegated identity,
