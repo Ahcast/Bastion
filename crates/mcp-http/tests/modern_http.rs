@@ -194,7 +194,7 @@ async fn mysql57_mcp_http_authenticates_filters_limits_and_audits() {
     assert_eq!(response.status(), StatusCode::OK);
     let json: serde_json::Value =
         serde_json::from_slice(&to_bytes(response.into_body(), 8192).await.unwrap()).unwrap();
-    assert_eq!(json["result"]["tools"][0]["name"], "fixture.read");
+    assert!(json["result"]["tools"].as_array().unwrap().is_empty());
     let limited = router.oneshot(request("tools/list")).await.unwrap();
     assert_eq!(limited.status(), StatusCode::TOO_MANY_REQUESTS);
     assert!(limited.headers().contains_key(RETRY_AFTER));

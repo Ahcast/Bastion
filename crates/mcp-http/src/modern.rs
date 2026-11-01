@@ -254,7 +254,56 @@ async fn execute_read_tool<P>(
     correlation: &str,
 ) -> Response {
     let Some(id) = request.id() else {
-        return (StatusCode::ACCEPTED, [(CACHE_CONTROL, "no-store")]).into_response();
+        let charged = state
+            .quota
+            .charge(
+                access.user_id,
+                access.client_id,
+                "notification",
+                state.discovery_quota,
+            )
+            .await;
+        let label = match &charged {
+            Ok(()) => "success",
+            Err(QuotaError::Limited { .. }) => "limited",
+            Err(_) => "error",
+        };
+        if audit(
+            &state.pool,
+            access.user_id,
+            access.client_id,
+            access.grant_id,
+            correlation,
+            "mcp.notification",
+            label,
+        )
+        .await
+        .is_err()
+        {
+            return rpc_error(
+                StatusCode::SERVICE_UNAVAILABLE,
+                -32603,
+                "Temporarily unavailable",
+            );
+        }
+        return match charged {
+            Ok(()) => (StatusCode::ACCEPTED, [(CACHE_CONTROL, "no-store")]).into_response(),
+            Err(QuotaError::Limited {
+                retry_after_seconds,
+            }) => {
+                let mut response =
+                    rpc_error(StatusCode::TOO_MANY_REQUESTS, -32603, "Rate limit exceeded");
+                if let Ok(value) = HeaderValue::from_str(&retry_after_seconds.to_string()) {
+                    response.headers_mut().insert(RETRY_AFTER, value);
+                }
+                response
+            }
+            Err(_) => rpc_error(
+                StatusCode::SERVICE_UNAVAILABLE,
+                -32603,
+                "Temporarily unavailable",
+            ),
+        };
     };
     let Some(name) = request
         .params()
@@ -262,6 +311,26 @@ async fn execute_read_tool<P>(
         .and_then(Value::as_str)
         .filter(|name| !name.is_empty() && name.len() <= 128)
     else {
+        if audit(
+            &state.pool,
+            access.user_id,
+            access.client_id,
+            access.grant_id,
+            correlation,
+            "mcp.request.invalid",
+            "denied",
+        )
+        .await
+        .is_err()
+        {
+            return protocol_error(
+                StatusCode::SERVICE_UNAVAILABLE,
+                -32603,
+                "Temporarily unavailable",
+                Some(id.clone()),
+                None,
+            );
+        }
         return protocol_error(
             StatusCode::BAD_REQUEST,
             -32602,
@@ -276,6 +345,26 @@ async fn execute_read_tool<P>(
         .cloned()
         .unwrap_or_else(|| json!({}));
     if !args.is_object() {
+        if audit(
+            &state.pool,
+            access.user_id,
+            access.client_id,
+            access.grant_id,
+            correlation,
+            "mcp.request.invalid",
+            "denied",
+        )
+        .await
+        .is_err()
+        {
+            return protocol_error(
+                StatusCode::SERVICE_UNAVAILABLE,
+                -32603,
+                "Temporarily unavailable",
+                Some(id.clone()),
+                None,
+            );
+        }
         return protocol_error(
             StatusCode::BAD_REQUEST,
             -32602,
@@ -720,12 +809,18 @@ where
     }
     let modules:Vec<String>=match sqlx::query_scalar("SELECT module_id FROM module_registry WHERE included_in_release=1 AND environment_allowed=1 AND enabled=1").fetch_all(&state.pool).await {Ok(modules)=>modules,Err(_)=>return rpc_error(StatusCode::SERVICE_UNAVAILABLE,-32603,"Temporarily unavailable")};
     let enabled_modules = modules.into_iter().collect();
+    let empty_registry = if state.read_executor.is_none() {
+        Some(ToolRegistry::new(Vec::new(), &BTreeSet::new()).expect("empty registry is valid"))
+    } else {
+        None
+    };
+    let registry = empty_registry.as_ref().unwrap_or(state.registry.as_ref());
     let result = match &request {
         DraftRequest::Modern(request) => {
-            dispatch_discovery(request, &access, &state.registry, &enabled_modules, false).map(Some)
+            dispatch_discovery(request, &access, registry, &enabled_modules, false).map(Some)
         }
         DraftRequest::Legacy(request) => {
-            dispatch_legacy(request, &access, &state.registry, &enabled_modules).map(|response| {
+            dispatch_legacy(request, &access, registry, &enabled_modules).map(|response| {
                 match response {
                     LegacyDispatch::Response(value) => Some(value),
                     LegacyDispatch::AcceptedNotification => None,

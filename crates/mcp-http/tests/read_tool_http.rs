@@ -112,6 +112,22 @@ async fn mysql57_http_read_tool_requires_scope_permission_and_audits() {
     .unwrap()
     .with_read_executor(Arc::new(DraftReadExecutor::new(quotes, invoices, orders)));
     let router = draft_mcp_router(state);
+    let listing = Request::builder().method("POST").uri("/mcp")
+        .header(CONTENT_TYPE,"application/json").header(ACCEPT,"application/json, text/event-stream")
+        .header(AUTHORIZATION,format!("Bearer {}",access.expose()))
+        .header("mcp-protocol-version","2026-07-28").header("mcp-method","tools/list")
+        .body(Body::from(json!({"jsonrpc":"2.0","id":8,"method":"tools/list","params":{"_meta":{"io.modelcontextprotocol/protocolVersion":"2026-07-28","io.modelcontextprotocol/clientCapabilities":{}}}}).to_string())).unwrap();
+    let listing = router.clone().oneshot(listing).await.unwrap();
+    assert_eq!(listing.status(), StatusCode::OK);
+    let listing: serde_json::Value =
+        serde_json::from_slice(&to_bytes(listing.into_body(), 262144).await.unwrap()).unwrap();
+    let tools = listing["result"]["tools"].as_array().unwrap();
+    assert_eq!(tools.len(), 2);
+    assert!(
+        tools
+            .iter()
+            .all(|tool| tool["name"].as_str().unwrap().starts_with("cotizaciones."))
+    );
     let call = |name: &str, args: serde_json::Value| {
         Request::builder().method("POST").uri("/mcp").header(CONTENT_TYPE,"application/json").header(ACCEPT,"application/json, text/event-stream").header(AUTHORIZATION,format!("Bearer {}",access.expose())).header("mcp-protocol-version","2026-07-28").header("mcp-method","tools/call").header("mcp-name",name).body(Body::from(json!({"jsonrpc":"2.0","id":9,"method":"tools/call","params":{"name":name,"arguments":args,"_meta":{"io.modelcontextprotocol/protocolVersion":"2026-07-28","io.modelcontextprotocol/clientCapabilities":{}}}}).to_string())).unwrap()
     };
