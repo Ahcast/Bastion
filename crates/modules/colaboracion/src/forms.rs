@@ -324,6 +324,58 @@ impl CollaborationService {
         tx.commit().await?;
         Ok(())
     }
+    /// Schedule permanent removal of a template and all its historical source files.
+    /// The caller removes dependent expediente records in the same transaction.
+    pub async fn delete_form_sources_in_transaction(
+        &self, tx: &mut Transaction<'_, MySql>, actor: u64, id: u64, expected: u64, include_archived: bool,
+    ) -> Result<Vec<u64>, CoreError> {
+        self.admin.require_system_administrator_in_transaction(tx, actor).await?;
+        let current: Option<u64> = sqlx::query_scalar("SELECT current_revision FROM colaboracion_formularios WHERE id=? AND (? OR archived_at IS NULL) FOR UPDATE")
+            .bind(id).bind(include_archived).fetch_optional(&mut **tx).await?;
+        if current.ok_or(CoreError::NotFound)? != expected { return Err(CoreError::PreconditionFailed); }
+        let versions: Vec<serde_json::Value> = sqlx::query_scalar("SELECT definition_json FROM colaboracion_formulario_versiones WHERE form_id=? ORDER BY revision")
+            .bind(id).fetch_all(&mut **tx).await?;
+        let mut sources = BTreeSet::new();
+        for value in versions {
+            let definition: FormDefinition = serde_json::from_value(value).map_err(|_| CoreError::Invalid)?;
+            if let Some(source) = definition.template_source_id { sources.insert(source); }
+        }
+        for source in &sources {
+            let state: String = sqlx::query_scalar("SELECT state FROM colaboracion_files WHERE id=? FOR UPDATE")
+                .bind(source).fetch_optional(&mut **tx).await?.ok_or(CoreError::NotFound)?;
+            if state == "deleted" { continue; }
+            if !matches!(state.as_str(), "ready" | "trash" | "deleting") { return Err(CoreError::Conflict); }
+            let file = crate::service::load_state(tx, *source, &state).await?;
+            self.authorize_record(tx, actor, &file, "eliminar").await?;
+            let name = file.filename.to_ascii_lowercase();
+            if name == "config.typ" || name == "variables.typ" || name == "funciones.typ"
+                || name.starts_with("items") || name.starts_with("lote") {
+                return Err(CoreError::Invalid);
+            }
+        }
+        // A single source may be published under multiple names. Retire every
+        // active alias before scheduling that shared file for deletion.
+        let aliases: Vec<(u64, serde_json::Value)> = sqlx::query_as("SELECT f.id,v.definition_json FROM colaboracion_formularios f JOIN colaboracion_formulario_versiones v ON v.form_id=f.id AND v.revision=f.current_revision WHERE f.archived_at IS NULL FOR UPDATE")
+            .fetch_all(&mut **tx).await?;
+        for (alias, value) in aliases {
+            let definition: FormDefinition = serde_json::from_value(value).map_err(|_| CoreError::Invalid)?;
+            if alias != id && matches!(definition.section, FormSection::Economica)
+                && definition.template_source_id.is_some_and(|source| sources.contains(&source)) {
+                return Err(CoreError::Conflict);
+            }
+            if alias == id || definition.template_source_id.is_some_and(|source| sources.contains(&source)) {
+                sqlx::query("UPDATE colaboracion_formularios SET archived_at=UTC_TIMESTAMP(6) WHERE id=? AND archived_at IS NULL")
+                    .bind(alias).execute(&mut **tx).await?;
+            }
+        }
+        for source in &sources {
+            sqlx::query("UPDATE colaboracion_files SET state='deleting' WHERE id=? AND state IN ('ready','trash')")
+                .bind(source).execute(&mut **tx).await?;
+            CoreAdmin::record_domain_event(tx, actor, "colaboracion", "file.purge", &source.to_string(), serde_json::json!({"reason":"tender_template"})).await?;
+        }
+        CoreAdmin::record_domain_event(tx, actor, "colaboracion", "form.delete", &id.to_string(), serde_json::json!({"sources":sources.len()})).await?;
+        Ok(sources.into_iter().collect())
+    }
 }
 fn decode(
     id: u64,

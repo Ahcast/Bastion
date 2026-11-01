@@ -357,6 +357,51 @@ impl TenderService {
         tx.commit().await?;
         Ok(())
     }
+    pub async fn delete_published_template(&self, actor: u64, id: u64, revision: u64) -> Result<(), CoreError> {
+        if id == 0 || revision == 0 { return Err(CoreError::Invalid); }
+        let mut tx = self.begin(actor, "eliminar").await?;
+        self.delete_published_template_in_transaction(&mut tx, actor, id, revision, false).await?;
+        tx.commit().await?;
+        Ok(())
+    }
+    async fn delete_published_template_in_transaction(&self, tx: &mut Transaction<'_, MySql>, actor: u64, id: u64, revision: u64, include_archived: bool) -> Result<(), CoreError> {
+        let sources = self.library.delete_form_sources_in_transaction(tx, actor, id, revision, include_archived).await?;
+        let records: Vec<(u64, u64, serde_json::Value)> = sqlx::query_as("SELECT id,expediente_id,source_json FROM licitaciones_formularios FOR UPDATE")
+            .fetch_all(&mut **tx).await?;
+        let mut affected = std::collections::BTreeSet::new();
+        for (copy_id, expedient_id, value) in records {
+            let form: PublishedForm = serde_json::from_value(value).map_err(|_| CoreError::Invalid)?;
+            if form.id != id && matches!(form.definition.section, bastion_colaboracion::FormSection::Economica)
+                && form.definition.template_source_id.is_some_and(|source| sources.contains(&source)) {
+                return Err(CoreError::Conflict);
+            }
+            if form.id == id || form.definition.template_source_id.is_some_and(|source| sources.contains(&source)) {
+                sqlx::query("DELETE FROM licitaciones_formularios WHERE id=?").bind(copy_id).execute(&mut **tx).await?;
+                affected.insert(expedient_id);
+            }
+        }
+        for expedient_id in affected {
+            sqlx::query("UPDATE licitaciones_expedientes SET version=version+1,updated_by=?,updated_at=UTC_TIMESTAMP(6) WHERE id=?")
+                .bind(actor).bind(expedient_id).execute(&mut **tx).await?;
+        }
+        CoreAdmin::record_domain_event(tx, actor, "licitaciones", "form.template.delete", &id.to_string(), serde_json::json!({"revision":revision})).await?;
+        Ok(())
+    }
+    pub async fn delete_all_legal_templates(&self, actor: u64) -> Result<usize, CoreError> {
+        let mut tx = self.begin(actor, "eliminar").await?;
+        self.admin.require_system_administrator_in_transaction(&mut tx, actor).await?;
+        let forms: Vec<(u64, u64, serde_json::Value)> = sqlx::query_as("SELECT f.id,f.current_revision,v.definition_json FROM colaboracion_formularios f JOIN colaboracion_formulario_versiones v ON v.form_id=f.id AND v.revision=f.current_revision FOR UPDATE")
+            .fetch_all(&mut *tx).await?;
+        let mut count = 0;
+        for (id, revision, value) in forms {
+            let definition: bastion_colaboracion::FormDefinition = serde_json::from_value(value).map_err(|_| CoreError::Invalid)?;
+            if matches!(definition.section, bastion_colaboracion::FormSection::Economica) { continue; }
+            self.delete_published_template_in_transaction(&mut tx, actor, id, revision, true).await?;
+            count += 1;
+        }
+        tx.commit().await?;
+        Ok(count)
+    }
     pub async fn save_initial_forms(
         &self,
         actor: u64,

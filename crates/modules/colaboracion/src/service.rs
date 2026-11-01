@@ -431,7 +431,7 @@ impl CollaborationService {
         }
         Ok(())
     }
-    async fn authorize_record(
+    pub(crate) async fn authorize_record(
         &self,
         tx: &mut Transaction<'_, MySql>,
         actor: u64,
@@ -528,10 +528,10 @@ impl CollaborationService {
         Ok(true)
     }
 }
-async fn load(tx: &mut Transaction<'_, MySql>, id: u64) -> Result<FileRecord, CoreError> {
+pub(crate) async fn load(tx: &mut Transaction<'_, MySql>, id: u64) -> Result<FileRecord, CoreError> {
     load_state(tx, id, "ready").await
 }
-async fn load_state(
+pub(crate) async fn load_state(
     tx: &mut Transaction<'_, MySql>,
     id: u64,
     state: &str,

@@ -2,6 +2,10 @@
 
 Decisiones confirmadas por el usuario a partir de los archivos de `bastion formularios`, el 2026-10-28. Este documento define alcance; no acredita implementación ni despliegue.
 
+## Sustitución de formularios legales y técnicos
+
+El usuario decidió retirar las declaraciones legales originales y los formularios legales y técnicos publicados, incluso de los expedientes existentes, y eliminar sus originales de Colaboración. Se conservan la carta BID y la presentación STD, así como configuración, ítems, lotes, variables y funciones. Ajustes permite eliminar cada Typst publicado o retirar todos los legales y técnicos; las fuentes compartidas con formularios económicos impiden la operación para protegerlos. La limpieza de originales se realiza mediante el mecanismo existente de eliminación permanente de Colaboración. La migración retira únicamente las dos selecciones legales originales; los archivos privados originales deben retirarse del servidor después de desplegar el backend compatible. Estas decisiones no acreditan la ejecución de la eliminación ni el despliegue.
+
 ## Variables del expediente
 
 Los datos se capturan en Variables y se validan antes de entregarlos a Typst. `lpn`, `inst` y `descripcion` son texto; `dia`, `year` y `lotes` son enteros; `mes` se selecciona entre los meses del año; `stylo` se selecciona entre `bid` y `std`. `total_paginas` se calcula a partir de todas las páginas del PDF final, incluidos los PDF e imágenes adjuntos. No es editable como valor manual.

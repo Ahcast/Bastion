@@ -187,7 +187,7 @@ test('a form editor selects a Typst file while variables are global', async () =
   } finally { await act(async () => root.unmount()); container.remove(); }
 });
 
-test('settings remove a published Typst form without deleting its source file', async () => {
+test('settings remove a published Typst form and its original from all expedientes', async () => {
   const calls: { path:string; method:string }[] = [];
   const form = { id: 4, revision: 1, hash: 'a'.repeat(64), definition: { title:'Declaración', section:'legal', variables:[], template_source_id:7 } };
   const api = new ApiClient('https://example.test', async (url, init = {}) => { const path = new URL(String(url)).pathname; calls.push({ path, method:init.method ?? 'GET' }); if (init.method === 'DELETE') return new Response(null, { status:204 }); return Response.json({items:[form], page:1, page_size:25, has_more:false}); });
@@ -195,10 +195,10 @@ test('settings remove a published Typst form without deleting its source file', 
   const container = document.createElement('div'); document.body.append(container); const root = createRoot(container);
   try {
     await act(async () => root.render(<NavigationGuardProvider><CoreContext.Provider value={{api, access:admin, notify:()=>{}}}><FormLibrary settings /></CoreContext.Provider></NavigationGuardProvider>));
-    await act(async () => [...container.querySelectorAll('button')].find(b => b.textContent === 'Quitar del catálogo')!.click());
-    const dialog = document.body.querySelector('[role="dialog"]')!; assert.ok(dialog.textContent?.includes('expedientes existentes'));
-    await act(async () => [...dialog.querySelectorAll('button')].find(b => b.textContent === 'Quitar formulario')!.click());
-    assert.deepEqual(calls.filter(c => c.method === 'DELETE'), [{path:'/api/v1/colaboracion/formularios/4', method:'DELETE'}]);
+    await act(async () => [...container.querySelectorAll('button')].find(b => b.textContent === 'Eliminar archivo')!.click());
+    const dialog = document.body.querySelector('[role="dialog"]')!; assert.ok(dialog.textContent?.includes('todos los expedientes'));
+    await act(async () => [...dialog.querySelectorAll('button')].find(b => b.textContent === 'Confirmar eliminación')!.click());
+    assert.deepEqual(calls.filter(c => c.method === 'DELETE'), [{path:'/api/v1/licitaciones/plantillas/4', method:'DELETE'}]);
   } finally { await act(async () => root.unmount()); container.remove(); }
 });
 
