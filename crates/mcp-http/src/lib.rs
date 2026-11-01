@@ -1,7 +1,9 @@
 #![forbid(unsafe_code)]
 
 mod modern;
+mod oauth_metadata;
 pub use modern::{DraftMcpState, McpConfigurationError, draft_mcp_router};
+pub use oauth_metadata::{DraftOauthMetadata, OauthMetadataError};
 
 use std::collections::BTreeSet;
 
