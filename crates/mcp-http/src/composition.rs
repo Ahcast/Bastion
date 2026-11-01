@@ -15,13 +15,14 @@ use bastion_mcp_core::{
     CoreScopePolicy, DraftReadExecutor, approved_read_requirements, draft_read_tool_registry,
 };
 use bastion_ordenes_compra::OrderService;
-use tower_http::cors::{Any, CorsLayer};
+use tower_http::cors::{AllowOrigin, Any, CorsLayer};
 use url::Url;
 
 use crate::{
-    ClientMetadataSource, DraftClientRequestState, DraftConsentState, DraftMcpState,
-    DraftOauthMetadata, TokenEndpoint, draft_client_request_router, draft_consent_router,
-    draft_mcp_router, draft_oauth_metadata_router, draft_token_router,
+    ClientMetadataSource, DraftAuthorizationState, DraftClientRequestState, DraftConsentState,
+    DraftMcpState, DraftOauthMetadata, TokenEndpoint, draft_authorization_router,
+    draft_client_request_router, draft_consent_router, draft_mcp_router,
+    draft_oauth_metadata_router, draft_token_router,
 };
 
 pub struct DraftCompositionConfig {
@@ -112,6 +113,15 @@ pub fn compose_draft_router<F: ClientMetadataSource>(
         config.frontend_origin.clone(),
     )
     .map_err(|_| DraftCompositionError)?;
+    let authorization = DraftAuthorizationState::new(
+        pool.clone(),
+        config.resource.clone(),
+        config.frontend_origin.clone(),
+        config.client_origins.clone(),
+        fetcher.clone(),
+        config.max_metadata_fetches,
+    )
+    .map_err(|_| DraftCompositionError)?;
     let requests = DraftClientRequestState::new(
         pool,
         core,
@@ -121,7 +131,7 @@ pub fn compose_draft_router<F: ClientMetadataSource>(
     )
     .map_err(|_| DraftCompositionError)?;
     let browser_cors = CorsLayer::new()
-        .allow_origin(frontend)
+        .allow_origin(AllowOrigin::list([frontend]))
         .allow_credentials(true)
         .allow_methods([Method::POST, Method::OPTIONS])
         .allow_headers([CONTENT_TYPE, HeaderName::from_static("x-csrf-token")]);
@@ -143,6 +153,7 @@ pub fn compose_draft_router<F: ClientMetadataSource>(
         .merge(draft_client_request_router(requests))
         .layer(browser_cors);
     let protocol = draft_mcp_router(mcp)
+        .merge(draft_authorization_router(authorization))
         .merge(draft_token_router(TokenEndpoint::new(
             exchange,
             config.resource,

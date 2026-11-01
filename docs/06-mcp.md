@@ -4,7 +4,7 @@
 
 El core hospeda la infraestructura MCP común y mantiene el registro de herramientas. Cada módulo aporta herramientas específicas. Un servidor MCP no implementa lógica de negocio aparte: traduce la petición a un caso de uso normal del módulo.
 
-**Estado de implementación:** MCP se desarrolla en routers aislados y permanece desactivado en la aplicación activa. Antes de habilitarlo faltan el inicio de autorización, revalidación de la ficha del cliente, controles de perímetro, notificaciones y pruebas integrales de interoperabilidad.
+**Estado de implementación:** MCP se desarrolla en routers aislados y permanece desactivado en la aplicación activa. Antes de habilitarlo faltan revalidar la ficha del cliente durante todo el ciclo de credenciales, controles de perímetro, notificaciones y pruebas integrales de interoperabilidad.
 
 Las piezas preparadas incluyen OAuth Authorization Code con PKCE, canje y rotación transaccionales, revocación, consentimiento ligado a sesión, descubrimiento, cuotas y auditoría. Las herramientas de consulta para cotizaciones, facturas y órdenes de compra llaman a los servicios de dominio existentes y comprueban los permisos vigentes. Las migraciones OAuth 3 a 8 no se han aplicado en la base operativa.
 
@@ -14,7 +14,7 @@ El workflow `MCP MySQL checks` ejecuta las pruebas sobre una base MySQL 5.7 dese
 
 El router HTTP MCP en preparación permanece aislado de la aplicación activa. Integra validación de bearer y permisos vigentes, límites, auditoría y descubrimiento; permite probar consultas de dominio autorizadas. No constituye una versión desplegable: faltan protección por IP, compatibilidad entre clientes y pruebas completas de extremo a extremo.
 
-Se prepara una composición aislada que reúne los routers y separa CORS con credenciales para el frontend de Bastion del CORS sin credenciales para clientes MCP. No se registra en el servidor activo; aún faltan el inicio HTTP de autorización, las verificaciones de ficha vigente, límites de perímetro y validación integral antes de publicarla.
+Se prepara una composición aislada que reúne los routers y separa CORS con credenciales para el frontend de Bastion del CORS sin credenciales para clientes MCP. El inicio HTTP de autorización comprueba la aprobación y vuelve a descargar la ficha antes de dirigir al usuario al frontend. No se registra en el servidor activo; aún faltan las verificaciones de ficha vigente durante el uso de tokens, límites de perímetro, redacción de parámetros en logs del proxy y validación integral antes de publicarla.
 
 El router aislado prepara soporte MCP 2025-11-25: validación JSON-RPC, inicialización y listado junto con autenticación, límites y auditoría. No está conectado a la aplicación; la compatibilidad todavía requiere negociación completa de versiones y pruebas con clientes reales.
 

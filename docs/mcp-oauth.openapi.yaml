@@ -6,6 +6,27 @@ info:
     Contrato en preparación. Ninguna ruta se anuncia ni habilita hasta completar
     consentimiento, autorización vigente, auditoría, límites y verificación.
 paths:
+  /oauth/authorize:
+    get:
+      summary: Iniciar autorización OAuth — borrador aislado
+      description: >-
+        Comprueba cliente aprobado, redirección, alcances y ficha recuperada antes de
+        dirigir el navegador al frontend configurado. Las fallas no se redirigen al cliente.
+      parameters:
+        - { in: query, name: response_type, required: true, schema: { const: code } }
+        - { in: query, name: client_id, required: true, schema: { type: string, maxLength: 2048 } }
+        - { in: query, name: redirect_uri, required: true, schema: { type: string, maxLength: 2048 } }
+        - { in: query, name: resource, required: true, schema: { type: string, maxLength: 2048 } }
+        - { in: query, name: scope, required: true, schema: { type: string, maxLength: 2048 } }
+        - { in: query, name: state, required: false, schema: { type: string, maxLength: 2048 } }
+        - { in: query, name: code_challenge_method, required: true, schema: { const: S256 } }
+        - { in: query, name: code_challenge, required: true, schema: { type: string } }
+      responses:
+        '303': { description: Redirección al frontend configurado para solicitar consentimiento. }
+        '400': { description: Solicitud inválida o cliente no aprobado. }
+        '403': { description: Origen de navegador rechazado. }
+        '429': { description: Límite de concurrencia alcanzado. }
+        '503': { description: Servicio temporalmente indisponible. }
   /oauth/clients/request:
     post:
       summary: Solicitar revisión de un cliente MCP — borrador aislado
