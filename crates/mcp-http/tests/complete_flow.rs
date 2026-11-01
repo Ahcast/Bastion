@@ -133,6 +133,25 @@ async fn mysql57_full_draft_oauth_to_tool_rechecks_permissions_and_replay() {
         .layer(axum::Extension(axum::extract::ConnectInfo(
             "192.0.2.1:1234".parse::<std::net::SocketAddr>().unwrap(),
         )));
+    let rejected_origin = Request::builder()
+        .uri("/mcp")
+        .header(ORIGIN, "https://evil.invalid")
+        .body(Body::empty())
+        .unwrap();
+    assert_eq!(
+        router
+            .clone()
+            .oneshot(rejected_origin)
+            .await
+            .unwrap()
+            .status(),
+        StatusCode::FORBIDDEN
+    );
+    let no_stream = Request::builder().uri("/mcp").body(Body::empty()).unwrap();
+    assert_eq!(
+        router.clone().oneshot(no_stream).await.unwrap().status(),
+        StatusCode::METHOD_NOT_ALLOWED
+    );
     let mut form = url::form_urlencoded::Serializer::new(String::new());
     form.append_pair("response_type", "code")
         .append_pair("client_id", client)
@@ -243,8 +262,58 @@ async fn mysql57_full_draft_oauth_to_tool_rechecks_permissions_and_replay() {
     let result: serde_json::Value =
         serde_json::from_slice(&to_bytes(result.into_body(), 262144).await.unwrap()).unwrap();
     assert_eq!(result["result"]["structuredContent"]["page_size"], 5);
+    // Exercise the public MCP 2025-11-25 lifecycle through the same OAuth grant.
+    let legacy = |body: serde_json::Value, initialized: bool| {
+        let mut builder = Request::builder()
+            .method("POST")
+            .uri("/mcp")
+            .header(CONTENT_TYPE, "application/json")
+            .header(ACCEPT, "application/json, text/event-stream")
+            .header(AUTHORIZATION, format!("Bearer {access}"));
+        if initialized {
+            builder = builder.header("mcp-protocol-version", "2025-11-25");
+        }
+        builder.body(Body::from(body.to_string())).unwrap()
+    };
+    let initialized = router.clone().oneshot(legacy(json!({"jsonrpc":"2.0","id":11,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"fixture","version":"1"}}}), false)).await.unwrap();
+    assert_eq!(initialized.status(), StatusCode::OK);
+    let initialized: serde_json::Value =
+        serde_json::from_slice(&to_bytes(initialized.into_body(), 8192).await.unwrap()).unwrap();
+    assert_eq!(initialized["result"]["protocolVersion"], "2025-11-25");
+    let notification = router
+        .clone()
+        .oneshot(legacy(
+            json!({"jsonrpc":"2.0","method":"notifications/initialized"}),
+            true,
+        ))
+        .await
+        .unwrap();
+    assert_eq!(notification.status(), StatusCode::ACCEPTED);
+    let listing = router
+        .clone()
+        .oneshot(legacy(
+            json!({"jsonrpc":"2.0","id":12,"method":"tools/list","params":{}}),
+            true,
+        ))
+        .await
+        .unwrap();
+    assert_eq!(listing.status(), StatusCode::OK);
+    let listing: serde_json::Value =
+        serde_json::from_slice(&to_bytes(listing.into_body(), 262144).await.unwrap()).unwrap();
+    assert!(
+        listing["result"]["tools"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|tool| tool["name"] == "cotizaciones.listar")
+    );
+    let legacy_call = router.clone().oneshot(legacy(json!({"jsonrpc":"2.0","id":13,"method":"tools/call","params":{"name":"cotizaciones.listar","arguments":{"page_size":5}}}), true)).await.unwrap();
+    assert_eq!(legacy_call.status(), StatusCode::OK);
+    let legacy_call: serde_json::Value =
+        serde_json::from_slice(&to_bytes(legacy_call.into_body(), 262144).await.unwrap()).unwrap();
+    assert_eq!(legacy_call["result"]["structuredContent"]["page_size"], 5);
     let audited:i64=sqlx::query_scalar("SELECT COUNT(*) FROM audit_events WHERE actor_id=? AND action='mcp.tool.call' AND target_id='cotizaciones.listar' AND result='success'").bind(user).fetch_one(&pool).await.unwrap();
-    assert_eq!(audited, 1);
+    assert_eq!(audited, 2);
     sqlx::query("DELETE FROM role_permissions WHERE role_id=? AND module_id='cotizaciones'")
         .bind(role)
         .execute(&pool)

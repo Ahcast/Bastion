@@ -100,7 +100,14 @@ pub fn validate_legacy_message(
     };
     if method == "initialize" {
         if id.is_none()
-            || params.get("protocolVersion").and_then(Value::as_str) != Some(VERSION)
+            || !params
+                .get("protocolVersion")
+                .and_then(Value::as_str)
+                .is_some_and(|version| {
+                    !version.is_empty()
+                        && version.len() <= 64
+                        && version.bytes().all(|byte| (0x21..=0x7e).contains(&byte))
+                })
             || !params.get("capabilities").is_some_and(Value::is_object)
             || !params
                 .get("clientInfo")
@@ -138,6 +145,8 @@ mod tests {
         let request = validate_legacy_message(None, init).unwrap();
         assert_eq!(request.method, "initialize");
         assert_eq!(request.id, Some(json!(1)));
+        let unknown = br#"{"jsonrpc":"2.0","id":2,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"client","version":"1"}}}"#;
+        assert!(validate_legacy_message(None, unknown).is_ok());
         let notification = br#"{"jsonrpc":"2.0","method":"notifications/initialized"}"#;
         assert!(
             validate_legacy_message(Some(VERSION), notification)

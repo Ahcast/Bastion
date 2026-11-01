@@ -192,11 +192,30 @@ where
     P: ExchangePolicy + Clone + Send + Sync + 'static,
 {
     Router::new()
-        .route("/mcp", post(mcp::<P>))
+        .route("/mcp", post(mcp::<P>).get(mcp_get::<P>))
         .layer(DefaultBodyLimit::max(MAX_BODY))
         .with_state(state)
 }
 
+async fn mcp_get<P>(State(state): State<DraftMcpState<P>>, headers: HeaderMap) -> Response
+where
+    P: ExchangePolicy + Clone + Send + Sync + 'static,
+{
+    match single(&headers, "origin") {
+        Err(()) => rpc_error(StatusCode::FORBIDDEN, -32600, "Forbidden origin"),
+        Ok(Some(origin)) if !state.origins.contains(origin) => {
+            rpc_error(StatusCode::FORBIDDEN, -32600, "Forbidden origin")
+        }
+        _ => (
+            StatusCode::METHOD_NOT_ALLOWED,
+            [
+                (CACHE_CONTROL, "no-store"),
+                (axum::http::header::ALLOW, "POST"),
+            ],
+        )
+            .into_response(),
+    }
+}
 fn rpc_error(status: StatusCode, code: i32, message: &'static str) -> Response {
     (
         status,
