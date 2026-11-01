@@ -67,14 +67,16 @@ function ExpedientWorkspace({ id, back }: { id: number; back: () => void }) {
 function InitialForms({ record, latest, editable, saved }: { record: Expedient; latest: () => Expedient; editable: boolean; saved: (value: Expedient) => void }) {
   const { api } = useCore();
   const options = [{ key:'integridad', label:'Declaración de integridad' }, { key:'oferente', label:'Información sobre el oferente' }];
+  const available = useLoad(signal => api.request<{form_key:string; enabled:boolean}[]>('/api/v1/licitaciones/plantillas-instaladas', { signal }));
   const [selected, setSelected] = useState<string[]>(record.initial_forms ?? []), [busy, setBusy] = useState(false), [error, setError] = useState('');
   const baseline = useRef(JSON.stringify(selected));
   const dirty = JSON.stringify(selected) !== baseline.current;
   const save = async () => { setBusy(true); setError(''); try { const value = await api.request<Expedient>(`/api/v1/licitaciones/${record.id}/pdf/formularios-iniciales`, { method:'PUT', ifMatch:latest().version, body:{forms:selected} }); baseline.current = JSON.stringify(selected); saved(value); return true; } catch (reason) { setError(message(reason)); return false; } finally { setBusy(false); } };
   useUnsavedChanges(dirty, busy, save, 30);
-  return <section className="stack"><Notice>{error}</Notice>
+  const eligible = options.filter(option => !selected.includes(option.key) && ((Array.isArray(available.data) && available.data.some(item => item.form_key === option.key && item.enabled)) || (record.initial_forms ?? []).includes(option.key)));
+  return <section className="stack"><Notice>{error || available.error}</Notice>
     {selected.map(key => { const option = options.find(item => item.key === key); return option && <div className="actions" key={key}><span>{option.label}</span>{editable && <button type="button" disabled={busy} onClick={() => setSelected(current => current.filter(item => item !== key))}>Quitar</button>}</div>; })}
-    {editable && options.some(option => !selected.includes(option.key)) && <label>Agregar declaración instalada<select value="" disabled={busy} onChange={event => { const value = event.target.value; if (value) setSelected(current => [...current, value]); }}><option value="">Seleccionar declaración</option>{options.filter(option => !selected.includes(option.key)).map(option => <option key={option.key} value={option.key}>{option.label}</option>)}</select></label>}
+    {editable && eligible.length > 0 && <label>Agregar declaración instalada<select value="" disabled={busy} onChange={event => { const value = event.target.value; if (value) setSelected(current => [...current, value]); }}><option value="">Seleccionar declaración</option>{eligible.map(option => <option key={option.key} value={option.key}>{option.label}</option>)}</select></label>}
     {editable && <button type="button" disabled={!dirty || busy} onClick={() => { void save(); }}>{busy ? 'Guardando…' : 'Guardar selección'}</button>}
   </section>;
 }
@@ -174,5 +176,9 @@ function DeleteExpedient({ record, close, deleted }: { record: Expedient; close:
 }
 
 export function TenderSettings() {
-  return <section className="card stack"><h2>Ajustes de Licitaciones</h2><p>Administra los formularios y declaraciones Typst disponibles para los expedientes.</p><FormLibrary settings /></section>;
+  const { api, access, notify } = useCore();
+  const [busy, setBusy] = useState(false), [error, setError] = useState('');
+  const installed = useLoad(signal => api.request<{form_key:string; enabled:boolean}[]>('/api/v1/licitaciones/plantillas-instaladas', { signal }));
+  const labels: Record<string,string> = { integridad:'Declaración de integridad', oferente:'Información sobre el oferente' };
+  return <section className="card stack"><h2>Ajustes de Licitaciones</h2><p>Administra los formularios y declaraciones Typst disponibles para los expedientes.</p><h3>Declaraciones instaladas</h3><Notice>{error || installed.error}</Notice>{installed.data && <Table columns={['Declaración','Estado','Acción']} rows={installed.data.map(form => [labels[form.form_key] ?? form.form_key, form.enabled ? 'Disponible' : 'Retirada', access.is_system_administrator ? <button disabled={busy} onClick={async () => { setBusy(true); setError(''); try { await api.request(`/api/v1/licitaciones/plantillas-instaladas/${form.form_key}`, { method:'PUT', body:{enabled:!form.enabled} }); installed.reload(); notify(form.enabled ? 'Declaración retirada para expedientes nuevos.' : 'Declaración disponible.'); } catch (reason) { setError(message(reason)); } finally { setBusy(false); } }}>{form.enabled ? 'Quitar del catálogo' : 'Restaurar'}</button> : '—'])} />}<p className="document-note">Retirar una declaración impide agregarla a nuevos expedientes y conserva las que ya estaban incorporadas.</p><FormLibrary settings /></section>;
 }

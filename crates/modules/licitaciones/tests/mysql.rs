@@ -3,8 +3,8 @@ use bastion_colaboracion::{
 };
 use bastion_core::{CoreError, CoreService, Database};
 use bastion_licitaciones::{
-    CopyFormInput, GlobalVariable, GlobalVariablesInput, LotInput, LotItem, NameInput, PageQuery,
-    PdfOrderInput, TenderService, ValuesInput,
+    CopyFormInput, GlobalVariable, GlobalVariablesInput, InitialFormsInput, LotInput, LotItem,
+    NameInput, PageQuery, PdfOrderInput, TenderService, ValuesInput,
 };
 use sqlx::mysql::MySqlPoolOptions;
 
@@ -691,4 +691,64 @@ async fn mysql57_tenders_snapshots_permissions_races_receipts_and_deletion() {
         .await
         .unwrap();
     assert!(removed.forms.is_empty());
+    let selected = tenders
+        .save_initial_forms(
+            1,
+            draft.id,
+            removed.version,
+            InitialFormsInput {
+                forms: vec!["integridad".into()],
+            },
+        )
+        .await
+        .unwrap();
+    assert!(matches!(
+        tenders.set_installed_form(2, "integridad", false).await,
+        Err(CoreError::Forbidden)
+    ));
+    tenders
+        .set_installed_form(1, "integridad", false)
+        .await
+        .unwrap();
+    assert!(
+        tenders
+            .detail(1, draft.id)
+            .await
+            .unwrap()
+            .initial_forms
+            .contains(&"integridad".into())
+    );
+    let other = tenders.create(1, "installed-forms-test-01").await.unwrap();
+    assert!(matches!(
+        tenders
+            .save_initial_forms(
+                1,
+                other.id,
+                other.version,
+                InitialFormsInput {
+                    forms: vec!["integridad".into()]
+                }
+            )
+            .await,
+        Err(CoreError::NotFound)
+    ));
+    assert_eq!(
+        tenders
+            .save_initial_forms(
+                1,
+                draft.id,
+                selected.version,
+                InitialFormsInput {
+                    forms: vec!["integridad".into()]
+                }
+            )
+            .await
+            .unwrap()
+            .version,
+        selected.version
+    );
+    tenders
+        .set_installed_form(1, "integridad", true)
+        .await
+        .unwrap();
 }
