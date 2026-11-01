@@ -1,4 +1,4 @@
-use std::net::{IpAddr, Ipv4Addr, SocketAddr};
+use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr};
 
 use url::{Host, Url};
 
@@ -24,8 +24,8 @@ impl PublicDnsCandidates {
 }
 
 /// Conservative initial profile: a DNS hostname over standard HTTPS, with
-/// only public IPv4 answers. Mixed public/private or IPv6 answer sets fail
-/// closed; this restriction must be documented in compatibility testing.
+/// only globally scoped unicast candidates. Mixed public/private answers fail
+/// closed; the network perimeter must also block infrastructure destinations.
 pub fn validate_public_dns_candidates(
     client_id: &str,
     addresses: &[SocketAddr],
@@ -35,8 +35,9 @@ pub fn validate_public_dns_candidates(
     let Some(Host::Domain(hostname)) = url.host() else {
         return Err(DnsPolicyError);
     };
-    if hostname.eq_ignore_ascii_case("localhost")
-        || hostname.ends_with(".localhost")
+    let host_without_dot = hostname.trim_end_matches('.');
+    if host_without_dot.eq_ignore_ascii_case("localhost")
+        || host_without_dot.ends_with(".localhost")
         || url.port_or_known_default() != Some(443)
         || addresses.is_empty()
         || addresses.len() > 16
@@ -44,7 +45,11 @@ pub fn validate_public_dns_candidates(
         return Err(DnsPolicyError);
     }
     if addresses.iter().any(|socket| {
-        socket.port() != 443 || !matches!(socket.ip(), IpAddr::V4(ip) if public_ipv4(ip))
+        socket.port() != 443
+            || !match socket.ip() {
+                IpAddr::V4(ip) => public_ipv4(ip),
+                IpAddr::V6(ip) => public_ipv6(ip),
+            }
     }) {
         return Err(DnsPolicyError);
     }
@@ -52,6 +57,18 @@ pub fn validate_public_dns_candidates(
         hostname: hostname.to_owned(),
         addresses: addresses.to_vec(),
     })
+}
+
+fn public_ipv6(ip: Ipv6Addr) -> bool {
+    let s = ip.segments();
+    // Permit only 2000::/3 and conservatively exclude special-purpose and
+    // documentation ranges even where sub-allocations may be reachable.
+    (s[0] & 0xe000) == 0x2000
+        && !(s[0] == 0x2001 && (s[1] & 0xfe00) == 0)
+        && !(s[0] == 0x2001 && s[1] == 0x0db8)
+        && s[0] != 0x2002
+        && s[0] != 0x3ffe
+        && !(s[0] == 0x3fff && (s[1] & 0xf000) == 0)
 }
 
 fn public_ipv4(ip: Ipv4Addr) -> bool {
@@ -98,11 +115,28 @@ mod tests {
         assert!(validate_public_dns_candidates(id, &[]).is_err());
         assert!(validate_public_dns_candidates(id, &[public, private]).is_err());
         assert!(validate_public_dns_candidates(id, &[ipv6]).is_err());
+        for ip in [
+            "::",
+            "::1",
+            "::ffff:8.8.8.8",
+            "fc00::1",
+            "fe80::1",
+            "ff00::1",
+            "2001:db8::1",
+            "2001::1",
+            "2002::1",
+            "3fff::1",
+        ] {
+            let addr: SocketAddr = format!("[{ip}]:443").parse().unwrap();
+            assert!(validate_public_dns_candidates(id, &[addr]).is_err(), "{ip}");
+        }
         assert!(validate_public_dns_candidates(id, &["8.8.8.8:444".parse().unwrap()]).is_err());
         assert!(validate_public_dns_candidates("https://127.0.0.1/doc", &[public]).is_err());
         assert!(validate_public_dns_candidates("https://localhost/doc", &[public]).is_err());
-        let candidates = validate_public_dns_candidates(id, &[public]).unwrap();
+        assert!(validate_public_dns_candidates("https://localhost./doc", &[public]).is_err());
+        let public6: SocketAddr = "[2606:4700:4700::1111]:443".parse().unwrap();
+        let candidates = validate_public_dns_candidates(id, &[public, public6]).unwrap();
         assert_eq!(candidates.hostname(), "client.example");
-        assert_eq!(candidates.addresses(), &[public]);
+        assert_eq!(candidates.addresses(), &[public, public6]);
     }
 }
