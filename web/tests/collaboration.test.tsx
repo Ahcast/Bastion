@@ -86,6 +86,36 @@ test('active content cannot acquire a preview origin through its declared MIME',
   await assert.rejects(fileBase64({ size: MAX_FILE_BYTES + 1 } as File));
 });
 
+test('PDF preview uses the isolated browser viewer instead of a sandboxed iframe', async () => {
+  const record = { id: 5, scope: 'empresa', id_persona: null, title: 'Manual', notes: '', filename: 'manual.pdf', mime: 'application/pdf', size_bytes: 13, created_at: '2026-10-31T12:00:00Z', trashed_at: null, purge_after: null };
+  const api = new ApiClient('https://example.test', async url => {
+    const path = new URL(String(url)).pathname;
+    if (path.endsWith('/settings')) return Response.json({ max_file_mb: 50, trash_retention_days: 30, allowed_extensions: ['pdf'], blocked_extensions: ['exe'] });
+    if (path.endsWith('/preview')) return Response.json({ filename: 'manual.pdf', mime: 'application/pdf', content_base64: btoa('%PDF-synthetic') });
+    return Response.json({ items: [record], page: 1, page_size: 25, has_more: false });
+  });
+  const tab = { closed: false, opener: {} as unknown, document: { title: '', body: { textContent: '' } }, location: { href: 'about:blank', replace(value: string) { this.href = value; } }, close() { this.closed = true; } };
+  const openDescriptor = Object.getOwnPropertyDescriptor(window, 'open'), setIntervalDescriptor = Object.getOwnPropertyDescriptor(globalThis, 'setInterval');
+  let poll: (() => void) | undefined;
+  Object.defineProperty(window, 'open', { configurable: true, value: () => tab });
+  Object.defineProperty(globalThis, 'setInterval', { configurable: true, value: ((handler: TimerHandler, timeout?: number, ...args: unknown[]) => { poll = handler as () => void; return Reflect.apply(setIntervalDescriptor!.value, globalThis, [handler, timeout, ...args]); }) as typeof setInterval });
+  const container = document.createElement('div'); document.body.append(container); const root = createRoot(container);
+  try {
+    await act(async () => root.render(<NavigationGuardProvider><CoreContext.Provider value={{ api, access: { ...access, permissions: [{ module_id: 'colaboracion', scope_key: '*', capability: 'ver' }] }, notify: () => {} }}><Colaboracion /></CoreContext.Provider></NavigationGuardProvider>));
+    const button = [...container.querySelectorAll('button')].find(item => item.textContent === 'Ver'); assert.ok(button);
+    await act(async () => { button.click(); await Promise.resolve(); await Promise.resolve(); });
+    assert.equal(tab.opener, null);
+    assert.equal(tab.document.title, 'manual.pdf');
+    assert.ok(tab.location.href.startsWith('blob:'));
+    assert.equal(container.querySelector('iframe'), null);
+  } finally {
+    tab.closed = true; poll?.();
+    if (openDescriptor) Object.defineProperty(window, 'open', openDescriptor); else Reflect.deleteProperty(window, 'open');
+    if (setIntervalDescriptor) Object.defineProperty(globalThis, 'setInterval', setIntervalDescriptor); else Reflect.deleteProperty(globalThis, 'setInterval');
+    await act(async () => root.unmount()); container.remove();
+  }
+});
+
 
 
 test('person folders filter requests and upload targets; deletion requires explicit confirmation and its own permission', async () => {

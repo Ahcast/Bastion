@@ -3,7 +3,8 @@ import { message } from '../api.js';
 import { Dialog, Heading, Loading, Notice, Table, useCore, useLoad } from '../ui.js';
 import { moduleCan } from '../types.js';
 import { useUnsavedChanges } from '../navigationGuard.js';
-import { collaborationCan, contentBlob, fileBase64 } from '../collaboration.js';
+import { collaborationCan, contentBlob, fileBase64, MAX_FILE_BYTES } from '../collaboration.js';
+import { reservePdfViewer } from '../quoteDocuments.js';
 import FormLibrary from './FormLibrary.js';
 import { useNavigationGuard } from '../navigationGuard.js';
 import type { CollaborationFile, FileContent, FilePage, FilePolicy } from '../collaboration.js';
@@ -32,13 +33,19 @@ function Workspace() {
   const result = useLoad(signal => api.request<FilePage>(`/api/v1/colaboracion?trash=${trash}&scope=${scope}${person && scope === 'persona' ? `&id_persona=${person.id}` : ''}&search=${encodeURIComponent(query)}&page=${page}&page_size=25`, { signal }), [trash, scope, person?.id, query, page]);
   useEffect(() => () => { if (preview) URL.revokeObjectURL(preview.url); }, [preview]);
   const read = async (record: CollaborationFile, show: boolean) => {
+    let viewer: ReturnType<typeof reservePdfViewer> | undefined;
+    try { if (show && record.mime === 'application/pdf') viewer = reservePdfViewer(MAX_FILE_BYTES); }
+    catch (reason) { setError(message(reason)); return; }
     setBusy(true); setError('');
     try {
       const content = await api.request<FileContent>(`/api/v1/colaboracion/${record.id}/${show ? 'preview' : 'download'}`);
-      const blob = contentBlob(content, show), url = URL.createObjectURL(blob);
-      if (show) setPreview({ title: record.title, url, mime: content.mime, text: content.mime === 'text/plain' ? await blob.text() : undefined });
-      else { const link = document.createElement('a'); link.href = url; link.download = record.filename; document.body.append(link); link.click(); link.remove(); setTimeout(() => URL.revokeObjectURL(url), 60_000); }
-    } catch (reason) { setError(message(reason)); } finally { setBusy(false); }
+      if (viewer) viewer.show(content);
+      else {
+        const blob = contentBlob(content, show), url = URL.createObjectURL(blob);
+        if (show) setPreview({ title: record.title, url, mime: content.mime, text: content.mime === 'text/plain' ? await blob.text() : undefined });
+        else { const link = document.createElement('a'); link.href = url; link.download = record.filename; document.body.append(link); link.click(); link.remove(); setTimeout(() => URL.revokeObjectURL(url), 60_000); }
+      }
+    } catch (reason) { viewer?.close(); setError(message(reason)); } finally { setBusy(false); }
   };
   return <><Heading title="Colaboración" description="Archivos comunes de empresa y documentos organizados por persona." action={<button disabled={busy} onClick={result.reload}>Actualizar</button>} />
     <div className="collaboration-folders" role="group" aria-label="Vista de archivos"><button aria-pressed={!trash} disabled={busy} onClick={() => { setTrash(false); setPage(1); }}>Archivos</button><button aria-pressed={trash} disabled={busy} onClick={() => { setTrash(true); setPage(1); }}>Papelera</button></div>
@@ -61,7 +68,7 @@ function Workspace() {
     {!trash && scope === 'persona' && !person && collaborationCan(access, 'editar') && <p>Abre una carpeta de persona para subir sus documentos.</p>}
     {result.data ? <><Table columns={['Título', 'Carpeta', 'Archivo', 'Tamaño', 'Fecha', 'Notas', ...(trash ? ['Purga programada'] : []), 'Acciones']} rows={result.data.items.map(record => [record.title, record.scope === 'empresa' ? 'Empresa' : (person?.id === record.id_persona ? person.full_name : `Persona #${record.id_persona}`), record.filename, `${(record.size_bytes / 1024).toFixed(1)} KiB`, new Intl.DateTimeFormat('es-HN', { dateStyle: 'short', timeStyle: 'short', timeZone: 'America/Tegucigalpa' }).format(new Date(record.created_at)), record.notes || '—', ...(trash ? [record.purge_after ? new Intl.DateTimeFormat('es-HN', { dateStyle: 'short', timeStyle: 'short', timeZone: 'America/Tegucigalpa' }).format(new Date(record.purge_after)) : '—'] : []), <div className="actions">{!trash && <><button disabled={busy} onClick={() => void read(record, true)}>Ver</button><button disabled={busy} onClick={() => void read(record, false)}>Descargar</button></>}{moduleCan(access, 'colaboracion', record.scope === 'empresa' ? 'empresa' : `persona:${record.id_persona}`, 'eliminar') && <>{trash && <button disabled={busy} onClick={async () => { setBusy(true); setError(''); try { await api.request(`/api/v1/colaboracion/${record.id}/restore`, { method: 'POST' }); result.reload(); notify('Archivo restaurado.'); } catch (reason) { setError(message(reason)); } finally { setBusy(false); } }}>Restaurar</button>}<button className="danger" disabled={busy} onClick={() => { setPurging(trash); setRemoving(record); }}>{trash ? 'Eliminar definitivamente' : 'Eliminar'}</button></>}</div>])} /><nav className="row" aria-label="Paginación de archivos"><button disabled={page === 1 || busy} onClick={() => setPage(value => value - 1)}>Anterior</button><span>Página {page}</span><button disabled={!result.data.has_more || busy} onClick={() => setPage(value => value + 1)}>Siguiente</button></nav></> : !result.error && <Loading />}
     {removing && <Dialog title={purging ? 'Eliminar definitivamente' : 'Mover a papelera'} close={() => { if (!busy) setRemoving(null); }}><p>{purging ? `Se eliminará definitivamente «${removing.title}» y su archivo privado. Esta acción no tiene restauración.` : `«${removing.title}» se moverá a papelera durante ${policy.data?.trash_retention_days ?? 30} días. Puedes restaurarlo antes de su purga.`}</p><Notice>{error}</Notice><div className="actions"><button disabled={busy} onClick={() => setRemoving(null)}>Cancelar</button><button className="danger" disabled={busy} onClick={async () => { setBusy(true); setError(''); try { await api.request(`/api/v1/colaboracion/${removing.id}${purging ? '/purge' : ''}`, { method: purging ? 'POST' : 'DELETE', body: { confirm_id: removing.id } }); setRemoving(null); result.reload(); notify(purging ? 'Borrado definitivo registrado. Se retirará el archivo privado.' : 'Archivo movido a papelera.'); } catch (reason) { setError(message(reason)); } finally { setBusy(false); } }}>{purging ? 'Confirmar borrado definitivo' : 'Mover a papelera'}</button></div></Dialog>}
-    {preview && <Dialog title={preview.title} close={() => setPreview(null)}>{preview.mime === 'text/plain' ? <pre className="collaboration-text">{preview.text}</pre> : preview.mime.startsWith('image/') ? <img className="collaboration-image" src={preview.url} alt={preview.title} /> : <iframe title={`Vista previa: ${preview.title}`} className="collaboration-pdf" src={preview.url} sandbox="" />}</Dialog>}
+    {preview && <Dialog title={preview.title} close={() => setPreview(null)}>{preview.mime === 'text/plain' ? <pre className="collaboration-text">{preview.text}</pre> : <img className="collaboration-image" src={preview.url} alt={preview.title} />}</Dialog>}
   </>;
 }
 function PersonFolders({ selected, choose, disabled }: { selected: { id: number; full_name: string } | null; choose: (person: { id: number; full_name: string } | null) => void; disabled: boolean }) {
