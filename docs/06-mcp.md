@@ -28,6 +28,8 @@ Se prepara el canje transaccional de códigos y la rotación de refresh tokens p
 
 ## Modelo de operación
 
+El router HTTP MCP en preparación permanece aislado de la aplicación activa. Integra validación de bearer y permisos vigentes, límites, auditoría y descubrimiento con un registro de herramientas controlado por el servidor. Aún no ejecuta herramientas de dominio ni constituye una versión desplegable: faltan descubrimiento OAuth, consentimiento en la interfaz, protección por IP, compatibilidad entre clientes y pruebas completas de extremo a extremo.
+
 ```mermaid
 flowchart LR
     Agent[Cliente IA/MCP] --> Host[Servidor MCP del core]

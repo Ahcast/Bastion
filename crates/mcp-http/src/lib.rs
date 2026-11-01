@@ -1,5 +1,8 @@
 #![forbid(unsafe_code)]
 
+mod modern;
+pub use modern::{DraftMcpState, McpConfigurationError, draft_mcp_router};
+
 use std::collections::BTreeSet;
 
 use axum::{

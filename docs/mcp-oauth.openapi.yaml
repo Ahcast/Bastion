@@ -6,6 +6,39 @@ info:
     Contrato en preparación. Ninguna ruta se anuncia ni habilita hasta completar
     consentimiento, autorización vigente, auditoría, límites y verificación.
 paths:
+  /mcp:
+    post:
+      summary: Descubrimiento MCP — borrador aislado
+      description: >-
+        Ruta no habilitada en la aplicación. Valida autorización y límites,
+        y ofrece únicamente descubrimiento y listado de herramientas registradas;
+        no ejecuta operaciones de dominio.
+      parameters:
+        - in: header
+          name: Authorization
+          required: true
+          schema: { type: string }
+        - in: header
+          name: MCP-Protocol-Version
+          required: true
+          schema: { type: string }
+        - in: header
+          name: MCP-Method
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object }
+      responses:
+        '200': { description: Respuesta JSON-RPC de descubrimiento. }
+        '400': { description: Solicitud o cabeceras inválidas. }
+        '401': { description: Credencial ausente o inválida. }
+        '403': { description: Origen de navegador no permitido. }
+        '413': { description: Cuerpo mayor al límite de 65536 bytes. }
+        '429': { description: Cuota o concurrencia agotada. }
+        '503': { description: Servicio temporalmente indisponible. }
   /oauth/token:
     post:
       summary: Canjear un código PKCE o rotar un refresh token

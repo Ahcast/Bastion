@@ -7,7 +7,10 @@ edition.workspace = true
 axum.workspace = true
 bastion-mcp = { path = "../mcp" }
 serde.workspace = true
+serde_json.workspace = true
 sqlx.workspace = true
+tokio.workspace = true
+url.workspace = true
 
 [dev-dependencies]
 bastion-core = { path = "../core", features = ["test-support"] }

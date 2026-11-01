@@ -17,6 +17,7 @@ pub struct PermissionRequirement {
 
 /// No implicit scopes: an empty registry denies all access. Each registered
 /// scope can require multiple permissions, e.g. a report and its source domain.
+#[derive(Clone)]
 pub struct CoreScopePolicy {
     core: CoreAdmin,
     registry: BTreeMap<String, Vec<PermissionRequirement>>,

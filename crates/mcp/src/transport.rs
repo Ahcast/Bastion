@@ -28,9 +28,26 @@ pub struct ModernRequest {
 pub enum TransportError {
     ForbiddenOrigin,
     InvalidRequest,
+    InvalidParams,
     HeaderMismatch,
     UnsupportedVersion,
     Unacceptable,
+}
+
+/// Extract an unambiguous request ID for a protocol error without accepting
+/// duplicate JSON keys or oversized payloads.
+pub fn extract_request_id(body: &[u8]) -> Option<Value> {
+    if body.is_empty() || body.len() > MAX_BODY {
+        return None;
+    }
+    let mut parser = serde_json::Deserializer::from_slice(body);
+    let StrictValue(value) = StrictValue::deserialize(&mut parser).ok()?;
+    parser.end().ok()?;
+    value
+        .as_object()?
+        .get("id")
+        .filter(|id| id.is_string() || id.as_i64().is_some() || id.as_u64().is_some())
+        .cloned()
 }
 
 /// Validate a single modern JSON-RPC request. This is not an HTTP route and
@@ -79,20 +96,20 @@ pub fn validate_modern_request(
     let params = object
         .get("params")
         .filter(|v| v.is_object())
-        .ok_or(TransportError::InvalidRequest)?;
+        .ok_or(TransportError::InvalidParams)?;
     let meta = params
         .get("_meta")
         .and_then(Value::as_object)
-        .ok_or(TransportError::InvalidRequest)?;
+        .ok_or(TransportError::InvalidParams)?;
     let version = meta
         .get("io.modelcontextprotocol/protocolVersion")
         .and_then(Value::as_str)
-        .ok_or(TransportError::InvalidRequest)?;
+        .ok_or(TransportError::InvalidParams)?;
     if !meta
         .get("io.modelcontextprotocol/clientCapabilities")
         .is_some_and(Value::is_object)
     {
-        return Err(TransportError::InvalidRequest);
+        return Err(TransportError::InvalidParams);
     }
     if let Some(info) = meta.get("io.modelcontextprotocol/clientInfo") {
         let valid = info.as_object().is_some_and(|object| {
@@ -104,7 +121,7 @@ pub fn validate_modern_request(
             })
         });
         if !valid {
-            return Err(TransportError::InvalidRequest);
+            return Err(TransportError::InvalidParams);
         }
     }
     if headers.protocol_version != Some(version) || headers.method != Some(method) {
@@ -122,7 +139,7 @@ pub fn validate_modern_request(
         let name = params
             .get(field)
             .and_then(Value::as_str)
-            .ok_or(TransportError::InvalidRequest)?;
+            .ok_or(TransportError::InvalidParams)?;
         let header = headers.name.ok_or(TransportError::HeaderMismatch)?;
         if decode_name(header).as_deref() != Some(name) {
             return Err(TransportError::HeaderMismatch);
@@ -275,7 +292,7 @@ mod tests {
             text.replace(",\"io.modelcontextprotocol/clientCapabilities\":{}", "");
         assert!(matches!(
             validate_modern_request(&headers(), &allowed, missing_capabilities.as_bytes()),
-            Err(TransportError::InvalidRequest)
+            Err(TransportError::InvalidParams)
         ));
         let encoded = "=?base64?YnVzY2Fy?=";
         let mut h = headers();
