@@ -1335,6 +1335,53 @@ impl CoreService {
         }
     }
 
+    /// Transfer one MCP notice to the existing encrypted outbox. The sender is
+    /// explicitly configured by the operator and must remain an active system
+    /// administrator with SMTP credentials. This does not send mail itself.
+    pub async fn queue_one_mcp_notification(&self, sender_id: u64) -> Result<bool, CoreError> {
+        let mut tx = self.database.pool.begin().await?;
+        let sender: Option<u64> = sqlx::query_scalar("SELECT u.id FROM users u JOIN roles r ON r.id=u.role_id JOIN user_smtp_credentials c ON c.user_id=u.id WHERE u.id=? AND u.status='active' AND r.system_key='system_administrator' FOR UPDATE")
+            .bind(sender_id).fetch_optional(&mut *tx).await?;
+        if sender.is_none() {
+            tx.commit().await?;
+            return Ok(false);
+        }
+        let notification: Option<(u64, String, String)> = sqlx::query_as("SELECT n.id,n.kind,u.email FROM admin_notifications n JOIN users u ON u.id=n.recipient_user_id JOIN roles r ON r.id=u.role_id WHERE n.delivery_status='pending' AND n.mail_outbox_id IS NULL AND u.status='active' AND (n.kind='oauth_client_review' OR (n.kind IN ('oauth_client_request','oauth_client_changed') AND r.system_key='system_administrator')) ORDER BY n.id LIMIT 1 FOR UPDATE")
+            .fetch_optional(&mut *tx).await?;
+        let Some((notification_id, kind, recipient)) = notification else {
+            tx.commit().await?;
+            return Ok(false);
+        };
+        let (subject, body) = match kind.as_str() {
+            "oauth_client_request" => (
+                "Solicitud de cliente MCP",
+                "Hay una solicitud de acceso MCP pendiente de revisión en Bastion. Ingresa a Ajustes para revisarla.",
+            ),
+            "oauth_client_changed" => (
+                "Cliente MCP requiere revisión",
+                "Cambió la información de un cliente MCP. Revisa su estado en Ajustes de Bastion.",
+            ),
+            "oauth_client_review" => (
+                "Resultado de solicitud MCP",
+                "Hay una actualización de tu solicitud de cliente MCP. Ingresa a Bastion para consultar su estado.",
+            ),
+            _ => return Err(CoreError::Invalid),
+        };
+        let encrypted = self.encrypt(body)?;
+        let mail = sqlx::query("INSERT INTO mail_outbox (kind,sender_user_id,recipient_email,subject,body_ciphertext,delivery_status,available_at,created_at) VALUES ('security_notice',?,?,?,?,'pending',UTC_TIMESTAMP(6),UTC_TIMESTAMP(6))")
+            .bind(sender_id).bind(recipient).bind(subject).bind(encrypted).execute(&mut *tx).await?.last_insert_id();
+        sqlx::query("UPDATE admin_notifications SET delivery_status='queued',mail_outbox_id=?,last_error_code=NULL WHERE id=? AND delivery_status='pending' AND mail_outbox_id IS NULL")
+            .bind(mail).bind(notification_id).execute(&mut *tx).await?;
+        tx.commit().await?;
+        Ok(true)
+    }
+
+    /// Mirror delivery status without treating a queued message as sent.
+    pub async fn reconcile_mcp_notification_mail(&self) -> Result<u64, CoreError> {
+        let result = sqlx::query("UPDATE admin_notifications n JOIN mail_outbox m ON m.id=n.mail_outbox_id SET n.delivery_status=CASE WHEN m.delivery_status='sent' THEN 'sent' WHEN m.delivery_status IN ('failed','cancelled') THEN 'failed' ELSE 'queued' END,n.last_error_code=m.last_error_code,n.sent_at=m.sent_at WHERE n.kind IN ('oauth_client_request','oauth_client_changed','oauth_client_review') AND n.delivery_status IN ('queued','failed') AND ((m.delivery_status='sent' AND n.delivery_status<>'sent') OR (m.delivery_status IN ('failed','cancelled') AND n.delivery_status<>'failed') OR (m.delivery_status IN ('pending','delivering') AND n.delivery_status='failed'))")
+            .execute(&self.database.pool).await?;
+        Ok(result.rows_affected())
+    }
     pub async fn deliver_one_mail(&self) -> Result<bool, CoreError> {
         let now = Utc::now().naive_utc();
         let mut tx = self.database.pool.begin().await?;
