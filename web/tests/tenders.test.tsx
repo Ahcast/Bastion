@@ -137,6 +137,29 @@ test('drafts survive tab changes and can be saved together when leaving', async 
   } finally { await act(async () => root.unmount()); container.remove(); }
 });
 
+test('legal files share one list and installed Typst selections save with the expediente', async () => {
+  let record: Expedient = { id: 7, name: 'Prueba', version: 1, state: 'borrador', forms: [], variables: [], initial_forms: [] };
+  const api = new ApiClient('https://example.test', async (url, init = {}) => {
+    const path = new URL(String(url)).pathname;
+    if (init.method === 'PUT') { const body = JSON.parse(String(init.body)); record = { ...record, version: 2, initial_forms: body.forms }; return Response.json(record); }
+    if (path.endsWith('/plantillas-instaladas')) return Response.json([{form_key:'integridad', enabled:true}]);
+    if (path.endsWith('/archivos')) return Response.json({ items:[{id:1, section:'legal', filename:'anexo.pdf', byte_size:50, mime:'application/pdf', available:true}], retained_bytes:50 });
+    return Response.json(path === '/api/v1/licitaciones' ? { items:[record], page:1, page_size:25, has_more:false } : record);
+  });
+  const context = { ...access, permissions: [...access.permissions, {module_id:'licitaciones', scope_key:'expedientes', capability:'editar'}] };
+  const container = document.createElement('div'); document.body.append(container); const root = createRoot(container);
+  const click = async (label:string, scope:ParentNode = container) => { const button = [...scope.querySelectorAll('button')].find(b => b.textContent === label); assert.ok(button, label); await act(async () => button.click()); };
+  try {
+    await act(async () => root.render(<NavigationGuardProvider><CoreContext.Provider value={{api, access:context, notify:()=>{}}}><Licitaciones /></CoreContext.Provider></NavigationGuardProvider>));
+    await click('Abrir expediente'); await click('Documentación legal'); await click('Agregar archivo Typst');
+    const dialog = document.body.querySelector('[role="dialog"]')!; await click('Agregar', dialog);
+    const table = [...container.querySelectorAll('table')].find(t => t.textContent?.includes('anexo.pdf'))!;
+    assert.ok(table.textContent?.includes('Declaración de integridad'));
+    await click('Variables'); assert.equal(document.body.querySelector('[role="dialog"]'), null);
+    await click('Guardar expediente'); assert.deepEqual(record.initial_forms, ['integridad']);
+  } finally { await act(async () => root.unmount()); container.remove(); }
+});
+
 test('new library schemas have no default variables and require explicit administrative approval', async () => {
   let writes = 0;
   const api = new ApiClient('https://example.test', async (_url, init = {}) => { if (init.method === 'POST') writes++; return Response.json({ items: [], page: 1, page_size: 25, has_more: false }); });
@@ -191,7 +214,7 @@ test('settings upload a Typst file and select it for the new form', async () => 
   const container=document.createElement('div'); document.body.append(container); const root=createRoot(container);
   try {
     await act(async()=>root.render(<NavigationGuardProvider><CoreContext.Provider value={{api, access:admin, notify:()=>{}}}><FormLibrary settings /></CoreContext.Provider></NavigationGuardProvider>));
-    await act(async()=>[...container.querySelectorAll('button')].find(b=>b.textContent==='Nuevo formulario')!.click());
+    await act(async()=>[...container.querySelectorAll('button')].find(b=>b.textContent==='Agregar archivo Typst')!.click());
     const dialog=document.body.querySelector('[role="dialog"]')!; const input=dialog.querySelector<HTMLInputElement>('input[type="file"]')!;
     const file=new window.File(['#variables.nombre'], 'formulario.typ', {type:'text/plain'}); Object.defineProperty(input, 'files', {configurable:true, value:[file]});
     await act(async()=>{input.dispatchEvent(new Event('change',{bubbles:true})); await window.happyDOM.waitUntilComplete();});
