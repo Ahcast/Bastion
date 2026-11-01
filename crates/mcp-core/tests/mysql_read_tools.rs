@@ -94,6 +94,21 @@ async fn mysql57_read_tools_reuse_domain_authorization_and_validate_arguments() 
             .await,
         Err(ReadToolError::Invalid)
     );
+    for module in ["facturas", "ordenes_compra"] {
+        sqlx::query("INSERT INTO role_permissions (role_id,module_id,scope_key,scope_hash,capability) VALUES (?,?,'documentos',UNHEX(SHA2('documentos',256)),'ver')").bind(role).bind(module).execute(&pool).await.unwrap();
+        let page = executor
+            .call(&access, &format!("{module}.listar"), json!({"page_size":5}))
+            .await
+            .unwrap();
+        assert_eq!(page["page_size"], 5);
+        assert!(page["items"].as_array().unwrap().is_empty());
+        assert_eq!(
+            executor
+                .call(&access, &format!("{module}.consultar"), json!({"id":1}))
+                .await,
+            Err(ReadToolError::NotFound)
+        );
+    }
     let no_scope = AuthenticatedAccess {
         scopes: BTreeSet::new(),
         ..access
