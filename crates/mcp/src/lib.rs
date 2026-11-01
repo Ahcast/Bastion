@@ -3,12 +3,14 @@
 mod client_approval;
 mod consent;
 mod credential;
+mod discovery;
 mod exchange;
 mod metadata;
 mod pkce;
 mod policy;
 mod protocol;
 mod quota;
+mod registry;
 mod storage;
 mod token_exchange;
 mod transport;
@@ -19,6 +21,7 @@ pub use consent::{
     ConsentError, ConsentIdentity, ConsentPolicy, ConsentResult, MysqlConsent, PendingConsent,
 };
 pub use credential::{Credential, CredentialError, CredentialKind};
+pub use discovery::{DiscoveryError, dispatch_discovery};
 pub use exchange::{
     CodeRecord, ExchangeError, RefreshRecord, validate_code_exchange, validate_refresh_exchange,
 };
@@ -32,6 +35,7 @@ pub use protocol::{
     parse_token_parameters,
 };
 pub use quota::{ActorQuota, MysqlQuota, QuotaError, ToolQuota};
+pub use registry::{RegistryError, ToolDescriptor, ToolRegistry, ToolRisk};
 pub use storage::{MysqlOauthStore, StoreError, revoke_user_grants_in_transaction};
 pub use token_exchange::{
     AuthenticatedAccess, ExchangePolicy, IssuedTokens, MysqlTokenExchange, TokenExchangeError,
