@@ -62,13 +62,13 @@ test('expedients start empty; values preserve drafts on 412 and navigation asks 
     const row = [...container.querySelectorAll('fieldset.document-variable')].find(e => e.querySelector<HTMLInputElement>('input')?.value === 'dato')!; const input = [...row.querySelectorAll<HTMLInputElement>('input')].find(e => e.parentElement?.textContent?.startsWith('Valor'))!; assert.ok(input);
     const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')!.set!;
     await act(async () => { setter.call(input, 'Texto privado'); input.dispatchEvent(new Event('input', { bubbles: true })); });
-    await act(async () => container.querySelector('form')!.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })));
+    await act(async () => container.querySelector('form.document-values')!.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })));
     assert.equal(input.value, 'Texto privado'); assert.ok(container.textContent?.includes('Cambió la versión'));
     const write = calls.find(c => c.init.method === 'PUT')!;
     assert.equal(new Headers(write.init.headers).get('if-match'), '"2"');
     assert.equal(write.path, '/api/v1/licitaciones/7/variables'); assert.deepEqual(JSON.parse(String(write.init.body)).variables.find((v: {key:string}) => v.key === 'dato'), { key:'dato', label:'Dato sintético', kind:'text', value:'Texto privado' });
     await click('Volver al listado'); assert.ok(document.body.textContent?.includes('Cambios sin guardar')); await click('Seguir editando', document.body);
-    stale = false; await act(async () => container.querySelector('form')!.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })));
+    stale = false; await act(async () => container.querySelector('form.document-values')!.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })));
     await click('Volver al listado'); await click('Nuevo expediente');
     assert.ok(container.textContent?.includes('0 formularios incorporados'));
     assert.ok(!container.textContent?.includes('Entidad convocante'));
@@ -92,9 +92,48 @@ test('variables are created in the expediente before any form is added', async (
     const row = [...container.querySelectorAll('fieldset.document-variable')].at(-1)!; const inputs = [...row.querySelectorAll<HTMLInputElement>('input')];
     const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')!.set!;
     for (const [i, value] of ['nombre', 'Nombre', 'Marco'].entries()) await act(async () => { setter.call(inputs[i], value); inputs[i]!.dispatchEvent(new Event('input', { bubbles: true })); });
-    await act(async () => container.querySelector('form')!.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })));
+    await act(async () => container.querySelector('form.document-values')!.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })));
     assert.deepEqual((body as {variables: {key:string}[]}).variables.find(v => v.key === 'nombre'), { key: 'nombre', label: 'Nombre', kind: 'text', value: 'Marco' });
     assert.ok(container.textContent?.includes('#variables.nombre'));
+  } finally { await act(async () => root.unmount()); container.remove(); }
+});
+
+test('drafts survive tab changes and can be saved together when leaving', async () => {
+  let record: Expedient = { id: 7, name: 'Inicial', version: 1, state: 'borrador', forms: [], variables: [{ key:'dato', label:'Dato', kind:'text', value:null }] };
+  const writes: { method: string; version: string | null }[] = [];
+  const api = new ApiClient('https://example.test', async (url, init = {}) => {
+    const path = new URL(String(url)).pathname;
+    if (init.method === 'PATCH' || init.method === 'PUT') {
+      const version = new Headers(init.headers).get('if-match'); writes.push({ method:init.method, version });
+      assert.equal(version, `"${record.version}"`);
+      const body = JSON.parse(String(init.body));
+      record = { ...record, version: record.version + 1, ...(init.method === 'PATCH' ? { name: body.name } : { variables: body.variables }) };
+      return Response.json(record);
+    }
+    return Response.json(path === '/api/v1/licitaciones' ? { items:[record], page:1, page_size:25, has_more:false } : record);
+  });
+  const context = { ...access, permissions: [...access.permissions, { module_id:'licitaciones', scope_key:'expedientes', capability:'editar' }] };
+  const container = document.createElement('div'); document.body.append(container); const root = createRoot(container);
+  const click = async (label: string, scope: ParentNode = container) => { const button = [...scope.querySelectorAll('button')].find(b => b.textContent === label); assert.ok(button, label); await act(async () => button.click()); };
+  const type = async (input: HTMLInputElement, value: string) => { const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')!.set!; await act(async () => { setter.call(input, value); input.dispatchEvent(new Event('input', { bubbles:true })); }); };
+  try {
+    await act(async () => root.render(<NavigationGuardProvider><CoreContext.Provider value={{api, access:context, notify:()=>{}}}><Licitaciones /></CoreContext.Provider></NavigationGuardProvider>));
+    await click('Abrir expediente');
+    await type(container.querySelector<HTMLInputElement>('input[name="expedient_name"]')!, 'Editado');
+    await click('Variables');
+    const row = [...container.querySelectorAll('fieldset.document-variable')].find(e => e.querySelector<HTMLInputElement>('input')?.value === 'dato')!;
+    const value = [...row.querySelectorAll<HTMLInputElement>('input')].find(e => e.parentElement?.textContent?.startsWith('Valor'))!;
+    await type(value, 'Conservado');
+    await click('Oferta económica'); assert.equal(document.body.querySelector('[role="dialog"]'), null);
+    const economic = [...container.querySelectorAll('section')].find(e => e.querySelector('h2')?.textContent === 'Oferta económica')!;
+    assert.ok(!economic.textContent?.includes('Incorporar formulario'));
+    await click('Variables'); assert.equal(value.value, 'Conservado');
+    await click('Volver al listado');
+    const dialog = document.body.querySelector('[role="dialog"]')!; assert.ok(dialog.textContent?.includes('Guardar y salir'));
+    await click('Guardar y salir', dialog);
+    assert.deepEqual(writes, [{method:'PATCH',version:'"1"'},{method:'PUT',version:'"2"'}]);
+    assert.equal(record.name, 'Editado'); assert.equal(record.variables?.find(v=>v.key==='dato')?.value,'Conservado');
+    assert.ok(container.textContent?.includes('Listado de expedientes'));
   } finally { await act(async () => root.unmount()); container.remove(); }
 });
 
@@ -122,6 +161,21 @@ test('a form editor selects a Typst file while variables are global', async () =
     const dialog = document.body.querySelector('[role="dialog"]')!;
     await act(async () => [...dialog.querySelectorAll('button')].find(b => b.textContent === 'Seleccionar plantilla')!.click());
     assert.ok(dialog.textContent?.includes('archivo #7')); assert.ok(dialog.textContent?.includes('pestaña Variables')); assert.equal(dialog.querySelectorAll('legend').length, 0);
+  } finally { await act(async () => root.unmount()); container.remove(); }
+});
+
+test('settings remove a published Typst form without deleting its source file', async () => {
+  const calls: { path:string; method:string }[] = [];
+  const form = { id: 4, revision: 1, hash: 'a'.repeat(64), definition: { title:'Declaración', section:'legal', variables:[], template_source_id:7 } };
+  const api = new ApiClient('https://example.test', async (url, init = {}) => { const path = new URL(String(url)).pathname; calls.push({ path, method:init.method ?? 'GET' }); if (init.method === 'DELETE') return new Response(null, { status:204 }); return Response.json({items:[form], page:1, page_size:25, has_more:false}); });
+  const admin: Access = { ...access, is_system_administrator:true, modules:[{ module_id:'colaboracion', display_name:'Colaboración' }] };
+  const container = document.createElement('div'); document.body.append(container); const root = createRoot(container);
+  try {
+    await act(async () => root.render(<NavigationGuardProvider><CoreContext.Provider value={{api, access:admin, notify:()=>{}}}><FormLibrary settings /></CoreContext.Provider></NavigationGuardProvider>));
+    await act(async () => [...container.querySelectorAll('button')].find(b => b.textContent === 'Quitar del catálogo')!.click());
+    const dialog = document.body.querySelector('[role="dialog"]')!; assert.ok(dialog.textContent?.includes('expedientes existentes'));
+    await act(async () => [...dialog.querySelectorAll('button')].find(b => b.textContent === 'Quitar formulario')!.click());
+    assert.deepEqual(calls.filter(c => c.method === 'DELETE'), [{path:'/api/v1/colaboracion/formularios/4', method:'DELETE'}]);
   } finally { await act(async () => root.unmount()); container.remove(); }
 });
 
