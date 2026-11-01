@@ -12,15 +12,15 @@ pub struct ConsentIdentity {
 }
 
 /// Only the Core may verify a browser session. No default trust is provided.
-#[allow(async_fn_in_trait)]
 pub trait ConsentPolicy {
-    async fn session(
+    fn session(
         &self,
         tx: &mut Transaction<'_, MySql>,
         session_token: &str,
-    ) -> Result<Option<ConsentIdentity>, sqlx::Error>;
+    ) -> impl std::future::Future<Output = Result<Option<ConsentIdentity>, sqlx::Error>> + Send;
 }
 
+#[derive(Clone)]
 pub struct MysqlConsent<S, P> {
     pool: MySqlPool,
     session: S,

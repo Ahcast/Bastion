@@ -36,6 +36,8 @@ Los documentos de descubrimiento OAuth se preparan a partir de direcciones HTTPS
 
 Se preparan las respuestas de aprobación y rechazo al URI registrado, incluyendo el emisor `iss` y codificación del estado. Se rechazan parámetros OAuth ambiguos al registrar el cliente y antes de crear el grant, incluso si ya había sido registrado. El flujo HTTP deberá preservar estos controles en todos los errores y evitar exponer el código en registros; todavía no está conectado.
 
+Un router de consentimiento aislado prepara y decide solicitudes mediante sesión del Core, origen exacto y CSRF ligado a la sesión. La decisión vuelve a comprobar cliente, redirección y permisos, y sus respuestas prohíben caché. No está conectado a la API activa: faltan la interfaz de usuario, CORS, límites de perímetro y pruebas completas de interoperabilidad antes de exponerlo.
+
 ```mermaid
 flowchart LR
     Agent[Cliente IA/MCP] --> Host[Servidor MCP del core]

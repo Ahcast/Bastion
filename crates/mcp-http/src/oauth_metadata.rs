@@ -95,6 +95,9 @@ impl DraftOauthMetadata {
     pub fn protected_resource_metadata_url(&self) -> &str {
         &self.protected_resource_metadata_url
     }
+    pub fn resource(&self) -> &str {
+        &self.resource
+    }
     pub fn authorization_server_metadata_url(&self) -> &str {
         &self.authorization_server_metadata_url
     }

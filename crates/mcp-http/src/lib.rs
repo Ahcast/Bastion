@@ -1,7 +1,9 @@
 #![forbid(unsafe_code)]
 
+mod consent_http;
 mod modern;
 mod oauth_metadata;
+pub use consent_http::{DraftConsentState, draft_consent_router};
 pub use modern::{DraftMcpState, McpConfigurationError, draft_mcp_router};
 pub use oauth_metadata::{DraftOauthMetadata, OauthMetadataError, draft_oauth_metadata_router};
 

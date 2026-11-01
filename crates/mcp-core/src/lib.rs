@@ -28,6 +28,7 @@ pub struct CoreScopePolicy {
     registry: BTreeMap<String, Vec<PermissionRequirement>>,
 }
 
+#[derive(Clone)]
 pub struct CoreConsentPolicy;
 
 impl ConsentPolicy for CoreConsentPolicy {

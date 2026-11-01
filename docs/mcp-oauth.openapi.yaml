@@ -6,6 +6,51 @@ info:
     Contrato en preparación. Ninguna ruta se anuncia ni habilita hasta completar
     consentimiento, autorización vigente, auditoría, límites y verificación.
 paths:
+  /oauth/consent/begin:
+    post:
+      summary: Preparar consentimiento en la sesión del usuario — borrador
+      description: >-
+        Requiere sesión, origen y CSRF verificados; valida cliente, recurso,
+        redirección, PKCE y permisos. No crea un grant.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [authorization_query]
+              properties:
+                authorization_query: { type: string, maxLength: 8192 }
+              additionalProperties: false
+      responses:
+        '200': { description: Solicitud de consentimiento ligada a la sesión, con nombre y alcances. }
+        '400': { description: Solicitud inválida o cliente no aprobado. }
+        '401': { description: Sesión no autorizada. }
+        '403': { description: Origen o CSRF inválido. }
+        '503': { description: Servicio temporalmente indisponible. }
+  /oauth/consent/decision:
+    post:
+      summary: Aprobar o rechazar consentimiento explícitamente — borrador
+      description: >-
+        Requiere la misma sesión, origen y CSRF; vuelve a validar el cliente,
+        los permisos y la dirección antes de responder. La respuesta es privada.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [handle, decision]
+              properties:
+                handle: { type: string }
+                decision: { enum: [approve, deny] }
+              additionalProperties: false
+      responses:
+        '200': { description: Redirección validada al cliente, sin almacenamiento en caché. }
+        '400': { description: Solicitud inválida, consumida o vencida. }
+        '401': { description: Sesión no autorizada. }
+        '403': { description: Origen o CSRF inválido. }
+        '503': { description: Servicio temporalmente indisponible. }
   /.well-known/oauth-protected-resource/mcp:
     get:
       summary: Metadatos del recurso MCP — ruta de ejemplo aislada
