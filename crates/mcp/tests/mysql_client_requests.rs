@@ -1,9 +1,26 @@
-use bastion_core::Database;
+use bastion_core::{Database, oauth_session_in_transaction};
 use bastion_mcp::{
-    ClientRequestError, ClientRequestStore, ReviewDecision, validate_client_metadata,
+    ClientRequestError, ClientRequestStore, ConsentIdentity, ConsentPolicy, Credential,
+    ReviewDecision, validate_client_metadata,
 };
-use sqlx::mysql::MySqlPoolOptions;
+use sqlx::{MySql, Transaction, mysql::MySqlPoolOptions};
 use std::collections::BTreeSet;
+
+struct CoreSession;
+impl ConsentPolicy for CoreSession {
+    async fn session(
+        &self,
+        tx: &mut Transaction<'_, MySql>,
+        token: &str,
+    ) -> Result<Option<ConsentIdentity>, sqlx::Error> {
+        Ok(oauth_session_in_transaction(tx, token)
+            .await?
+            .map(|identity| ConsentIdentity {
+                user_id: identity.user_id,
+                session_id: identity.session_id,
+            }))
+    }
+}
 
 #[tokio::test]
 async fn mysql57_client_requests_require_admin_and_never_create_user_grants() {
@@ -43,6 +60,17 @@ async fn mysql57_client_requests_require_admin_and_never_create_user_grants() {
             .unwrap()
             .last_insert_id();
     let user=sqlx::query("INSERT INTO users (person_id,role_id,email,status) VALUES (?,?,'oauth-request-user@example.invalid','active')").bind(person).bind(role).execute(&pool).await.unwrap().last_insert_id();
+    let user_session = Credential::generate().unwrap().expose();
+    let admin_session = Credential::generate().unwrap().expose();
+    let revoked_session = Credential::generate().unwrap().expose();
+    let csrf = Credential::generate().unwrap().expose();
+    for (actor, token, revoked) in [
+        (user, &user_session, false),
+        (admin, &admin_session, false),
+        (user, &revoked_session, true),
+    ] {
+        sqlx::query("INSERT INTO sessions (user_id,token_hash,csrf_hash,ip_address,started_at,last_activity_at,last_totp_at,expires_at,revoked_at) VALUES (?,UNHEX(SHA2(?,256)),UNHEX(SHA2(?,256)),'127.0.0.1',UTC_TIMESTAMP(6),UTC_TIMESTAMP(6),UTC_TIMESTAMP(6),UTC_TIMESTAMP(6)+INTERVAL 1 HOUR,IF(?,UTC_TIMESTAMP(6),NULL))").bind(actor).bind(token).bind(&csrf).bind(revoked).execute(&pool).await.unwrap();
+    }
     let id = "https://request-client.example.invalid/metadata.json";
     let raw=serde_json::json!({"client_id":id,"client_name":"Request fixture","redirect_uris":["https://request-client.example.invalid/cb"],"token_endpoint_auth_method":"none"}).to_string();
     let metadata = validate_client_metadata(id, id, 200, raw.as_bytes()).unwrap();
@@ -62,10 +90,43 @@ async fn mysql57_client_requests_require_admin_and_never_create_user_grants() {
             .await,
         Err(ClientRequestError::Invalid)
     ));
+    assert!(matches!(
+        store
+            .submit_for_session(
+                &CoreSession,
+                &revoked_session,
+                &metadata,
+                &quote,
+                &registered
+            )
+            .await,
+        Err(ClientRequestError::Forbidden)
+    ));
     let request = store
-        .submit(user, &metadata, &quote, &registered)
+        .submit_for_session(&CoreSession, &user_session, &metadata, &quote, &registered)
         .await
         .unwrap();
+    assert!(matches!(
+        store
+            .list_for_session(&CoreSession, &revoked_session, None, false)
+            .await,
+        Err(ClientRequestError::Forbidden)
+    ));
+    assert!(matches!(
+        store
+            .list_for_session(&CoreSession, &user_session, None, true)
+            .await,
+        Err(ClientRequestError::Forbidden)
+    ));
+    assert!(
+        store
+            .list_for_session(&CoreSession, &admin_session, None, true)
+            .await
+            .unwrap()
+            .items
+            .iter()
+            .any(|item| item.id == request)
+    );
     assert!(matches!(
         store.list_pending(user, None).await,
         Err(ClientRequestError::Forbidden)
@@ -116,6 +177,18 @@ async fn mysql57_client_requests_require_admin_and_never_create_user_grants() {
     ));
     assert!(matches!(
         store
+            .review_for_session(
+                &CoreSession,
+                &revoked_session,
+                request,
+                ReviewDecision::Reject,
+                &registered
+            )
+            .await,
+        Err(ClientRequestError::Forbidden)
+    ));
+    assert!(matches!(
+        store
             .review(
                 admin,
                 request,
@@ -129,8 +202,9 @@ async fn mysql57_client_requests_require_admin_and_never_create_user_grants() {
         Err(ClientRequestError::Invalid)
     ));
     store
-        .review(
-            admin,
+        .review_for_session(
+            &CoreSession,
+            &admin_session,
             request,
             ReviewDecision::Approve {
                 metadata: &metadata,
