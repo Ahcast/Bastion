@@ -10,6 +10,7 @@ mod policy;
 mod protocol;
 mod storage;
 mod token_exchange;
+mod transport;
 mod validity;
 
 pub use client_approval::{ApprovedClientStore, ClientApprovalError};
@@ -33,6 +34,7 @@ pub use storage::{MysqlOauthStore, StoreError, revoke_user_grants_in_transaction
 pub use token_exchange::{
     AuthenticatedAccess, ExchangePolicy, IssuedTokens, MysqlTokenExchange, TokenExchangeError,
 };
+pub use transport::{ModernHeaders, ModernRequest, TransportError, validate_modern_request};
 pub use validity::{GrantState, TokenWindow, ValidityError, validate_token_window};
 
 // MCP transport stays disabled until OAuth consent, delegated identity,
