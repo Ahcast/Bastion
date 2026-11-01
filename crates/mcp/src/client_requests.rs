@@ -38,6 +38,7 @@ pub struct ClientRequestSummary {
     pub client_name: String,
     pub client_id: String,
     pub scopes: Vec<String>,
+    pub approved_scopes: Option<Vec<String>>,
     pub status: String,
     pub created_at: chrono::NaiveDateTime,
 }
@@ -155,7 +156,7 @@ impl ClientRequestStore {
             return Err(ClientRequestError::Forbidden);
         }
         let mut query = QueryBuilder::<MySql>::new(
-            "SELECT r.id,c.display_name,c.client_id,r.requested_scopes,r.status,r.created_at FROM oauth_client_requests r JOIN oauth_clients c ON c.id=r.client_id WHERE ",
+            "SELECT r.id,c.display_name,c.client_id,r.requested_scopes,r.approved_scopes,r.status,r.created_at FROM oauth_client_requests r JOIN oauth_clients c ON c.id=r.client_id WHERE ",
         );
         if admin {
             query.push("r.status='pending'");
@@ -171,6 +172,7 @@ impl ClientRequestStore {
             String,
             String,
             Json<Vec<String>>,
+            Option<Json<Vec<String>>>,
             String,
             chrono::NaiveDateTime,
         )> = query.build_query_as().fetch_all(&mut **tx).await?;
@@ -179,12 +181,21 @@ impl ClientRequestStore {
             .into_iter()
             .take(50)
             .map(
-                |(id, client_name, client_id, Json(scopes), status, created_at)| {
+                |(
+                    id,
+                    client_name,
+                    client_id,
+                    Json(scopes),
+                    approved_scopes,
+                    status,
+                    created_at,
+                )| {
                     ClientRequestSummary {
                         id,
                         client_name,
                         client_id,
                         scopes,
+                        approved_scopes: approved_scopes.map(|Json(value)| value),
                         status,
                         created_at,
                     }
@@ -372,7 +383,7 @@ impl ClientRequestStore {
             return Err(ClientRequestError::Conflict);
         }
         let requested: BTreeSet<String> = requested.into_iter().collect();
-        let (status, action) = match decision {
+        let (status, action, approved_scopes) = match decision {
             ReviewDecision::Approve { metadata, scopes } => {
                 if method != "none"
                     || snapshot.as_deref() != Some(current.as_slice())
@@ -401,11 +412,15 @@ impl ClientRequestStore {
                     sqlx::query("UPDATE oauth_grants SET revoked_at=UTC_TIMESTAMP(6),revocation_reason='client_reapproval' WHERE client_id=? AND revoked_at IS NULL").bind(client).execute(&mut **tx).await?;
                 }
                 sqlx::query("UPDATE oauth_clients SET enabled=1,approved_metadata_hash=metadata_hash,approved_by=?,approved_at=UTC_TIMESTAMP(6),updated_at=UTC_TIMESTAMP(6) WHERE id=?").bind(actor).bind(client).execute(&mut **tx).await?;
-                ("approved", "oauth.client.request.approve")
+                (
+                    "approved",
+                    "oauth.client.request.approve",
+                    Some(Json(scopes.iter().cloned().collect::<Vec<_>>())),
+                )
             }
-            ReviewDecision::Reject => ("rejected", "oauth.client.request.reject"),
+            ReviewDecision::Reject => ("rejected", "oauth.client.request.reject", None),
         };
-        sqlx::query("UPDATE oauth_client_requests SET status=?,reviewed_by=?,reviewed_at=UTC_TIMESTAMP(6),updated_at=UTC_TIMESTAMP(6) WHERE id=? AND status='pending'").bind(status).bind(actor).bind(request).execute(&mut **tx).await?;
+        sqlx::query("UPDATE oauth_client_requests SET status=?,approved_scopes=?,reviewed_by=?,reviewed_at=UTC_TIMESTAMP(6),updated_at=UTC_TIMESTAMP(6) WHERE id=? AND status='pending'").bind(status).bind(approved_scopes).bind(actor).bind(request).execute(&mut **tx).await?;
         sqlx::query("INSERT INTO admin_notifications (recipient_user_id,kind,subject,payload_json,delivery_status,created_at) VALUES (?,'oauth_client_review','Resultado de solicitud MCP',JSON_OBJECT('request_id',?),'pending',UTC_TIMESTAMP(6))").bind(requester).bind(request).execute(&mut **tx).await?;
         sqlx::query("INSERT INTO audit_events (actor_id,module_id,action,target_type,target_id,result,created_at) VALUES (?,'core',?,'oauth_client',?,'success',UTC_TIMESTAMP(6))").bind(actor).bind(action).bind(client.to_string()).execute(&mut **tx).await?;
         Ok(())

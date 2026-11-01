@@ -78,6 +78,7 @@ async fn mysql57_client_requests_require_admin_and_never_create_user_grants() {
     let registered = BTreeSet::from(["quote:read".to_owned(), "invoice:read".to_owned()]);
     let quote = BTreeSet::from(["quote:read".to_owned()]);
     let invoice = BTreeSet::from(["invoice:read".to_owned()]);
+    let both = registered.clone();
     let store = ClientRequestStore::new(pool.clone());
     assert!(matches!(
         store
@@ -103,7 +104,7 @@ async fn mysql57_client_requests_require_admin_and_never_create_user_grants() {
         Err(ClientRequestError::Forbidden)
     ));
     let request = store
-        .submit_for_session(&CoreSession, &user_session, &metadata, &quote, &registered)
+        .submit_for_session(&CoreSession, &user_session, &metadata, &both, &registered)
         .await
         .unwrap();
     assert!(matches!(
@@ -152,7 +153,7 @@ async fn mysql57_client_requests_require_admin_and_never_create_user_grants() {
     );
     assert_eq!(
         store
-            .submit(user, &metadata, &quote, &registered)
+            .submit(user, &metadata, &both, &registered)
             .await
             .unwrap(),
         request
@@ -222,6 +223,13 @@ async fn mysql57_client_requests_require_admin_and_never_create_user_grants() {
             .items
             .iter()
             .any(|item| item.id == request)
+    );
+    let own = store.list_own(user, None).await.unwrap();
+    let reviewed = own.items.iter().find(|item| item.id == request).unwrap();
+    assert_eq!(reviewed.scopes.len(), 2);
+    assert_eq!(
+        reviewed.approved_scopes.as_ref().unwrap(),
+        &vec!["quote:read".to_owned()]
     );
     let (enabled, approved): (bool, bool) = sqlx::query_as(
         "SELECT enabled,approved_metadata_hash=metadata_hash FROM oauth_clients WHERE client_id=?",
