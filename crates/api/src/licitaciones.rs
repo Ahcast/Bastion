@@ -13,6 +13,10 @@ pub(super) fn routes(state: ApiState) -> Router<ApiState> {
         )
         .route("/api/v1/licitaciones/{id}/formularios", post(copy_form))
         .route(
+            "/api/v1/licitaciones/{id}/formularios/{copy_id}",
+            axum::routing::delete(remove_form),
+        )
+        .route(
             "/api/v1/licitaciones/{id}/variables",
             axum::routing::put(global_variables),
         )
@@ -376,6 +380,23 @@ async fn copy_form(
             single_header(&headers, "idempotency-key")?,
             input,
         )
+        .await
+        .map(response)
+        .map_err(ApiError)
+}
+async fn remove_form(
+    State(state): State<ApiState>,
+    headers: axum::http::HeaderMap,
+    Path((id, copy_id)): Path<(u64, u64)>,
+    Json(input): Json<DeleteInput>,
+) -> Result<Response, ApiError> {
+    if input.confirm_id != copy_id {
+        return Err(ApiError(CoreError::Invalid));
+    }
+    let user = actor(&state, &headers).await?;
+    state
+        .licitaciones
+        .remove_form(user.id, id, copy_id, expected(&headers)?)
         .await
         .map(response)
         .map_err(ApiError)

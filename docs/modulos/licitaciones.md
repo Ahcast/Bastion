@@ -175,4 +175,8 @@ Se conservan en la fuente los detalles candidatos de diseño. Cualquier respuest
 
 ### PDF final y formularios iniciales: despliegue
 
+#### Ajustes y edición del expediente: en preparación
+
+Se prepara la administración de formularios Typst en Ajustes de Licitaciones mediante la biblioteca de Colaboración: selección de un archivo existente o subida desde la PC, publicación y retiro del catálogo. El retiro conserva las revisiones y las copias ya incorporadas a expedientes. La migración `202611010001` agrega el estado de retiro a la biblioteca; requiere respaldo y migración de Colaboración antes de instalar el backend. En el expediente, la eliminación de una copia requiere el permiso `eliminar` y una versión vigente. Los borradores de las pestañas se conservan al navegar y el guardado común aplica los cambios en secuencia. Las subidas y eliminaciones de archivos siguen confirmándose inmediatamente. Esta preparación no acredita despliegue.
+
 La selección por expediente incluye «Declaración de integridad» e «Información sobre el oferente», sin publicar los originales privados en Git. Oferta BID/STD, lotes ofertados, formularios de Colaboración y adjuntos se ordenan juntos; las referencias se vuelven a autorizar antes de publicar y descargar el PDF. Una cola persistente coordina el trabajador aislado mediante un socket local y almacena el resultado privado. BMP y TIFF se convierten dentro del aislamiento, conservando las páginas TIFF. El límite del PDF final es independiente y asciende a 1.000.000.000 bytes. El 2026-10-29 se desplegó el commit `d6e82df` en AWS y Bluehost, con CI integral aprobado. La validación de extremo a extremo con una sesión y un expediente reales sigue pendiente; no se ha medido la capacidad máxima de 1 GB en producción.

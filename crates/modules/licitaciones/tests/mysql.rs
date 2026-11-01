@@ -611,4 +611,49 @@ async fn mysql57_tenders_snapshots_permissions_races_receipts_and_deletion() {
             .await
             .unwrap();
     assert_eq!(state, ("failed".into(), true));
+    let archived = library
+        .publish_form(
+            1,
+            "archive-test-publish-01",
+            PublishFormInput {
+                form_id: None,
+                expected_revision: None,
+                definition: definition("Formulario a retirar"),
+            },
+        )
+        .await
+        .unwrap();
+    let draft = tenders.create(1, "archive-test-create-01").await.unwrap();
+    let copy = tenders
+        .copy_form(
+            1,
+            draft.id,
+            draft.version,
+            "archive-test-copy-01",
+            CopyFormInput {
+                source_id: archived.id,
+                revision: archived.revision,
+            },
+        )
+        .await
+        .unwrap();
+    assert!(matches!(
+        library.archive_form(2, archived.id, archived.revision).await,
+        Err(CoreError::Forbidden)
+    ));
+    assert!(matches!(library.archive_form(1, archived.id, archived.revision + 1).await, Err(CoreError::PreconditionFailed)));
+    library.archive_form(1, archived.id, archived.revision).await.unwrap();
+    assert!(
+        !library.list_forms(1, 1, 100).await.unwrap().items.iter().any(|f| f.id == archived.id)
+    );
+    assert!(tenders.detail(1, draft.id).await.unwrap().forms.iter().any(|f| f.source.id == archived.id));
+    assert!(matches!(
+        tenders.copy_form(1, draft.id, copy.version, "archive-test-copy-02", CopyFormInput { source_id: archived.id, revision: archived.revision }).await,
+        Err(CoreError::NotFound)
+    ));
+    let removed = tenders
+        .remove_form(1, draft.id, copy.forms[0].id, copy.version)
+        .await
+        .unwrap();
+    assert!(removed.forms.is_empty());
 }
