@@ -2,6 +2,7 @@
 
 mod credential;
 mod exchange;
+mod metadata;
 mod pkce;
 mod policy;
 mod protocol;
@@ -12,6 +13,7 @@ pub use credential::{Credential, CredentialError, CredentialKind};
 pub use exchange::{
     CodeRecord, ExchangeError, RefreshRecord, validate_code_exchange, validate_refresh_exchange,
 };
+pub use metadata::{ClientMetadata, MetadataError, validate_client_metadata};
 pub use pkce::{PkceError, S256Challenge};
 pub use policy::{
     AuthorizationRequest, ClientApproval, PolicyError, validate_authorization_request,
