@@ -8,7 +8,7 @@ use axum::{
 use bastion_core::{CoreService, Database};
 use bastion_cotizaciones::QuoteService;
 use bastion_mcp::{
-    ActorQuota, ApprovedClientStore, ClientMetadata, Credential, ToolQuota,
+    ActorQuota, ApprovedClientStore, ClientMetadata, Credential, CredentialKind, ToolQuota,
     validate_client_metadata,
 };
 use bastion_mcp_http::{
@@ -16,14 +16,25 @@ use bastion_mcp_http::{
 };
 use serde_json::json;
 use sqlx::mysql::MySqlPoolOptions;
-use std::{collections::BTreeSet, time::Duration};
+use std::{
+    collections::BTreeSet,
+    sync::{
+        Arc,
+        atomic::{AtomicBool, AtomicUsize, Ordering},
+    },
+    time::Duration,
+};
 use tower::ServiceExt;
 
 #[derive(Clone)]
-struct FakeFetcher;
+struct FakeFetcher(Arc<AtomicBool>, Arc<AtomicUsize>);
 impl ClientMetadataSource for FakeFetcher {
     async fn fetch(&self, id: &str) -> Result<ClientMetadata, MetadataFetchError> {
-        let raw=json!({"client_id":id,"client_name":"End-to-end fixture","redirect_uris":["https://complete-client.example.invalid/cb"],"token_endpoint_auth_method":"none"}).to_string();
+        self.1.fetch_add(1, Ordering::SeqCst);
+        let mut raw=json!({"client_id":id,"client_name":"End-to-end fixture","redirect_uris":["https://complete-client.example.invalid/cb"],"token_endpoint_auth_method":"none"}).to_string();
+        if self.0.load(Ordering::SeqCst) {
+            raw.push(' ');
+        }
         validate_client_metadata(id, id, 200, raw.as_bytes())
             .map_err(|_| MetadataFetchError::InvalidResponse)
     }
@@ -86,7 +97,10 @@ async fn mysql57_full_draft_oauth_to_tool_rechecks_permissions_and_replay() {
     let client = "https://complete-client.example.invalid/metadata.json";
     let redirect = "https://complete-client.example.invalid/cb";
     let resource = "https://api.example.invalid/mcp";
-    let metadata = FakeFetcher.fetch(client).await.unwrap();
+    let changed = Arc::new(AtomicBool::new(false));
+    let hits = Arc::new(AtomicUsize::new(0));
+    let fetcher = FakeFetcher(changed.clone(), hits.clone());
+    let metadata = fetcher.fetch(client).await.unwrap();
     let scopes = BTreeSet::from(["cotizaciones:read".to_owned()]);
     ApprovedClientStore::new(pool.clone())
         .approve_new_client(admin, &metadata, &scopes, &scopes)
@@ -112,7 +126,7 @@ async fn mysql57_full_draft_oauth_to_tool_rechecks_permissions_and_replay() {
         max_metadata_fetches: 2,
         request_timeout: Duration::from_secs(10),
     };
-    let router = compose_draft_router(core, config, FakeFetcher).unwrap();
+    let router = compose_draft_router(core, config, fetcher).unwrap();
     let mut form = url::form_urlencoded::Serializer::new(String::new());
     form.append_pair("response_type", "code")
         .append_pair("client_id", client)
@@ -206,16 +220,20 @@ async fn mysql57_full_draft_oauth_to_tool_rechecks_permissions_and_replay() {
             .body(Body::from(token_body.clone()))
             .unwrap()
     };
+    let before_token = hits.load(Ordering::SeqCst);
     let token = router.clone().oneshot(token_request()).await.unwrap();
     assert_eq!(token.status(), StatusCode::OK);
+    assert_eq!(hits.load(Ordering::SeqCst), before_token + 1);
     let token: serde_json::Value =
         serde_json::from_slice(&to_bytes(token.into_body(), 8192).await.unwrap()).unwrap();
     let access = token["access_token"].as_str().unwrap();
-    let call = || {
+    let call = |access: &str| {
         Request::builder().method("POST").uri("/mcp").header(CONTENT_TYPE,"application/json").header(ACCEPT,"application/json, text/event-stream").header(AUTHORIZATION,format!("Bearer {access}")).header("mcp-protocol-version","2026-07-28").header("mcp-method","tools/call").header("mcp-name","cotizaciones.listar").body(Body::from(json!({"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"cotizaciones.listar","arguments":{"page_size":5},"_meta":{"io.modelcontextprotocol/protocolVersion":"2026-07-28","io.modelcontextprotocol/clientCapabilities":{}}}}).to_string())).unwrap()
     };
-    let result = router.clone().oneshot(call()).await.unwrap();
+    let before_call = hits.load(Ordering::SeqCst);
+    let result = router.clone().oneshot(call(access)).await.unwrap();
     assert_eq!(result.status(), StatusCode::OK);
+    assert_eq!(hits.load(Ordering::SeqCst), before_call + 1);
     let result: serde_json::Value =
         serde_json::from_slice(&to_bytes(result.into_body(), 262144).await.unwrap()).unwrap();
     assert_eq!(result["result"]["structuredContent"]["page_size"], 5);
@@ -227,7 +245,7 @@ async fn mysql57_full_draft_oauth_to_tool_rechecks_permissions_and_replay() {
         .await
         .unwrap();
     assert_eq!(
-        router.clone().oneshot(call()).await.unwrap().status(),
+        router.clone().oneshot(call(access)).await.unwrap().status(),
         StatusCode::UNAUTHORIZED
     );
     sqlx::query("INSERT INTO role_permissions (role_id,module_id,scope_key,scope_hash,capability) VALUES (?,'cotizaciones','documentos',UNHEX(SHA2('documentos',256)),'ver')").bind(role).execute(&pool).await.unwrap();
@@ -241,7 +259,40 @@ async fn mysql57_full_draft_oauth_to_tool_rechecks_permissions_and_replay() {
         StatusCode::BAD_REQUEST
     );
     assert_eq!(
-        router.oneshot(call()).await.unwrap().status(),
+        router.clone().oneshot(call(access)).await.unwrap().status(),
         StatusCode::UNAUTHORIZED
     );
+    let client_pk: u64 = sqlx::query_scalar("SELECT id FROM oauth_clients WHERE client_id=?")
+        .bind(client)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    let new_grant=sqlx::query("INSERT INTO oauth_grants (user_id,client_id,resource_uri,scopes_json,issued_at,expires_at) VALUES (?,?,?,JSON_ARRAY('cotizaciones:read'),UTC_TIMESTAMP(6)-INTERVAL 1 SECOND,UTC_TIMESTAMP(6)+INTERVAL 1 DAY)").bind(user).bind(client_pk).bind(resource).execute(&pool).await.unwrap().last_insert_id();
+    let new_access = Credential::generate().unwrap();
+    sqlx::query("INSERT INTO oauth_access_tokens (grant_id,token_hash,scopes_json,issued_at,expires_at) VALUES (?,?,JSON_ARRAY('cotizaciones:read'),UTC_TIMESTAMP(6)-INTERVAL 1 SECOND,UTC_TIMESTAMP(6)+INTERVAL 10 MINUTE)").bind(new_grant).bind(new_access.digest(CredentialKind::AccessToken).as_slice()).execute(&pool).await.unwrap();
+    assert_eq!(
+        router
+            .clone()
+            .oneshot(call(&new_access.expose()))
+            .await
+            .unwrap()
+            .status(),
+        StatusCode::OK
+    );
+    changed.store(true, Ordering::SeqCst);
+    assert_eq!(
+        router
+            .oneshot(call(&new_access.expose()))
+            .await
+            .unwrap()
+            .status(),
+        StatusCode::UNAUTHORIZED
+    );
+    let revoked: bool =
+        sqlx::query_scalar("SELECT revoked_at IS NOT NULL FROM oauth_grants WHERE id=?")
+            .bind(new_grant)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert!(revoked);
 }

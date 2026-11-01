@@ -20,9 +20,9 @@ use url::Url;
 
 use crate::{
     ClientMetadataSource, DraftAuthorizationState, DraftClientRequestState, DraftConsentState,
-    DraftMcpState, DraftOauthMetadata, TokenEndpoint, draft_authorization_router,
-    draft_client_request_router, draft_consent_router, draft_mcp_router,
-    draft_oauth_metadata_router, draft_token_router,
+    DraftMcpState, DraftMetadataIntegrity, DraftOauthMetadata, TokenEndpoint,
+    draft_authorization_router, draft_client_request_router, draft_consent_router,
+    draft_mcp_router, draft_oauth_metadata_router, draft_token_router,
 };
 
 pub struct DraftCompositionConfig {
@@ -85,6 +85,10 @@ pub fn compose_draft_router<F: ClientMetadataSource>(
     let exchange = MysqlTokenExchange::new(pool.clone(), policy.clone());
     let quota =
         MysqlQuota::new(pool.clone(), config.actor_quota).map_err(|_| DraftCompositionError)?;
+    let integrity = Arc::new(
+        DraftMetadataIntegrity::new(pool.clone(), fetcher.clone(), config.max_metadata_fetches)
+            .map_err(|_| DraftCompositionError)?,
+    );
     let registry = Arc::new(draft_read_tool_registry().map_err(|_| DraftCompositionError)?);
     let executor = Arc::new(DraftReadExecutor::new(
         QuoteService::new(db.clone(), admin.clone()),
@@ -104,7 +108,8 @@ pub fn compose_draft_router<F: ClientMetadataSource>(
         config.request_timeout,
     )
     .map_err(|_| DraftCompositionError)?
-    .with_read_executor(executor);
+    .with_read_executor(executor)
+    .with_integrity_guard(integrity.clone());
     let consent = DraftConsentState::new(
         pool.clone(),
         core.clone(),
@@ -154,11 +159,10 @@ pub fn compose_draft_router<F: ClientMetadataSource>(
         .layer(browser_cors);
     let protocol = draft_mcp_router(mcp)
         .merge(draft_authorization_router(authorization))
-        .merge(draft_token_router(TokenEndpoint::new(
-            exchange,
-            config.resource,
-            config.client_origins,
-        )))
+        .merge(draft_token_router(
+            TokenEndpoint::new(exchange, config.resource, config.client_origins)
+                .with_integrity_guard(integrity),
+        ))
         .layer(client_cors);
     let discovery = draft_oauth_metadata_router(metadata).layer(discovery_cors);
     Ok(browser.merge(protocol).merge(discovery))

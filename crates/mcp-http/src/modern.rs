@@ -1,5 +1,6 @@
 use std::{collections::BTreeSet, sync::Arc, time::Duration};
 
+use crate::{MetadataIntegrity, MetadataIntegrityError};
 use axum::{
     Json, Router,
     body::Bytes,
@@ -60,6 +61,7 @@ pub struct DraftMcpState<P> {
     origins: BTreeSet<String>,
     registry: Arc<ToolRegistry>,
     read_executor: Option<Arc<DraftReadExecutor>>,
+    integrity: Option<Arc<dyn MetadataIntegrity>>,
     quota: MysqlQuota,
     discovery_quota: ToolQuota,
     slots: Arc<Semaphore>,
@@ -125,6 +127,7 @@ impl<P> DraftMcpState<P> {
             origins,
             registry,
             read_executor: None,
+            integrity: None,
             quota,
             discovery_quota,
             slots: Arc::new(Semaphore::new(max_concurrent)),
@@ -136,6 +139,10 @@ impl<P> DraftMcpState<P> {
     /// OAuth consent, terminal audit on timeout, and interoperable clients.
     pub fn with_read_executor(mut self, executor: Arc<DraftReadExecutor>) -> Self {
         self.read_executor = Some(executor);
+        self
+    }
+    pub fn with_integrity_guard(mut self, guard: Arc<dyn MetadataIntegrity>) -> Self {
+        self.integrity = Some(guard);
         self
     }
 }
@@ -638,6 +645,28 @@ where
             );
         }
     };
+    if let Some(guard) = &state.integrity {
+        match guard.check_client_pk(access.client_id).await {
+            Ok(()) => {}
+            Err(MetadataIntegrityError::Invalid) => {
+                return (
+                    StatusCode::UNAUTHORIZED,
+                    [
+                        (WWW_AUTHENTICATE, state.challenge.clone()),
+                        (CACHE_CONTROL, HeaderValue::from_static("no-store")),
+                    ],
+                )
+                    .into_response();
+            }
+            Err(MetadataIntegrityError::Unavailable) => {
+                return rpc_error(
+                    StatusCode::SERVICE_UNAVAILABLE,
+                    -32603,
+                    "Temporarily unavailable",
+                );
+            }
+        }
+    }
     let request_id = match Credential::generate() {
         Ok(value) => value.expose(),
         Err(_) => {

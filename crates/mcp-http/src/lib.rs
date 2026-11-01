@@ -5,6 +5,7 @@ mod client_requests_http;
 mod composition;
 mod consent_http;
 mod metadata_fetch;
+mod metadata_integrity;
 mod modern;
 mod oauth_metadata;
 pub use authorization_http::{DraftAuthorizationState, draft_authorization_router};
@@ -14,10 +15,11 @@ pub use client_requests_http::{
 pub use composition::{DraftCompositionConfig, DraftCompositionError, compose_draft_router};
 pub use consent_http::{DraftConsentState, draft_consent_router};
 pub use metadata_fetch::{DraftMetadataFetcher, MetadataFetchError};
+pub use metadata_integrity::{DraftMetadataIntegrity, MetadataIntegrity, MetadataIntegrityError};
 pub use modern::{DraftMcpState, McpConfigurationError, draft_mcp_router};
 pub use oauth_metadata::{DraftOauthMetadata, OauthMetadataError, draft_oauth_metadata_router};
 
-use std::collections::BTreeSet;
+use std::{collections::BTreeSet, sync::Arc};
 
 use axum::{
     Json, Router,
@@ -43,6 +45,7 @@ pub struct TokenEndpoint<P> {
     exchange: MysqlTokenExchange<P>,
     resource: String,
     allowed_origins: BTreeSet<String>,
+    integrity: Option<Arc<dyn MetadataIntegrity>>,
 }
 
 impl<P> TokenEndpoint<P> {
@@ -56,7 +59,12 @@ impl<P> TokenEndpoint<P> {
             exchange,
             resource,
             allowed_origins,
+            integrity: None,
         }
+    }
+    pub fn with_integrity_guard(mut self, guard: Arc<dyn MetadataIntegrity>) -> Self {
+        self.integrity = Some(guard);
+        self
     }
 }
 
@@ -148,6 +156,21 @@ where
             );
         }
     };
+    if let Some(guard) = &state.integrity {
+        let client_id = match &request {
+            TokenParameters::AuthorizationCode { client_id, .. }
+            | TokenParameters::RefreshToken { client_id, .. } => client_id,
+        };
+        match guard.check_client_id(client_id).await {
+            Ok(()) => {}
+            Err(MetadataIntegrityError::Invalid) => {
+                return error(StatusCode::BAD_REQUEST, "invalid_grant");
+            }
+            Err(MetadataIntegrityError::Unavailable) => {
+                return error(StatusCode::SERVICE_UNAVAILABLE, "temporarily_unavailable");
+            }
+        }
+    }
     let result = match &request {
         TokenParameters::AuthorizationCode { .. } => state.exchange.redeem_code(&request).await,
         TokenParameters::RefreshToken { .. } => state.exchange.rotate_refresh(&request).await,
