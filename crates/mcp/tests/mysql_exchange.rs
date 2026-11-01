@@ -104,4 +104,66 @@ async fn mysql57_code_exchange_is_atomic_and_replay_revokes_grant() {
             .await
             .unwrap();
     assert!(revoked.is_some());
+
+    let refresh_grant = sqlx::query("INSERT INTO oauth_grants (user_id,client_id,resource_uri,scopes_json,issued_at,expires_at) VALUES (?,?,'https://example.invalid/mcp',JSON_ARRAY('read'),UTC_TIMESTAMP(6)-INTERVAL 1 SECOND,UTC_TIMESTAMP(6)+INTERVAL 1 DAY)").bind(user).bind(client).execute(&pool).await.unwrap().last_insert_id();
+    let refresh = Credential::generate().unwrap();
+    sqlx::query("INSERT INTO oauth_refresh_tokens (grant_id,token_hash,issued_at,expires_at) VALUES (?,?,UTC_TIMESTAMP(6)-INTERVAL 1 SECOND,UTC_TIMESTAMP(6)+INTERVAL 12 HOUR)")
+        .bind(refresh_grant).bind(refresh.digest(CredentialKind::RefreshToken).as_slice()).execute(&pool).await.unwrap();
+    let refresh_request = TokenParameters::RefreshToken {
+        client_id: "exchange-client".into(),
+        resource: "https://example.invalid/mcp".into(),
+        refresh_token: refresh,
+        scopes: None,
+    };
+    assert!(matches!(
+        denied.rotate_refresh(&refresh_request).await,
+        Err(TokenExchangeError::InvalidGrant)
+    ));
+    let unused: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM oauth_refresh_tokens WHERE grant_id=? AND consumed_at IS NULL",
+    )
+    .bind(refresh_grant)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(unused, 1);
+    let rotated = exchange.rotate_refresh(&refresh_request).await.unwrap();
+    assert!((1..=900).contains(&rotated.expires_in));
+    let successor: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM oauth_refresh_tokens WHERE grant_id=? AND token_hash=? AND consumed_at IS NULL")
+        .bind(refresh_grant).bind(rotated.refresh_token.digest(CredentialKind::RefreshToken).as_slice()).fetch_one(&pool).await.unwrap();
+    assert_eq!(successor, 1);
+    assert!(matches!(
+        exchange.rotate_refresh(&refresh_request).await,
+        Err(TokenExchangeError::InvalidGrant)
+    ));
+    let revoked: Option<chrono::NaiveDateTime> =
+        sqlx::query_scalar("SELECT revoked_at FROM oauth_grants WHERE id=?")
+            .bind(refresh_grant)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert!(revoked.is_some());
+
+    let concurrent_grant = sqlx::query("INSERT INTO oauth_grants (user_id,client_id,resource_uri,scopes_json,issued_at,expires_at) VALUES (?,?,'https://example.invalid/mcp',JSON_ARRAY('read'),UTC_TIMESTAMP(6)-INTERVAL 1 SECOND,UTC_TIMESTAMP(6)+INTERVAL 1 DAY)").bind(user).bind(client).execute(&pool).await.unwrap().last_insert_id();
+    let concurrent_secret = Credential::generate().unwrap();
+    sqlx::query("INSERT INTO oauth_refresh_tokens (grant_id,token_hash,issued_at,expires_at) VALUES (?,?,UTC_TIMESTAMP(6)-INTERVAL 1 SECOND,UTC_TIMESTAMP(6)+INTERVAL 12 HOUR)")
+        .bind(concurrent_grant).bind(concurrent_secret.digest(CredentialKind::RefreshToken).as_slice()).execute(&pool).await.unwrap();
+    let concurrent_request = TokenParameters::RefreshToken {
+        client_id: "exchange-client".into(),
+        resource: "https://example.invalid/mcp".into(),
+        refresh_token: concurrent_secret,
+        scopes: None,
+    };
+    let (first, second) = tokio::join!(
+        exchange.rotate_refresh(&concurrent_request),
+        exchange.rotate_refresh(&concurrent_request)
+    );
+    assert_ne!(first.is_ok(), second.is_ok());
+    let revoked: Option<chrono::NaiveDateTime> =
+        sqlx::query_scalar("SELECT revoked_at FROM oauth_grants WHERE id=?")
+            .bind(concurrent_grant)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert!(revoked.is_some());
 }
