@@ -105,7 +105,46 @@ async fn mysql57_consent_is_session_bound_rechecks_metadata_and_requires_permiss
         .begin(&session, &request, &request.resource)
         .await
         .unwrap();
-    consent.deny(&session, &rejected.handle).await.unwrap();
+    assert!(matches!(
+        consent
+            .deny(&other_session, &rejected.handle, &request.resource)
+            .await,
+        Err(ConsentError::InvalidRequest)
+    ));
+    sqlx::query("UPDATE oauth_consent_requests SET redirect_uri=? WHERE request_hash=?")
+        .bind(ambiguous)
+        .bind(
+            rejected
+                .handle
+                .digest(CredentialKind::ConsentRequest)
+                .as_slice(),
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+    assert!(matches!(
+        consent
+            .deny(&session, &rejected.handle, &request.resource)
+            .await,
+        Err(ConsentError::InvalidRequest)
+    ));
+    sqlx::query("UPDATE oauth_consent_requests SET redirect_uri=? WHERE request_hash=?")
+        .bind(redirect)
+        .bind(
+            rejected
+                .handle
+                .digest(CredentialKind::ConsentRequest)
+                .as_slice(),
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+    let denied = consent
+        .deny(&session, &rejected.handle, &request.resource)
+        .await
+        .unwrap();
+    assert_eq!(denied.redirect_uri, redirect);
+    assert_eq!(denied.state.as_deref(), Some("opaque-state"));
     assert!(matches!(
         consent
             .approve(&session, &rejected.handle, &request.resource)

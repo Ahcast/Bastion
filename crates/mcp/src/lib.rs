@@ -18,7 +18,8 @@ mod validity;
 
 pub use client_approval::{ApprovedClientStore, ClientApprovalError};
 pub use consent::{
-    ConsentError, ConsentIdentity, ConsentPolicy, ConsentResult, MysqlConsent, PendingConsent,
+    ConsentError, ConsentIdentity, ConsentPolicy, ConsentResult, DeniedConsent, MysqlConsent,
+    PendingConsent,
 };
 pub use credential::{Credential, CredentialError, CredentialKind};
 pub use discovery::{DiscoveryError, dispatch_discovery};

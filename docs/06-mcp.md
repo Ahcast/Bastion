@@ -32,7 +32,7 @@ El router HTTP MCP en preparación permanece aislado de la aplicación activa. I
 
 Los documentos de descubrimiento OAuth se preparan a partir de direcciones HTTPS canónicas configuradas por el servidor, con metadatos para recurso y emisor. Un router aislado atiende sus rutas well-known para pruebas; no está conectado a la aplicación activa. No se anuncia compatibilidad CIMD hasta contar con obtención segura de metadatos y autorización completa.
 
-Se prepara la devolución del código de autorización al URI registrado, incluyendo el emisor `iss` y codificación del estado. Se rechazan parámetros OAuth ambiguos al registrar el cliente y antes de crear el grant, incluso si ya había sido registrado. El flujo HTTP deberá además devolver el emisor en errores y evitar exponer el código en registros; todavía no está conectado.
+Se preparan las respuestas de aprobación y rechazo al URI registrado, incluyendo el emisor `iss` y codificación del estado. Se rechazan parámetros OAuth ambiguos al registrar el cliente y antes de crear el grant, incluso si ya había sido registrado. El flujo HTTP deberá preservar estos controles en todos los errores y evitar exponer el código en registros; todavía no está conectado.
 
 ```mermaid
 flowchart LR

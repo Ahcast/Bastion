@@ -41,6 +41,13 @@ pub struct ConsentResult {
     pub state: Option<String>,
 }
 
+/// Validated callback information for an explicit user denial. No code or
+/// grant is issued; the HTTP handler must still protect the response.
+pub struct DeniedConsent {
+    pub redirect_uri: String,
+    pub state: Option<String>,
+}
+
 #[derive(Debug)]
 pub enum ConsentError {
     InvalidRequest,
@@ -237,7 +244,15 @@ impl<S: ConsentPolicy, P: ExchangePolicy> MysqlConsent<S, P> {
 
     /// Reject a pending request from the same authenticated browser session.
     /// It consumes the request without creating a grant or credentials.
-    pub async fn deny(&self, session_token: &str, handle: &Credential) -> Result<(), ConsentError> {
+    pub async fn deny(
+        &self,
+        session_token: &str,
+        handle: &Credential,
+        configured_resource: &str,
+    ) -> Result<DeniedConsent, ConsentError> {
+        if configured_resource.is_empty() {
+            return Err(ConsentError::InvalidRequest);
+        }
         let mut tx = self.pool.begin().await?;
         let identity = self
             .session
@@ -245,12 +260,35 @@ impl<S: ConsentPolicy, P: ExchangePolicy> MysqlConsent<S, P> {
             .await?
             .ok_or(ConsentError::Unauthorized)?;
         let hash = handle.digest(CredentialKind::ConsentRequest);
-        let row=sqlx::query_as::<_,(u64,NaiveDateTime,Option<NaiveDateTime>)>("SELECT client_id,expires_at,consumed_at FROM oauth_consent_requests WHERE request_hash=? AND user_id=? AND session_id=? FOR UPDATE")
+        let client_id=sqlx::query_scalar::<_,u64>("SELECT client_id FROM oauth_consent_requests WHERE request_hash=? AND user_id=? AND session_id=?")
+            .bind(hash.as_slice()).bind(identity.user_id).bind(identity.session_id).fetch_optional(&mut *tx).await?.ok_or(ConsentError::InvalidRequest)?;
+        let client=sqlx::query_as::<_,(Vec<u8>,Option<Vec<u8>>,bool,String)>("SELECT metadata_hash,approved_metadata_hash,enabled,token_auth_method FROM oauth_clients WHERE id=? FOR UPDATE")
+            .bind(client_id).fetch_optional(&mut *tx).await?.ok_or(ConsentError::InvalidRequest)?;
+        let row=sqlx::query_as::<_,(String,String,Option<String>,NaiveDateTime,Option<NaiveDateTime>,Option<Vec<u8>>)>("SELECT redirect_uri,resource_uri,state_value,expires_at,consumed_at,approved_metadata_hash FROM oauth_consent_requests WHERE request_hash=? AND user_id=? AND session_id=? FOR UPDATE")
             .bind(hash.as_slice()).bind(identity.user_id).bind(identity.session_id).fetch_optional(&mut *tx).await?.ok_or(ConsentError::InvalidRequest)?;
         let now: NaiveDateTime = sqlx::query_scalar("SELECT UTC_TIMESTAMP(6)")
             .fetch_one(&mut *tx)
             .await?;
-        if row.1 <= now || row.2.is_some() {
+        if !client.2
+            || client.3 != "none"
+            || client.1.as_deref() != Some(client.0.as_slice())
+            || row.5.as_deref() != Some(client.0.as_slice())
+            || row.1 != configured_resource
+            || row.3 <= now
+            || row.4.is_some()
+            || crate::validate_redirect_uri(&row.0).is_err()
+        {
+            return Err(ConsentError::InvalidRequest);
+        }
+        let redirect_hash = Sha256::digest(row.0.as_bytes());
+        let current_redirect = sqlx::query_scalar::<_, String>(
+            "SELECT uri FROM oauth_client_redirects WHERE client_id=? AND uri_hash=?",
+        )
+        .bind(client_id)
+        .bind(redirect_hash.as_slice())
+        .fetch_optional(&mut *tx)
+        .await?;
+        if current_redirect.as_deref() != Some(row.0.as_str()) {
             return Err(ConsentError::InvalidRequest);
         }
         let used=sqlx::query("UPDATE oauth_consent_requests SET consumed_at=? WHERE request_hash=? AND consumed_at IS NULL")
@@ -259,8 +297,11 @@ impl<S: ConsentPolicy, P: ExchangePolicy> MysqlConsent<S, P> {
             return Err(ConsentError::InvalidRequest);
         }
         sqlx::query("INSERT INTO audit_events (actor_id,module_id,action,target_type,target_id,result,created_at) VALUES (?,'core','oauth.consent.deny','oauth_client',?,'success',?)")
-            .bind(identity.user_id).bind(row.0.to_string()).bind(now).execute(&mut *tx).await?;
+            .bind(identity.user_id).bind(client_id.to_string()).bind(now).execute(&mut *tx).await?;
         tx.commit().await?;
-        Ok(())
+        Ok(DeniedConsent {
+            redirect_uri: row.0,
+            state: row.2,
+        })
     }
 }

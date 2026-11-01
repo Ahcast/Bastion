@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use axum::{Json, Router, extract::State, http::header::CACHE_CONTROL, routing::get};
-use bastion_mcp::{ConsentResult, validate_redirect_uri};
+use bastion_mcp::{ConsentResult, DeniedConsent, validate_redirect_uri};
 use serde_json::{Value, json};
 use url::Url;
 
@@ -118,6 +118,22 @@ impl DraftOauthMetadata {
             query.append_pair("code", &consent.code.expose());
             query.append_pair("iss", &self.issuer);
             if let Some(state) = consent.state {
+                query.append_pair("state", &state);
+            }
+        }
+        Ok(target.into())
+    }
+
+    /// Use only the validated result of an explicit user denial. The issuer
+    /// binds the error to this authorization server (RFC 9207).
+    pub fn denied_redirect(&self, denial: DeniedConsent) -> Result<String, OauthMetadataError> {
+        validate_redirect_uri(&denial.redirect_uri).map_err(|_| OauthMetadataError)?;
+        let mut target = Url::parse(&denial.redirect_uri).map_err(|_| OauthMetadataError)?;
+        {
+            let mut query = target.query_pairs_mut();
+            query.append_pair("error", "access_denied");
+            query.append_pair("iss", &self.issuer);
+            if let Some(state) = denial.state {
                 query.append_pair("state", &state);
             }
         }
@@ -328,5 +344,16 @@ mod tests {
                 .is_err()
             );
         }
+        let error = doc
+            .denied_redirect(DeniedConsent {
+                redirect_uri: "https://client.invalid/callback?original=yes".into(),
+                state: Some("a&iss=fake".into()),
+            })
+            .unwrap();
+        let parsed = Url::parse(&error).unwrap();
+        let pairs: std::collections::BTreeMap<_, _> = parsed.query_pairs().into_owned().collect();
+        assert_eq!(pairs.get("error").unwrap(), "access_denied");
+        assert_eq!(pairs.get("iss").unwrap(), "https://example.invalid/oauth");
+        assert_eq!(pairs.get("state").unwrap(), "a&iss=fake");
     }
 }
