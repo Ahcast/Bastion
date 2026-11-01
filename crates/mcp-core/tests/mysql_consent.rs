@@ -77,7 +77,7 @@ async fn mysql57_consent_is_session_bound_rechecks_metadata_and_requires_permiss
         pool.clone(),
         CoreScopePolicy::new(core.admin(), registry).unwrap(),
     );
-    let request = AuthorizationParameters {
+    let mut request = AuthorizationParameters {
         client_id: client_uri.into(),
         redirect_uri: redirect.into(),
         resource: "https://example.invalid/mcp".into(),
@@ -85,6 +85,16 @@ async fn mysql57_consent_is_session_bound_rechecks_metadata_and_requires_permiss
         state: Some("opaque-state".into()),
         challenge: S256Challenge::parse("E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM").unwrap(),
     };
+    // A previously approved redirect cannot smuggle an OAuth response field.
+    let ambiguous = "https://consent-client.example.invalid/callback?%63ode=attacker";
+    sqlx::query("INSERT INTO oauth_client_redirects (client_id,uri,uri_hash) VALUES (?,?,UNHEX(SHA2(?,256)))")
+        .bind(client).bind(ambiguous).bind(ambiguous).execute(&pool).await.unwrap();
+    request.redirect_uri = ambiguous.into();
+    assert!(matches!(
+        consent.begin(&session, &request, &request.resource).await,
+        Err(ConsentError::InvalidRequest)
+    ));
+    request.redirect_uri = redirect.into();
     assert!(matches!(
         consent
             .begin("invalid-session", &request, &request.resource)
@@ -104,6 +114,34 @@ async fn mysql57_consent_is_session_bound_rechecks_metadata_and_requires_permiss
     ));
     let pending = consent
         .begin(&session, &request, &request.resource)
+        .await
+        .unwrap();
+    sqlx::query("UPDATE oauth_consent_requests SET redirect_uri=? WHERE request_hash=?")
+        .bind(ambiguous)
+        .bind(
+            pending
+                .handle
+                .digest(CredentialKind::ConsentRequest)
+                .as_slice(),
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+    assert!(matches!(
+        consent
+            .approve(&session, &pending.handle, &request.resource)
+            .await,
+        Err(ConsentError::InvalidRequest)
+    ));
+    sqlx::query("UPDATE oauth_consent_requests SET redirect_uri=? WHERE request_hash=?")
+        .bind(redirect)
+        .bind(
+            pending
+                .handle
+                .digest(CredentialKind::ConsentRequest)
+                .as_slice(),
+        )
+        .execute(&pool)
         .await
         .unwrap();
     assert!(matches!(
