@@ -3,6 +3,23 @@
 # Backend: BASTION_LISTEN_ADDR=127.0.0.1:8080
 # Backend: BASTION_TRUSTED_PROXY_CIDRS=127.0.0.1/32,::1/128
 api.example.com {
+    # Validate the installed Caddy version and test synthetic requests before
+    # enabling access logs: OAuth query strings, headers and redirects are private.
+    log {
+        format filter {
+          wrap json
+          fields {
+            request>uri regexp "[?].*" "?REDACTED"
+            request>headers>Authorization delete
+            request>headers>Proxy-Authorization delete
+            request>headers>Cookie delete
+            request>headers>Referer delete
+            request>headers>X-Csrf-Token delete
+            resp_headers>Set-Cookie delete
+            resp_headers>Location delete
+          }
+        }
+    }
     reverse_proxy 127.0.0.1:8080 {
         header_up X-Forwarded-For {remote_host}
         header_up -CF-Connecting-IP
