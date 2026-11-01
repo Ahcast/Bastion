@@ -126,6 +126,8 @@ async fn mysql57_authorization_entry_refetches_approved_metadata_and_only_redire
         "https://app.example.invalid"
     );
     assert_eq!(redirect.path(), "/oauth/consent");
+    assert_eq!(redirect.query(), None);
+    assert_eq!(redirect.fragment(), Some(query.as_str()));
     let client_pk: u64 = sqlx::query_scalar("SELECT id FROM oauth_clients WHERE client_id=?")
         .bind(client_id)
         .fetch_one(&pool)

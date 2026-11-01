@@ -30,23 +30,27 @@ def service_uid():
     return uid
 
 
-def install(uid, run=subprocess.run):
+def rules(uid):
     if not isinstance(uid, int) or uid <= 0:
         raise ValueError("invalid service UID")
+    for command, networks in NETWORKS.items():
+        for network in networks:
+            yield command, ["-p", "tcp", "-d", network, "--dport", "443", "-m", "owner", "--uid-owner", str(uid), "-m", "comment", "--comment", MARKER, "-j", "REJECT"]
+
+
+def install(uid, run=subprocess.run):
     added = []
     try:
-        for command, networks in NETWORKS.items():
-            for network in networks:
-                rule = ["-p", "tcp", "-d", network, "--dport", "443", "-m", "owner", "--uid-owner", str(uid), "-m", "comment", "--comment", MARKER, "-j", "REJECT"]
-                check = run([command, "-w", "5", "-C", "OUTPUT", *rule], capture_output=True, timeout=10)
-                if check.returncode == 0:
-                    continue
-                if check.returncode != 1:
-                    raise RuntimeError("could not inspect egress guard")
-                result = run([command, "-w", "5", "-I", "OUTPUT", "1", *rule], capture_output=True, timeout=10)
-                if result.returncode:
-                    raise RuntimeError("could not install egress guard")
-                added.append((command, rule))
+        for command, rule in rules(uid):
+            check = run([command, "-w", "5", "-C", "OUTPUT", *rule], capture_output=True, timeout=10)
+            if check.returncode == 0:
+                continue
+            if check.returncode != 1:
+                raise RuntimeError("could not inspect egress guard")
+            result = run([command, "-w", "5", "-I", "OUTPUT", "1", *rule], capture_output=True, timeout=10)
+            if result.returncode:
+                raise RuntimeError("could not install egress guard")
+            added.append((command, rule))
     except Exception:
         rollback_failed = False
         for command, rule in reversed(added):
@@ -60,11 +64,28 @@ def install(uid, run=subprocess.run):
         raise
 
 
+def remove(uid, run=subprocess.run):
+    # Remove only exact rules owned by this guard; never flush a chain.
+    for command, rule in rules(uid):
+        while True:
+            check = run([command, "-w", "5", "-C", "OUTPUT", *rule], capture_output=True, timeout=10)
+            if check.returncode == 1:
+                break
+            if check.returncode != 0:
+                raise RuntimeError("could not inspect egress guard")
+            result = run([command, "-w", "5", "-D", "OUTPUT", *rule], capture_output=True, timeout=10)
+            if result.returncode:
+                raise RuntimeError("could not remove egress guard")
+
 def main():
-    if len(sys.argv) != 1:
+    if len(sys.argv) == 1:
+        install(service_uid())
+        print("Bastion MCP egress guards installed")
+    elif sys.argv[1:] == ["--remove"]:
+        remove(service_uid())
+        print("Bastion MCP egress guards removed")
+    else:
         raise ValueError("unexpected arguments")
-    install(service_uid())
-    print("Bastion MCP egress guards installed")
 
 
 if __name__ == "__main__":

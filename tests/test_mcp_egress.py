@@ -19,12 +19,18 @@ class GuardTest(unittest.TestCase):
             if operation == "-I":
                 installed.add(key)
                 return SimpleNamespace(returncode=0)
+            if operation == "-D":
+                installed.remove(key)
+                return SimpleNamespace(returncode=0)
             raise AssertionError(args)
         module.install(1234, run)
         self.assertEqual(len(installed), sum(map(len, module.NETWORKS.values())))
         module.install(1234, run)
         self.assertEqual(len(installed), sum(map(len, module.NETWORKS.values())))
         self.assertTrue(all("443" in rule and "1234" in rule for _, rule in installed))
+        module.remove(1234, run)
+        self.assertEqual(len(installed), 0)
+        module.remove(1234, run)
 
     def test_rolls_back_only_rules_added_by_failed_attempt(self):
         operations = []

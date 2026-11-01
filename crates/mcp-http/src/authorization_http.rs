@@ -201,7 +201,7 @@ async fn authorize<F: ClientMetadataSource>(
         Err(_) => return error(StatusCode::SERVICE_UNAVAILABLE),
     }
     let location = match HeaderValue::from_str(&format!(
-        "{}/oauth/consent?{}",
+        "{}/oauth/consent#{}",
         state.frontend_origin, query
     )) {
         Ok(value) => value,

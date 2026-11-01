@@ -182,7 +182,7 @@ async fn mysql57_full_draft_oauth_to_tool_rechecks_permissions_and_replay() {
         start.headers()[LOCATION]
             .to_str()
             .unwrap()
-            .starts_with("https://app.example.invalid/oauth/consent?")
+            .starts_with("https://app.example.invalid/oauth/consent#")
     );
     let browser = |path: &str, body: serde_json::Value| {
         Request::builder()
