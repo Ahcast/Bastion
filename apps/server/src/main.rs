@@ -60,6 +60,7 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
         return Err(std::io::Error::other("unknown command").into());
     }
     let config = AppConfig::from_env()?;
+    let mcp_notification_sender = mcp_notification_sender_from_env()?;
     let scout_config = scout_import::ScoutImportConfig::from_env()?;
     let scout_csv_path = scout_config.csv_path.clone();
     if scout_config.enabled && !config.procesos_allowed {
@@ -172,6 +173,28 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
             tokio::time::sleep(std::time::Duration::from_secs(10)).await;
         }
     });
+    if let Some(sender_id) = mcp_notification_sender {
+        let notifications = core.clone();
+        tokio::spawn(async move {
+            loop {
+                if notifications
+                    .queue_one_mcp_notification(sender_id)
+                    .await
+                    .is_err()
+                {
+                    tracing::error!("MCP notification enqueue failed");
+                }
+                if notifications
+                    .reconcile_mcp_notification_mail()
+                    .await
+                    .is_err()
+                {
+                    tracing::error!("MCP notification status reconciliation failed");
+                }
+                tokio::time::sleep(std::time::Duration::from_secs(10)).await;
+            }
+        });
+    }
     if config.cotizaciones_allowed {
         let quote_mailer = bastion_cotizaciones::QuoteMailService::new(core.clone());
         let quote_documents =
@@ -223,6 +246,40 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
     Ok(())
 }
 
+fn parse_mcp_notification_sender(value: Option<&str>) -> std::io::Result<Option<u64>> {
+    let Some(value) = value else {
+        return Ok(None);
+    };
+    let id = value
+        .parse::<u64>()
+        .ok()
+        .filter(|id| *id > 0)
+        .ok_or_else(|| std::io::Error::other("invalid BASTION_MCP_NOTIFICATION_SENDER_USER_ID"))?;
+    Ok(Some(id))
+}
+
+fn mcp_notification_sender_from_env() -> std::io::Result<Option<u64>> {
+    match std::env::var("BASTION_MCP_NOTIFICATION_SENDER_USER_ID") {
+        Ok(value) => parse_mcp_notification_sender(Some(&value)),
+        Err(std::env::VarError::NotPresent) => parse_mcp_notification_sender(None),
+        Err(_) => Err(std::io::Error::other(
+            "invalid BASTION_MCP_NOTIFICATION_SENDER_USER_ID",
+        )),
+    }
+}
+
+#[cfg(test)]
+mod mcp_notification_config_tests {
+    use super::parse_mcp_notification_sender;
+    #[test]
+    fn sender_is_explicit_and_nonzero() {
+        assert_eq!(parse_mcp_notification_sender(None).unwrap(), None);
+        assert_eq!(parse_mcp_notification_sender(Some("12")).unwrap(), Some(12));
+        for invalid in ["", "0", "-1", "invalid"] {
+            assert!(parse_mcp_notification_sender(Some(invalid)).is_err());
+        }
+    }
+}
 async fn shutdown_signal() {
     #[cfg(unix)]
     let terminate = async {

@@ -1344,7 +1344,7 @@ impl CoreService {
             .bind(sender_id).fetch_optional(&mut *tx).await?;
         if sender.is_none() {
             tx.commit().await?;
-            return Ok(false);
+            return Err(CoreError::Invalid);
         }
         let notification: Option<(u64, String, String)> = sqlx::query_as("SELECT n.id,n.kind,u.email FROM admin_notifications n JOIN users u ON u.id=n.recipient_user_id JOIN roles r ON r.id=u.role_id WHERE n.delivery_status='pending' AND n.mail_outbox_id IS NULL AND u.status='active' AND (n.kind='oauth_client_review' OR (n.kind IN ('oauth_client_request','oauth_client_changed') AND r.system_key='system_administrator')) ORDER BY n.id LIMIT 1 FOR UPDATE")
             .fetch_optional(&mut *tx).await?;
