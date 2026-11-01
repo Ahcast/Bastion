@@ -304,4 +304,46 @@ async fn mysql57_client_requests_require_admin_and_never_create_user_grants() {
             .await
             .unwrap();
     assert!(revoked);
+    let second_grant=sqlx::query("INSERT INTO oauth_grants (user_id,client_id,resource_uri,scopes_json,issued_at,expires_at) VALUES (?,?,'https://example.invalid/mcp',JSON_ARRAY('quote:read'),UTC_TIMESTAMP(6),UTC_TIMESTAMP(6)+INTERVAL 1 DAY)").bind(user).bind(client).execute(&pool).await.unwrap().last_insert_id();
+    let updated_raw=serde_json::json!({"client_id":id,"client_name":"Updated fixture","redirect_uris":["https://request-client.example.invalid/new-cb"],"token_endpoint_auth_method":"none"}).to_string();
+    let updated = validate_client_metadata(id, id, 200, updated_raw.as_bytes()).unwrap();
+    assert!(!store.observe_approved_metadata(&updated).await.unwrap());
+    let revoked: bool =
+        sqlx::query_scalar("SELECT revoked_at IS NOT NULL FROM oauth_grants WHERE id=?")
+            .bind(second_grant)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert!(revoked);
+    let before: String =
+        sqlx::query_scalar("SELECT uri FROM oauth_client_redirects WHERE client_id=?")
+            .bind(client)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!(before, "https://request-client.example.invalid/cb");
+    let changed_request = store
+        .submit(user, &updated, &quote, &registered)
+        .await
+        .unwrap();
+    store
+        .review(
+            admin,
+            changed_request,
+            ReviewDecision::Approve {
+                metadata: &updated,
+                scopes: &quote,
+            },
+            &registered,
+        )
+        .await
+        .unwrap();
+    let after: String =
+        sqlx::query_scalar("SELECT uri FROM oauth_client_redirects WHERE client_id=?")
+            .bind(client)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!(after, "https://request-client.example.invalid/new-cb");
+    assert!(store.observe_approved_metadata(&updated).await.unwrap());
 }

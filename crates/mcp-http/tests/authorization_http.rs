@@ -126,11 +126,24 @@ async fn mysql57_authorization_entry_refetches_approved_metadata_and_only_redire
         "https://app.example.invalid"
     );
     assert_eq!(redirect.path(), "/oauth/consent");
+    let client_pk: u64 = sqlx::query_scalar("SELECT id FROM oauth_clients WHERE client_id=?")
+        .bind(client_id)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    let old_grant=sqlx::query("INSERT INTO oauth_grants (user_id,client_id,resource_uri,scopes_json,issued_at,expires_at) VALUES (?,?,'https://api.example.invalid/mcp',JSON_ARRAY('cotizaciones:read'),UTC_TIMESTAMP(6),UTC_TIMESTAMP(6)+INTERVAL 1 DAY)").bind(admin).bind(client_pk).execute(&pool).await.unwrap().last_insert_id();
     changed.store(true, Ordering::SeqCst);
     assert_eq!(
         router.clone().oneshot(request()).await.unwrap().status(),
         StatusCode::BAD_REQUEST
     );
+    let revoked: bool =
+        sqlx::query_scalar("SELECT revoked_at IS NOT NULL FROM oauth_grants WHERE id=?")
+            .bind(old_grant)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert!(revoked);
     let other = query.replace("cotizaciones%3Aread", "facturas%3Aread");
     let invalid = Request::builder()
         .uri(format!("/oauth/authorize?{other}"))
@@ -143,5 +156,5 @@ async fn mysql57_authorization_entry_refetches_approved_metadata_and_only_redire
     );
     assert_eq!(hits.load(Ordering::SeqCst), before);
     let grants:i64=sqlx::query_scalar("SELECT COUNT(*) FROM oauth_grants WHERE client_id=(SELECT id FROM oauth_clients WHERE client_id=?)").bind(client_id).fetch_one(&pool).await.unwrap();
-    assert_eq!(grants, 0);
+    assert_eq!(grants, 1);
 }

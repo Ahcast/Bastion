@@ -67,6 +67,42 @@ impl ClientRequestStore {
         Self { pool }
     }
 
+    /// Called only with freshly fetched, validated metadata. A detected change
+    /// invalidates existing grants atomically and requires administrative review.
+    pub async fn observe_approved_metadata(
+        &self,
+        metadata: &ClientMetadata,
+    ) -> Result<bool, ClientRequestError> {
+        let hash: [u8; 32] = Sha256::digest(metadata.client_id().as_bytes()).into();
+        let mut tx = self.pool.begin().await?;
+        let row=sqlx::query_as::<_,(u64,String,Vec<u8>,Option<Vec<u8>>,bool)>("SELECT id,client_id,metadata_hash,approved_metadata_hash,enabled FROM oauth_clients WHERE client_id_hash=? FOR UPDATE").bind(hash.as_slice()).fetch_optional(&mut *tx).await?;
+        let Some((client, identity, current, approved, enabled)) = row else {
+            return Ok(false);
+        };
+        if identity != metadata.client_id()
+            || !enabled
+            || approved.as_deref() != Some(current.as_slice())
+        {
+            return Ok(false);
+        }
+        if current.as_slice() == metadata.document_hash() {
+            tx.commit().await?;
+            return Ok(true);
+        }
+        sqlx::query(
+            "UPDATE oauth_clients SET metadata_hash=?,updated_at=UTC_TIMESTAMP(6) WHERE id=?",
+        )
+        .bind(metadata.document_hash().as_slice())
+        .bind(client)
+        .execute(&mut *tx)
+        .await?;
+        sqlx::query("UPDATE oauth_grants SET revoked_at=UTC_TIMESTAMP(6),revocation_reason='client_metadata_changed' WHERE client_id=? AND revoked_at IS NULL").bind(client).execute(&mut *tx).await?;
+        sqlx::query("INSERT INTO admin_notifications (recipient_user_id,kind,subject,payload_json,delivery_status,created_at) SELECT u.id,'oauth_client_changed','Cliente MCP requiere revisión',JSON_OBJECT('client_id',?),'pending',UTC_TIMESTAMP(6) FROM users u JOIN roles r ON r.id=u.role_id WHERE u.status='active' AND r.system_key='system_administrator'").bind(client).execute(&mut *tx).await?;
+        sqlx::query("INSERT INTO audit_events (actor_id,module_id,action,target_type,target_id,result,created_at) VALUES (NULL,'core','oauth.client.metadata_changed','oauth_client',?,'denied',UTC_TIMESTAMP(6))").bind(client.to_string()).execute(&mut *tx).await?;
+        tx.commit().await?;
+        Ok(false)
+    }
+
     /// Check a browser session before expensive work such as metadata fetch.
     /// A later mutation must independently revalidate it in its transaction.
     pub async fn authorize_session<S: ConsentPolicy>(
@@ -305,6 +341,17 @@ impl ClientRequestStore {
             }
             id
         };
+        sqlx::query(
+            "DELETE FROM oauth_client_candidate_redirects WHERE client_id=? AND metadata_hash<>?",
+        )
+        .bind(client)
+        .bind(metadata.document_hash().as_slice())
+        .execute(&mut **tx)
+        .await?;
+        for uri in metadata.redirect_uris() {
+            let uri_hash: [u8; 32] = Sha256::digest(uri.as_bytes()).into();
+            sqlx::query("INSERT INTO oauth_client_candidate_redirects (client_id,metadata_hash,uri_hash,uri) VALUES (?,?,?,?) ON DUPLICATE KEY UPDATE uri=VALUES(uri)").bind(client).bind(metadata.document_hash().as_slice()).bind(uri_hash.as_slice()).bind(uri).execute(&mut **tx).await?;
+        }
         let prior=sqlx::query_as::<_,(u64,Json<Vec<String>>,Option<Vec<u8>>)>("SELECT id,requested_scopes,metadata_hash FROM oauth_client_requests WHERE user_id=? AND client_id=? AND status='pending' FOR UPDATE")
             .bind(user).bind(client).fetch_optional(&mut **tx).await?;
         if let Some((id, Json(previous), snapshot)) = prior {
@@ -402,16 +449,34 @@ impl ClientRequestStore {
                 .await?;
                 let count = redirects.len();
                 let redirects: BTreeSet<_> = redirects.into_iter().collect();
-                if count != redirects.len() || &redirects != metadata.redirect_uris() {
+                if count != redirects.len() {
                     return Err(ClientRequestError::Conflict);
+                }
+                let redirects_changed = &redirects != metadata.redirect_uris();
+                if redirects_changed {
+                    let candidate:Vec<String>=sqlx::query_scalar("SELECT uri FROM oauth_client_candidate_redirects WHERE client_id=? AND metadata_hash=? FOR UPDATE").bind(client).bind(current.as_slice()).fetch_all(&mut **tx).await?;
+                    let count = candidate.len();
+                    let candidate: BTreeSet<_> = candidate.into_iter().collect();
+                    if count != candidate.len() || &candidate != metadata.redirect_uris() {
+                        return Err(ClientRequestError::Conflict);
+                    }
+                    sqlx::query("DELETE FROM oauth_client_redirects WHERE client_id=?")
+                        .bind(client)
+                        .execute(&mut **tx)
+                        .await?;
+                    for uri in &candidate {
+                        let uri_hash: [u8; 32] = Sha256::digest(uri.as_bytes()).into();
+                        sqlx::query("INSERT INTO oauth_client_redirects (client_id,uri,uri_hash) VALUES (?,?,?)").bind(client).bind(uri).bind(uri_hash.as_slice()).execute(&mut **tx).await?;
+                    }
                 }
                 for scope in scopes {
                     sqlx::query("INSERT INTO oauth_client_scopes (client_id,scope_name) VALUES (?,?) ON DUPLICATE KEY UPDATE scope_name=VALUES(scope_name)").bind(client).bind(scope).execute(&mut **tx).await?;
                 }
-                if !enabled || approved.as_deref() != Some(current.as_slice()) {
+                if !enabled || approved.as_deref() != Some(current.as_slice()) || redirects_changed
+                {
                     sqlx::query("UPDATE oauth_grants SET revoked_at=UTC_TIMESTAMP(6),revocation_reason='client_reapproval' WHERE client_id=? AND revoked_at IS NULL").bind(client).execute(&mut **tx).await?;
                 }
-                sqlx::query("UPDATE oauth_clients SET enabled=1,approved_metadata_hash=metadata_hash,approved_by=?,approved_at=UTC_TIMESTAMP(6),updated_at=UTC_TIMESTAMP(6) WHERE id=?").bind(actor).bind(client).execute(&mut **tx).await?;
+                sqlx::query("UPDATE oauth_clients SET display_name=?,enabled=1,approved_metadata_hash=metadata_hash,approved_by=?,approved_at=UTC_TIMESTAMP(6),updated_at=UTC_TIMESTAMP(6) WHERE id=?").bind(metadata.name().unwrap_or("Cliente sin nombre")).bind(actor).bind(client).execute(&mut **tx).await?;
                 (
                     "approved",
                     "oauth.client.request.approve",

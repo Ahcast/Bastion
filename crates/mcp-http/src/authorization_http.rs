@@ -12,7 +12,9 @@ use axum::{
     response::{IntoResponse, Response},
     routing::get,
 };
-use bastion_mcp::{AuthorizationParameters, ClientMetadata, parse_authorization_parameters};
+use bastion_mcp::{
+    AuthorizationParameters, ClientMetadata, ClientRequestStore, parse_authorization_parameters,
+};
 use bastion_mcp_core::approved_read_requirements;
 use sha2::{Digest, Sha256};
 use sqlx::MySqlPool;
@@ -182,6 +184,17 @@ async fn authorize<F: ClientMetadataSource>(
         Ok(value) => value,
         Err(_) => return error(StatusCode::BAD_REQUEST),
     };
+    if metadata.client_id() != request.client_id {
+        return error(StatusCode::BAD_REQUEST);
+    }
+    match ClientRequestStore::new(state.pool.clone())
+        .observe_approved_metadata(&metadata)
+        .await
+    {
+        Ok(true) => {}
+        Ok(false) => return error(StatusCode::BAD_REQUEST),
+        Err(_) => return error(StatusCode::SERVICE_UNAVAILABLE),
+    }
     match approved(&state.pool, &request, Some(&metadata)).await {
         Ok(true) => {}
         Ok(false) => return error(StatusCode::BAD_REQUEST),
