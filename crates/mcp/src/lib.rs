@@ -4,6 +4,7 @@ mod client_approval;
 mod consent;
 mod credential;
 mod discovery;
+mod dns_policy;
 mod exchange;
 mod metadata;
 mod pkce;
@@ -23,6 +24,7 @@ pub use consent::{
 };
 pub use credential::{Credential, CredentialError, CredentialKind};
 pub use discovery::{DiscoveryError, dispatch_discovery};
+pub use dns_policy::{DnsPolicyError, PublicDnsCandidates, validate_public_dns_candidates};
 pub use exchange::{
     CodeRecord, ExchangeError, RefreshRecord, validate_code_exchange, validate_refresh_exchange,
 };

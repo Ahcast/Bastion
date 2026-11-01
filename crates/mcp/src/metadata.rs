@@ -116,7 +116,7 @@ pub fn validate_client_metadata(
     })
 }
 
-fn validate_client_identifier(value: &str) -> Result<(), MetadataError> {
+pub(crate) fn validate_client_identifier(value: &str) -> Result<(), MetadataError> {
     if value.len() > MAX_URI_BYTES || !value.starts_with("https://") {
         return Err(MetadataError::InvalidIdentifier);
     }
