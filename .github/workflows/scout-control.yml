@@ -1,7 +1,7 @@
 name: Scout control checks
 on:
   push:
-    branches: [main]
+    branches: [main, codex/licitaciones-release-20261101]
   pull_request:
 permissions:
   contents: read
