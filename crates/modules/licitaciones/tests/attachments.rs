@@ -563,16 +563,25 @@ async fn mysql57_tender_files_private_copies_integrity_recovery_and_budgets() {
             .await,
         Err(CoreError::Invalid)
     ));
-    service.delete_published_template(1, form.id, form.revision).await.unwrap();
+    service
+        .delete_published_template(1, form.id, form.revision)
+        .await
+        .unwrap();
     let after_delete = service.detail(1, template_exp.id).await.unwrap();
     assert!(after_delete.forms.is_empty());
     assert_eq!(after_delete.version, template_exp.version + 1);
     let state: String = sqlx::query_scalar("SELECT state FROM colaboracion_files WHERE id=?")
-        .bind(template.id).fetch_one(&pool).await.unwrap();
+        .bind(template.id)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
     assert_eq!(state, "deleting");
     while library.clean_one().await.unwrap() {}
     let state: String = sqlx::query_scalar("SELECT state FROM colaboracion_files WHERE id=?")
-        .bind(template.id).fetch_one(&pool).await.unwrap();
+        .bind(template.id)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
     assert_eq!(state, "deleted");
     service
         .delete(1, template_exp.id, after_delete.version, template_exp.id)

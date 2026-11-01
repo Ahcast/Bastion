@@ -212,7 +212,9 @@ impl TenderService {
                         "integridad" => &bundle.legal_integridad,
                         "oferente" => &bundle.legal_oferente,
                         _ => return Err(CoreError::Invalid),
-                    }.as_ref().ok_or(CoreError::NotFound)?;
+                    }
+                    .as_ref()
+                    .ok_or(CoreError::NotFound)?;
                     create(
                         &root,
                         &format!("source-{number:06}.typ"),

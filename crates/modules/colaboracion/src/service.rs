@@ -528,7 +528,10 @@ impl CollaborationService {
         Ok(true)
     }
 }
-pub(crate) async fn load(tx: &mut Transaction<'_, MySql>, id: u64) -> Result<FileRecord, CoreError> {
+pub(crate) async fn load(
+    tx: &mut Transaction<'_, MySql>,
+    id: u64,
+) -> Result<FileRecord, CoreError> {
     load_state(tx, id, "ready").await
 }
 pub(crate) async fn load_state(
