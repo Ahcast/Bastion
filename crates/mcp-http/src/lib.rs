@@ -3,7 +3,7 @@
 mod modern;
 mod oauth_metadata;
 pub use modern::{DraftMcpState, McpConfigurationError, draft_mcp_router};
-pub use oauth_metadata::{DraftOauthMetadata, OauthMetadataError};
+pub use oauth_metadata::{DraftOauthMetadata, OauthMetadataError, draft_oauth_metadata_router};
 
 use std::collections::BTreeSet;
 

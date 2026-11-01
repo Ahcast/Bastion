@@ -1,3 +1,6 @@
+use std::sync::Arc;
+
+use axum::{Json, Router, extract::State, http::header::CACHE_CONTROL, routing::get};
 use serde_json::{Value, json};
 use url::Url;
 
@@ -47,6 +50,18 @@ impl DraftOauthMetadata {
         let issuer_url = checked(&issuer)?;
         let auth_url = checked(&authorization_endpoint)?;
         let token_url = checked(&token_endpoint)?;
+        // Axum route patterns must be literal and cannot contain capture
+        // syntax, percent escapes, or ambiguous path separators.
+        for url in [&resource_url, &issuer_url] {
+            if !url
+                .path()
+                .bytes()
+                .all(|b| b.is_ascii_alphanumeric() || b"/-._~".contains(&b))
+                || url.path().contains("//")
+            {
+                return Err(OauthMetadataError);
+            }
+        }
         if auth_url.origin() != issuer_url.origin()
             || token_url.origin() != issuer_url.origin()
             || auth_url == token_url
@@ -92,9 +107,49 @@ impl DraftOauthMetadata {
     }
 }
 
+/// Draft router; do not mount or advertise until the authorization endpoint,
+/// metadata retrieval and browser consent are implemented and verified.
+pub fn draft_oauth_metadata_router(metadata: DraftOauthMetadata) -> Router {
+    let resource_path = Url::parse(metadata.protected_resource_metadata_url())
+        .expect("validated metadata URL")
+        .path()
+        .to_owned();
+    let server_path = Url::parse(metadata.authorization_server_metadata_url())
+        .expect("validated metadata URL")
+        .path()
+        .to_owned();
+    Router::new()
+        .route(&resource_path, get(protected_resource))
+        .route(&server_path, get(authorization_server))
+        .with_state(Arc::new(metadata))
+}
+
+async fn protected_resource(
+    State(metadata): State<Arc<DraftOauthMetadata>>,
+) -> ([(axum::http::HeaderName, &'static str); 1], Json<Value>) {
+    (
+        [(CACHE_CONTROL, "no-store")],
+        Json(metadata.protected_resource()),
+    )
+}
+
+async fn authorization_server(
+    State(metadata): State<Arc<DraftOauthMetadata>>,
+) -> ([(axum::http::HeaderName, &'static str); 1], Json<Value>) {
+    (
+        [(CACHE_CONTROL, "no-store")],
+        Json(metadata.authorization_server()),
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use axum::{
+        body::{Body, to_bytes},
+        http::{Request, StatusCode},
+    };
+    use tower::ServiceExt;
 
     fn metadata(
         resource: &str,
@@ -160,5 +215,58 @@ mod tests {
         }
         assert!(metadata(good.0, good.1, "https://other.invalid/authorize", good.3).is_err());
         assert!(metadata(good.0, good.1, good.3, good.3).is_err());
+        assert!(metadata("https://example.invalid/{capture}", good.1, good.2, good.3).is_err());
+        assert!(metadata("https://example.invalid/a%2Fb", good.1, good.2, good.3).is_err());
+    }
+
+    #[tokio::test]
+    async fn serves_both_draft_documents_only_at_configured_paths() {
+        let doc = metadata(
+            "https://example.invalid/mcp",
+            "https://example.invalid/oauth",
+            "https://example.invalid/oauth/authorize",
+            "https://example.invalid/oauth/token",
+        )
+        .unwrap();
+        let router = draft_oauth_metadata_router(doc);
+        let response = router
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .uri("/.well-known/oauth-protected-resource/mcp")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+        assert_eq!(response.headers().get(CACHE_CONTROL).unwrap(), "no-store");
+        let body: Value =
+            serde_json::from_slice(&to_bytes(response.into_body(), 8192).await.unwrap()).unwrap();
+        assert_eq!(body["resource"], "https://example.invalid/mcp");
+        let response = router
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .uri("/.well-known/oauth-authorization-server/oauth")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+        let body: Value =
+            serde_json::from_slice(&to_bytes(response.into_body(), 8192).await.unwrap()).unwrap();
+        assert_eq!(body["issuer"], "https://example.invalid/oauth");
+        let missing = router
+            .oneshot(
+                Request::builder()
+                    .uri("/.well-known/oauth-protected-resource/other")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(missing.status(), StatusCode::NOT_FOUND);
     }
 }

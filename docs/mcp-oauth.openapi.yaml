@@ -6,6 +6,18 @@ info:
     Contrato en preparación. Ninguna ruta se anuncia ni habilita hasta completar
     consentimiento, autorización vigente, auditoría, límites y verificación.
 paths:
+  /.well-known/oauth-protected-resource/mcp:
+    get:
+      summary: Metadatos del recurso MCP — ruta de ejemplo aislada
+      description: La ruta real depende del identificador de recurso configurado; todavía no se publica.
+      responses:
+        '200': { description: Identificador del recurso y servidor de autorización. }
+  /.well-known/oauth-authorization-server/oauth:
+    get:
+      summary: Metadatos del servidor OAuth — ruta de ejemplo aislada
+      description: La ruta real depende del emisor configurado; todavía no se publica.
+      responses:
+        '200': { description: Emisor y capacidades implementadas del servidor OAuth. }
   /mcp:
     post:
       summary: Descubrimiento MCP — borrador aislado
