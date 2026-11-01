@@ -7,6 +7,7 @@ use url::Url;
 
 /// Server-owned OAuth discovery values. These documents are not exposed by
 /// the application until their endpoints and public-client flow are complete.
+#[derive(Clone)]
 pub struct DraftOauthMetadata {
     resource: String,
     issuer: String,

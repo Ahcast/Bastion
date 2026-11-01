@@ -6,8 +6,11 @@ edition.workspace = true
 [dependencies]
 axum.workspace = true
 bastion-core = { path = "../core" }
+bastion-cotizaciones = { path = "../modules/cotizaciones" }
+bastion-facturas = { path = "../modules/facturas" }
 bastion-mcp = { path = "../mcp" }
 bastion-mcp-core = { path = "../mcp-core" }
+bastion-ordenes-compra = { path = "../modules/ordenes_compra" }
 bytes = "1"
 http-body-util = "0.1"
 hyper = { version = "1", features = ["client", "http1"] }
@@ -19,6 +22,7 @@ sqlx.workspace = true
 subtle.workspace = true
 tokio.workspace = true
 tokio-rustls = { version = "0.26", default-features = false, features = ["ring", "tls12"] }
+tower-http.workspace = true
 url.workspace = true
 webpki-roots = "1"
 
