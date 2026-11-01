@@ -10,11 +10,26 @@ const MAX_REDIRECTS: usize = 32;
 
 /// Validated data for administrative review. This does not approve a client.
 pub struct ClientMetadata {
-    pub client_id: String,
-    pub name: Option<String>,
-    pub redirect_uris: BTreeSet<String>,
+    client_id: String,
+    name: Option<String>,
+    redirect_uris: BTreeSet<String>,
     /// Hash of the exact document bytes; any change requires a new review.
-    pub document_hash: [u8; 32],
+    document_hash: [u8; 32],
+}
+
+impl ClientMetadata {
+    pub fn client_id(&self) -> &str {
+        &self.client_id
+    }
+    pub fn name(&self) -> Option<&str> {
+        self.name.as_deref()
+    }
+    pub fn redirect_uris(&self) -> &BTreeSet<String> {
+        &self.redirect_uris
+    }
+    pub fn document_hash(&self) -> &[u8; 32] {
+        &self.document_hash
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
