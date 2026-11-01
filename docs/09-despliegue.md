@@ -179,3 +179,9 @@ El 2026-10-29 se desplegó el PDF de Licitaciones desde `d6e82df`, con [CI aprob
 ## Respaldo integral de datos
 
 El Core centraliza la administración de copias y recuperación mediante un trabajador privado persistente en AWS. Se conserva frontend Bluehost y MySQL Bluehost. Véase [alcance, recuperación y límites](18-respaldo-mysql.md).
+
+## Colaboración: vista previa PDF corregida
+
+El 2026-11-01 se publicó en GitHub y Bluehost el commit [fe13c90](https://github.com/Ahcast/Bastion/commit/fe13c90c7274f6aef5039b7e26a19cb8437d3345), con [Core checks aprobados](https://github.com/Ahcast/Bastion/actions/runs/41351824281). La vista de PDF deja de usar un iframe con sandbox que bloqueaba el visor integrado del navegador. Reserva una pestaña durante el gesto del usuario, separa `opener`, valida MIME/tamaño/firma PDF antes de mostrarlo y revoca el URL temporal al cerrar o al vencer el plazo. No se relajó CSP ni se publicaron documentos privados.
+
+Bluehost activó el artifact estático del commit después de verificar SHA-256, `BUILD.txt` y sus 48 archivos del manifiesto. Se creó un respaldo privado previo (SHA-256 `5f87d38b65484e44ec735fae23709d59404cbfef625214ecb739ddb3a3bf4e67`); se conservaron `config.js`, los dos `.htaccess` y assets con hash previos. Cinco recursos HTTPS respondieron 200: SPA, `BUILD.txt`, `config.js`, ruta `/colaboracion` y el chunk actualizado del módulo. No hubo cambios en AWS, API, datos, permisos, allowlist ni activación.
