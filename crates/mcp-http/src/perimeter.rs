@@ -156,7 +156,7 @@ impl SharedPerimeter {
         // Bounded incremental cleanup of old buckets. Keeping at least two
         // hours avoids deleting an active bucket for any supported window.
         if self.ticks.fetch_add(1, Ordering::Relaxed) % 128 == 0 {
-            sqlx::query("DELETE FROM oauth_perimeter_quotas WHERE window_start < UTC_TIMESTAMP(6)-INTERVAL 2 HOUR LIMIT 100")
+            sqlx::query("DELETE FROM oauth_perimeter_quotas WHERE window_start < UTC_TIMESTAMP(6)-INTERVAL 2 HOUR LIMIT 256")
                 .execute(&self.pool).await?;
         }
         let mut tx = self.pool.begin().await?;
