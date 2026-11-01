@@ -72,8 +72,9 @@ function InitialForms({ record, latest, editable, saved }: { record: Expedient; 
   const dirty = JSON.stringify(selected) !== baseline.current;
   const save = async () => { setBusy(true); setError(''); try { const value = await api.request<Expedient>(`/api/v1/licitaciones/${record.id}/pdf/formularios-iniciales`, { method:'PUT', ifMatch:latest().version, body:{forms:selected} }); baseline.current = JSON.stringify(selected); saved(value); return true; } catch (reason) { setError(message(reason)); return false; } finally { setBusy(false); } };
   useUnsavedChanges(dirty, busy, save, 30);
-  return <section className="stack"><p>Selecciona los formularios iniciales que deseas incluir en este expediente.</p><Notice>{error}</Notice>
-    {options.map(option => <label className="checkbox" key={option.key}><input type="checkbox" checked={selected.includes(option.key)} disabled={!editable || busy} onChange={event => { const checked=event.currentTarget.checked; setSelected(current => options.filter(item => item.key === option.key ? checked : current.includes(item.key)).map(item => item.key)); }} />{option.label}</label>)}
+  return <section className="stack"><Notice>{error}</Notice>
+    {selected.map(key => { const option = options.find(item => item.key === key); return option && <div className="actions" key={key}><span>{option.label}</span>{editable && <button type="button" disabled={busy} onClick={() => setSelected(current => current.filter(item => item !== key))}>Quitar</button>}</div>; })}
+    {editable && options.some(option => !selected.includes(option.key)) && <label>Agregar declaración instalada<select value="" disabled={busy} onChange={event => { const value = event.target.value; if (value) setSelected(current => [...current, value]); }}><option value="">Seleccionar declaración</option>{options.filter(option => !selected.includes(option.key)).map(option => <option key={option.key} value={option.key}>{option.label}</option>)}</select></label>}
     {editable && <button type="button" disabled={!dirty || busy} onClick={() => { void save(); }}>{busy ? 'Guardando…' : 'Guardar selección'}</button>}
   </section>;
 }
