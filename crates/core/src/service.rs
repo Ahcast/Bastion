@@ -933,6 +933,8 @@ impl CoreService {
             .await?;
         sqlx::query("UPDATE sessions SET revoked_at=?,revocation_reason='password_changed' WHERE user_id=? AND revoked_at IS NULL")
             .bind(now).bind(row.1).execute(&mut *tx).await?;
+        sqlx::query("UPDATE oauth_grants SET revoked_at=?,revocation_reason='password_changed' WHERE user_id=? AND revoked_at IS NULL")
+            .bind(now).bind(row.1).execute(&mut *tx).await?;
         sqlx::query(
             "UPDATE trusted_devices SET revoked_at=? WHERE user_id=? AND revoked_at IS NULL",
         )
@@ -1910,6 +1912,7 @@ async fn revoke_user_access(
     reason: &str,
 ) -> Result<(), CoreError> {
     sqlx::query("UPDATE sessions SET revoked_at=?,revocation_reason=? WHERE user_id=? AND revoked_at IS NULL").bind(now).bind(reason).bind(user_id).execute(&mut **tx).await?;
+    sqlx::query("UPDATE oauth_grants SET revoked_at=?,revocation_reason=? WHERE user_id=? AND revoked_at IS NULL").bind(now).bind(reason).bind(user_id).execute(&mut **tx).await?;
     sqlx::query("UPDATE trusted_devices SET revoked_at=? WHERE user_id=? AND revoked_at IS NULL")
         .bind(now)
         .bind(user_id)
@@ -2121,8 +2124,7 @@ mod tests {
     #[tokio::test]
     async fn malformed_invitation_links_fail_before_password_or_database_work() {
         let pool = sqlx::mysql::MySqlPoolOptions::new()
-            .connect_lazy("mysql://unused:unused@127.0.0.1/unused")
-            .unwrap();
+            .connect_lazy_with(sqlx::mysql::MySqlConnectOptions::new().host("127.0.0.1"));
         let core = CoreService::new(
             Database { pool },
             "synthetic-bootstrap-secret".repeat(2),
@@ -2221,7 +2223,8 @@ mod tests {
             .create_user_with_invitation(administrator, person, role_id, "invited@example.test")
             .await
             .unwrap();
-        let password = "synthetic invitation passphrase";
+        let generated_password = random_token();
+        let password = generated_password.as_str();
 
         async fn queued_token(
             core: &CoreService,

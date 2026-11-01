@@ -1,7 +1,7 @@
 use std::collections::BTreeSet;
 
-use bastion_core::Database;
-use bastion_mcp::{MysqlOauthStore, StoreError, revoke_user_grants_in_transaction};
+use bastion_core::{CoreService, Database};
+use bastion_mcp::{Credential, MysqlOauthStore, StoreError, revoke_user_grants_in_transaction};
 use sqlx::mysql::MySqlPoolOptions;
 
 // This URL must point at a dedicated, empty database. CI supplies one in its
@@ -19,12 +19,6 @@ async fn mysql57_revoke_is_owned_audited_and_transactional() {
         .unwrap();
     Database::from_test_pool(pool.clone())
         .migrate()
-        .await
-        .unwrap();
-    // Execute this staged schema explicitly: its own migrator is not yet
-    // integrated with the Core migration history or the deployment command.
-    sqlx::raw_sql(include_str!("../migrations/0001_oauth.sql"))
-        .execute(&pool)
         .await
         .unwrap();
 
@@ -150,4 +144,45 @@ async fn mysql57_revoke_is_owned_audited_and_transactional() {
             .unwrap();
     assert!(kept.is_none());
     assert!(removed.is_some());
+
+    let other_grant = sqlx::query("INSERT INTO oauth_grants (user_id,client_id,resource_uri,scopes_json,issued_at,expires_at) VALUES (?,?,'https://example.invalid/mcp',JSON_ARRAY('read'),UTC_TIMESTAMP(6),UTC_TIMESTAMP(6)+INTERVAL 1 DAY)").bind(other).bind(scoped_client).execute(&pool).await.unwrap().last_insert_id();
+    let core = CoreService::new(
+        Database::from_test_pool(pool.clone()),
+        "test-bootstrap-secret".repeat(2),
+        [7; 32],
+    )
+    .unwrap();
+    core.admin()
+        .update_user(admin, user, None, None, Some(false))
+        .await
+        .unwrap();
+    let revoked_after_disable: Option<chrono::NaiveDateTime> =
+        sqlx::query_scalar("SELECT revoked_at FROM oauth_grants WHERE id=?")
+            .bind(read_grant)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    let other_still_valid: Option<chrono::NaiveDateTime> =
+        sqlx::query_scalar("SELECT revoked_at FROM oauth_grants WHERE id=?")
+            .bind(other_grant)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert!(revoked_after_disable.is_some());
+    assert!(other_still_valid.is_none());
+
+    let reset_token = Credential::generate().unwrap().expose();
+    let new_password = Credential::generate().unwrap().expose();
+    sqlx::query("INSERT INTO account_tokens (user_id,token_hash,token_type,mailed_at,expires_at) VALUES (?,UNHEX(SHA2(?,256)),'password_reset',UTC_TIMESTAMP(6),UTC_TIMESTAMP(6)+INTERVAL 1 HOUR)")
+        .bind(other).bind(&reset_token).execute(&pool).await.unwrap();
+    core.complete_password_reset(&reset_token, &new_password, "127.0.0.1")
+        .await
+        .unwrap();
+    let revoked_after_reset: Option<chrono::NaiveDateTime> =
+        sqlx::query_scalar("SELECT revoked_at FROM oauth_grants WHERE id=?")
+            .bind(other_grant)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert!(revoked_after_reset.is_some());
 }

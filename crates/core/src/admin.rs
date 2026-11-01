@@ -848,6 +848,7 @@ impl CoreAdmin {
             if status == "disabled" {
                 let now = Utc::now().naive_utc();
                 sqlx::query("UPDATE sessions SET revoked_at=?,revocation_reason='account_disabled' WHERE user_id=? AND revoked_at IS NULL").bind(now).bind(id).execute(&mut *tx).await?;
+                sqlx::query("UPDATE oauth_grants SET revoked_at=?,revocation_reason='user_disabled' WHERE user_id=? AND revoked_at IS NULL").bind(now).bind(id).execute(&mut *tx).await?;
                 sqlx::query("UPDATE trusted_devices SET revoked_at=? WHERE user_id=? AND revoked_at IS NULL").bind(now).bind(id).execute(&mut *tx).await?;
                 sqlx::query("UPDATE otp_challenges SET consumed_at=? WHERE user_id=? AND consumed_at IS NULL").bind(now).bind(id).execute(&mut *tx).await?;
             }

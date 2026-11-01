@@ -1,4 +1,4 @@
--- Staged only: not wired into the server migrator until OAuth is complete.
+-- Core-owned OAuth schema. Apply only as part of an authorized, backed-up release.
 -- All times are UTC. Secrets are stored only as purpose-separated digests.
 CREATE TABLE oauth_clients (
   id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
