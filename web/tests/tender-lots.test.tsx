@@ -62,7 +62,7 @@ test('reducing lots asks for confirmation and identifies the data to discard', a
     const input=[...row.querySelectorAll<HTMLInputElement>('input')].find(x=>x.parentElement?.textContent?.startsWith('Valor'))!;
     const setter=Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,'value')!.set!;
     await act(async()=>{setter.call(input,'1');input.dispatchEvent(new Event('input',{bubbles:true}));});
-    await act(async()=>container.querySelector('form')!.dispatchEvent(new Event('submit',{bubbles:true,cancelable:true})));
+    await act(async()=>container.querySelector('form.document-values')!.dispatchEvent(new Event('submit',{bubbles:true,cancelable:true})));
     const dialog=document.body.querySelector('[role="dialog"]')!;assert.ok(dialog.textContent?.includes('Lote 2: 3 ítem'));assert.equal(writes.length,0);
     await click('Confirmar descarte y guardar',dialog);
     assert.equal(JSON.parse(String(writes[0]!.body)).confirm_discard,true);
