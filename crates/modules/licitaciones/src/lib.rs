@@ -94,6 +94,16 @@ pub struct Expedient {
 pub struct InitialFormsInput {
     pub forms: Vec<String>,
 }
+#[derive(Clone, Debug, Serialize, Deserialize, sqlx::FromRow)]
+pub struct InstalledForm {
+    pub form_key: String,
+    pub enabled: bool,
+}
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct InstalledFormUpdate {
+    pub enabled: bool,
+}
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct GlobalVariable {

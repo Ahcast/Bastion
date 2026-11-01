@@ -5,7 +5,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { ApiClient } from '../src/api.js';
 import { CoreContext } from '../src/ui.js';
 import { NavigationGuardProvider } from '../src/navigationGuard.js';
-import Licitaciones from '../src/pages/Licitaciones.js';
+import Licitaciones, { TenderSettings } from '../src/pages/Licitaciones.js';
 import FormLibrary from '../src/pages/FormLibrary.js';
 import { mainNavigation, settingsSections } from '../src/navigation.js';
 import { fieldValue } from '../src/tenders.js';
@@ -198,6 +198,19 @@ test('settings upload a Typst file and select it for the new form', async () => 
     assert.equal(uploaded?.filename,'formulario.typ'); assert.equal(uploaded?.scope,'empresa'); assert.equal(Buffer.from(uploaded!.content_base64,'base64').toString(),'#variables.nombre');
     assert.ok(dialog.textContent?.includes('archivo #7'));
   } finally { await act(async()=>root.unmount()); container.remove(); delete (globalThis as {FileReader?:unknown}).FileReader; }
+});
+
+test('settings can retire an installed declaration without removing existing expedients', async () => {
+  const writes: {path:string; body:unknown}[] = [];
+  const api = new ApiClient('https://example.test', async (url, init = {}) => { const path=new URL(String(url)).pathname; if(init.method === 'PUT') { writes.push({path,body:JSON.parse(String(init.body))}); return new Response(null,{status:204}); } if(path.endsWith('/plantillas-instaladas')) return Response.json([{form_key:'integridad',enabled:true},{form_key:'oferente',enabled:true}]); return Response.json({items:[],page:1,page_size:25,has_more:false}); });
+  const admin:Access = { ...access, is_system_administrator:true, modules:[{module_id:'licitaciones',display_name:'Licitaciones'},{module_id:'colaboracion',display_name:'Colaboración'}] };
+  const container=document.createElement('div'); document.body.append(container); const root=createRoot(container);
+  try {
+    await act(async()=>root.render(<NavigationGuardProvider><CoreContext.Provider value={{api, access:admin, notify:()=>{}}}><TenderSettings /></CoreContext.Provider></NavigationGuardProvider>));
+    const row=[...container.querySelectorAll('tr')].find(item=>item.textContent?.includes('Declaración de integridad'))!;
+    await act(async()=>row.querySelector('button')!.click());
+    assert.deepEqual(writes,[{path:'/api/v1/licitaciones/plantillas-instaladas/integridad',body:{enabled:false}}]);
+  } finally { await act(async()=>root.unmount());container.remove(); }
 });
 
 test('expedient names persist with a version, keep text on conflicts and update headings and lists', async () => {
