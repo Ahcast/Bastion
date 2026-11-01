@@ -19,7 +19,7 @@ Se prepara una composición aislada que reúne los routers y separa CORS con cre
 
 El router prepara soporte MCP 2025-11-25: validación JSON-RPC, inicialización y listado junto con autenticación, límites y auditoría. Las rutas están apagadas por defecto; la compatibilidad todavía requiere pruebas con clientes reales.
 
-Los documentos de descubrimiento OAuth se preparan a partir de direcciones HTTPS canónicas configuradas por el servidor, con metadatos para recurso y emisor. Un router aislado atiende sus rutas well-known para pruebas; no está conectado a la aplicación activa. No se anuncia compatibilidad CIMD hasta contar con obtención segura de metadatos y autorización completa.
+Los documentos de descubrimiento OAuth se preparan a partir de direcciones HTTPS canónicas configuradas por el servidor, con metadatos para recurso y emisor. Un router aislado atiende sus rutas well-known para pruebas; no está conectado a la aplicación activa. El descubrimiento anuncia documentos de identidad de cliente (CIMD) para clientes públicos previamente aprobados y los tres alcances de lectura. Clientes confidenciales y registro dinámico no están soportados; la interoperabilidad con clientes reales todavía debe comprobarse.
 
 Se preparan las respuestas de aprobación y rechazo al URI registrado, incluyendo el emisor `iss` y codificación del estado. Se rechazan parámetros OAuth ambiguos al registrar el cliente y antes de crear el grant, incluso si ya había sido registrado. El flujo HTTP deberá preservar estos controles en todos los errores y evitar exponer el código en registros; todavía no está conectado.
 

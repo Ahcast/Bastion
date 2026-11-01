@@ -104,11 +104,11 @@ impl DraftOauthMetadata {
     }
 
     pub fn protected_resource(&self) -> Value {
-        json!({"resource": self.resource, "authorization_servers": [self.issuer], "bearer_methods_supported": ["header"]})
+        json!({"resource": self.resource, "authorization_servers": [self.issuer], "bearer_methods_supported": ["header"], "scopes_supported": bastion_mcp_core::approved_read_requirements().into_keys().collect::<Vec<_>>()})
     }
 
     pub fn authorization_server(&self) -> Value {
-        json!({"issuer": self.issuer, "authorization_endpoint": self.authorization_endpoint, "token_endpoint": self.token_endpoint, "response_types_supported": ["code"], "grant_types_supported": ["authorization_code", "refresh_token"], "token_endpoint_auth_methods_supported": ["none"], "code_challenge_methods_supported": ["S256"]})
+        json!({"issuer": self.issuer, "authorization_endpoint": self.authorization_endpoint, "token_endpoint": self.token_endpoint, "response_types_supported": ["code"], "grant_types_supported": ["authorization_code", "refresh_token"], "token_endpoint_auth_methods_supported": ["none"], "code_challenge_methods_supported": ["S256"], "client_id_metadata_document_supported": true, "scopes_supported": bastion_mcp_core::approved_read_requirements().into_keys().collect::<Vec<_>>()})
     }
 
     /// Only call after the transactional consent flow has returned the
@@ -228,10 +228,16 @@ mod tests {
             doc.authorization_server()["token_endpoint_auth_methods_supported"][0],
             "none"
         );
-        assert!(
-            doc.authorization_server()
-                .get("client_id_metadata_document_supported")
-                .is_none()
+        assert_eq!(
+            doc.authorization_server()["client_id_metadata_document_supported"],
+            true
+        );
+        assert_eq!(
+            doc.protected_resource()["scopes_supported"]
+                .as_array()
+                .unwrap()
+                .len(),
+            3
         );
     }
 

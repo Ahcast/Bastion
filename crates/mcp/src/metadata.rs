@@ -93,7 +93,7 @@ pub fn validate_client_metadata(
     {
         return Err(MetadataError::UnsupportedAuthentication);
     }
-    if document.client_name.as_ref().is_some_and(|name| {
+    if document.client_name.as_ref().is_none_or(|name| {
         name.is_empty() || name.len() > 255 || name.chars().any(char::is_control)
     }) {
         return Err(MetadataError::InvalidDocument);
@@ -206,6 +206,11 @@ mod tests {
 
     #[test]
     fn rejects_unsafe_or_ambiguous_metadata() {
+        let missing_name = br#"{"client_id":"https://client.example/metadata.json","redirect_uris":["https://client.example/callback"],"token_endpoint_auth_method":"none"}"#;
+        assert!(matches!(
+            validate_client_metadata(ID, ID, 200, missing_name),
+            Err(MetadataError::InvalidDocument)
+        ));
         assert!(validate_redirect_uri("https://client.example/callback?next=home").is_ok());
         for key in [
             "code",

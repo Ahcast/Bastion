@@ -399,7 +399,7 @@ mod tests {
         }
         let id = "https://metadata.example/doc";
         let url = validated_url(id).unwrap();
-        let body=serde_json::json!({"client_id":id,"redirect_uris":["https://client.example/cb"],"token_endpoint_auth_method":"none"}).to_string();
+        let body=serde_json::json!({"client_id":id,"client_name":"Fixture","redirect_uris":["https://client.example/cb"],"token_endpoint_auth_method":"none"}).to_string();
         let (address, server) = serve(acceptor.clone(), "200 OK", body.clone()).await;
         let value = tokio::time::timeout(
             Duration::from_secs(5),
