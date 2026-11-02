@@ -108,7 +108,7 @@ impl DraftOauthMetadata {
     }
 
     pub fn authorization_server(&self) -> Value {
-        json!({"issuer": self.issuer, "authorization_endpoint": self.authorization_endpoint, "token_endpoint": self.token_endpoint, "response_types_supported": ["code"], "grant_types_supported": ["authorization_code", "refresh_token"], "token_endpoint_auth_methods_supported": ["none"], "code_challenge_methods_supported": ["S256"], "client_id_metadata_document_supported": true, "scopes_supported": bastion_mcp_core::approved_read_requirements().into_keys().collect::<Vec<_>>()})
+        json!({"issuer": self.issuer, "authorization_endpoint": self.authorization_endpoint, "token_endpoint": self.token_endpoint, "response_types_supported": ["code"], "grant_types_supported": ["authorization_code", "refresh_token"], "token_endpoint_auth_methods_supported": ["none"], "code_challenge_methods_supported": ["S256"], "client_id_metadata_document_supported": true, "authorization_response_iss_parameter_supported": true, "scopes_supported": bastion_mcp_core::approved_read_requirements().into_keys().collect::<Vec<_>>()})
     }
 
     /// Only call after the transactional consent flow has returned the
@@ -230,6 +230,10 @@ mod tests {
         );
         assert_eq!(
             doc.authorization_server()["client_id_metadata_document_supported"],
+            true
+        );
+        assert_eq!(
+            doc.authorization_server()["authorization_response_iss_parameter_supported"],
             true
         );
         assert_eq!(
