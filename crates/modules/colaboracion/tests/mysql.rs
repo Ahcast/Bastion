@@ -216,6 +216,44 @@ else:
         service.save_policy(2, default_policy.clone()).await,
         Err(CoreError::Forbidden)
     ));
+    let typst = service
+        .upload(
+            1,
+            "typst-objective-c-regression",
+            UploadInput {
+                scope: "empresa".into(),
+                id_persona: None,
+                title: "Plantilla Typst".into(),
+                notes: String::new(),
+                filename: "formulario.typ".into(),
+                content_base64: STANDARD.encode(b"#import \"config.typ\": datos\n= Oferta\n"),
+            },
+        )
+        .await
+        .unwrap();
+    assert_eq!(typst.mime, "text/plain");
+    assert_eq!(
+        service.read(1, typst.id, true).await.unwrap().mime,
+        "text/plain"
+    );
+    let published = service
+        .publish_form(
+            1,
+            "typst-objective-c-publish",
+            bastion_colaboracion::PublishFormInput {
+                form_id: None,
+                expected_revision: None,
+                definition: bastion_colaboracion::FormDefinition {
+                    title: "Oferta".into(),
+                    section: bastion_colaboracion::FormSection::Legal,
+                    variables: vec![],
+                    template_source_id: Some(typst.id),
+                },
+            },
+        )
+        .await
+        .unwrap();
+    assert_eq!(published.definition.template_source_id, Some(typst.id));
     let input = || UploadInput {
         scope: "persona".into(),
         id_persona: Some(2),
