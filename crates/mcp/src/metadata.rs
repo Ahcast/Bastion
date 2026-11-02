@@ -211,9 +211,11 @@ mod tests {
             "token_endpoint_auth_method": "none"
         });
         let metadata = validate_client_metadata(id, id, 200, body.to_string().as_bytes()).unwrap();
-        assert!(metadata
-            .redirect_uris()
-            .contains("http://localhost:8787/callback"));
+        assert!(
+            metadata
+                .redirect_uris()
+                .contains("http://localhost:8787/callback")
+        );
         for uri in [
             "http://localhost.example/callback",
             "http://localhost./callback",
