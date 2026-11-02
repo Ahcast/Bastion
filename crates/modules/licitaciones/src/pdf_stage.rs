@@ -12,10 +12,10 @@ use std::{
 /// Trusted, privately installed templates from the user's approved first group.
 /// These are loaded by the service configuration, never supplied by an API caller.
 pub struct TenderTemplateBundle {
-    pub bid_offer: String,
-    pub std_offer: String,
-    pub bid_lot: String,
-    pub std_lot: String,
+    pub bid_offer: Option<String>,
+    pub std_offer: Option<String>,
+    pub bid_lot: Option<String>,
+    pub std_lot: Option<String>,
     pub functions: String,
     pub legal_integridad: Option<String>,
     pub legal_oferente: Option<String>,
@@ -73,15 +73,55 @@ impl TenderTemplateBundle {
                 }
             };
             Ok(Self {
-                bid_offer: read("carta-de-oferta.typ")?,
-                std_offer: read("presentacion-de-oferta.typ")?,
-                bid_lot: read("lote1-bid.typ")?,
-                std_lot: read("lote1-std.typ")?,
+                bid_offer: read_optional("carta-de-oferta.typ")?,
+                std_offer: read_optional("presentacion-de-oferta.typ")?,
+                bid_lot: read_optional("lote1-bid.typ")?,
+                std_lot: read_optional("lote1-std.typ")?,
                 functions: read("funciones.typ")?,
                 legal_integridad: read_optional("dj-integridad.typ")?,
                 legal_oferente: read_optional("informacion_sobre_el_oferente.typ")?,
             })
         }
+    }
+    fn for_style(&self, style: &str) -> Result<(&str, &str), CoreError> {
+        let (offer, lot) = match style {
+            "bid" => (&self.bid_offer, &self.bid_lot),
+            "std" => (&self.std_offer, &self.std_lot),
+            _ => return Err(CoreError::Invalid),
+        };
+        Ok((
+            offer.as_deref().ok_or(CoreError::NotFound)?,
+            lot.as_deref().ok_or(CoreError::NotFound)?,
+        ))
+    }
+}
+
+#[cfg(test)]
+mod template_tests {
+    use super::*;
+    #[test]
+    fn each_style_requires_only_its_own_offer_and_lot() {
+        let mut bundle = TenderTemplateBundle {
+            bid_offer: Some("BID".into()),
+            bid_lot: Some("Lote BID".into()),
+            std_offer: None,
+            std_lot: None,
+            functions: "Funciones".into(),
+            legal_integridad: None,
+            legal_oferente: None,
+        };
+        assert!(matches!(bundle.for_style("bid"), Ok(("BID", "Lote BID"))));
+        assert!(matches!(bundle.for_style("std"), Err(CoreError::NotFound)));
+        bundle.bid_offer = None;
+        bundle.bid_lot = None;
+        bundle.std_offer = Some("STD".into());
+        bundle.std_lot = Some("Lote STD".into());
+        assert!(matches!(bundle.for_style("std"), Ok(("STD", "Lote STD"))));
+        assert!(matches!(bundle.for_style("bid"), Err(CoreError::NotFound)));
+        assert!(matches!(
+            bundle.for_style("invalid"),
+            Err(CoreError::Invalid)
+        ));
     }
 }
 
@@ -164,11 +204,7 @@ impl TenderService {
             .and_then(|v| v.value.as_ref())
             .and_then(|v| v.as_str())
             .ok_or(CoreError::Invalid)?;
-        let (offer, lot_template) = match style {
-            "bid" => (&bundle.bid_offer, &bundle.bid_lot),
-            "std" => (&bundle.std_offer, &bundle.std_lot),
-            _ => return Err(CoreError::Invalid),
-        };
+        let (offer, lot_template) = bundle.for_style(style)?;
         let snapshot = self
             .prepare_typst_snapshot(actor, id, expected, 1, lot_template)
             .await?;

@@ -300,10 +300,10 @@ async fn mysql57_tender_files_private_copies_integrity_recovery_and_budgets() {
         std::fs::set_permissions(&root, std::fs::Permissions::from_mode(0o700)).unwrap();
     }
     let bundle = TenderTemplateBundle {
-        bid_offer: "= Oferta BID".into(),
-        std_offer: "= Oferta STD".into(),
-        bid_lot: "#import \"items1_bid.typ\": items".into(),
-        std_lot: "#import \"items1_std.typ\": items".into(),
+        bid_offer: Some("= Oferta BID".into()),
+        std_offer: Some("= Oferta STD".into()),
+        bid_lot: Some("#import \"items1_bid.typ\": items".into()),
+        std_lot: Some("#import \"items1_std.typ\": items".into()),
         functions: "#let f = 1".into(),
         legal_integridad: Some("= Integridad".into()),
         legal_oferente: Some("= Oferente".into()),
