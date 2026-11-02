@@ -552,16 +552,30 @@ async fn lot_summaries(
         .map(Json)
         .map_err(ApiError)
 }
+#[derive(serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+struct LotRequest {
+    items: Vec<bastion_licitaciones::LotItem>,
+    #[serde(default)]
+    tamano_tabla: Option<String>,
+}
 async fn save_lot(
     State(state): State<ApiState>,
     headers: axum::http::HeaderMap,
     Path((id, numero)): Path<(u64, u32)>,
-    Json(input): Json<LotInput>,
+    Json(input): Json<LotRequest>,
 ) -> Result<Response, ApiError> {
     let user = actor(&state, &headers).await?;
     state
         .licitaciones
-        .save_lot(user.id, id, numero, expected(&headers)?, input)
+        .save_lot_with_font_size(
+            user.id,
+            id,
+            numero,
+            expected(&headers)?,
+            LotInput { items: input.items },
+            input.tamano_tabla,
+        )
         .await
         .map(response)
         .map_err(ApiError)
