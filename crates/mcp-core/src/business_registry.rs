@@ -16,17 +16,38 @@ pub fn approved_read_requirements() -> BTreeMap<String, Vec<PermissionRequiremen
                 format!("{module}:read"),
                 vec![PermissionRequirement {
                     module_id: module.into(),
-                    scope_key: if module == "licitaciones" { "expedientes" } else { "documentos" }.into(),
+                    scope_key: if module == "licitaciones" {
+                        "expedientes"
+                    } else {
+                        "documentos"
+                    }
+                    .into(),
                     capability: "ver".into(),
                 }],
             )
         })
-        .chain(["cotizaciones", "facturas", "ordenes_compra", "licitaciones"].into_iter().map(|module| {
-            let scope_key = if module == "licitaciones" { "expedientes" } else { "documentos" };
-            (format!("{module}:write"), ["ver", "editar"].into_iter().map(|capability| PermissionRequirement {
-                module_id: module.into(), scope_key: scope_key.into(), capability: capability.into(),
-            }).collect())
-        }))
+        .chain(
+            ["cotizaciones", "facturas", "ordenes_compra", "licitaciones"]
+                .into_iter()
+                .map(|module| {
+                    let scope_key = if module == "licitaciones" {
+                        "expedientes"
+                    } else {
+                        "documentos"
+                    };
+                    (
+                        format!("{module}:write"),
+                        ["ver", "editar"]
+                            .into_iter()
+                            .map(|capability| PermissionRequirement {
+                                module_id: module.into(),
+                                scope_key: scope_key.into(),
+                                capability: capability.into(),
+                            })
+                            .collect(),
+                    )
+                }),
+        )
         .collect()
 }
 
@@ -58,27 +79,117 @@ pub fn draft_read_tool_registry() -> Result<ToolRegistry, RegistryError> {
         });
     }
     for (operation, description, schema) in [
-        ("listar_lotes", "Consultar los lotes de un expediente.", json!({"type":"object","properties":{"id":{"type":"integer","minimum":1}},"required":["id"],"additionalProperties":false})),
-        ("consultar_lote", "Consultar un lote y sus partidas.", json!({"type":"object","properties":{"id":{"type":"integer","minimum":1},"numero":{"type":"integer","minimum":1}},"required":["id","numero"],"additionalProperties":false})),
+        (
+            "listar_lotes",
+            "Consultar los lotes de un expediente.",
+            json!({"type":"object","properties":{"id":{"type":"integer","minimum":1}},"required":["id"],"additionalProperties":false}),
+        ),
+        (
+            "consultar_lote",
+            "Consultar un lote y sus partidas.",
+            json!({"type":"object","properties":{"id":{"type":"integer","minimum":1},"numero":{"type":"integer","minimum":1}},"required":["id","numero"],"additionalProperties":false}),
+        ),
     ] {
-        tools.push(ToolDescriptor { name:format!("licitaciones.{operation}"), module_id:"licitaciones".into(), description:description.into(), required_scope:"licitaciones:read".into(), input_schema:schema, output_schema:None, risk:ToolRisk::ReadOnly, idempotent:true, max_response_bytes:262144, max_duration_ms:10000 });
+        tools.push(ToolDescriptor {
+            name: format!("licitaciones.{operation}"),
+            module_id: "licitaciones".into(),
+            description: description.into(),
+            required_scope: "licitaciones:read".into(),
+            input_schema: schema,
+            output_schema: None,
+            risk: ToolRisk::ReadOnly,
+            idempotent: true,
+            max_response_bytes: 262144,
+            max_duration_ms: 10000,
+        });
     }
     for (module, operation, description, mut schema, idempotent) in [
-        ("cotizaciones", "crear_borrador", "Crear una cotización en borrador.", json!({"type":"object","properties":{"idempotency_key":{"type":"string","minLength":16,"maxLength":128},"data":{"type":"object","description":"Datos completos de cotización; status debe ser Borrador."}},"required":["idempotency_key","data"],"additionalProperties":false}), true),
-        ("cotizaciones", "editar_borrador", "Reemplazar los datos de una cotización en borrador con la versión observada.", json!({"type":"object","properties":{"id":{"type":"integer","minimum":1},"version":{"type":"integer","minimum":1},"data":{"type":"object","description":"Datos completos de cotización; status debe ser Borrador."}},"required":["id","version","data"],"additionalProperties":false}), false),
-        ("facturas", "crear_borrador", "Crear una factura en borrador sin registrar pagos.", json!({"type":"object","properties":{"idempotency_key":{"type":"string","minLength":16,"maxLength":128},"data":{"type":"object","description":"Datos completos de factura, sin initial_payment."}},"required":["idempotency_key","data"],"additionalProperties":false}), true),
-        ("facturas", "editar_borrador", "Reemplazar los datos de una factura en borrador sin registrar pagos.", json!({"type":"object","properties":{"id":{"type":"integer","minimum":1},"version":{"type":"integer","minimum":1},"data":{"type":"object","description":"Datos completos de factura, sin initial_payment."}},"required":["id","version","data"],"additionalProperties":false}), false),
-        ("ordenes_compra", "crear_pendiente", "Crear una orden pendiente sin compras ni entrega.", json!({"type":"object","properties":{"idempotency_key":{"type":"string","minLength":16,"maxLength":128},"data":{"type":"object","description":"Datos de la orden, sin factura ni fecha de entrega; todos los productos en Pendiente."}},"required":["idempotency_key","data"],"additionalProperties":false}), true),
-        ("ordenes_compra", "editar_pendiente", "Editar una orden pendiente sin compras ni entrega.", json!({"type":"object","properties":{"id":{"type":"integer","minimum":1},"version":{"type":"integer","minimum":1},"data":{"type":"object","description":"Datos de la orden, sin factura ni fecha de entrega; todos los productos en Pendiente."}},"required":["id","version","data"],"additionalProperties":false}), false),
-        ("licitaciones", "crear_borrador", "Crear un expediente de licitación vacío en borrador.", json!({"type":"object","properties":{"idempotency_key":{"type":"string","minLength":16,"maxLength":128}},"required":["idempotency_key"],"additionalProperties":false}), true),
-        ("licitaciones", "renombrar_borrador", "Cambiar el nombre de un expediente en borrador.", json!({"type":"object","properties":{"id":{"type":"integer","minimum":1},"version":{"type":"integer","minimum":1},"name":{"type":"string","maxLength":255}},"required":["id","version","name"],"additionalProperties":false}), false),
-        ("licitaciones", "editar_variables", "Actualizar variables de un expediente en borrador, sin descartar lotes.", json!({"type":"object","properties":{"id":{"type":"integer","minimum":1},"version":{"type":"integer","minimum":1},"variables":{"type":"array","items":{"type":"object"}}},"required":["id","version","variables"],"additionalProperties":false}), false),
-        ("licitaciones", "editar_lote", "Reemplazar las partidas de un lote de un expediente en borrador.", json!({"type":"object","properties":{"id":{"type":"integer","minimum":1},"version":{"type":"integer","minimum":1},"numero":{"type":"integer","minimum":1},"items":{"type":"array","maxItems":1000,"items":{"type":"object","additionalProperties":false,"properties":{"descripcion":{"type":"string"},"pais_origen":{"type":"string"},"fecha_entrega":{"type":"string"},"cantidad":{"type":"string"},"unidad":{"type":"string"},"transporte":{"type":"string"},"precio_unitario":{"type":"string"}},"required":["descripcion","pais_origen","fecha_entrega","cantidad","unidad","transporte","precio_unitario"]}}},"required":["id","version","numero","items"],"additionalProperties":false}), false),
+        (
+            "cotizaciones",
+            "crear_borrador",
+            "Crear una cotización en borrador.",
+            json!({"type":"object","properties":{"idempotency_key":{"type":"string","minLength":16,"maxLength":128},"data":{"type":"object","description":"Datos completos de cotización; status debe ser Borrador."}},"required":["idempotency_key","data"],"additionalProperties":false}),
+            true,
+        ),
+        (
+            "cotizaciones",
+            "editar_borrador",
+            "Reemplazar los datos de una cotización en borrador con la versión observada.",
+            json!({"type":"object","properties":{"id":{"type":"integer","minimum":1},"version":{"type":"integer","minimum":1},"data":{"type":"object","description":"Datos completos de cotización; status debe ser Borrador."}},"required":["id","version","data"],"additionalProperties":false}),
+            false,
+        ),
+        (
+            "facturas",
+            "crear_borrador",
+            "Crear una factura en borrador sin registrar pagos.",
+            json!({"type":"object","properties":{"idempotency_key":{"type":"string","minLength":16,"maxLength":128},"data":{"type":"object","description":"Datos completos de factura, sin initial_payment."}},"required":["idempotency_key","data"],"additionalProperties":false}),
+            true,
+        ),
+        (
+            "facturas",
+            "editar_borrador",
+            "Reemplazar los datos de una factura en borrador sin registrar pagos.",
+            json!({"type":"object","properties":{"id":{"type":"integer","minimum":1},"version":{"type":"integer","minimum":1},"data":{"type":"object","description":"Datos completos de factura, sin initial_payment."}},"required":["id","version","data"],"additionalProperties":false}),
+            false,
+        ),
+        (
+            "ordenes_compra",
+            "crear_pendiente",
+            "Crear una orden pendiente sin compras ni entrega.",
+            json!({"type":"object","properties":{"idempotency_key":{"type":"string","minLength":16,"maxLength":128},"data":{"type":"object","description":"Datos de la orden, sin factura ni fecha de entrega; todos los productos en Pendiente."}},"required":["idempotency_key","data"],"additionalProperties":false}),
+            true,
+        ),
+        (
+            "ordenes_compra",
+            "editar_pendiente",
+            "Editar una orden pendiente sin compras ni entrega.",
+            json!({"type":"object","properties":{"id":{"type":"integer","minimum":1},"version":{"type":"integer","minimum":1},"data":{"type":"object","description":"Datos de la orden, sin factura ni fecha de entrega; todos los productos en Pendiente."}},"required":["id","version","data"],"additionalProperties":false}),
+            false,
+        ),
+        (
+            "licitaciones",
+            "crear_borrador",
+            "Crear un expediente de licitación vacío en borrador.",
+            json!({"type":"object","properties":{"idempotency_key":{"type":"string","minLength":16,"maxLength":128}},"required":["idempotency_key"],"additionalProperties":false}),
+            true,
+        ),
+        (
+            "licitaciones",
+            "renombrar_borrador",
+            "Cambiar el nombre de un expediente en borrador.",
+            json!({"type":"object","properties":{"id":{"type":"integer","minimum":1},"version":{"type":"integer","minimum":1},"name":{"type":"string","maxLength":255}},"required":["id","version","name"],"additionalProperties":false}),
+            false,
+        ),
+        (
+            "licitaciones",
+            "editar_variables",
+            "Actualizar variables de un expediente en borrador, sin descartar lotes.",
+            json!({"type":"object","properties":{"id":{"type":"integer","minimum":1},"version":{"type":"integer","minimum":1},"variables":{"type":"array","items":{"type":"object"}}},"required":["id","version","variables"],"additionalProperties":false}),
+            false,
+        ),
+        (
+            "licitaciones",
+            "editar_lote",
+            "Reemplazar las partidas de un lote de un expediente en borrador.",
+            json!({"type":"object","properties":{"id":{"type":"integer","minimum":1},"version":{"type":"integer","minimum":1},"numero":{"type":"integer","minimum":1},"items":{"type":"array","maxItems":1000,"items":{"type":"object","additionalProperties":false,"properties":{"descripcion":{"type":"string"},"pais_origen":{"type":"string"},"fecha_entrega":{"type":"string"},"cantidad":{"type":"string"},"unidad":{"type":"string"},"transporte":{"type":"string"},"precio_unitario":{"type":"string"}},"required":["descripcion","pais_origen","fecha_entrega","cantidad","unidad","transporte","precio_unitario"]}}},"required":["id","version","numero","items"],"additionalProperties":false}),
+            false,
+        ),
     ] {
         if matches!(module, "cotizaciones" | "facturas" | "ordenes_compra") {
             schema["properties"]["data"] = draft_data_schema(module);
         }
-        tools.push(ToolDescriptor { name:format!("{module}.{operation}"), module_id:module.into(), description:description.into(), required_scope:format!("{module}:write"), input_schema:schema, output_schema:None, risk:ToolRisk::Mutation, idempotent, max_response_bytes:262144, max_duration_ms:10000 });
+        tools.push(ToolDescriptor {
+            name: format!("{module}.{operation}"),
+            module_id: module.into(),
+            description: description.into(),
+            required_scope: format!("{module}:write"),
+            input_schema: schema,
+            output_schema: None,
+            risk: ToolRisk::Mutation,
+            idempotent,
+            max_response_bytes: 262144,
+            max_duration_ms: 10000,
+        });
     }
     let scopes: BTreeSet<String> = approved_read_requirements().into_keys().collect();
     ToolRegistry::new(tools, &scopes)
@@ -104,12 +215,13 @@ mod tests {
     fn exposes_only_approved_read_tools_for_active_modules_and_scopes() {
         let requirements = approved_read_requirements();
         assert_eq!(requirements.len(), 8);
-        assert!(
-            requirements
-                .values()
-                .flatten()
-                .all(|r| matches!(r.scope_key.as_str(), "documentos" | "expedientes") && matches!(r.capability.as_str(), "ver" | "editar"))
-        );
+        assert!(requirements.values().flatten().all(|r| matches!(
+            r.scope_key.as_str(),
+            "documentos" | "expedientes"
+        ) && matches!(
+            r.capability.as_str(),
+            "ver" | "editar"
+        )));
         let registry = draft_read_tool_registry().unwrap();
         let user = AuthenticatedAccess {
             user_id: 1,

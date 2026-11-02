@@ -37,25 +37,50 @@ struct DetailArguments {
 }
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
-struct CreateArguments<T> { idempotency_key: String, data: T }
+struct CreateArguments<T> {
+    idempotency_key: String,
+    data: T,
+}
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
-struct UpdateArguments<T> { id: u64, version: u64, data: T }
+struct UpdateArguments<T> {
+    id: u64,
+    version: u64,
+    data: T,
+}
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
-struct TenderCreateArguments { idempotency_key: String }
+struct TenderCreateArguments {
+    idempotency_key: String,
+}
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
-struct TenderNameArguments { id: u64, version: u64, name: String }
+struct TenderNameArguments {
+    id: u64,
+    version: u64,
+    name: String,
+}
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
-struct TenderVariablesArguments { id: u64, version: u64, variables: Vec<bastion_licitaciones::GlobalVariable> }
+struct TenderVariablesArguments {
+    id: u64,
+    version: u64,
+    variables: Vec<bastion_licitaciones::GlobalVariable>,
+}
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
-struct TenderLotArguments { id: u64, numero: u32 }
+struct TenderLotArguments {
+    id: u64,
+    numero: u32,
+}
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
-struct TenderLotWriteArguments { id: u64, version: u64, numero: u32, items: Vec<bastion_licitaciones::LotItem> }
+struct TenderLotWriteArguments {
+    id: u64,
+    version: u64,
+    numero: u32,
+    items: Vec<bastion_licitaciones::LotItem>,
+}
 
 /// Typed draft adapter over existing domain services. The caller must provide
 /// freshly authenticated OAuth access, enforce per-tool concurrency/time and
@@ -89,31 +114,60 @@ impl DraftReadExecutor {
         arguments: Value,
     ) -> Result<Value, ReadToolError> {
         let (module, operation) = tool.split_once('.').ok_or(ReadToolError::Invalid)?;
-        if !matches!(module, "cotizaciones" | "facturas" | "ordenes_compra" | "licitaciones") {
+        if !matches!(
+            module,
+            "cotizaciones" | "facturas" | "ordenes_compra" | "licitaciones"
+        ) {
             return Err(ReadToolError::Invalid);
         }
-        let reading = matches!(operation, "listar" | "consultar") || (module == "licitaciones" && matches!(operation, "listar_lotes" | "consultar_lote"));
-        if !access.scopes.contains(&format!("{module}:{}", if reading { "read" } else { "write" })) {
+        let reading = matches!(operation, "listar" | "consultar")
+            || (module == "licitaciones" && matches!(operation, "listar_lotes" | "consultar_lote"));
+        if !access.scopes.contains(&format!(
+            "{module}:{}",
+            if reading { "read" } else { "write" }
+        )) {
             return Err(ReadToolError::Denied);
         }
         if !reading {
-            if !access.scopes.contains(&format!("{module}:read")) { return Err(ReadToolError::Denied); }
+            if !access.scopes.contains(&format!("{module}:read")) {
+                return Err(ReadToolError::Denied);
+            }
             return self.write(access, module, operation, arguments).await;
         }
         if module == "licitaciones" && operation == "listar_lotes" {
-            let args: DetailArguments = serde_json::from_value(arguments).map_err(|_| ReadToolError::Invalid)?;
+            let args: DetailArguments =
+                serde_json::from_value(arguments).map_err(|_| ReadToolError::Invalid)?;
             valid_version(args.id, 1)?;
             let service = self.tenders.as_ref().ok_or(ReadToolError::Unavailable)?;
-            service.consume_request(access.user_id).await.map_err(map_error)?;
-            return bounded(&service.lot_summaries(access.user_id, args.id).await.map_err(map_error)?);
+            service
+                .consume_request(access.user_id)
+                .await
+                .map_err(map_error)?;
+            return bounded(
+                &service
+                    .lot_summaries(access.user_id, args.id)
+                    .await
+                    .map_err(map_error)?,
+            );
         }
         if module == "licitaciones" && operation == "consultar_lote" {
-            let args: TenderLotArguments = serde_json::from_value(arguments).map_err(|_| ReadToolError::Invalid)?;
+            let args: TenderLotArguments =
+                serde_json::from_value(arguments).map_err(|_| ReadToolError::Invalid)?;
             valid_version(args.id, 1)?;
-            if args.numero == 0 { return Err(ReadToolError::Invalid); }
+            if args.numero == 0 {
+                return Err(ReadToolError::Invalid);
+            }
             let service = self.tenders.as_ref().ok_or(ReadToolError::Unavailable)?;
-            service.consume_request(access.user_id).await.map_err(map_error)?;
-            return bounded(&service.lot(access.user_id, args.id, args.numero).await.map_err(map_error)?);
+            service
+                .consume_request(access.user_id)
+                .await
+                .map_err(map_error)?;
+            return bounded(
+                &service
+                    .lot(access.user_id, args.id, args.numero)
+                    .await
+                    .map_err(map_error)?,
+            );
         }
         if operation == "listar" {
             let args: ListArguments =
@@ -186,10 +240,26 @@ impl DraftReadExecutor {
                     )
                 }
                 "licitaciones" => {
-                    if args.search.is_some() { return Err(ReadToolError::Invalid); }
+                    if args.search.is_some() {
+                        return Err(ReadToolError::Invalid);
+                    }
                     let service = self.tenders.as_ref().ok_or(ReadToolError::Unavailable)?;
-                    service.consume_request(access.user_id).await.map_err(map_error)?;
-                    bounded(&service.list(access.user_id, &PageQuery { page: Some(page), page_size: Some(size) }).await.map_err(map_error)?)
+                    service
+                        .consume_request(access.user_id)
+                        .await
+                        .map_err(map_error)?;
+                    bounded(
+                        &service
+                            .list(
+                                access.user_id,
+                                &PageQuery {
+                                    page: Some(page),
+                                    page_size: Some(size),
+                                },
+                            )
+                            .await
+                            .map_err(map_error)?,
+                    )
                 }
                 _ => Err(ReadToolError::Invalid),
             }
@@ -241,85 +311,232 @@ impl DraftReadExecutor {
                 }
                 "licitaciones" => {
                     let service = self.tenders.as_ref().ok_or(ReadToolError::Unavailable)?;
-                    service.consume_request(access.user_id).await.map_err(map_error)?;
-                    bounded(&service.detail(access.user_id, args.id).await.map_err(map_error)?)
+                    service
+                        .consume_request(access.user_id)
+                        .await
+                        .map_err(map_error)?;
+                    bounded(
+                        &service
+                            .detail(access.user_id, args.id)
+                            .await
+                            .map_err(map_error)?,
+                    )
                 }
                 _ => Err(ReadToolError::Invalid),
             }
         }
     }
 
-    async fn write(&self, access: &AuthenticatedAccess, module: &str, operation: &str, arguments: Value) -> Result<Value, ReadToolError> {
+    async fn write(
+        &self,
+        access: &AuthenticatedAccess,
+        module: &str,
+        operation: &str,
+        arguments: Value,
+    ) -> Result<Value, ReadToolError> {
         let actor = access.user_id;
         match (module, operation) {
             ("cotizaciones", "crear_borrador") => {
-                let args: CreateArguments<QuoteInput> = serde_json::from_value(arguments).map_err(|_| ReadToolError::Invalid)?;
-                if !matches!(args.data.status, QuoteStatus::Borrador) { return Err(ReadToolError::Invalid); }
-                self.quotes.consume_request(actor).await.map_err(map_error)?;
-                bounded(&self.quotes.create(actor, &args.idempotency_key, args.data).await.map_err(map_error)?)
+                let args: CreateArguments<QuoteInput> =
+                    serde_json::from_value(arguments).map_err(|_| ReadToolError::Invalid)?;
+                if !matches!(args.data.status, QuoteStatus::Borrador) {
+                    return Err(ReadToolError::Invalid);
+                }
+                self.quotes
+                    .consume_request(actor)
+                    .await
+                    .map_err(map_error)?;
+                bounded(
+                    &self
+                        .quotes
+                        .create(actor, &args.idempotency_key, args.data)
+                        .await
+                        .map_err(map_error)?,
+                )
             }
             ("cotizaciones", "editar_borrador") => {
-                let args: UpdateArguments<QuoteInput> = serde_json::from_value(arguments).map_err(|_| ReadToolError::Invalid)?;
+                let args: UpdateArguments<QuoteInput> =
+                    serde_json::from_value(arguments).map_err(|_| ReadToolError::Invalid)?;
                 valid_version(args.id, args.version)?;
-                if !matches!(args.data.status, QuoteStatus::Borrador) { return Err(ReadToolError::Invalid); }
-                self.quotes.consume_request(actor).await.map_err(map_error)?;
-                let current = self.quotes.detail(actor, args.id).await.map_err(map_error)?;
-                if current.version != args.version || current.status != "Borrador" { return Err(ReadToolError::Conflict); }
-                bounded(&self.quotes.replace(actor, args.id, args.version, args.data).await.map_err(map_error)?)
+                if !matches!(args.data.status, QuoteStatus::Borrador) {
+                    return Err(ReadToolError::Invalid);
+                }
+                self.quotes
+                    .consume_request(actor)
+                    .await
+                    .map_err(map_error)?;
+                let current = self
+                    .quotes
+                    .detail(actor, args.id)
+                    .await
+                    .map_err(map_error)?;
+                if current.version != args.version || current.status != "Borrador" {
+                    return Err(ReadToolError::Conflict);
+                }
+                bounded(
+                    &self
+                        .quotes
+                        .replace(actor, args.id, args.version, args.data)
+                        .await
+                        .map_err(map_error)?,
+                )
             }
             ("facturas", "crear_borrador") => {
-                let args: CreateArguments<InvoiceInput> = serde_json::from_value(arguments).map_err(|_| ReadToolError::Invalid)?;
-                if args.data.initial_payment.is_some() { return Err(ReadToolError::Invalid); }
-                self.invoices.consume_request(actor).await.map_err(map_error)?;
-                bounded(&self.invoices.create(actor, &args.idempotency_key, args.data).await.map_err(map_error)?)
+                let args: CreateArguments<InvoiceInput> =
+                    serde_json::from_value(arguments).map_err(|_| ReadToolError::Invalid)?;
+                if args.data.initial_payment.is_some() {
+                    return Err(ReadToolError::Invalid);
+                }
+                self.invoices
+                    .consume_request(actor)
+                    .await
+                    .map_err(map_error)?;
+                bounded(
+                    &self
+                        .invoices
+                        .create(actor, &args.idempotency_key, args.data)
+                        .await
+                        .map_err(map_error)?,
+                )
             }
             ("facturas", "editar_borrador") => {
-                let args: UpdateArguments<InvoiceInput> = serde_json::from_value(arguments).map_err(|_| ReadToolError::Invalid)?;
+                let args: UpdateArguments<InvoiceInput> =
+                    serde_json::from_value(arguments).map_err(|_| ReadToolError::Invalid)?;
                 valid_version(args.id, args.version)?;
-                if args.data.initial_payment.is_some() { return Err(ReadToolError::Invalid); }
-                self.invoices.consume_request(actor).await.map_err(map_error)?;
-                let current = self.invoices.detail(actor, args.id).await.map_err(map_error)?;
-                if current.version != args.version || current.status != "Borrador" { return Err(ReadToolError::Conflict); }
-                bounded(&self.invoices.replace(actor, args.id, args.version, args.data).await.map_err(map_error)?)
+                if args.data.initial_payment.is_some() {
+                    return Err(ReadToolError::Invalid);
+                }
+                self.invoices
+                    .consume_request(actor)
+                    .await
+                    .map_err(map_error)?;
+                let current = self
+                    .invoices
+                    .detail(actor, args.id)
+                    .await
+                    .map_err(map_error)?;
+                if current.version != args.version || current.status != "Borrador" {
+                    return Err(ReadToolError::Conflict);
+                }
+                bounded(
+                    &self
+                        .invoices
+                        .replace(actor, args.id, args.version, args.data)
+                        .await
+                        .map_err(map_error)?,
+                )
             }
             ("ordenes_compra", "crear_pendiente") => {
-                let args: CreateArguments<OrderInput> = serde_json::from_value(arguments).map_err(|_| ReadToolError::Invalid)?;
-                if !pending_order(&args.data) { return Err(ReadToolError::Invalid); }
-                self.orders.consume_request(actor).await.map_err(map_error)?;
-                bounded(&self.orders.create(actor, &args.idempotency_key, args.data).await.map_err(map_error)?)
+                let args: CreateArguments<OrderInput> =
+                    serde_json::from_value(arguments).map_err(|_| ReadToolError::Invalid)?;
+                if !pending_order(&args.data) {
+                    return Err(ReadToolError::Invalid);
+                }
+                self.orders
+                    .consume_request(actor)
+                    .await
+                    .map_err(map_error)?;
+                bounded(
+                    &self
+                        .orders
+                        .create(actor, &args.idempotency_key, args.data)
+                        .await
+                        .map_err(map_error)?,
+                )
             }
             ("ordenes_compra", "editar_pendiente") => {
-                let args: UpdateArguments<OrderInput> = serde_json::from_value(arguments).map_err(|_| ReadToolError::Invalid)?;
+                let args: UpdateArguments<OrderInput> =
+                    serde_json::from_value(arguments).map_err(|_| ReadToolError::Invalid)?;
                 valid_version(args.id, args.version)?;
-                if !pending_order(&args.data) { return Err(ReadToolError::Invalid); }
-                self.orders.consume_request(actor).await.map_err(map_error)?;
-                let current = self.orders.detail(actor, args.id).await.map_err(map_error)?;
-                if current.version != args.version || current.status != "Pendiente" || !pending_order(&current.data) { return Err(ReadToolError::Conflict); }
-                bounded(&self.orders.replace(actor, args.id, args.version, args.data).await.map_err(map_error)?)
+                if !pending_order(&args.data) {
+                    return Err(ReadToolError::Invalid);
+                }
+                self.orders
+                    .consume_request(actor)
+                    .await
+                    .map_err(map_error)?;
+                let current = self
+                    .orders
+                    .detail(actor, args.id)
+                    .await
+                    .map_err(map_error)?;
+                if current.version != args.version
+                    || current.status != "Pendiente"
+                    || !pending_order(&current.data)
+                {
+                    return Err(ReadToolError::Conflict);
+                }
+                bounded(
+                    &self
+                        .orders
+                        .replace(actor, args.id, args.version, args.data)
+                        .await
+                        .map_err(map_error)?,
+                )
             }
             ("licitaciones", operation) => {
                 let service = self.tenders.as_ref().ok_or(ReadToolError::Unavailable)?;
                 service.consume_request(actor).await.map_err(map_error)?;
                 match operation {
                     "crear_borrador" => {
-                        let args: TenderCreateArguments = serde_json::from_value(arguments).map_err(|_| ReadToolError::Invalid)?;
-                        bounded(&service.create(actor, &args.idempotency_key).await.map_err(map_error)?)
+                        let args: TenderCreateArguments = serde_json::from_value(arguments)
+                            .map_err(|_| ReadToolError::Invalid)?;
+                        bounded(
+                            &service
+                                .create(actor, &args.idempotency_key)
+                                .await
+                                .map_err(map_error)?,
+                        )
                     }
                     "renombrar_borrador" => {
-                        let args: TenderNameArguments = serde_json::from_value(arguments).map_err(|_| ReadToolError::Invalid)?;
+                        let args: TenderNameArguments = serde_json::from_value(arguments)
+                            .map_err(|_| ReadToolError::Invalid)?;
                         valid_version(args.id, args.version)?;
-                        bounded(&service.rename(actor, args.id, args.version, NameInput { name: args.name }).await.map_err(map_error)?)
+                        bounded(
+                            &service
+                                .rename(actor, args.id, args.version, NameInput { name: args.name })
+                                .await
+                                .map_err(map_error)?,
+                        )
                     }
                     "editar_variables" => {
-                        let args: TenderVariablesArguments = serde_json::from_value(arguments).map_err(|_| ReadToolError::Invalid)?;
+                        let args: TenderVariablesArguments = serde_json::from_value(arguments)
+                            .map_err(|_| ReadToolError::Invalid)?;
                         valid_version(args.id, args.version)?;
-                        bounded(&service.save_global_variables(actor, args.id, args.version, GlobalVariablesInput { variables: args.variables }, false).await.map_err(map_error)?)
+                        bounded(
+                            &service
+                                .save_global_variables(
+                                    actor,
+                                    args.id,
+                                    args.version,
+                                    GlobalVariablesInput {
+                                        variables: args.variables,
+                                    },
+                                    false,
+                                )
+                                .await
+                                .map_err(map_error)?,
+                        )
                     }
                     "editar_lote" => {
-                        let args: TenderLotWriteArguments = serde_json::from_value(arguments).map_err(|_| ReadToolError::Invalid)?;
+                        let args: TenderLotWriteArguments = serde_json::from_value(arguments)
+                            .map_err(|_| ReadToolError::Invalid)?;
                         valid_version(args.id, args.version)?;
-                        if args.numero == 0 { return Err(ReadToolError::Invalid); }
-                        bounded(&service.save_lot(actor, args.id, args.numero, args.version, LotInput { items: args.items }).await.map_err(map_error)?)
+                        if args.numero == 0 {
+                            return Err(ReadToolError::Invalid);
+                        }
+                        bounded(
+                            &service
+                                .save_lot(
+                                    actor,
+                                    args.id,
+                                    args.numero,
+                                    args.version,
+                                    LotInput { items: args.items },
+                                )
+                                .await
+                                .map_err(map_error)?,
+                        )
                     }
                     _ => Err(ReadToolError::Invalid),
                 }
@@ -330,10 +547,19 @@ impl DraftReadExecutor {
 }
 
 fn valid_version(id: u64, version: u64) -> Result<(), ReadToolError> {
-    if id == 0 || id > MAX_SAFE_ID || version == 0 || version > MAX_SAFE_ID { Err(ReadToolError::Invalid) } else { Ok(()) }
+    if id == 0 || id > MAX_SAFE_ID || version == 0 || version > MAX_SAFE_ID {
+        Err(ReadToolError::Invalid)
+    } else {
+        Ok(())
+    }
 }
 fn pending_order(input: &OrderInput) -> bool {
-    input.n_bill.trim().is_empty() && input.received_date.is_none() && input.products.iter().all(|product| product.status == ProductStatus::Pendiente)
+    input.n_bill.trim().is_empty()
+        && input.received_date.is_none()
+        && input
+            .products
+            .iter()
+            .all(|product| product.status == ProductStatus::Pendiente)
 }
 
 fn map_error(error: CoreError) -> ReadToolError {

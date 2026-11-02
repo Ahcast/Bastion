@@ -94,11 +94,14 @@ pub fn compose_draft_router<F: ClientMetadataSource>(
             .map_err(|_| DraftCompositionError)?,
     );
     let registry = Arc::new(draft_read_tool_registry().map_err(|_| DraftCompositionError)?);
-    let executor = Arc::new(DraftReadExecutor::new(
-        QuoteService::new(db.clone(), admin.clone()),
-        InvoiceService::new(db.clone(), admin.clone()),
-        OrderService::new(db.clone(), admin.clone()),
-    ).with_tenders(TenderService::new(db, admin)));
+    let executor = Arc::new(
+        DraftReadExecutor::new(
+            QuoteService::new(db.clone(), admin.clone()),
+            InvoiceService::new(db.clone(), admin.clone()),
+            OrderService::new(db.clone(), admin.clone()),
+        )
+        .with_tenders(TenderService::new(db, admin)),
+    );
     let mcp = DraftMcpState::new(
         pool.clone(),
         exchange.clone(),

@@ -118,60 +118,221 @@ async fn mysql57_read_tools_reuse_domain_authorization_and_validate_arguments() 
             Err(ReadToolError::NotFound)
         );
     }
-    for (module, scope) in [("cotizaciones", "documentos"), ("facturas", "documentos"), ("ordenes_compra", "documentos"), ("licitaciones", "expedientes")] {
+    for (module, scope) in [
+        ("cotizaciones", "documentos"),
+        ("facturas", "documentos"),
+        ("ordenes_compra", "documentos"),
+        ("licitaciones", "expedientes"),
+    ] {
         for capability in ["ver", "editar"] {
             sqlx::query("INSERT IGNORE INTO role_permissions (role_id,module_id,scope_key,scope_hash,capability) VALUES (?,?,?,UNHEX(SHA2(?,256)),?)").bind(role).bind(module).bind(scope).bind(scope).bind(capability).execute(&pool).await.unwrap();
         }
     }
     let quote = json!({"client_name":"Fixture", "order_number":"MCP", "quote_date":"2026-10-22", "valid_days":30, "notes":"", "terms":"", "discount_type":"amount", "discount_value":"0", "items":[]});
     let create = json!({"idempotency_key":"quote-fixture-key-001", "data":quote});
-    let first = executor.call(&access, "cotizaciones.crear_borrador", create.clone()).await.unwrap();
-    let replay = executor.call(&access, "cotizaciones.crear_borrador", create).await.unwrap();
+    let first = executor
+        .call(&access, "cotizaciones.crear_borrador", create.clone())
+        .await
+        .unwrap();
+    let replay = executor
+        .call(&access, "cotizaciones.crear_borrador", create)
+        .await
+        .unwrap();
     assert_eq!(first["id"], replay["id"]);
     let id = first["id"].as_u64().unwrap();
     let mut invalid = first["data"].clone();
     invalid["status"] = json!("Enviada");
-    assert_eq!(executor.call(&access, "cotizaciones.editar_borrador", json!({"id":id,"version":1,"data":invalid})).await, Err(ReadToolError::Invalid));
-    let updated = executor.call(&access, "cotizaciones.editar_borrador", json!({"id":id,"version":1,"data":first["data"]})).await.unwrap();
+    assert_eq!(
+        executor
+            .call(
+                &access,
+                "cotizaciones.editar_borrador",
+                json!({"id":id,"version":1,"data":invalid})
+            )
+            .await,
+        Err(ReadToolError::Invalid)
+    );
+    let updated = executor
+        .call(
+            &access,
+            "cotizaciones.editar_borrador",
+            json!({"id":id,"version":1,"data":first["data"]}),
+        )
+        .await
+        .unwrap();
     assert_eq!(updated["version"], 2);
-    assert_eq!(executor.call(&access, "cotizaciones.editar_borrador", json!({"id":id,"version":1,"data":first["data"]})).await, Err(ReadToolError::Conflict));
+    assert_eq!(
+        executor
+            .call(
+                &access,
+                "cotizaciones.editar_borrador",
+                json!({"id":id,"version":1,"data":first["data"]})
+            )
+            .await,
+        Err(ReadToolError::Conflict)
+    );
     sqlx::query("UPDATE cotizaciones_drafts SET data_json=JSON_SET(data_json,'$.status','Enviada'),version=3 WHERE id=?").bind(id).execute(&pool).await.unwrap();
-    assert_eq!(executor.call(&access, "cotizaciones.editar_borrador", json!({"id":id,"version":3,"data":first["data"]})).await, Err(ReadToolError::Conflict));
+    assert_eq!(
+        executor
+            .call(
+                &access,
+                "cotizaciones.editar_borrador",
+                json!({"id":id,"version":3,"data":first["data"]})
+            )
+            .await,
+        Err(ReadToolError::Conflict)
+    );
     let invoice = json!({"client_name":"Fixture", "order_number":"MCP", "invoice_date":"2026-10-22", "payment_term_type":"credito", "credit_days":30, "discount_type":"amount", "discount_value":"0", "notes":"", "public_notes":"", "expenses":[], "items":[]});
     let mut payment = invoice.clone();
-    payment["initial_payment"] = json!({"amount":"1","date":"2026-10-22","method":"Efectivo","reference":""});
-    assert_eq!(executor.call(&access, "facturas.crear_borrador", json!({"idempotency_key":"invoice-fixture-key-001","data":payment})).await, Err(ReadToolError::Invalid));
-    let invoice = executor.call(&access, "facturas.crear_borrador", json!({"idempotency_key":"invoice-fixture-key-001","data":invoice})).await.unwrap();
+    payment["initial_payment"] =
+        json!({"amount":"1","date":"2026-10-22","method":"Efectivo","reference":""});
+    assert_eq!(
+        executor
+            .call(
+                &access,
+                "facturas.crear_borrador",
+                json!({"idempotency_key":"invoice-fixture-key-001","data":payment})
+            )
+            .await,
+        Err(ReadToolError::Invalid)
+    );
+    let invoice = executor
+        .call(
+            &access,
+            "facturas.crear_borrador",
+            json!({"idempotency_key":"invoice-fixture-key-001","data":invoice}),
+        )
+        .await
+        .unwrap();
     assert_eq!(invoice["status"], "Borrador");
     let invoice_id = invoice["id"].as_u64().unwrap();
-    sqlx::query("UPDATE facturas_drafts SET status='Enviado',version=2 WHERE id=?").bind(invoice_id).execute(&pool).await.unwrap();
-    assert_eq!(executor.call(&access, "facturas.editar_borrador", json!({"id":invoice_id,"version":2,"data":invoice["data"]})).await, Err(ReadToolError::Conflict));
+    sqlx::query("UPDATE facturas_drafts SET status='Enviado',version=2 WHERE id=?")
+        .bind(invoice_id)
+        .execute(&pool)
+        .await
+        .unwrap();
+    assert_eq!(
+        executor
+            .call(
+                &access,
+                "facturas.editar_borrador",
+                json!({"id":invoice_id,"version":2,"data":invoice["data"]})
+            )
+            .await,
+        Err(ReadToolError::Conflict)
+    );
     let destination = sqlx::query("INSERT INTO ordenes_destinations (destination,name_key) VALUES ('MCP fixture','mcp fixture')").execute(&pool).await.unwrap().last_insert_id();
     let order = json!({"n_orders":"OC-MCP","n_bill":"","order_date":"2026-10-23","received_date":null,"client_name":"Fixture","client_rtn":"","id_destination":destination,"comments":"","products":[{"description":"Equipo","cantidad":1,"sale_price":"60","purchase_price":"100","tracking":"","isv":true,"status":"Pendiente","coments":""}],"expenses":[]});
     let mut purchased = order.clone();
     purchased["products"][0]["status"] = json!("Comprado");
-    assert_eq!(executor.call(&access, "ordenes_compra.crear_pendiente", json!({"idempotency_key":"orders-fixture-key-001","data":purchased})).await, Err(ReadToolError::Invalid));
-    let order = executor.call(&access, "ordenes_compra.crear_pendiente", json!({"idempotency_key":"orders-fixture-key-001","data":order})).await.unwrap();
+    assert_eq!(
+        executor
+            .call(
+                &access,
+                "ordenes_compra.crear_pendiente",
+                json!({"idempotency_key":"orders-fixture-key-001","data":purchased})
+            )
+            .await,
+        Err(ReadToolError::Invalid)
+    );
+    let order = executor
+        .call(
+            &access,
+            "ordenes_compra.crear_pendiente",
+            json!({"idempotency_key":"orders-fixture-key-001","data":order}),
+        )
+        .await
+        .unwrap();
     assert_eq!(order["status"], "Pendiente");
     let order_id = order["id"].as_u64().unwrap();
     let mut delivered = order["data"].clone();
     delivered["n_bill"] = json!("FAC-1");
-    assert_eq!(executor.call(&access, "ordenes_compra.editar_pendiente", json!({"id":order_id,"version":1,"data":delivered})).await, Err(ReadToolError::Invalid));
-    let order = executor.call(&access, "ordenes_compra.editar_pendiente", json!({"id":order_id,"version":1,"data":order["data"]})).await.unwrap();
+    assert_eq!(
+        executor
+            .call(
+                &access,
+                "ordenes_compra.editar_pendiente",
+                json!({"id":order_id,"version":1,"data":delivered})
+            )
+            .await,
+        Err(ReadToolError::Invalid)
+    );
+    let order = executor
+        .call(
+            &access,
+            "ordenes_compra.editar_pendiente",
+            json!({"id":order_id,"version":1,"data":order["data"]}),
+        )
+        .await
+        .unwrap();
     assert_eq!(order["version"], 2);
     sqlx::query("UPDATE ordenes_orders SET calculation_json=JSON_SET(calculation_json,'$.data.products[0].status','Comprado'),version=3 WHERE id=?").bind(order_id).execute(&pool).await.unwrap();
-    assert_eq!(executor.call(&access, "ordenes_compra.editar_pendiente", json!({"id":order_id,"version":3,"data":order["data"]})).await, Err(ReadToolError::Conflict));
-    let tender = executor.call(&access, "licitaciones.crear_borrador", json!({"idempotency_key":"tender-fixture-key-001"})).await.unwrap();
+    assert_eq!(
+        executor
+            .call(
+                &access,
+                "ordenes_compra.editar_pendiente",
+                json!({"id":order_id,"version":3,"data":order["data"]})
+            )
+            .await,
+        Err(ReadToolError::Conflict)
+    );
+    let tender = executor
+        .call(
+            &access,
+            "licitaciones.crear_borrador",
+            json!({"idempotency_key":"tender-fixture-key-001"}),
+        )
+        .await
+        .unwrap();
     assert_eq!(tender["state"], "borrador");
     let tender_id = tender["id"].as_u64().unwrap();
-    let renamed = executor.call(&access, "licitaciones.renombrar_borrador", json!({"id":tender_id,"version":1,"name":"Oferta de prueba"})).await.unwrap();
+    let renamed = executor
+        .call(
+            &access,
+            "licitaciones.renombrar_borrador",
+            json!({"id":tender_id,"version":1,"name":"Oferta de prueba"}),
+        )
+        .await
+        .unwrap();
     assert_eq!(renamed["name"], "Oferta de prueba");
-    assert_eq!(executor.call(&access, "licitaciones.renombrar_borrador", json!({"id":tender_id,"version":1,"name":"Otro"})).await, Err(ReadToolError::Conflict));
-    let page = executor.call(&access, "licitaciones.listar", json!({})).await.unwrap();
+    assert_eq!(
+        executor
+            .call(
+                &access,
+                "licitaciones.renombrar_borrador",
+                json!({"id":tender_id,"version":1,"name":"Otro"})
+            )
+            .await,
+        Err(ReadToolError::Conflict)
+    );
+    let page = executor
+        .call(&access, "licitaciones.listar", json!({}))
+        .await
+        .unwrap();
     assert_eq!(page["items"].as_array().unwrap().len(), 1);
-    assert_eq!(executor.call(&access, "licitaciones.listar", json!({"search":"x"})).await, Err(ReadToolError::Invalid));
-    let write_without_read = AuthenticatedAccess { user_id: access.user_id, client_id: access.client_id, grant_id: access.grant_id, scopes: BTreeSet::from(["cotizaciones:write".into()]) };
-    assert_eq!(executor.call(&write_without_read, "cotizaciones.crear_borrador", json!({})).await, Err(ReadToolError::Denied));
+    assert_eq!(
+        executor
+            .call(&access, "licitaciones.listar", json!({"search":"x"}))
+            .await,
+        Err(ReadToolError::Invalid)
+    );
+    let write_without_read = AuthenticatedAccess {
+        user_id: access.user_id,
+        client_id: access.client_id,
+        grant_id: access.grant_id,
+        scopes: BTreeSet::from(["cotizaciones:write".into()]),
+    };
+    assert_eq!(
+        executor
+            .call(
+                &write_without_read,
+                "cotizaciones.crear_borrador",
+                json!({})
+            )
+            .await,
+        Err(ReadToolError::Denied)
+    );
     let no_scope = AuthenticatedAccess {
         scopes: BTreeSet::new(),
         ..access
