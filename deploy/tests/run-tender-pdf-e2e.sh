@@ -56,9 +56,7 @@ from pathlib import Path
 import sys
 p=Path(sys.argv[1])
 files={
- 'carta-de-oferta.typ':'#import "variables.typ": datos\nOferta #datos.lpn',
  'presentacion-de-oferta.typ':'#import "variables.typ": datos\nPresentacion #datos.lpn',
- 'lote1-bid.typ':'#import "items1_bid.typ": items\n#let total_lote = decimal("0.00")\nLote #items.len()',
  'lote1-std.typ':'#import "items1_std.typ": items\n#let total_lote = decimal("0.00")\nLote #items.len()',
  'funciones.typ':'#let f(x) = x',
  'dj-integridad.typ':'= Integridad\n#variables.lpn',
