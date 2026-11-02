@@ -170,6 +170,7 @@ pub fn validate_redirect_uri(value: &str) -> Result<(), MetadataError> {
     let loopback = match parsed.host() {
         Some(Host::Ipv4(ip)) => ip.is_loopback(),
         Some(Host::Ipv6(ip)) => ip.is_loopback(),
+        Some(Host::Domain(host)) => host == "localhost",
         _ => false,
     };
     if authority.contains('@')
@@ -193,6 +194,38 @@ mod tests {
     use super::*;
     const ID: &str = "https://client.example/metadata.json";
     const VALID: &[u8] = br#"{"client_id":"https://client.example/metadata.json","client_name":"Example","redirect_uris":["https://client.example/callback","http://127.0.0.1:41234/cb"],"token_endpoint_auth_method":"none"}"#;
+
+    #[test]
+    fn accepts_cursor_metadata_with_exact_localhost_callback() {
+        let id = "https://cursor.com/oauth/mcp-client.json";
+        let body = serde_json::json!({
+            "client_id": id,
+            "client_name": "Cursor",
+            "redirect_uris": [
+                "https://www.cursor.com/agents/mcp/oauth/callback",
+                "https://www.cursor.com/bot/mcp/oauth/callback",
+                "https://grok.com/connectors-oauth-exchange-code/",
+                "http://localhost:8787/callback",
+                "http://127.0.0.1:8787/callback"
+            ],
+            "token_endpoint_auth_method": "none"
+        });
+        let metadata = validate_client_metadata(id, id, 200, body.to_string().as_bytes()).unwrap();
+        assert!(metadata
+            .redirect_uris()
+            .contains("http://localhost:8787/callback"));
+        for uri in [
+            "http://localhost.example/callback",
+            "http://localhost./callback",
+            "http://user@localhost:8787/callback",
+            "http://localhost:8787/callback#fragment",
+        ] {
+            assert_eq!(
+                validate_redirect_uri(uri),
+                Err(MetadataError::InvalidRedirect)
+            );
+        }
+    }
 
     #[test]
     fn accepts_public_method_from_supported_list_without_enabling_confidential_auth() {

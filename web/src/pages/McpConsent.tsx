@@ -25,7 +25,7 @@ function safeRedirect(value: unknown): string {
   if (typeof value !== 'string' || value.length > 8192) throw new Error('No se pudo completar la solicitud.');
   let url: URL;
   try { url = new URL(value); } catch { throw new Error('No se pudo completar la solicitud.'); }
-  const loopback = url.hostname === '127.0.0.1' || url.hostname === '[::1]';
+  const loopback = url.hostname === '127.0.0.1' || url.hostname === '[::1]' || url.hostname === 'localhost';
   if (url.username || url.password || url.hash || !(url.protocol === 'https:' || (url.protocol === 'http:' && loopback))) {
     throw new Error('No se pudo completar la solicitud.');
   }
