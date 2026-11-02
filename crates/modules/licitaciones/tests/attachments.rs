@@ -583,6 +583,10 @@ async fn mysql57_tender_files_private_copies_integrity_recovery_and_budgets() {
         .await
         .unwrap();
     assert_eq!(state, "deleted");
+    core.admin()
+        .set_module_enabled(1, "colaboracion", true)
+        .await
+        .unwrap();
     let economic_source = library
         .upload(
             1,
