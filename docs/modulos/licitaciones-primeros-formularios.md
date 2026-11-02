@@ -8,6 +8,10 @@ El usuario decidió retirar las declaraciones legales originales y los formulari
 
 El 2026-11-01 se desplegó el backend `62b4a9ec2048` y el frontend `427f44c00de0`, con CI aprobado. La migración 9 retiró las selecciones legales iniciales y se retiraron los dos archivos privados antiguos tras verificar un respaldo; las plantillas económicas y de soporte se conservaron. Un formulario legal archivado referenciaba una carta económica: se retiró del expediente y del catálogo por SSH, con respaldo y auditoría, conservando la fuente económica.
 
+## Retiro de las plantillas originales
+
+El 2026-11-01 el usuario decidió retirar todas las plantillas Typst originales de Licitaciones, incluidas las económicas y las de soporte, para reemplazarlas por archivos nuevos. Se retiraron las cinco fuentes privadas restantes y se purgó el original de Colaboración; el catálogo y las referencias de formularios quedaron vacíos. Los datos y tamaños de los lotes se conservan. La generación de PDF de Licitaciones no estará disponible hasta instalar e integrar los nuevos archivos. La decisión sobre eliminar las copias privadas de respaldo permanece pendiente de respuesta.
+
 ## Variables del expediente
 
 Los datos se capturan en Variables y se validan antes de entregarlos a Typst. `lpn`, `inst` y `descripcion` son texto; `dia`, `year` y `lotes` son enteros; `mes` se selecciona entre los meses del año; `stylo` se selecciona entre `bid` y `std`. `total_paginas` se calcula a partir de todas las páginas del PDF final, incluidos los PDF e imágenes adjuntos. No es editable como valor manual.
