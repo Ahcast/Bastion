@@ -460,8 +460,13 @@ mod tests {
     #[test]
     fn support_and_economic_sources_are_protected() {
         for name in [
-            "config.typ", "variables.typ", "funciones.typ", "items1_bid.typ", "lote1-bid.typ",
-            "CARTA-DE-OFERTA.TYP", "presentacion-de-oferta.typ",
+            "config.typ",
+            "variables.typ",
+            "funciones.typ",
+            "items1_bid.typ",
+            "lote1-bid.typ",
+            "CARTA-DE-OFERTA.TYP",
+            "presentacion-de-oferta.typ",
         ] {
             assert!(protected_template_source(name));
         }
