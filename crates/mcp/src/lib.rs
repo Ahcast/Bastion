@@ -21,7 +21,8 @@ mod validity;
 
 pub use client_approval::{ApprovedClientStore, ClientApprovalError};
 pub use client_requests::{
-    ClientRequestError, ClientRequestPage, ClientRequestStore, ClientRequestSummary, ReviewDecision,
+    ClientRequestError, ClientRequestPage, ClientRequestStore, ClientRequestSummary, ManagedClient,
+    ManagedClientPage, ReviewDecision,
 };
 pub use consent::{
     ConsentError, ConsentIdentity, ConsentPolicy, ConsentResult, DeniedConsent, MysqlConsent,
