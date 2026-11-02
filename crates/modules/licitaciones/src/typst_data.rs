@@ -329,9 +329,14 @@ mod tests {
             let template = format!(
                 "#import \"items1_{style}.typ\": items\n#let tamano_tabla = 7pt\n#assert.eq(tamano_tabla, 9.5pt)\n#let total_lote = decimal(\"0.00\")\n{body}\n"
             );
+            let mut sample = item();
+            if style == "std" {
+                sample.pais_origen.clear();
+                sample.transporte = "0.00".into();
+            }
             let built = prepare_typst_lot_sources_with_sizes(
                 &input,
-                &BTreeMap::from([(1, vec![item()])]),
+                &BTreeMap::from([(1, vec![sample])]),
                 &BTreeMap::from([(1, "9.5".into())]),
                 1,
                 &template,
