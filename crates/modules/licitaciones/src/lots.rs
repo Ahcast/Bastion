@@ -23,6 +23,7 @@ pub struct LotInput {
 pub struct Lot {
     pub numero: u32,
     pub items: Vec<LotItem>,
+    pub tamano_tabla: String,
     pub total: String,
     pub version: u64,
 }
@@ -30,6 +31,7 @@ pub struct Lot {
 pub struct LotSummary {
     pub numero: u32,
     pub items: u64,
+    pub tamano_tabla: String,
 }
 
 // Return an exact nonnegative integer at a fixed scale. Never round user input.
@@ -55,6 +57,12 @@ fn scaled(value: &str, scale: u32) -> Result<i128, CoreError> {
         .checked_mul(10_i128.pow(scale))
         .and_then(|v| v.checked_add(fraction))
         .ok_or(CoreError::Invalid)
+}
+pub(crate) fn validate_table_font_size(value: &str) -> Result<(), CoreError> {
+    if value.len() > 8 || !(100..=10_000).contains(&scaled(value, 2)?) {
+        return Err(CoreError::Invalid);
+    }
+    Ok(())
 }
 fn nonempty(value: &str, max: usize) -> bool {
     !value.trim().is_empty()
@@ -146,14 +154,14 @@ pub(crate) async fn reconcile(
         .and_then(|s| s.parse::<u32>().ok())
         .filter(|n| *n <= 1000)
         .unwrap_or(0);
-    let rows: Vec<(u32, serde_json::Value)> = sqlx::query_as("SELECT numero,items_json FROM licitaciones_lotes WHERE expediente_id=? ORDER BY numero FOR UPDATE").bind(id).fetch_all(&mut **tx).await?;
+    let rows: Vec<(u32, serde_json::Value, String)> = sqlx::query_as("SELECT numero,items_json,tamano_tabla FROM licitaciones_lotes WHERE expediente_id=? ORDER BY numero FOR UPDATE").bind(id).fetch_all(&mut **tx).await?;
     let mut deletions = Vec::new();
     let mut changes = Vec::new();
-    for (number, raw) in rows {
+    for (number, raw, size) in rows {
         let mut items: Vec<LotItem> =
             serde_json::from_value(raw).map_err(|_| CoreError::Invalid)?;
         if number > count || new_style.is_none() {
-            if !items.is_empty() && !confirm {
+            if (!items.is_empty() || scaled(&size, 2)? != 700) && !confirm {
                 return Err(CoreError::Conflict);
             }
             deletions.push(number);
@@ -194,15 +202,16 @@ impl TenderService {
     pub async fn lot_summaries(&self, actor: u64, id: u64) -> Result<Vec<LotSummary>, CoreError> {
         let mut tx = self.begin(actor, "ver").await?;
         load(&mut tx, id).await?;
-        let rows: Vec<(u32, serde_json::Value)> = sqlx::query_as("SELECT numero,items_json FROM licitaciones_lotes WHERE expediente_id=? ORDER BY numero").bind(id).fetch_all(&mut *tx).await?;
+        let rows: Vec<(u32, serde_json::Value, String)> = sqlx::query_as("SELECT numero,items_json,tamano_tabla FROM licitaciones_lotes WHERE expediente_id=? ORDER BY numero").bind(id).fetch_all(&mut *tx).await?;
         let result = rows
             .into_iter()
-            .map(|(numero, value)| {
+            .map(|(numero, value, tamano_tabla)| {
                 value
                     .as_array()
                     .map(|items| LotSummary {
                         numero,
                         items: items.len() as u64,
+                        tamano_tabla,
                     })
                     .ok_or(CoreError::Invalid)
             })
@@ -214,15 +223,19 @@ impl TenderService {
         let mut tx = self.begin(actor, "ver").await?;
         let exp = load(&mut tx, id).await?;
         let bid = config(&exp, numero)?;
-        let row: Option<serde_json::Value> = sqlx::query_scalar(
-            "SELECT items_json FROM licitaciones_lotes WHERE expediente_id=? AND numero=?",
+        let row: Option<(serde_json::Value, String)> = sqlx::query_as(
+            "SELECT items_json,tamano_tabla FROM licitaciones_lotes WHERE expediente_id=? AND numero=?",
         )
         .bind(id)
         .bind(numero)
         .fetch_optional(&mut *tx)
         .await?;
+        let size = row
+            .as_ref()
+            .map(|(_, size)| size.clone())
+            .unwrap_or_else(|| "7".into());
         let items: Vec<LotItem> = row
-            .map(serde_json::from_value)
+            .map(|(value, _)| serde_json::from_value(value))
             .transpose()
             .map_err(|_| CoreError::Invalid)?
             .unwrap_or_default();
@@ -234,6 +247,7 @@ impl TenderService {
         Ok(Lot {
             numero,
             items,
+            tamano_tabla: size,
             total,
             version: exp.version,
         })
@@ -246,12 +260,27 @@ impl TenderService {
         version: u64,
         input: LotInput,
     ) -> Result<Expedient, CoreError> {
+        self.save_lot_with_font_size(actor, id, numero, version, input, None)
+            .await
+    }
+    pub async fn save_lot_with_font_size(
+        &self,
+        actor: u64,
+        id: u64,
+        numero: u32,
+        version: u64,
+        input: LotInput,
+        tamano_tabla: Option<String>,
+    ) -> Result<Expedient, CoreError> {
+        if let Some(value) = &tamano_tabla {
+            validate_table_font_size(value)?;
+        }
         let mut tx = self.begin(actor, "editar").await?;
         let exp = load(&mut tx, id).await?;
         editable(&exp, version)?;
         input.total(config(&exp, numero)?)?;
-        sqlx::query("INSERT INTO licitaciones_lotes(expediente_id,numero,items_json) VALUES (?,?,?) ON DUPLICATE KEY UPDATE items_json=VALUES(items_json)")
-            .bind(id).bind(numero).bind(serde_json::to_value(input.items).map_err(|_|CoreError::Invalid)?).execute(&mut *tx).await?;
+        sqlx::query("INSERT INTO licitaciones_lotes(expediente_id,numero,items_json,tamano_tabla) VALUES (?,?,?,COALESCE(?, '7')) ON DUPLICATE KEY UPDATE items_json=VALUES(items_json),tamano_tabla=COALESCE(?,tamano_tabla)")
+            .bind(id).bind(numero).bind(serde_json::to_value(input.items).map_err(|_|CoreError::Invalid)?).bind(&tamano_tabla).bind(&tamano_tabla).execute(&mut *tx).await?;
         bump(&mut tx, actor, id, version).await?;
         let exp = load(&mut tx, id).await?;
         event(&mut tx, actor, "lot.items", id, exp.version).await?;
@@ -289,5 +318,14 @@ mod tests {
             .is_err()
         );
         assert_eq!(LotInput { items: vec![] }.total(false).unwrap(), "0.00");
+    }
+    #[test]
+    fn table_font_size_accepts_only_bounded_numeric_points() {
+        for size in ["1", "7", "8.5", "100"] {
+            assert!(validate_table_font_size(size).is_ok());
+        }
+        for size in ["0", "101", "7pt", "#panic()", "7.123", "-1", ""] {
+            assert!(validate_table_font_size(size).is_err());
+        }
     }
 }

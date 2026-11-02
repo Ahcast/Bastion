@@ -2,7 +2,7 @@ name: Core checks
 
 on:
   push:
-    branches: [main, codex/proteger-economicas-backend-release]
+    branches: [main, codex/tamano-tabla-backend-release]
   pull_request:
     branches: [main]
 

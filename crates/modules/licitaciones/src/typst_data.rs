@@ -9,10 +9,31 @@ pub struct TypstLotSources {
     pub files: BTreeMap<String, Vec<u8>>,
     pub offered_lots: Vec<u32>,
 }
+fn is_table_font_declaration(line: &str) -> bool {
+    line.trim_start()
+        .strip_prefix("#let ")
+        .and_then(|rest| rest.split_once('='))
+        .is_some_and(|(name, _)| name.trim() == "tamano_tabla")
+}
 
 pub fn prepare_typst_lot_sources(
     variables: &[GlobalVariable],
     lots: &BTreeMap<u32, Vec<LotItem>>,
+    total_pages: u32,
+    lot_template: &str,
+) -> Result<TypstLotSources, CoreError> {
+    prepare_typst_lot_sources_with_sizes(
+        variables,
+        lots,
+        &BTreeMap::new(),
+        total_pages,
+        lot_template,
+    )
+}
+fn prepare_typst_lot_sources_with_sizes(
+    variables: &[GlobalVariable],
+    lots: &BTreeMap<u32, Vec<LotItem>>,
+    sizes: &BTreeMap<u32, String>,
     total_pages: u32,
     lot_template: &str,
 ) -> Result<TypstLotSources, CoreError> {
@@ -87,12 +108,40 @@ pub fn prepare_typst_lot_sources(
             files.insert(lot_name, b"#let total_lote = decimal(\"0.00\")\n".to_vec());
         } else {
             offered_lots.push(number);
+            let size = sizes.get(&number).map(String::as_str).unwrap_or("7");
+            crate::lots::validate_table_font_size(size)?;
+            let size_name = format!("lote{number}-{style}-config.json");
             files.insert(
-                lot_name,
-                lot_template
-                    .replace(&marker, &format!("items{number}_{style}.typ"))
-                    .into_bytes(),
+                size_name.clone(),
+                serde_json::to_vec(&json!({"tamano_tabla":size}))
+                    .map_err(|_| CoreError::Invalid)?,
             );
+            let declaration =
+                format!("#let tamano_tabla = float(json(\"{size_name}\").tamano_tabla) * 1pt");
+            let original = lot_template.replace(&marker, &format!("items{number}_{style}.typ"));
+            let declarations = original
+                .lines()
+                .filter(|line| is_table_font_declaration(line))
+                .count();
+            if declarations > 1 {
+                return Err(CoreError::Invalid);
+            }
+            let source = if declarations == 1 {
+                original
+                    .lines()
+                    .map(|line| {
+                        if is_table_font_declaration(line) {
+                            declaration.as_str()
+                        } else {
+                            line
+                        }
+                    })
+                    .collect::<Vec<_>>()
+                    .join("\n")
+            } else {
+                format!("{declaration}\n#show table: set text(size: tamano_tabla)\n{original}")
+            };
+            files.insert(lot_name, source.into_bytes());
         }
     }
     let mut totals = String::from("#import \"config.typ\": datos_base\n");
@@ -149,17 +198,24 @@ impl crate::TenderService {
         {
             return Err(CoreError::Invalid);
         }
-        let rows: Vec<(u32, serde_json::Value)> = sqlx::query_as("SELECT numero,items_json FROM licitaciones_lotes WHERE expediente_id=? ORDER BY numero")
+        let rows: Vec<(u32, serde_json::Value, String)> = sqlx::query_as("SELECT numero,items_json,tamano_tabla FROM licitaciones_lotes WHERE expediente_id=? ORDER BY numero")
             .bind(id).fetch_all(&mut *tx).await?;
         let mut lots = BTreeMap::new();
-        for (number, raw) in rows {
+        let mut sizes = BTreeMap::new();
+        for (number, raw, size) in rows {
             lots.insert(
                 number,
                 serde_json::from_value(raw).map_err(|_| CoreError::Invalid)?,
             );
+            sizes.insert(number, size);
         }
-        let sources =
-            prepare_typst_lot_sources(&expediente.variables, &lots, total_pages, lot_template)?;
+        let sources = prepare_typst_lot_sources_with_sizes(
+            &expediente.variables,
+            &lots,
+            &sizes,
+            total_pages,
+            lot_template,
+        )?;
         let mut candidates = crate::order::candidates(self, &mut tx, actor, &expediente).await?;
         let stored: Option<serde_json::Value> =
             sqlx::query_scalar("SELECT pdf_order_json FROM licitaciones_expedientes WHERE id=?")
@@ -235,6 +291,27 @@ mod tests {
         );
     }
     #[test]
+    fn table_font_size_is_per_lot_and_remains_data() {
+        let source = prepare_typst_lot_sources_with_sizes(
+            &variables(),
+            &BTreeMap::from([(1, vec![item()]), (2, vec![item()])]),
+            &BTreeMap::from([(1, "8.5".into()), (2, "10".into())]),
+            1,
+            "#import \"items1_bid.typ\": items\n#let tamano_tabla = 7pt\n#table()",
+        )
+        .unwrap();
+        for (number, expected) in [(1, "8.5"), (2, "10")] {
+            let data: Value =
+                serde_json::from_slice(&source.files[&format!("lote{number}-bid-config.json")])
+                    .unwrap();
+            assert_eq!(data["tamano_tabla"], expected);
+            let text =
+                String::from_utf8(source.files[&format!("lote{number}-bid.typ")].clone()).unwrap();
+            assert_eq!(text.matches("#let tamano_tabla =").count(), 1);
+            assert!(!text.contains("#let tamano_tabla = 7pt"));
+        }
+    }
+    #[test]
     fn rejects_missing_or_invalid_data_and_unexpected_lots() {
         let mut data = variables();
         data.retain(|v| v.key != "inst");
@@ -269,7 +346,7 @@ mod tests {
         let root =
             std::env::temp_dir().join(format!("bastion-tender-typst-{}", std::process::id()));
         std::fs::create_dir_all(&root).unwrap();
-        let template = "#import \"items1_bid.typ\": items\n#let total_lote = items.map(p => p.cantidad * p.precio_unitario * decimal(\"1.15\") + p.transporte).sum(default: decimal(\"0.00\"))\n";
+        let template = "#import \"items1_bid.typ\": items\n#assert.eq(tamano_tabla, 7pt)\n#table(columns: 1, [Prueba])\n#let total_lote = items.map(p => p.cantidad * p.precio_unitario * decimal(\"1.15\") + p.transporte).sum(default: decimal(\"0.00\"))\n";
         let built = prepare_typst_lot_sources(
             &variables(),
             &BTreeMap::from([(2, vec![item()])]),

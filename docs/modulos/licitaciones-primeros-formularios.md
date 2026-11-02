@@ -20,6 +20,8 @@ El archivo `config.typ` de origen define `datos_base`; los documentos recibidos 
 
 Para cada lote se generan `items{n}_{stylo}.typ` y `lote{n}-{stylo}.typ`. El número de ítem se genera por orden y se vuelve a enumerar al eliminar. Ambos estilos contienen descripción, fecha de entrega, cantidad decimal, unidad y precio unitario con dos decimales. BID añade país de origen y transporte con dos decimales. Se requiere validación exacta de montos y cantidades sin usar números binarios flotantes.
 
+Cada lote tiene su propio `tamano_tabla`, capturado como número en puntos. El valor inicial es 7 pt, como en las plantillas actualmente instaladas. En las plantillas nuevas se declara como longitud Typst (`#let tamano_tabla = 7pt`) y se usa para el tamaño de texto de la tabla. El sistema sustituye ese valor por el configurado en el lote al generar los archivos, sin interpolar texto del usuario como código.
+
 Según las plantillas y confirmación del usuario, el subtotal es cantidad por precio unitario, el ISV es 15 % del subtotal y en BID el transporte de la línea se suma después del impuesto. Se conserva el redondeo de las plantillas: el total de lote es la suma de los totales calculados, redondeada a dos decimales. `variables.typ` suma los totales de los lotes. Se requiere corroborar que los totales mostrados en pantalla coincidan con los documentos generados.
 
 Al cambiar de BID a STD o reducir los lotes se identifica la información que se descartaría y se exige confirmación antes de descartar esos datos. En otro caso se preservan los cambios. El control de versión del expediente debe proteger contra ediciones concurrentes.
