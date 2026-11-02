@@ -213,7 +213,8 @@ impl CollaborationService {
             .authorize(actor, "colaboracion", &folder_key, "editar")
             .await?;
         let detected = self.storage.detect_mime(bytes.clone()).await?;
-        let mime = crate::policy::canonical_upload_mime(&input.filename, &detected, &bytes).to_owned();
+        let mime =
+            crate::policy::canonical_upload_mime(&input.filename, &detected, &bytes).to_owned();
         policy.check(&input.filename, &mime, &bytes)?;
         let request_hash =
             Sha256::digest(serde_json::to_vec(&input).map_err(|_| CoreError::Invalid)?).to_vec();

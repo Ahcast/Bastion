@@ -10,10 +10,19 @@ pub const BLOCKED_EXTENSIONS: &[&str] = &[
 ];
 /// libmagic can classify Typst imports as Objective-C or other source code.
 /// Store Typst as inert text only after checking that its bytes are valid text.
-pub(crate) fn canonical_upload_mime<'a>(filename: &str, detected: &'a str, bytes: &[u8]) -> &'a str {
-    if filename.rsplit('.').next().is_some_and(|ext| ext.eq_ignore_ascii_case("typ"))
+pub(crate) fn canonical_upload_mime<'a>(
+    filename: &str,
+    detected: &'a str,
+    bytes: &[u8],
+) -> &'a str {
+    if filename
+        .rsplit('.')
+        .next()
+        .is_some_and(|ext| ext.eq_ignore_ascii_case("typ"))
         && std::str::from_utf8(bytes).is_ok()
-        && !bytes.iter().any(|byte| (*byte < 32 && !matches!(*byte, 9 | 10 | 13)) || *byte == 127)
+        && !bytes
+            .iter()
+            .any(|byte| (*byte < 32 && !matches!(*byte, 9 | 10 | 13)) || *byte == 127)
     {
         "text/plain"
     } else {
@@ -277,11 +286,41 @@ mod tests {
         let mime = canonical_upload_mime("OFERTA.TYP", "text/x-objective-c", typst);
         assert_eq!(mime, "text/plain");
         assert!(policy.check("OFERTA.TYP", mime, typst).is_ok());
-        assert_eq!(canonical_upload_mime("archivo.txt", "text/x-objective-c", typst), "text/x-objective-c");
-        assert_eq!(canonical_upload_mime("archivo.typ", "application/octet-stream", b"\0bad"), "application/octet-stream");
-        assert!(policy.check("archivo.typ", canonical_upload_mime("archivo.typ", "text/plain", b"#!script"), b"#!script").is_err());
-        assert!(policy.check("archivo.typ", canonical_upload_mime("archivo.typ", "text/html", b"<script>"), b"<script>").is_err());
-        assert!(policy.check("archivo.typ", canonical_upload_mime("archivo.typ", "application/octet-stream", b"MZbinary"), b"MZbinary").is_err());
+        assert_eq!(
+            canonical_upload_mime("archivo.txt", "text/x-objective-c", typst),
+            "text/x-objective-c"
+        );
+        assert_eq!(
+            canonical_upload_mime("archivo.typ", "application/octet-stream", b"\0bad"),
+            "application/octet-stream"
+        );
+        assert!(
+            policy
+                .check(
+                    "archivo.typ",
+                    canonical_upload_mime("archivo.typ", "text/plain", b"#!script"),
+                    b"#!script"
+                )
+                .is_err()
+        );
+        assert!(
+            policy
+                .check(
+                    "archivo.typ",
+                    canonical_upload_mime("archivo.typ", "text/html", b"<script>"),
+                    b"<script>"
+                )
+                .is_err()
+        );
+        assert!(
+            policy
+                .check(
+                    "archivo.typ",
+                    canonical_upload_mime("archivo.typ", "application/octet-stream", b"MZbinary"),
+                    b"MZbinary"
+                )
+                .is_err()
+        );
     }
     #[test]
     fn zip_directory_rejects_hidden_executables_and_traversal_without_extraction() {
