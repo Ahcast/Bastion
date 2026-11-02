@@ -10,7 +10,7 @@ El 2026-11-01 se desplegó el backend `62b4a9ec2048` y el frontend `427f44c00de0
 
 ## Retiro de las plantillas originales
 
-El 2026-11-01 el usuario decidió retirar todas las plantillas Typst originales de Licitaciones, incluidas las económicas y las de soporte, para reemplazarlas por archivos nuevos. Se retiraron las cinco fuentes privadas restantes y se purgó el original de Colaboración; el catálogo y las referencias de formularios quedaron vacíos. Los datos y tamaños de los lotes se conservan. La generación de PDF de Licitaciones no estará disponible hasta instalar e integrar los nuevos archivos. La decisión sobre eliminar las copias privadas de respaldo permanece pendiente de respuesta.
+El 2026-11-01 el usuario decidió retirar todas las plantillas Typst originales de Licitaciones, incluidas las económicas y las de soporte, para reemplazarlas por archivos nuevos. Se retiraron las cinco fuentes privadas restantes y se purgó el original de Colaboración; el catálogo y las referencias de formularios quedaron vacíos. Por solicitud expresa posterior se eliminaron también los dos respaldos privados que contenían las siete plantillas originales. Los datos y tamaños de los lotes se conservan. La generación de PDF de Licitaciones no estará disponible hasta instalar e integrar los nuevos archivos.
 
 ## Variables del expediente
 
