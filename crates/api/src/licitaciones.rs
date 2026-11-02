@@ -568,7 +568,14 @@ async fn save_lot(
     let user = actor(&state, &headers).await?;
     state
         .licitaciones
-        .save_lot_with_font_size(user.id, id, numero, expected(&headers)?, LotInput { items: input.items }, input.tamano_tabla)
+        .save_lot_with_font_size(
+            user.id,
+            id,
+            numero,
+            expected(&headers)?,
+            LotInput { items: input.items },
+            input.tamano_tabla,
+        )
         .await
         .map(response)
         .map_err(ApiError)

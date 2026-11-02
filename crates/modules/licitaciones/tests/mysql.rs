@@ -462,11 +462,25 @@ async fn mysql57_tenders_snapshots_permissions_races_receipts_and_deletion() {
         .await
         .unwrap();
     tenders
-        .save_lot_with_font_size(1, exp.id, 1, 5, LotInput { items: vec![row()] }, Some("8.5".into()))
+        .save_lot_with_font_size(
+            1,
+            exp.id,
+            1,
+            5,
+            LotInput { items: vec![row()] },
+            Some("8.5".into()),
+        )
         .await
         .unwrap();
     tenders
-        .save_lot_with_font_size(1, exp.id, 2, 6, LotInput { items: vec![row()] }, Some("9".into()))
+        .save_lot_with_font_size(
+            1,
+            exp.id,
+            2,
+            6,
+            LotInput { items: vec![row()] },
+            Some("9".into()),
+        )
         .await
         .unwrap();
     assert_eq!(tenders.lot(1, exp.id, 1).await.unwrap().total, "297.50");

@@ -230,7 +230,10 @@ impl TenderService {
         .bind(numero)
         .fetch_optional(&mut *tx)
         .await?;
-        let size = row.as_ref().map(|(_, size)| size.clone()).unwrap_or_else(|| "7".into());
+        let size = row
+            .as_ref()
+            .map(|(_, size)| size.clone())
+            .unwrap_or_else(|| "7".into());
         let items: Vec<LotItem> = row
             .map(|(value, _)| serde_json::from_value(value))
             .transpose()
@@ -257,7 +260,8 @@ impl TenderService {
         version: u64,
         input: LotInput,
     ) -> Result<Expedient, CoreError> {
-        self.save_lot_with_font_size(actor, id, numero, version, input, None).await
+        self.save_lot_with_font_size(actor, id, numero, version, input, None)
+            .await
     }
     pub async fn save_lot_with_font_size(
         &self,
@@ -268,7 +272,9 @@ impl TenderService {
         input: LotInput,
         tamano_tabla: Option<String>,
     ) -> Result<Expedient, CoreError> {
-        if let Some(value) = &tamano_tabla { validate_table_font_size(value)?; }
+        if let Some(value) = &tamano_tabla {
+            validate_table_font_size(value)?;
+        }
         let mut tx = self.begin(actor, "editar").await?;
         let exp = load(&mut tx, id).await?;
         editable(&exp, version)?;
