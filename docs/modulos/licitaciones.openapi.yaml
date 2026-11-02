@@ -157,10 +157,11 @@ paths:
                 type: array
                 items:
                   type: object
-                  required: [numero, items]
+                  required: [numero, items, tamano_tabla]
                   properties:
                     numero: { type: integer, minimum: 1 }
                     items: { type: integer, minimum: 0 }
+                    tamano_tabla: { type: string, description: Tamaño de texto de la tabla en puntos }
   /api/v1/licitaciones/{id}/lotes/{numero}:
     parameters:
       - $ref: '#/components/parameters/Id'
@@ -175,7 +176,7 @@ paths:
               schema: { $ref: '#/components/schemas/Lot' }
         '400': { description: Lote fuera del rango o configuración incompleta }
     put:
-      summary: Sustituir ítems del lote en Borrador; requiere editar
+      summary: Guardar ítems y tamaño de tabla del lote en Borrador; requiere editar
       parameters:
         - $ref: '#/components/parameters/Version'
         - $ref: '#/components/parameters/Csrf'
@@ -189,6 +190,7 @@ paths:
               required: [items]
               properties:
                 items: { type: array, maxItems: 1000, items: { $ref: '#/components/schemas/LotItem' } }
+                tamano_tabla: { type: string, pattern: '^[0-9]+(\.[0-9]{1,2})?$', description: Número entre 1 y 100 puntos; si se omite se conserva el valor anterior }
       responses:
         '200': { description: Expediente actualizado con ETag fuerte }
         '400': { description: Datos, montos o cantidades inválidos }
@@ -660,10 +662,11 @@ components:
         precio_unitario: { type: string, description: Hasta dos decimales }
     Lot:
       type: object
-      required: [numero, items, total, version]
+      required: [numero, items, tamano_tabla, total, version]
       properties:
         numero: { type: integer, minimum: 1 }
         items: { type: array, items: { $ref: '#/components/schemas/LotItem' } }
+        tamano_tabla: { type: string, description: Tamaño de texto de la tabla en puntos; 7 por defecto }
         total: { type: string, description: Total calculado en lempiras con dos decimales }
         version: { type: integer, minimum: 1 }
     PdfJob:
