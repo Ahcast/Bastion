@@ -55,3 +55,20 @@ test('consent never navigates to an unsafe response URL', async () => {
     assert.ok(container.querySelector('[role="alert"]'));
   } finally { await act(async () => root.unmount()); container.remove(); }
 });
+
+test('consent permits exact localhost but rejects similar remote hostnames', async () => {
+  for (const [target, allowed] of [['http://localhost:8787/callback?code=test', true], ['http://localhost.example/callback', false], ['http://localhost./callback', false]] as const) {
+    const api = new ApiClient('https://api.example.test', async url => Response.json(new URL(String(url)).pathname.endsWith('/begin')
+      ? { handle: 'A'.repeat(43), client_name: 'Client', scopes: ['facturas:read'], expires_at: '2099-01-01T00:00:00Z' }
+      : { redirect_to: target }));
+    let redirected = '';
+    const container = document.createElement('div'); document.body.append(container); const root = createRoot(container);
+    try {
+      await act(async () => root.render(<McpConsent api={api} authorizationQuery="request" navigate={url => { redirected = url; }} />));
+      await act(async () => container.querySelector<HTMLButtonElement>('button')!.click());
+      await act(async () => [...container.querySelectorAll('button')].find(item => item.textContent === 'Autorizar')!.click());
+      assert.equal(redirected, allowed ? target : '');
+      if (!allowed) assert.ok(container.querySelector('[role="alert"]'));
+    } finally { await act(async () => root.unmount()); container.remove(); }
+  }
+});
