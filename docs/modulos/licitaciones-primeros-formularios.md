@@ -10,6 +10,8 @@ El 2026-11-01 se desplegó el backend `62b4a9ec2048` y el frontend `427f44c00de0
 
 ## Retiro de las plantillas originales
 
+El 2026-11-01 se corrigió la carga de archivos `.typ` detectados por libmagic como `text/x-objective-c`. El backend `0e11ea265da5`, compilado y probado en CI desde la fusión de `1b27ef1` con el PR 28, fue desplegado en AWS; su código coincide con el de `main` salvo cambios de documentación. La prueba en CI verificó la carga y publicación de un Typst con `#import`; el servicio y readiness HTTPS respondieron correctamente. Queda pendiente la comprobación autenticada con un archivo real.
+
 El 2026-11-01 el usuario decidió retirar todas las plantillas Typst originales de Licitaciones, incluidas las económicas y las de soporte, para reemplazarlas por archivos nuevos. Se retiraron las cinco fuentes privadas restantes y se purgó el original de Colaboración; el catálogo y las referencias de formularios quedaron vacíos. Por solicitud expresa posterior se eliminaron también los dos respaldos privados que contenían las siete plantillas originales. Los datos y tamaños de los lotes se conservan. La generación de PDF de Licitaciones no estará disponible hasta instalar e integrar los nuevos archivos.
 
 ## Variables del expediente
