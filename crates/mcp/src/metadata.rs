@@ -82,7 +82,9 @@ pub fn validate_client_metadata(
         Some(methods) => {
             !methods.is_empty()
                 && methods.len() <= 8
-                && methods.iter().all(|method| !method.is_empty() && method.len() <= 64)
+                && methods
+                    .iter()
+                    .all(|method| !method.is_empty() && method.len() <= 64)
                 && methods.iter().collect::<BTreeSet<_>>().len() == methods.len()
                 && methods.iter().any(|method| method == "none")
         }
@@ -94,13 +96,9 @@ pub fn validate_client_metadata(
     let value: serde_json::Value =
         serde_json::from_slice(body).map_err(|_| MetadataError::InvalidDocument)?;
     let object = value.as_object().ok_or(MetadataError::InvalidDocument)?;
-    if [
-        "client_secret",
-        "client_secret_expires_at",
-        "jwks",
-    ]
-    .iter()
-    .any(|key| object.contains_key(*key))
+    if ["client_secret", "client_secret_expires_at", "jwks"]
+        .iter()
+        .any(|key| object.contains_key(*key))
     {
         return Err(MetadataError::UnsupportedAuthentication);
     }
@@ -200,21 +198,32 @@ mod tests {
     fn accepts_public_method_from_supported_list_without_enabling_confidential_auth() {
         let mut document: serde_json::Value = serde_json::from_slice(VALID).unwrap();
         document["token_endpoint_auth_method"] = "private_key_jwt".into();
-        document["token_endpoint_auth_methods_supported"] = serde_json::json!(["none", "private_key_jwt"]);
+        document["token_endpoint_auth_methods_supported"] =
+            serde_json::json!(["none", "private_key_jwt"]);
         document["jwks_uri"] = "https://client.example/jwks.json".into();
         let check = |value: &serde_json::Value| {
             validate_client_metadata(ID, ID, 200, value.to_string().as_bytes()).map(|_| ())
         };
         assert!(check(&document).is_ok());
         let mut confidential = document.clone();
-        confidential["token_endpoint_auth_methods_supported"] = serde_json::json!(["private_key_jwt"]);
-        assert_eq!(check(&confidential), Err(MetadataError::UnsupportedAuthentication));
+        confidential["token_endpoint_auth_methods_supported"] =
+            serde_json::json!(["private_key_jwt"]);
+        assert_eq!(
+            check(&confidential),
+            Err(MetadataError::UnsupportedAuthentication)
+        );
         let mut duplicate = document.clone();
         duplicate["token_endpoint_auth_methods_supported"] = serde_json::json!(["none", "none"]);
-        assert_eq!(check(&duplicate), Err(MetadataError::UnsupportedAuthentication));
+        assert_eq!(
+            check(&duplicate),
+            Err(MetadataError::UnsupportedAuthentication)
+        );
         let mut secret = document.clone();
         secret["client_secret"] = "not-allowed".into();
-        assert_eq!(check(&secret), Err(MetadataError::UnsupportedAuthentication));
+        assert_eq!(
+            check(&secret),
+            Err(MetadataError::UnsupportedAuthentication)
+        );
         let mut wrong_type = document;
         wrong_type["token_endpoint_auth_methods_supported"] = "none".into();
         assert_eq!(check(&wrong_type), Err(MetadataError::InvalidDocument));
