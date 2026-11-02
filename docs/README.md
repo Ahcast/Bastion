@@ -51,6 +51,8 @@ El informe se obtuvo de una copia de frontend Angular compilado y backend Larave
 
 ## Registro de decisiones
 
+- 2026-11-01: el usuario autoriza consultas MCP de Licitaciones y creación y edición de borradores. Para órdenes, autoriza usar Pendiente como etapa inicial, sin productos comprados ni entregas. Los alcances de escritura son independientes y requieren aprobación y consentimiento; ver `06-mcp.md`.
+
 - 2026-10-28: el usuario autoriza editar facturas Enviadas; Pagado continúa sin edición y solo se eliminan borradores sin pagos. Se conserva número SAR, pagos y datos fiscales capturados. Ver `modulos/facturas-acciones.md`.
 - 2026-10-27: el usuario confirma número SAR solo al marcar como enviado y la regla inicial de inmutabilidad, posteriormente modificada el 2026-10-28. Se completan las acciones de Facturas con pagos, clonación y documentos privados. Autoriza reutilizar la credencial MySQL existente únicamente para la migración 5, con respaldo previo, sin cuentas/privilegios nuevos ni credenciales persistentes. Ver `modulos/facturas-acciones.md`.
 

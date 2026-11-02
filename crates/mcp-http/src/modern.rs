@@ -592,6 +592,12 @@ async fn execute_read_tool<P>(
         Ok(Err(ReadToolError::Invalid)) => ("denied", None),
         Ok(Err(ReadToolError::Denied | ReadToolError::NotFound)) => ("denied", None),
         Ok(Err(ReadToolError::Limited)) => ("limited", None),
+        Ok(Err(ReadToolError::Conflict)) => (
+            "denied",
+            Some(
+                json!({"jsonrpc":"2.0","id":id,"result":{"content":[{"type":"text","text":"El borrador cambió o ya no se puede editar. Consulta su estado y versión actuales."}],"isError":true}}),
+            ),
+        ),
         Ok(Err(_)) => ("error", None),
         Err(_) => ("timeout", None),
     };

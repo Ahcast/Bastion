@@ -8,6 +8,7 @@ bastion-core = { path = "../core" }
 bastion-mcp = { path = "../mcp" }
 bastion-cotizaciones = { path = "../modules/cotizaciones" }
 bastion-facturas = { path = "../modules/facturas" }
+bastion-licitaciones = { path = "../modules/licitaciones" }
 bastion-ordenes-compra = { path = "../modules/ordenes_compra" }
 serde.workspace = true
 serde_json.workspace = true

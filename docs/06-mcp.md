@@ -4,13 +4,13 @@
 
 El core hospeda la infraestructura MCP común y mantiene el registro de herramientas. Cada módulo aporta herramientas específicas. Un servidor MCP no implementa lógica de negocio aparte: traduce la petición a un caso de uso normal del módulo.
 
-**Estado (2026-11-01, Honduras):** MCP y OAuth están habilitados en AWS; la interfaz está publicada en Bluehost. El backend y el frontend ejecutan la revisión `1b27ef1e575a50d04ee9fa1eefa5435e74b39228`. Las migraciones Core 3 a 11 se aplicaron con respaldo previo y una restauración de prueba en tablas temporales. Las herramientas disponibles son de lectura para cotizaciones, facturas y órdenes de compra, sujetas a permisos y consentimiento.
+**Estado (2026-11-01, Honduras):** MCP y OAuth están habilitados en AWS; la interfaz está publicada en Bluehost. La primera publicación usó la revisión `1b27ef1e575a50d04ee9fa1eefa5435e74b39228`; el backend recibió después actualizaciones de Licitaciones. Las migraciones Core 3 a 11 se aplicaron con respaldo previo y una restauración de prueba en tablas temporales. Las herramientas de la primera publicación son de lectura para cotizaciones, facturas y órdenes de compra, sujetas a permisos y consentimiento.
 
 El backend expone Streamable HTTP con OAuth Authorization Code y PKCE, clientes públicos CIMD aprobados por un administrador, consentimiento del usuario, revocación, cuotas y auditoría. No admite clientes confidenciales ni registro dinámico en esta versión. Admite documentos CIMD que incluyen `none` entre varios métodos, seleccionando exclusivamente `none`, y anuncia la identificación del emisor en las respuestas de autorización. Para clientes como Grok Bot, se admite el retorno HTTP al host exacto `localhost`, además de las redirecciones HTTPS o loopback numérico autorizadas. La aprobación del cliente y el consentimiento del usuario siguen siendo necesarios. La configuración y las claves permanecen en el entorno del servidor; el frontend no contiene secretos.
 
 El servicio de protección `bastion-mcp-egress.service` y su tabla nftables están instalados y verificados. Restringen el puerto TCP 443 del usuario del backend hacia redes privadas y de infraestructura sin cambiar la política de UFW. El proxy de AWS aplica redacción de datos sensibles. El frontend y las rutas de descubrimiento responden públicamente; una solicitud MCP sin credenciales recibe 401. Se verificaron disponibilidad de los módulos, concordancia de los binarios y respaldo restaurable.
 
-Las pruebas de CI incluyen MySQL 5.7 y el SDK oficial de MCP con token sintético; OAuth completo se prueba por separado. Sigue pendiente validar una conexión real de un cliente aprobado con un usuario que otorgue consentimiento y comprobar sus permisos y notificaciones. No usar la base operativa como `BASTION_MCP_TEST_URL`. `migrate-core` aplica exclusivamente las migraciones del Core.
+Las pruebas de CI incluyen MySQL 5.7 y el SDK oficial de MCP con token sintético; OAuth completo se prueba por separado. El usuario confirmó que la conexión real del cliente autorizado ya funciona. Los permisos adicionales requieren su propia aprobación y consentimiento. No usar la base operativa como `BASTION_MCP_TEST_URL`. `migrate-core` aplica exclusivamente las migraciones del Core.
 
 ```mermaid
 flowchart LR
@@ -40,6 +40,12 @@ Cada herramienta declara nombre estable y módulo propietario, propósito, esque
 ## Diseño de herramientas
 
 Preferir operaciones concretas de dominio y respuestas estructuradas. Consultas paginadas y limitadas. Mutaciones separadas de consultas; evitar una herramienta genérica que acepte SQL o instrucciones libres.
+
+### Ampliación autorizada: borradores y licitaciones
+
+El usuario autoriza consultar licitaciones y crear y editar borradores en los cuatro módulos. Cada módulo tiene alcances `:read` y `:write` independientes. Escritura requiere ambos alcances y permisos Core `ver` y `editar`, aprobación administrativa del alcance y consentimiento del usuario; las autorizaciones anteriores no conceden automáticamente los alcances nuevos. La creación usa una clave de idempotencia y las modificaciones exigen la versión consultada. Cotizaciones solo admite estado Borrador; Facturas solo edita Borrador y rechaza pagos. En Órdenes de compra, el usuario aprobó usar Pendiente como etapa inicial: tanto el registro existente como los datos propuestos deben mantener todos los productos pendientes, sin factura ni fecha de recepción. No se permite enviar, pagar, convertir, entregar ni eliminar mediante estas herramientas.
+
+En Licitaciones se consultan expedientes y lotes, se crean expedientes vacíos, se cambia su nombre y se editan variables y partidas. Las variables no autorizan descartar lotes; editar un lote reemplaza su lista de partidas. Esta lista describe el alcance implementado, no edición de archivos, generación de PDF o todas las funciones del módulo. Las escrituras pueden fallar por reglas del módulo, permisos o cambios de versión; ante un conflicto el cliente debe consultar de nuevo antes de actuar. La disponibilidad de estas capacidades requiere verificar CI y la revisión operativa desplegada.
 
 ## Exposición inicial derivada del informe
 

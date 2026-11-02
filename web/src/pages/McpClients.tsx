@@ -2,13 +2,18 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { ApiClient, message } from '../api.js';
 import { Notice } from '../ui.js';
 
-type Scope = 'cotizaciones:read' | 'facturas:read' | 'ordenes_compra:read';
+type Scope = 'cotizaciones:read' | 'facturas:read' | 'ordenes_compra:read' | 'licitaciones:read' | 'cotizaciones:write' | 'facturas:write' | 'ordenes_compra:write' | 'licitaciones:write';
 type Entry = { id: number; client_name: string; client_id: string; scopes: string[]; approved_scopes?: string[] | null; status: string };
 type Page = { items: Entry[]; next_before: number | null };
 const options: { scope: Scope; label: string }[] = [
   { scope: 'cotizaciones:read', label: 'Consultar cotizaciones' },
   { scope: 'facturas:read', label: 'Consultar facturas' },
   { scope: 'ordenes_compra:read', label: 'Consultar órdenes de compra' },
+  { scope: 'licitaciones:read', label: 'Consultar licitaciones' },
+  { scope: 'cotizaciones:write', label: 'Crear y editar cotizaciones en borrador' },
+  { scope: 'facturas:write', label: 'Crear y editar facturas en borrador' },
+  { scope: 'ordenes_compra:write', label: 'Crear y editar órdenes pendientes sin compras ni entregas' },
+  { scope: 'licitaciones:write', label: 'Crear y editar licitaciones en borrador' },
 ];
 function label(scope: string) { return options.find(option => option.scope === scope)?.label ?? scope; }
 function validClientId(value: string) {
@@ -63,8 +68,9 @@ export default function McpClients({ api, isAdministrator }: { api: ApiClient; i
     finally { working.current = false; setBusy(false); }
   }
 
-  return <section><h1>Clientes MCP</h1><p>Solicita la habilitación de una aplicación para consultar información de Bastion.</p><Notice>{error}</Notice>
+  return <section><h1>Clientes MCP</h1><p>Solicita la habilitación de una aplicación y selecciona sus permisos en Bastion.</p><Notice>{error}</Notice>
     <label>Dirección de metadatos del cliente <input type="url" value={clientId} maxLength={2048} onChange={event => setClientId(event.currentTarget.value)} /></label>
+    <p>Para crear o editar en un módulo, solicita también su permiso de consulta.</p>
     <fieldset><legend>Permisos solicitados</legend>{options.map(option => <label key={option.scope}><input type="checkbox" checked={requested.includes(option.scope)} onChange={event => { const checked = event.currentTarget.checked; setRequested(current => checked ? [...current, option.scope] : current.filter(item => item !== option.scope)); }} /> {option.label}</label>)}</fieldset>
     <button type="button" disabled={busy} onClick={() => void submit()}>Solicitar revisión</button>
     <h2>Mis solicitudes</h2>{own === null ? <p role="status">Cargando…</p> : own.items.length === 0 ? <p>Sin solicitudes.</p> : <ul>{own.items.map(item => <li key={item.id}>{item.client_name}: {item.status === 'approved' ? 'Aprobada' : item.status === 'rejected' ? 'Rechazada' : 'Pendiente'} — Solicitados: {item.scopes.map(label).join(', ')}{item.status === 'approved' && (item.approved_scopes ? ` — Aprobados: ${item.approved_scopes.map(label).join(', ')}` : ' — Detalle de aprobación no disponible')}</li>)}</ul>}
