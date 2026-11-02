@@ -43,6 +43,11 @@ class FakeNft:
 
 
 class GuardTest(unittest.TestCase):
+    def test_linux_executable_has_portable_shebang(self):
+        if __import__('os').name == 'nt': self.skipTest('Git may use CRLF on Windows')
+        path = Path(__file__).resolve().parents[1] / 'deploy' / 'bastion-mcp-egress.py'
+        self.assertTrue(path.read_bytes().startswith(b'#!/usr/bin/env python3\n'))
+
     def test_rules_are_uid_scoped_and_preserve_loopback(self):
         text = module.ruleset(1234)
         self.assertIn("meta skuid 1234 tcp dport 443", text)
