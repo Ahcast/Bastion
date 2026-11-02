@@ -8,6 +8,7 @@ axum.workspace = true
 bastion-core = { path = "../core" }
 bastion-cotizaciones = { path = "../modules/cotizaciones" }
 bastion-facturas = { path = "../modules/facturas" }
+bastion-licitaciones = { path = "../modules/licitaciones" }
 bastion-mcp = { path = "../mcp" }
 bastion-mcp-core = { path = "../mcp-core" }
 bastion-ordenes-compra = { path = "../modules/ordenes_compra" }

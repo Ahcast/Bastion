@@ -18,7 +18,7 @@ test('consent requires an explicit review and decision and renders client text s
       const path = new URL(String(url)).pathname;
       calls.push({ path, body: JSON.parse(String(init.body)) as Record<string, unknown> });
       return Response.json(path.endsWith('/begin')
-        ? { handle: 'A'.repeat(43), client_name: '<img src=x onerror=alert(1)>', scopes: ['cotizaciones:read', 'facturas:read', 'ordenes_compra:read'], expires_at: '2099-01-01T00:00:00Z' }
+        ? { handle: 'A'.repeat(43), client_name: '<img src=x onerror=alert(1)>', scopes: ['cotizaciones:read', 'facturas:read', 'ordenes_compra:read', 'licitaciones:read', 'facturas:write'], expires_at: '2099-01-01T00:00:00Z' }
         : { redirect_to: 'https://client.example.test/callback?state=ok' });
     });
     let redirected = '';
@@ -32,6 +32,8 @@ test('consent requires an explicit review and decision and renders client text s
       assert.ok(container.textContent?.includes('<img src=x onerror=alert(1)>'));
       assert.equal(container.querySelector('img'), null);
       assert.ok(container.textContent?.includes('Consultar órdenes de compra'));
+      assert.ok(container.textContent?.includes('Consultar licitaciones'));
+      assert.ok(container.textContent?.includes('Crear y editar facturas en borrador'));
       const buttons = [...container.querySelectorAll('button')];
       const button = buttons.find(item => item.textContent === (decision === 'approve' ? 'Autorizar' : 'Rechazar'))!;
       await act(async () => button.click());

@@ -11,6 +11,7 @@ use axum::{
 use bastion_core::CoreService;
 use bastion_cotizaciones::QuoteService;
 use bastion_facturas::InvoiceService;
+use bastion_licitaciones::TenderService;
 use bastion_mcp::{ActorQuota, MysqlQuota, MysqlTokenExchange, ToolQuota};
 use bastion_mcp_core::{
     CoreScopePolicy, DraftReadExecutor, approved_read_requirements, draft_read_tool_registry,
@@ -96,8 +97,8 @@ pub fn compose_draft_router<F: ClientMetadataSource>(
     let executor = Arc::new(DraftReadExecutor::new(
         QuoteService::new(db.clone(), admin.clone()),
         InvoiceService::new(db.clone(), admin.clone()),
-        OrderService::new(db, admin),
-    ));
+        OrderService::new(db.clone(), admin.clone()),
+    ).with_tenders(TenderService::new(db, admin)));
     let mcp = DraftMcpState::new(
         pool.clone(),
         exchange.clone(),

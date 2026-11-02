@@ -26,6 +26,9 @@ test('only an administrator sees the review queue and selects scopes explicitly'
       await act(async () => root.render(<McpClients api={api} isAdministrator={admin} />));
       assert.equal(calls.some(call => call.path.endsWith('/pending')), admin);
       assert.ok(container.textContent?.includes('Aprobados: Consultar cotizaciones'));
+      assert.ok(container.textContent?.includes('Consultar licitaciones'));
+      assert.ok(container.textContent?.includes('Crear y editar órdenes pendientes sin compras ni entregas'));
+      assert.ok(container.textContent?.includes('Crear y editar facturas en borrador'));
       if (admin) {
         assert.ok(container.textContent?.includes('<img src=x>'));
         assert.equal(container.querySelector('img'), null);

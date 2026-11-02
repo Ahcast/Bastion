@@ -41,6 +41,12 @@ Cada herramienta declara nombre estable y módulo propietario, propósito, esque
 
 Preferir operaciones concretas de dominio y respuestas estructuradas. Consultas paginadas y limitadas. Mutaciones separadas de consultas; evitar una herramienta genérica que acepte SQL o instrucciones libres.
 
+### Ampliación autorizada: borradores y licitaciones
+
+El usuario autoriza consultar licitaciones y crear y editar borradores en los cuatro módulos. Cada módulo tiene alcances `:read` y `:write` independientes. Escritura requiere ambos alcances y permisos Core `ver` y `editar`, aprobación administrativa del alcance y consentimiento del usuario; las autorizaciones anteriores no conceden automáticamente los alcances nuevos. La creación usa una clave de idempotencia y las modificaciones exigen la versión consultada. Cotizaciones solo admite estado Borrador; Facturas solo edita Borrador y rechaza pagos. En Órdenes de compra, el usuario aprobó usar Pendiente como etapa inicial: tanto el registro existente como los datos propuestos deben mantener todos los productos pendientes, sin factura ni fecha de recepción. No se permite enviar, pagar, convertir, entregar ni eliminar mediante estas herramientas.
+
+En Licitaciones se consultan expedientes y lotes, se crean expedientes vacíos, se cambia su nombre y se editan variables y partidas. Las variables no autorizan descartar lotes; editar un lote reemplaza su lista de partidas. Esta lista describe el alcance implementado, no edición de archivos, generación de PDF o todas las funciones del módulo. Las escrituras pueden fallar por reglas del módulo, permisos o cambios de versión; ante un conflicto el cliente debe consultar de nuevo antes de actuar. Estas capacidades están pendientes de validación y despliegue hasta que se verifiquen CI y la versión operativa.
+
 ## Exposición inicial derivada del informe
 
 La primera versión expone listados paginados y consultas por identificador de cotizaciones, facturas y órdenes de compra, exclusivamente de lectura y sujetos al permiso Core `documentos/ver`, al módulo activo y al consentimiento OAuth. Las acciones de modificación requieren una decisión posterior. Las llamadas se auditan; si la base de datos no está disponible puede quedar solo el evento de inicio como señal de interrupción.

@@ -9,6 +9,11 @@ const scopeLabels: Record<string, string> = {
   'cotizaciones:read': 'Consultar cotizaciones',
   'facturas:read': 'Consultar facturas',
   'ordenes_compra:read': 'Consultar órdenes de compra',
+  'licitaciones:read': 'Consultar licitaciones',
+  'cotizaciones:write': 'Crear y editar cotizaciones en borrador',
+  'facturas:write': 'Crear y editar facturas en borrador',
+  'ordenes_compra:write': 'Crear y editar órdenes pendientes sin compras ni entregas',
+  'licitaciones:write': 'Crear y editar licitaciones en borrador',
 };
 
 function validPending(value: unknown): value is PendingConsent {
