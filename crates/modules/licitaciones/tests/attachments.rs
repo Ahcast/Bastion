@@ -583,6 +583,48 @@ async fn mysql57_tender_files_private_copies_integrity_recovery_and_budgets() {
         .await
         .unwrap();
     assert_eq!(state, "deleted");
+    let economic_source = library
+        .upload(
+            1,
+            "economic-source-protected",
+            UploadInput {
+                scope: "empresa".into(),
+                id_persona: None,
+                title: "Oferta".into(),
+                notes: String::new(),
+                filename: "carta-de-oferta.typ".into(),
+                content_base64: STANDARD.encode(b"= Oferta"),
+            },
+        )
+        .await
+        .unwrap();
+    let economic_form = library
+        .publish_form(
+            1,
+            "economic-source-form",
+            PublishFormInput {
+                form_id: None,
+                expected_revision: None,
+                definition: FormDefinition {
+                    title: "Oferta".into(),
+                    section: FormSection::Legal,
+                    template_source_id: Some(economic_source.id),
+                    variables: vec![],
+                },
+            },
+        )
+        .await
+        .unwrap();
+    service
+        .delete_published_template(1, economic_form.id, economic_form.revision)
+        .await
+        .unwrap();
+    let state: String = sqlx::query_scalar("SELECT state FROM colaboracion_files WHERE id=?")
+        .bind(economic_source.id)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!(state, "ready");
     service
         .delete(1, template_exp.id, after_delete.version, template_exp.id)
         .await
