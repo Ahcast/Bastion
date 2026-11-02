@@ -191,6 +191,18 @@ pub fn draft_read_tool_registry() -> Result<ToolRegistry, RegistryError> {
             max_duration_ms: 10000,
         });
     }
+    tools.push(ToolDescriptor {
+        name: "ordenes_compra.listar_destinos".into(),
+        module_id: "ordenes_compra".into(),
+        description: "Consultar los destinos disponibles para órdenes de compra.".into(),
+        required_scope: "ordenes_compra:read".into(),
+        input_schema: json!({"type":"object","properties":{},"additionalProperties":false}),
+        output_schema: None,
+        risk: ToolRisk::ReadOnly,
+        idempotent: true,
+        max_response_bytes: 262144,
+        max_duration_ms: 10000,
+    });
     let scopes: BTreeSet<String> = approved_read_requirements().into_keys().collect();
     ToolRegistry::new(tools, &scopes)
 }

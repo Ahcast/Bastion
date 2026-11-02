@@ -37,6 +37,9 @@ struct DetailArguments {
 }
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
+struct EmptyArguments {}
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
 struct CreateArguments<T> {
     idempotency_key: String,
     data: T,
@@ -121,6 +124,7 @@ impl DraftReadExecutor {
             return Err(ReadToolError::Invalid);
         }
         let reading = matches!(operation, "listar" | "consultar")
+            || (module == "ordenes_compra" && operation == "listar_destinos")
             || (module == "licitaciones" && matches!(operation, "listar_lotes" | "consultar_lote"));
         if !access.scopes.contains(&format!(
             "{module}:{}",
@@ -133,6 +137,21 @@ impl DraftReadExecutor {
                 return Err(ReadToolError::Denied);
             }
             return self.write(access, module, operation, arguments).await;
+        }
+        if module == "ordenes_compra" && operation == "listar_destinos" {
+            let _: EmptyArguments =
+                serde_json::from_value(arguments).map_err(|_| ReadToolError::Invalid)?;
+            self.orders
+                .consume_request(access.user_id)
+                .await
+                .map_err(map_error)?;
+            return bounded(
+                &self
+                    .orders
+                    .destinations(access.user_id)
+                    .await
+                    .map_err(map_error)?,
+            );
         }
         if module == "licitaciones" && operation == "listar_lotes" {
             let args: DetailArguments =

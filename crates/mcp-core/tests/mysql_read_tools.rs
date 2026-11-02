@@ -222,6 +222,17 @@ async fn mysql57_read_tools_reuse_domain_authorization_and_validate_arguments() 
         Err(ReadToolError::Conflict)
     );
     let destination = sqlx::query("INSERT INTO ordenes_destinations (destination,name_key) VALUES ('MCP fixture','mcp fixture')").execute(&pool).await.unwrap().last_insert_id();
+    let destinations = executor
+        .call(&access, "ordenes_compra.listar_destinos", json!({}))
+        .await
+        .unwrap();
+    assert!(
+        destinations
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|d| d["id"] == destination)
+    );
     let order = json!({"n_orders":"OC-MCP","n_bill":"","order_date":"2026-10-23","received_date":null,"client_name":"Fixture","client_rtn":"","id_destination":destination,"comments":"","products":[{"description":"Equipo","cantidad":1,"sale_price":"60","purchase_price":"100","tracking":"","isv":true,"status":"Pendiente","coments":""}],"expenses":[]});
     let mut purchased = order.clone();
     purchased["products"][0]["status"] = json!("Comprado");
