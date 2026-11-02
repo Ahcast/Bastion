@@ -345,6 +345,12 @@ async fn mysql57_client_request_http_checks_session_csrf_admin_and_scope() {
     .await
     .unwrap();
     assert_eq!(active, 1);
+    let pending_request = router.clone().oneshot(managed("/oauth/clients/request", &user_session, json!({"client_id":"https://fixture.example/metadata.json","scopes":["ordenes_compra:read"]}))).await.unwrap();
+    assert_eq!(pending_request.status(), StatusCode::OK);
+    let pending_request: serde_json::Value =
+        serde_json::from_slice(&to_bytes(pending_request.into_body(), 8192).await.unwrap())
+            .unwrap();
+    let pending_request_id = pending_request["request_id"].as_u64().unwrap();
     let remove =
         json!({"id":client_id,"confirmed_client_id":"https://fixture.example/metadata.json"});
     assert_eq!(
@@ -407,4 +413,10 @@ async fn mysql57_client_request_http_checks_session_csrf_admin_and_scope() {
             .await
             .unwrap();
     assert_eq!(scopes_left, 0);
+    let status: String = sqlx::query_scalar("SELECT status FROM oauth_client_requests WHERE id=?")
+        .bind(pending_request_id)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!(status, "rejected");
 }
