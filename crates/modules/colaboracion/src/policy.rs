@@ -8,6 +8,18 @@ pub const BLOCKED_EXTENSIONS: &[&str] = &[
     "docm", "xlsm", "pptm", "dotm", "xlam", "ppam", "ppsm", "xlsb", "wsf", "wsh", "sct", "scf",
     "gadget", "so", "dylib", "elf", "apk", "app", "deb", "rpm", "dmg", "iso", "img",
 ];
+/// libmagic can classify Typst imports as Objective-C or other source code.
+/// Store Typst as inert text only after checking that its bytes are valid text.
+pub(crate) fn canonical_upload_mime<'a>(filename: &str, detected: &'a str, bytes: &[u8]) -> &'a str {
+    if filename.rsplit('.').next().is_some_and(|ext| ext.eq_ignore_ascii_case("typ"))
+        && std::str::from_utf8(bytes).is_ok()
+        && !bytes.iter().any(|byte| (*byte < 32 && !matches!(*byte, 9 | 10 | 13)) || *byte == 127)
+    {
+        "text/plain"
+    } else {
+        detected
+    }
+}
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct FilePolicy {
@@ -257,6 +269,19 @@ mod tests {
         let mut bad = p;
         bad.max_file_mb = 101;
         assert!(bad.validate().is_err());
+    }
+    #[test]
+    fn typst_source_classified_as_objective_c_is_validated_as_plain_text() {
+        let policy = FilePolicy::default();
+        let typst = b"#import \"config.typ\": datos\n= Oferta\n";
+        let mime = canonical_upload_mime("OFERTA.TYP", "text/x-objective-c", typst);
+        assert_eq!(mime, "text/plain");
+        assert!(policy.check("OFERTA.TYP", mime, typst).is_ok());
+        assert_eq!(canonical_upload_mime("archivo.txt", "text/x-objective-c", typst), "text/x-objective-c");
+        assert_eq!(canonical_upload_mime("archivo.typ", "application/octet-stream", b"\0bad"), "application/octet-stream");
+        assert!(policy.check("archivo.typ", canonical_upload_mime("archivo.typ", "text/plain", b"#!script"), b"#!script").is_err());
+        assert!(policy.check("archivo.typ", canonical_upload_mime("archivo.typ", "text/html", b"<script>"), b"<script>").is_err());
+        assert!(policy.check("archivo.typ", canonical_upload_mime("archivo.typ", "application/octet-stream", b"MZbinary"), b"MZbinary").is_err());
     }
     #[test]
     fn zip_directory_rejects_hidden_executables_and_traversal_without_extraction() {
