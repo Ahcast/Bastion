@@ -352,6 +352,7 @@ impl CollaborationService {
                 sources.insert(source);
             }
         }
+        let mut protected = BTreeSet::new();
         for source in &sources {
             let state: String =
                 sqlx::query_scalar("SELECT state FROM colaboracion_files WHERE id=? FOR UPDATE")
@@ -367,16 +368,11 @@ impl CollaborationService {
             }
             let file = crate::service::load_state(tx, *source, &state).await?;
             self.authorize_record(tx, actor, &file, "eliminar").await?;
-            let name = file.filename.to_ascii_lowercase();
-            if name == "config.typ"
-                || name == "variables.typ"
-                || name == "funciones.typ"
-                || name.starts_with("items")
-                || name.starts_with("lote")
-            {
-                return Err(CoreError::Invalid);
+            if protected_template_source(&file.filename) {
+                protected.insert(*source);
             }
         }
+        sources.retain(|source| !protected.contains(source));
         // A single source may be published under multiple names. Retire every
         // active alias before scheduling that shared file for deletion.
         let aliases: Vec<(u64, serde_json::Value)> = sqlx::query_as("SELECT f.id,v.definition_json FROM colaboracion_formularios f JOIN colaboracion_formulario_versiones v ON v.form_id=f.id AND v.revision=f.current_revision WHERE f.archived_at IS NULL FOR UPDATE")
@@ -426,6 +422,18 @@ impl CollaborationService {
         Ok(sources.into_iter().collect())
     }
 }
+fn protected_template_source(filename: &str) -> bool {
+    let name = filename.to_ascii_lowercase();
+    matches!(
+        name.as_str(),
+        "config.typ"
+            | "variables.typ"
+            | "funciones.typ"
+            | "carta-de-oferta.typ"
+            | "presentacion-de-oferta.typ"
+    ) || name.starts_with("items")
+        || name.starts_with("lote")
+}
 fn decode(
     id: u64,
     revision: u64,
@@ -449,6 +457,16 @@ fn decode(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn support_and_economic_sources_are_protected() {
+        for name in [
+            "config.typ", "variables.typ", "funciones.typ", "items1_bid.typ", "lote1-bid.typ",
+            "CARTA-DE-OFERTA.TYP", "presentacion-de-oferta.typ",
+        ] {
+            assert!(protected_template_source(name));
+        }
+        assert!(!protected_template_source("declaracion.typ"));
+    }
     fn schema(kind: VariableKind) -> FormDefinition {
         FormDefinition {
             template_source_id: None,
