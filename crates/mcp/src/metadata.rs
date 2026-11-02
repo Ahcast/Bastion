@@ -50,6 +50,7 @@ struct Document {
     client_name: Option<String>,
     redirect_uris: Vec<String>,
     token_endpoint_auth_method: Option<String>,
+    token_endpoint_auth_methods_supported: Option<Vec<String>>,
 }
 
 /// Validate bytes already fetched by a hardened HTTPS transport. That
@@ -74,9 +75,20 @@ pub fn validate_client_metadata(
     if document.client_id != client_id {
         return Err(MetadataError::IdentityMismatch);
     }
-    // This slice of the implementation is limited to public PKCE clients;
-    // confidential client authentication is not implemented yet.
-    if document.token_endpoint_auth_method.as_deref() != Some("none") {
+    // This server accepts only public clients. When a client publishes its
+    // supported methods, select "none" from the intersection; its singular
+    // field may express a preference that this server does not support.
+    let public_supported = match &document.token_endpoint_auth_methods_supported {
+        Some(methods) => {
+            !methods.is_empty()
+                && methods.len() <= 8
+                && methods.iter().all(|method| !method.is_empty() && method.len() <= 64)
+                && methods.iter().collect::<BTreeSet<_>>().len() == methods.len()
+                && methods.iter().any(|method| method == "none")
+        }
+        None => document.token_endpoint_auth_method.as_deref() == Some("none"),
+    };
+    if !public_supported {
         return Err(MetadataError::UnsupportedAuthentication);
     }
     let value: serde_json::Value =
@@ -86,11 +98,15 @@ pub fn validate_client_metadata(
         "client_secret",
         "client_secret_expires_at",
         "jwks",
-        "jwks_uri",
     ]
     .iter()
     .any(|key| object.contains_key(*key))
     {
+        return Err(MetadataError::UnsupportedAuthentication);
+    }
+    // A public client may publish a JWKS URI for other servers; Bastion does
+    // not fetch or use it, and still authenticates this client as "none".
+    if object.contains_key("jwks_uri") && document.token_endpoint_auth_methods_supported.is_none() {
         return Err(MetadataError::UnsupportedAuthentication);
     }
     if document.client_name.as_ref().is_none_or(|name| {
@@ -179,6 +195,30 @@ mod tests {
     use super::*;
     const ID: &str = "https://client.example/metadata.json";
     const VALID: &[u8] = br#"{"client_id":"https://client.example/metadata.json","client_name":"Example","redirect_uris":["https://client.example/callback","http://127.0.0.1:41234/cb"],"token_endpoint_auth_method":"none"}"#;
+
+    #[test]
+    fn accepts_public_method_from_supported_list_without_enabling_confidential_auth() {
+        let mut document: serde_json::Value = serde_json::from_slice(VALID).unwrap();
+        document["token_endpoint_auth_method"] = "private_key_jwt".into();
+        document["token_endpoint_auth_methods_supported"] = serde_json::json!(["none", "private_key_jwt"]);
+        document["jwks_uri"] = "https://client.example/jwks.json".into();
+        let check = |value: &serde_json::Value| {
+            validate_client_metadata(ID, ID, 200, value.to_string().as_bytes()).map(|_| ())
+        };
+        assert!(check(&document).is_ok());
+        let mut confidential = document.clone();
+        confidential["token_endpoint_auth_methods_supported"] = serde_json::json!(["private_key_jwt"]);
+        assert_eq!(check(&confidential), Err(MetadataError::UnsupportedAuthentication));
+        let mut duplicate = document.clone();
+        duplicate["token_endpoint_auth_methods_supported"] = serde_json::json!(["none", "none"]);
+        assert_eq!(check(&duplicate), Err(MetadataError::UnsupportedAuthentication));
+        let mut secret = document.clone();
+        secret["client_secret"] = "not-allowed".into();
+        assert_eq!(check(&secret), Err(MetadataError::UnsupportedAuthentication));
+        let mut wrong_type = document;
+        wrong_type["token_endpoint_auth_methods_supported"] = "none".into();
+        assert_eq!(check(&wrong_type), Err(MetadataError::InvalidDocument));
+    }
 
     #[test]
     fn validates_client_identity_and_preserves_exact_redirects() {
