@@ -312,6 +312,56 @@ mod tests {
         }
     }
     #[test]
+    fn custom_font_size_compiles_in_bid_and_std_table_contexts() {
+        let Some(bin) = std::env::var_os("BASTION_TYPST_BIN") else {
+            return;
+        };
+        let root = std::env::temp_dir().join(format!("bastion-tender-font-{}", std::process::id()));
+        std::fs::create_dir_all(&root).unwrap();
+        for style in ["bid", "std"] {
+            let mut input = variables();
+            input.iter_mut().find(|v| v.key == "stylo").unwrap().value = Some(json!(style));
+            let body = if style == "bid" {
+                "#{ set text(size: tamano_tabla)\n table(columns: 1, [Prueba]) }"
+            } else {
+                "#text(size: tamano_tabla)[#table(columns: 1, [Prueba])]"
+            };
+            let template = format!(
+                "#import \"items1_{style}.typ\": items\n#let tamano_tabla = 7pt\n#assert.eq(tamano_tabla, 9.5pt)\n#let total_lote = decimal(\"0.00\")\n{body}\n"
+            );
+            let mut sample = item();
+            if style == "std" {
+                sample.pais_origen.clear();
+                sample.transporte = "0.00".into();
+            }
+            let built = prepare_typst_lot_sources_with_sizes(
+                &input,
+                &BTreeMap::from([(1, vec![sample])]),
+                &BTreeMap::from([(1, "9.5".into())]),
+                1,
+                &template,
+            )
+            .unwrap();
+            for (name, content) in built.files {
+                std::fs::write(root.join(name), content).unwrap();
+            }
+            let output = std::process::Command::new(&bin)
+                .arg("compile")
+                .arg("--root")
+                .arg(&root)
+                .arg(root.join(format!("lote1-{style}.typ")))
+                .arg(root.join(format!("{style}.pdf")))
+                .output()
+                .unwrap();
+            assert!(
+                output.status.success(),
+                "{}",
+                String::from_utf8_lossy(&output.stderr)
+            );
+        }
+        let _ = std::fs::remove_dir_all(&root);
+    }
+    #[test]
     fn rejects_missing_or_invalid_data_and_unexpected_lots() {
         let mut data = variables();
         data.retain(|v| v.key != "inst");
