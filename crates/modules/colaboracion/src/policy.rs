@@ -19,6 +19,7 @@ pub(crate) fn canonical_upload_mime<'a>(
         .rsplit('.')
         .next()
         .is_some_and(|ext| ext.eq_ignore_ascii_case("typ"))
+        && detected.starts_with("text/")
         && std::str::from_utf8(bytes).is_ok()
         && !bytes
             .iter()
