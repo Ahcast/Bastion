@@ -163,8 +163,8 @@ pub fn draft_read_tool_registry() -> Result<ToolRegistry, RegistryError> {
         (
             "licitaciones",
             "editar_variables",
-            "Actualizar variables de un expediente en borrador, sin descartar lotes.",
-            json!({"type":"object","properties":{"id":{"type":"integer","minimum":1},"version":{"type":"integer","minimum":1},"variables":{"type":"array","items":{"type":"object"}}},"required":["id","version","variables"],"additionalProperties":false}),
+            "Reemplazar las variables de un expediente en borrador, sin descartar lotes.",
+            json!({"type":"object","properties":{"id":{"type":"integer","minimum":1},"version":{"type":"integer","minimum":1},"variables":{"type":"array","maxItems":100,"items":{"type":"object","additionalProperties":false,"properties":{"key":{"type":"string"},"label":{"type":"string"},"kind":{"enum":["text","integer","decimal","date","boolean"]},"value":{}},"required":["key","label","kind"]}}},"required":["id","version","variables"],"additionalProperties":false}),
             false,
         ),
         (

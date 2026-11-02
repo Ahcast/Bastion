@@ -296,6 +296,48 @@ async fn mysql57_read_tools_reuse_domain_authorization_and_validate_arguments() 
         .await
         .unwrap();
     assert_eq!(renamed["name"], "Oferta de prueba");
+    let variables = json!([
+        {"key":"lotes","label":"Lotes","kind":"integer","value":"1"},
+        {"key":"stylo","label":"Estilo","kind":"text","value":"bid"}
+    ]);
+    let configured = executor
+        .call(
+            &access,
+            "licitaciones.editar_variables",
+            json!({"id":tender_id,"version":2,"variables":variables}),
+        )
+        .await
+        .unwrap();
+    assert_eq!(configured["version"], 3);
+    let item = json!({"descripcion":"Equipo","pais_origen":"Honduras","fecha_entrega":"30 días","cantidad":"1","unidad":"und","transporte":"10.00","precio_unitario":"100.00"});
+    let edited = executor
+        .call(
+            &access,
+            "licitaciones.editar_lote",
+            json!({"id":tender_id,"version":3,"numero":1,"items":[item]}),
+        )
+        .await
+        .unwrap();
+    assert_eq!(edited["version"], 4);
+    let lot = executor
+        .call(
+            &access,
+            "licitaciones.consultar_lote",
+            json!({"id":tender_id,"numero":1}),
+        )
+        .await
+        .unwrap();
+    assert_eq!(lot["items"].as_array().unwrap().len(), 1);
+    assert_eq!(
+        executor
+            .call(
+                &access,
+                "licitaciones.editar_variables",
+                json!({"id":tender_id,"version":4,"variables":[]})
+            )
+            .await,
+        Err(ReadToolError::Conflict)
+    );
     assert_eq!(
         executor
             .call(

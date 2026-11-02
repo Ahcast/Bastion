@@ -70,6 +70,7 @@ export default function McpClients({ api, isAdministrator }: { api: ApiClient; i
 
   return <section><h1>Clientes MCP</h1><p>Solicita la habilitación de una aplicación y selecciona sus permisos en Bastion.</p><Notice>{error}</Notice>
     <label>Dirección de metadatos del cliente <input type="url" value={clientId} maxLength={2048} onChange={event => setClientId(event.currentTarget.value)} /></label>
+    <p>Para crear o editar en un módulo, solicita también su permiso de consulta.</p>
     <fieldset><legend>Permisos solicitados</legend>{options.map(option => <label key={option.scope}><input type="checkbox" checked={requested.includes(option.scope)} onChange={event => { const checked = event.currentTarget.checked; setRequested(current => checked ? [...current, option.scope] : current.filter(item => item !== option.scope)); }} /> {option.label}</label>)}</fieldset>
     <button type="button" disabled={busy} onClick={() => void submit()}>Solicitar revisión</button>
     <h2>Mis solicitudes</h2>{own === null ? <p role="status">Cargando…</p> : own.items.length === 0 ? <p>Sin solicitudes.</p> : <ul>{own.items.map(item => <li key={item.id}>{item.client_name}: {item.status === 'approved' ? 'Aprobada' : item.status === 'rejected' ? 'Rechazada' : 'Pendiente'} — Solicitados: {item.scopes.map(label).join(', ')}{item.status === 'approved' && (item.approved_scopes ? ` — Aprobados: ${item.approved_scopes.map(label).join(', ')}` : ' — Detalle de aprobación no disponible')}</li>)}</ul>}
