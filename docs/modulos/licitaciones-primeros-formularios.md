@@ -14,6 +14,8 @@ El 2026-11-01 se corrigió la carga de archivos `.typ` detectados por libmagic c
 
 El 2026-11-01 el usuario decidió retirar todas las plantillas Typst originales de Licitaciones, incluidas las económicas y las de soporte, para reemplazarlas por archivos nuevos. Se retiraron las cinco fuentes privadas restantes y se purgó el original de Colaboración; el catálogo y las referencias de formularios quedaron vacíos. Por solicitud expresa posterior se eliminaron también los dos respaldos privados que contenían las siete plantillas originales. Los datos y tamaños de los lotes se conservan. La generación de PDF de Licitaciones no estará disponible hasta instalar e integrar los nuevos archivos.
 
+Ese día se instalaron los nuevos archivos privados `lote1-bid.typ` (SHA-256 `8379dea873f8376b2276519ad96ff946028676ab0f519d7222101a011b4e87b2`) y `lote1-std.typ` (SHA-256 `3ebceb4883b29548da2277a0c6f646ce167484a093c08d65ac29ee7d4e6a63ba`). Se instaló la fuente Ubuntu `fonts-ibm-plex` 6.1.1-1. Ambas plantillas se compilaron con datos sintéticos en aislamiento, a 7 y 9.5 pt, verificando la fuente incluida en los cuatro PDF. Bastion conserva 7 pt como valor inicial y respeta los valores ya guardados. Aún faltan las nuevas plantillas de oferta BID y STD y `funciones.typ` para generar el expediente completo.
+
 ## Variables del expediente
 
 Los datos se capturan en Variables y se validan antes de entregarlos a Typst. `lpn`, `inst` y `descripcion` son texto; `dia`, `year` y `lotes` son enteros; `mes` se selecciona entre los meses del año; `stylo` se selecciona entre `bid` y `std`. `total_paginas` se calcula a partir de todas las páginas del PDF final, incluidos los PDF e imágenes adjuntos. No es editable como valor manual.
