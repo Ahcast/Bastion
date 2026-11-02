@@ -29,7 +29,7 @@ test('lot editor shows BID fields, lists all lots and sends one versioned lot', 
     await act(async()=>[...container.querySelectorAll('button')].find(b=>b.textContent==='Quitar')!.click());
     assert.equal(container.querySelectorAll('tbody tr').length,1); assert.equal(container.querySelector('tbody tr td')?.textContent,'1');
     await act(async()=>container.querySelector('form')!.dispatchEvent(new Event('submit',{bubbles:true,cancelable:true})));
-    assert.deepEqual(JSON.parse(String(writes[0]!.body)), {items:[item]}); assert.equal(new Headers(writes[0]!.headers).get('if-match'),'"1"');
+    assert.deepEqual(JSON.parse(String(writes[0]!.body)), {items:[item],tamano_tabla:'7'}); assert.equal(new Headers(writes[0]!.headers).get('if-match'),'"1"');
   } finally { await act(async()=>root.unmount());container.remove(); }
 });
 test('PDF order can be changed with accessible controls and saved', async () => {
@@ -55,6 +55,28 @@ test('lot drafts survive changing the selected lot', async () => {
     await act(async()=>{select.value='2';select.dispatchEvent(new Event('change',{bubbles:true}));});
     await act(async()=>{select.value='1';select.dispatchEvent(new Event('change',{bubbles:true}));});
     assert.equal(container.querySelector('textarea')?.value,'Equipo');
+  } finally { await act(async()=>root.unmount()); container.remove(); }
+});
+test('table font size is kept separately for each lot and saved in points', async () => {
+  const writes: {lot:number; body:{tamano_tabla:string}}[] = [];
+  const api = new ApiClient('https://example.test', async (url,init={}) => {
+    const lot=Number(new URL(String(url)).pathname.split('/').at(-1));
+    if(init.method==='PUT'){writes.push({lot,body:JSON.parse(String(init.body))});return Response.json({...record,version:2});}
+    return Response.json({numero:lot,items:[],tamano_tabla:'7',total:'0.00',version:1});
+  });
+  const container=document.createElement('div'); document.body.append(container); const root=createRoot(container);
+  try {
+    await act(async()=>root.render(<NavigationGuardProvider><CoreContext.Provider value={{api,access,notify:()=>{}}}><TenderLots record={record} editable saved={()=>{}} /></CoreContext.Provider></NavigationGuardProvider>));
+    const setter=Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,'value')!.set!;
+    const size=()=>container.querySelector<HTMLInputElement>('input[type="number"]')!;
+    await act(async()=>{setter.call(size(),'8.5');size().dispatchEvent(new Event('input',{bubbles:true}));});
+    const select=container.querySelector('select')!; await act(async()=>{select.value='2';select.dispatchEvent(new Event('change',{bubbles:true}));});
+    assert.equal(size().value,'7');
+    await act(async()=>{setter.call(size(),'9');size().dispatchEvent(new Event('input',{bubbles:true}));});
+    await act(async()=>{select.value='1';select.dispatchEvent(new Event('change',{bubbles:true}));});
+    assert.equal(size().value,'8.5');
+    await act(async()=>container.querySelector('form')!.dispatchEvent(new Event('submit',{bubbles:true,cancelable:true})));
+    assert.deepEqual(writes.map(x=>[x.lot,x.body.tamano_tabla]),[[1,'8.5'],[2,'9']]);
   } finally { await act(async()=>root.unmount()); container.remove(); }
 });
 test('a newly selected lot cannot be edited with the previous lot response', async () => {
