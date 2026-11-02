@@ -326,21 +326,33 @@ mod tests {
             } else {
                 "#text(size: tamano_tabla)[#table(columns: 1, [Prueba])]"
             };
-            let template = format!("#import \"items1_{style}.typ\": items\n#let tamano_tabla = 7pt\n#assert.eq(tamano_tabla, 9.5pt)\n#let total_lote = decimal(\"0.00\")\n{body}\n");
+            let template = format!(
+                "#import \"items1_{style}.typ\": items\n#let tamano_tabla = 7pt\n#assert.eq(tamano_tabla, 9.5pt)\n#let total_lote = decimal(\"0.00\")\n{body}\n"
+            );
             let built = prepare_typst_lot_sources_with_sizes(
                 &input,
                 &BTreeMap::from([(1, vec![item()])]),
                 &BTreeMap::from([(1, "9.5".into())]),
                 1,
                 &template,
-            ).unwrap();
-            for (name, content) in built.files { std::fs::write(root.join(name), content).unwrap(); }
+            )
+            .unwrap();
+            for (name, content) in built.files {
+                std::fs::write(root.join(name), content).unwrap();
+            }
             let output = std::process::Command::new(&bin)
-                .arg("compile").arg("--root").arg(&root)
+                .arg("compile")
+                .arg("--root")
+                .arg(&root)
                 .arg(root.join(format!("lote1-{style}.typ")))
                 .arg(root.join(format!("{style}.pdf")))
-                .output().unwrap();
-            assert!(output.status.success(), "{}", String::from_utf8_lossy(&output.stderr));
+                .output()
+                .unwrap();
+            assert!(
+                output.status.success(),
+                "{}",
+                String::from_utf8_lossy(&output.stderr)
+            );
         }
         let _ = std::fs::remove_dir_all(&root);
     }
