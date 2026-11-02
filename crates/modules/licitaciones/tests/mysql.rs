@@ -462,14 +462,16 @@ async fn mysql57_tenders_snapshots_permissions_races_receipts_and_deletion() {
         .await
         .unwrap();
     tenders
-        .save_lot(1, exp.id, 1, 5, LotInput { items: vec![row()] })
+        .save_lot_with_font_size(1, exp.id, 1, 5, LotInput { items: vec![row()] }, Some("8.5".into()))
         .await
         .unwrap();
     tenders
-        .save_lot(1, exp.id, 2, 6, LotInput { items: vec![row()] })
+        .save_lot_with_font_size(1, exp.id, 2, 6, LotInput { items: vec![row()] }, Some("9".into()))
         .await
         .unwrap();
     assert_eq!(tenders.lot(1, exp.id, 1).await.unwrap().total, "297.50");
+    assert_eq!(tenders.lot(1, exp.id, 1).await.unwrap().tamano_tabla, "8.5");
+    assert_eq!(tenders.lot(1, exp.id, 2).await.unwrap().tamano_tabla, "9");
     assert!(matches!(
         tenders
             .save_global_variables(1, exp.id, 7, config("std", "1"), false)
@@ -482,6 +484,7 @@ async fn mysql57_tenders_snapshots_permissions_races_receipts_and_deletion() {
         .await
         .unwrap();
     let lot = tenders.lot(1, exp.id, 1).await.unwrap();
+    assert_eq!(lot.tamano_tabla, "8.5");
     assert_eq!(lot.total, "287.50");
     assert!(lot.items[0].pais_origen.is_empty());
     assert_eq!(lot.items[0].transporte, "0.00");

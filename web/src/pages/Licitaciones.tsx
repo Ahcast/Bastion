@@ -48,7 +48,7 @@ function ExpedientWorkspace({ id, back }: { id: number; back: () => void }) {
   const saved = (value: Expedient) => { currentRecord.current = value; result.setData(value); };
   const [savingAll, setSavingAll] = useState(false);
   const [draftVariables, setDraftVariables] = useState<GlobalVariable[] | null>(null);
-  const [draftLots, setDraftLots] = useState<{numero:number; items:number}[]>([]);
+  const [draftLots, setDraftLots] = useState<{numero:number; items:number; tamano_tabla?:string}[]>([]);
   const editable = record?.state === 'borrador' && moduleCan(access, 'licitaciones', 'expedientes', 'editar');
   const tabs: { id: Tab; label: string }[] = [{ id: 'resumen', label: 'Resumen' }, { id: 'variables', label: 'Variables' }, ...Object.entries(sectionLabels).map(([key, label]) => ({ id: key as FormSection, label })), { id: 'pdf', label: 'PDF final' }];
   return <><Heading title={record?.name || `Expediente #${id}`} description={`Expediente #${id} · Cada formulario conserva su revisión de biblioteca.`} action={<div className="actions"><button disabled={savingAll} onClick={() => { void navigate(back); }}>Volver al listado</button>{editable && <button className="primary" disabled={savingAll} onClick={async () => { setSavingAll(true); try { if (await saveAll()) notify('Expediente guardado.'); } finally { setSavingAll(false); } }}>{savingAll ? 'Guardando…' : 'Guardar expediente'}</button>}</div>} />
@@ -105,7 +105,7 @@ function ExpedientName({ record, latest, editable, saved, reload }: { record: Ex
     </fieldset>
   </form>;
 }
-function GlobalVariablesEditor({ record, latest, onDraft, draftLots, editable, saved, reload }: { record: Expedient; latest: () => Expedient; onDraft: (value: GlobalVariable[]) => void; draftLots: {numero:number;items:number}[]; editable: boolean; saved: (value: Expedient) => void; reload: () => void }) {
+function GlobalVariablesEditor({ record, latest, onDraft, draftLots, editable, saved, reload }: { record: Expedient; latest: () => Expedient; onDraft: (value: GlobalVariable[]) => void; draftLots: {numero:number;items:number;tamano_tabla?:string}[]; editable: boolean; saved: (value: Expedient) => void; reload: () => void }) {
   const { api } = useCore();
   const fixed: GlobalVariable[] = [
     {key:'lpn', label:'LPN', kind:'text', value:null}, {key:'inst', label:'Institución', kind:'text', value:null},
@@ -128,9 +128,9 @@ function GlobalVariablesEditor({ record, latest, onDraft, draftLots, editable, s
         const nextStyle = variables.find(v => v.key === 'stylo')?.value ?? null;
         const nextCount = Number(variables.find(v => v.key === 'lotes')?.value ?? 0);
         if (oldStyle !== nextStyle || Number(current.variables?.find(v => v.key === 'lotes')?.value ?? 0) > nextCount) {
-          const lots = await api.request<{numero:number;items:number}[]>(`/api/v1/licitaciones/${record.id}/lotes`);
-          const affected = [...lots, ...draftLots].filter(l => l.items > 0 && (l.numero > nextCount || (oldStyle === 'bid' && nextStyle === 'std') || !nextStyle)).filter((l, i, all) => all.findIndex(other => other.numero === l.numero) === i);
-          if (affected.length) { setDiscard(affected.map(l => `Lote ${l.numero}: ${l.items} ítem(s)${l.numero <= nextCount && nextStyle ? ', país de origen y transporte' : ', todos sus datos'}`)); return false; }
+          const lots = await api.request<{numero:number;items:number;tamano_tabla?:string}[]>(`/api/v1/licitaciones/${record.id}/lotes`);
+          const affected = [...lots, ...draftLots].filter(l => ((l.numero > nextCount || !nextStyle) && (l.items > 0 || Number(l.tamano_tabla ?? '7') !== 7)) || (l.items > 0 && oldStyle === 'bid' && nextStyle === 'std')).filter((l, i, all) => all.findIndex(other => other.numero === l.numero) === i);
+          if (affected.length) { setDiscard(affected.map(l => `Lote ${l.numero}: ${l.items} ítem(s)${l.numero <= nextCount && nextStyle ? ', país de origen y transporte' : ', todos sus datos y tamaño de tabla'}`)); return false; }
         }
       }
       const updated = await api.request<Expedient>(`/api/v1/licitaciones/${record.id}/variables`, { method: 'PUT', body: { variables, confirm_discard:confirmDiscard }, ifMatch: latest().version }); baseline.current = JSON.stringify(variables); setDiscard(null); saved(updated); return true;
