@@ -209,6 +209,7 @@ async fn mysql57_client_request_http_checks_session_csrf_admin_and_scope() {
     );
     assert_eq!(hits.load(Ordering::SeqCst), 2);
     let pending = router
+        .clone()
         .oneshot(request(
             "/oauth/clients/pending",
             &admin_session,
@@ -232,4 +233,178 @@ async fn mysql57_client_request_http_checks_session_csrf_admin_and_scope() {
         .await
         .unwrap();
     assert_eq!(grants, 0);
+    let managed = |path: &str, session: &str, body: serde_json::Value| {
+        request(path, session, "https://app.example.invalid", body)
+    };
+    assert_eq!(
+        router
+            .clone()
+            .oneshot(managed(
+                "/oauth/clients/admin/list",
+                &user_session,
+                json!({})
+            ))
+            .await
+            .unwrap()
+            .status(),
+        StatusCode::FORBIDDEN
+    );
+    let list = router
+        .clone()
+        .oneshot(managed(
+            "/oauth/clients/admin/list",
+            &admin_session,
+            json!({}),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(list.status(), StatusCode::OK);
+    let body: serde_json::Value =
+        serde_json::from_slice(&to_bytes(list.into_body(), 8192).await.unwrap()).unwrap();
+    let client = body["items"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|c| c["client_id"] == "https://fixture.example/metadata.json")
+        .unwrap();
+    let client_id = client["id"].as_u64().unwrap();
+    let add = json!({"id":client_id,"expected_scopes":["cotizaciones:read"],"scopes":["cotizaciones:read","facturas:read"]});
+    assert_eq!(
+        router
+            .clone()
+            .oneshot(request(
+                "/oauth/clients/admin/scopes",
+                &admin_session,
+                "https://evil.invalid",
+                add.clone()
+            ))
+            .await
+            .unwrap()
+            .status(),
+        StatusCode::FORBIDDEN
+    );
+    assert_eq!(router.clone().oneshot(managed("/oauth/clients/admin/scopes", &admin_session, json!({"id":client_id,"expected_scopes":["cotizaciones:read"],"scopes":["facturas:write"]}))).await.unwrap().status(), StatusCode::BAD_REQUEST);
+    assert_eq!(
+        router
+            .clone()
+            .oneshot(managed(
+                "/oauth/clients/admin/scopes",
+                &user_session,
+                add.clone()
+            ))
+            .await
+            .unwrap()
+            .status(),
+        StatusCode::FORBIDDEN
+    );
+    assert_eq!(
+        router
+            .clone()
+            .oneshot(managed(
+                "/oauth/clients/admin/scopes",
+                &admin_session,
+                add.clone()
+            ))
+            .await
+            .unwrap()
+            .status(),
+        StatusCode::OK
+    );
+    assert_eq!(
+        router
+            .clone()
+            .oneshot(managed("/oauth/clients/admin/scopes", &admin_session, add))
+            .await
+            .unwrap()
+            .status(),
+        StatusCode::CONFLICT
+    );
+    for scope in ["cotizaciones:read", "facturas:read"] {
+        sqlx::query("INSERT INTO oauth_grants (user_id,client_id,resource_uri,scopes_json,issued_at,expires_at) VALUES (?,?,'https://api.example.invalid/mcp',JSON_ARRAY(?),UTC_TIMESTAMP(6),UTC_TIMESTAMP(6)+INTERVAL 1 DAY)")
+            .bind(user).bind(client_id).bind(scope).execute(&pool).await.unwrap();
+    }
+    let reduce = json!({"id":client_id,"expected_scopes":["cotizaciones:read","facturas:read"],"scopes":["facturas:read"]});
+    assert_eq!(
+        router
+            .clone()
+            .oneshot(managed(
+                "/oauth/clients/admin/scopes",
+                &admin_session,
+                reduce
+            ))
+            .await
+            .unwrap()
+            .status(),
+        StatusCode::OK
+    );
+    let active: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM oauth_grants WHERE client_id=? AND revoked_at IS NULL",
+    )
+    .bind(client_id)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(active, 1);
+    let remove =
+        json!({"id":client_id,"confirmed_client_id":"https://fixture.example/metadata.json"});
+    assert_eq!(
+        router
+            .clone()
+            .oneshot(managed(
+                "/oauth/clients/admin/disable",
+                &user_session,
+                remove.clone()
+            ))
+            .await
+            .unwrap()
+            .status(),
+        StatusCode::FORBIDDEN
+    );
+    assert_eq!(
+        router
+            .clone()
+            .oneshot(managed(
+                "/oauth/clients/admin/disable",
+                &admin_session,
+                json!({"id":client_id,"confirmed_client_id":"wrong"})
+            ))
+            .await
+            .unwrap()
+            .status(),
+        StatusCode::CONFLICT
+    );
+    assert_eq!(
+        router
+            .clone()
+            .oneshot(managed(
+                "/oauth/clients/admin/disable",
+                &admin_session,
+                remove
+            ))
+            .await
+            .unwrap()
+            .status(),
+        StatusCode::OK
+    );
+    let (enabled,): (bool,) = sqlx::query_as("SELECT enabled FROM oauth_clients WHERE id=?")
+        .bind(client_id)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert!(!enabled);
+    let active: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM oauth_grants WHERE client_id=? AND revoked_at IS NULL",
+    )
+    .bind(client_id)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(active, 0);
+    let scopes_left: i64 =
+        sqlx::query_scalar("SELECT COUNT(*) FROM oauth_client_scopes WHERE client_id=?")
+            .bind(client_id)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!(scopes_left, 0);
 }

@@ -49,6 +49,20 @@ pub struct ClientRequestPage {
     pub next_before: Option<u64>,
 }
 
+#[derive(serde::Serialize)]
+pub struct ManagedClient {
+    pub id: u64,
+    pub client_id: String,
+    pub client_name: String,
+    pub scopes: Vec<String>,
+}
+
+#[derive(serde::Serialize)]
+pub struct ManagedClientPage {
+    pub items: Vec<ManagedClient>,
+    pub next_before: Option<u64>,
+}
+
 fn valid_scopes(scopes: &BTreeSet<String>, registered: &BTreeSet<String>) -> bool {
     !scopes.is_empty()
         && scopes.len() <= 64
@@ -65,6 +79,158 @@ fn valid_scopes(scopes: &BTreeSet<String>, registered: &BTreeSet<String>) -> boo
 impl ClientRequestStore {
     pub fn new(pool: MySqlPool) -> Self {
         Self { pool }
+    }
+
+    async fn admin_session<S: ConsentPolicy>(
+        tx: &mut Transaction<'_, MySql>,
+        policy: &S,
+        session: &str,
+    ) -> Result<u64, ClientRequestError> {
+        let identity = policy
+            .session(tx, session)
+            .await?
+            .ok_or(ClientRequestError::Forbidden)?;
+        let actor = sqlx::query_scalar::<_, u64>("SELECT u.id FROM users u JOIN roles r ON r.id=u.role_id WHERE u.id=? AND u.status='active' AND r.system_key='system_administrator' FOR UPDATE")
+            .bind(identity.user_id).fetch_optional(&mut **tx).await?;
+        actor.ok_or(ClientRequestError::Forbidden)
+    }
+
+    /// List enabled clients, not historical approval requests.
+    pub async fn list_managed_for_session<S: ConsentPolicy>(
+        &self,
+        policy: &S,
+        session: &str,
+        before: Option<u64>,
+    ) -> Result<ManagedClientPage, ClientRequestError> {
+        if before == Some(0) {
+            return Err(ClientRequestError::Invalid);
+        }
+        let mut tx = self.pool.begin().await?;
+        Self::admin_session(&mut tx, policy, session).await?;
+        let rows: Vec<(u64, String, String)> = sqlx::query_as("SELECT id,client_id,display_name FROM oauth_clients WHERE enabled=1 AND (? IS NULL OR id<?) ORDER BY id DESC LIMIT 51")
+            .bind(before).bind(before).fetch_all(&mut *tx).await?;
+        let has_more = rows.len() > 50;
+        let mut items = Vec::new();
+        for (id, client_id, client_name) in rows.into_iter().take(50) {
+            let scopes = sqlx::query_scalar::<_, String>(
+                "SELECT scope_name FROM oauth_client_scopes WHERE client_id=? ORDER BY scope_name",
+            )
+            .bind(id)
+            .fetch_all(&mut *tx)
+            .await?;
+            items.push(ManagedClient {
+                id,
+                client_id,
+                client_name,
+                scopes,
+            });
+        }
+        let next_before = if has_more {
+            items.last().map(|client| client.id)
+        } else {
+            None
+        };
+        tx.commit().await?;
+        Ok(ManagedClientPage { items, next_before })
+    }
+
+    /// Replace the scope ceiling only if the reviewed current value still matches.
+    pub async fn update_managed_for_session<S: ConsentPolicy>(
+        &self,
+        policy: &S,
+        session: &str,
+        id: u64,
+        expected: &BTreeSet<String>,
+        desired: &BTreeSet<String>,
+        registered: &BTreeSet<String>,
+    ) -> Result<(), ClientRequestError> {
+        if id == 0 || !valid_scopes(desired, registered) || expected.len() > 64 {
+            return Err(ClientRequestError::Invalid);
+        }
+        let mut tx = self.pool.begin().await?;
+        let actor = Self::admin_session(&mut tx, policy, session).await?;
+        let enabled = sqlx::query_scalar::<_, bool>(
+            "SELECT enabled FROM oauth_clients WHERE id=? FOR UPDATE",
+        )
+        .bind(id)
+        .fetch_optional(&mut *tx)
+        .await?
+        .ok_or(ClientRequestError::NotFound)?;
+        if !enabled {
+            return Err(ClientRequestError::Conflict);
+        }
+        let current: BTreeSet<String> = sqlx::query_scalar(
+            "SELECT scope_name FROM oauth_client_scopes WHERE client_id=? FOR UPDATE",
+        )
+        .bind(id)
+        .fetch_all(&mut *tx)
+        .await?
+        .into_iter()
+        .collect();
+        if current != *expected {
+            return Err(ClientRequestError::Conflict);
+        }
+        if current != *desired {
+            for removed in current.difference(desired) {
+                sqlx::query("UPDATE oauth_grants SET revoked_at=UTC_TIMESTAMP(6),revocation_reason='scope_removed' WHERE client_id=? AND revoked_at IS NULL AND JSON_CONTAINS(scopes_json,JSON_QUOTE(?),'$')=1")
+                    .bind(id).bind(removed).execute(&mut *tx).await?;
+                sqlx::query("DELETE FROM oauth_client_scopes WHERE client_id=? AND scope_name=?")
+                    .bind(id)
+                    .bind(removed)
+                    .execute(&mut *tx)
+                    .await?;
+            }
+            for added in desired.difference(&current) {
+                sqlx::query("INSERT INTO oauth_client_scopes (client_id,scope_name) VALUES (?,?)")
+                    .bind(id)
+                    .bind(added)
+                    .execute(&mut *tx)
+                    .await?;
+            }
+            sqlx::query("INSERT INTO audit_events (actor_id,module_id,action,target_type,target_id,result,created_at) VALUES (?,'core','oauth.client.scopes.replace','oauth_client',?,'success',UTC_TIMESTAMP(6))")
+                .bind(actor).bind(id.to_string()).execute(&mut *tx).await?;
+        }
+        tx.commit().await?;
+        Ok(())
+    }
+
+    /// Disable instead of deleting historical audit records; invalidate all grants.
+    pub async fn disable_managed_for_session<S: ConsentPolicy>(
+        &self,
+        policy: &S,
+        session: &str,
+        id: u64,
+        confirmed_client_id: &str,
+    ) -> Result<(), ClientRequestError> {
+        if id == 0 || confirmed_client_id.is_empty() || confirmed_client_id.len() > 2048 {
+            return Err(ClientRequestError::Invalid);
+        }
+        let mut tx = self.pool.begin().await?;
+        let actor = Self::admin_session(&mut tx, policy, session).await?;
+        let (identity, enabled): (String, bool) =
+            sqlx::query_as("SELECT client_id,enabled FROM oauth_clients WHERE id=? FOR UPDATE")
+                .bind(id)
+                .fetch_optional(&mut *tx)
+                .await?
+                .ok_or(ClientRequestError::NotFound)?;
+        if identity != confirmed_client_id || !enabled {
+            return Err(ClientRequestError::Conflict);
+        }
+        sqlx::query("UPDATE oauth_clients SET enabled=0,updated_at=UTC_TIMESTAMP(6) WHERE id=?")
+            .bind(id)
+            .execute(&mut *tx)
+            .await?;
+        sqlx::query("UPDATE oauth_grants SET revoked_at=UTC_TIMESTAMP(6),revocation_reason='client_revoked' WHERE client_id=? AND revoked_at IS NULL").bind(id).execute(&mut *tx).await?;
+        sqlx::query("UPDATE oauth_client_requests SET status='rejected',reviewed_by=?,reviewed_at=UTC_TIMESTAMP(6),updated_at=UTC_TIMESTAMP(6) WHERE client_id=? AND status='pending'")
+            .bind(actor).bind(id).execute(&mut *tx).await?;
+        sqlx::query("DELETE FROM oauth_client_scopes WHERE client_id=?")
+            .bind(id)
+            .execute(&mut *tx)
+            .await?;
+        sqlx::query("INSERT INTO audit_events (actor_id,module_id,action,target_type,target_id,result,created_at) VALUES (?,'core','oauth.client.revoke','oauth_client',?,'success',UTC_TIMESTAMP(6))")
+            .bind(actor).bind(id.to_string()).execute(&mut *tx).await?;
+        tx.commit().await?;
+        Ok(())
     }
 
     /// Called only with freshly fetched, validated metadata. A detected change

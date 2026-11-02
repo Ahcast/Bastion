@@ -51,6 +51,8 @@ El informe se obtuvo de una copia de frontend Angular compilado y backend Larave
 
 ## Registro de decisiones
 
+- 2026-11-01: se solicita editar y eliminar clientes MCP desde Ajustes. La eliminación desactiva al cliente y revoca sus autorizaciones, sin borrar el historial; ver `06-mcp.md`.
+
 - 2026-11-01: el usuario autoriza consultas MCP de Licitaciones y creación y edición de borradores. Para órdenes, autoriza usar Pendiente como etapa inicial, sin productos comprados ni entregas. Los alcances de escritura son independientes y requieren aprobación y consentimiento; ver `06-mcp.md`.
 
 - 2026-10-28: el usuario autoriza editar facturas Enviadas; Pagado continúa sin edición y solo se eliminan borradores sin pagos. Se conserva número SAR, pagos y datos fiscales capturados. Ver `modulos/facturas-acciones.md`.

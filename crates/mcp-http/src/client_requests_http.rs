@@ -85,6 +85,9 @@ pub fn draft_client_request_router<F: ClientMetadataSource>(
         .route("/oauth/clients/mine", post(mine::<F>))
         .route("/oauth/clients/pending", post(pending::<F>))
         .route("/oauth/clients/review", post(review::<F>))
+        .route("/oauth/clients/admin/list", post(managed_list::<F>))
+        .route("/oauth/clients/admin/scopes", post(managed_scopes::<F>))
+        .route("/oauth/clients/admin/disable", post(managed_disable::<F>))
         .layer(DefaultBodyLimit::max(16 * 1024))
         .with_state(state)
 }
@@ -107,6 +110,19 @@ struct Review {
     decision: String,
     client_id: Option<String>,
     scopes: Option<Vec<String>>,
+}
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct UpdateManaged {
+    id: u64,
+    expected_scopes: Vec<String>,
+    scopes: Vec<String>,
+}
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct DisableManaged {
+    id: u64,
+    confirmed_client_id: String,
 }
 
 fn scopes(values: Vec<String>) -> Result<BTreeSet<String>, StatusCode> {
@@ -213,6 +229,104 @@ async fn pending<F: ClientMetadataSource>(
     body: Bytes,
 ) -> Response {
     list(state, headers, body, true).await
+}
+
+async fn managed_list<F: ClientMetadataSource>(
+    State(state): State<DraftClientRequestState<F>>,
+    headers: HeaderMap,
+    body: Bytes,
+) -> Response {
+    let session = match browser_session(&state.core, &state.origin, &headers).await {
+        Ok(v) => v,
+        Err(s) => return error(s),
+    };
+    let input: List = match serde_json::from_slice(&body) {
+        Ok(v) => v,
+        Err(_) => return error(StatusCode::BAD_REQUEST),
+    };
+    match ClientRequestStore::new(state.pool)
+        .list_managed_for_session(&CoreConsentPolicy, &session, input.before)
+        .await
+    {
+        Ok(page) => match serde_json::to_value(page) {
+            Ok(value) => response(StatusCode::OK, value),
+            Err(_) => error(StatusCode::SERVICE_UNAVAILABLE),
+        },
+        Err(e) => error(status(e)),
+    }
+}
+
+async fn managed_scopes<F: ClientMetadataSource>(
+    State(state): State<DraftClientRequestState<F>>,
+    headers: HeaderMap,
+    body: Bytes,
+) -> Response {
+    let session = match browser_session(&state.core, &state.origin, &headers).await {
+        Ok(v) => v,
+        Err(s) => return error(s),
+    };
+    let input: UpdateManaged = match serde_json::from_slice(&body) {
+        Ok(v) => v,
+        Err(_) => return error(StatusCode::BAD_REQUEST),
+    };
+    let expected_count = input.expected_scopes.len();
+    let expected: BTreeSet<String> = input.expected_scopes.into_iter().collect();
+    if expected_count != expected.len() || expected_count > 64 {
+        return error(StatusCode::BAD_REQUEST);
+    }
+    let desired = match scopes(input.scopes) {
+        Ok(v) => v,
+        Err(s) => return error(s),
+    };
+    if desired
+        .iter()
+        .filter_map(|scope| scope.strip_suffix(":write"))
+        .any(|module| !desired.contains(&format!("{module}:read")))
+    {
+        return error(StatusCode::BAD_REQUEST);
+    }
+    let registered = approved_read_requirements().into_keys().collect();
+    match ClientRequestStore::new(state.pool)
+        .update_managed_for_session(
+            &CoreConsentPolicy,
+            &session,
+            input.id,
+            &expected,
+            &desired,
+            &registered,
+        )
+        .await
+    {
+        Ok(()) => response(StatusCode::OK, json!({"status":"updated"})),
+        Err(e) => error(status(e)),
+    }
+}
+
+async fn managed_disable<F: ClientMetadataSource>(
+    State(state): State<DraftClientRequestState<F>>,
+    headers: HeaderMap,
+    body: Bytes,
+) -> Response {
+    let session = match browser_session(&state.core, &state.origin, &headers).await {
+        Ok(v) => v,
+        Err(s) => return error(s),
+    };
+    let input: DisableManaged = match serde_json::from_slice(&body) {
+        Ok(v) => v,
+        Err(_) => return error(StatusCode::BAD_REQUEST),
+    };
+    match ClientRequestStore::new(state.pool)
+        .disable_managed_for_session(
+            &CoreConsentPolicy,
+            &session,
+            input.id,
+            &input.confirmed_client_id,
+        )
+        .await
+    {
+        Ok(()) => response(StatusCode::OK, json!({"status":"disabled"})),
+        Err(e) => error(status(e)),
+    }
 }
 
 async fn review<F: ClientMetadataSource>(
