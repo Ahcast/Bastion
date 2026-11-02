@@ -1,6 +1,6 @@
 # Documentación del nuevo CastilloIT
 
-- 2026-11-01 (Honduras): MCP y OAuth habilitados en AWS y frontend en Bluehost con la revisión `69b311df41eee0defbbcb27c28317b9394a0d4bf`; respaldo y restauración de prueba verificados. La primera versión consulta cotizaciones, facturas y órdenes de compra. Queda pendiente una prueba con usuario y cliente real. Ver `06-mcp.md` y `09-despliegue.md`.
+- 2026-11-01 (Honduras): MCP y OAuth habilitados en AWS y frontend en Bluehost con backend `719570a1a67b973b1b48cd3ac4c776f6a432c6ae` y frontend `69b311df41eee0defbbcb27c28317b9394a0d4bf`; respaldo y restauración de prueba verificados. La primera versión consulta cotizaciones, facturas y órdenes de compra. Queda pendiente una prueba con usuario y cliente real. Ver `06-mcp.md` y `09-despliegue.md`.
 
 - 2026-10-27: el usuario solicita permitir `.typ`, `.png` y `.jpeg` en Colaboración. `.png` y `.jpeg` ya estaban en la política predeterminada; se conserva su validación MIME. Se añade `.typ` como texto plano (`text/plain`), sujeto a los controles existentes contra scripts, HTML activo y ejecutables. No habilita ejecución de Typst ni añade funciones de plantillas de Licitaciones. Ver `modulos/colaboracion-y-archivos.md` y `modulos/colaboracion-implementacion.md`.
 
