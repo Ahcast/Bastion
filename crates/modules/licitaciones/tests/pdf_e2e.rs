@@ -170,7 +170,6 @@ async fn isolated_job_generates_and_downloads_a_multipage_tiff() {
     );
     std::fs::remove_file(&output).unwrap();
     // Preview ignores legal templates and does not replace the final job.
-    std::fs::remove_file(std::path::Path::new(&template_dir).join("dj-integridad.typ")).unwrap();
     let preview = service
         .preview_economic_offer(1, exp.id, exp.version)
         .await
