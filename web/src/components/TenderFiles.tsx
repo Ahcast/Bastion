@@ -38,7 +38,7 @@ export default function TenderFiles({ record, section, changed, start, extraRows
     <p className="document-note">PDF e imágenes, hasta 100 MB por archivo y 1 GB por expediente. Los archivos de Colaboración se referencian al original.</p><Notice>{error || result.error}</Notice>
     {result.data ? <><Table columns={['Archivo','Tamaño','Origen','Acciones']} rows={[...result.data.items.filter(f => f.section === section).map(file => [file.filename,tenderSize(file.byte_size),file.is_reference ? 'Referencia de Colaboración' : file.source_id ? 'Copia anterior' : 'PC',<div className="actions">{file.available && file.mime !== 'image/tiff' && <button disabled={busy} onClick={() => { void read(file,true); }}>Ver</button>}{file.available && <button disabled={busy} onClick={() => { void read(file,false); }}>Descargar</button>}{canRemove && <button className="danger" disabled={busy} onClick={() => start(() => setRemoving(file))}>Quitar archivo</button>}</div>]), ...extraRows]} /><p className="document-note">Espacio retenido en el expediente: {tenderSize(result.data.retained_bytes)} de 1 GB.</p></> : !result.error && <Loading />}
     {upload && <UploadFiles record={record} section={section} changed={changed} close={() => setUpload(false)} />}
-    {library && <LibraryFiles record={record} section={section} changed={value => { changed(value); setLibrary(false); }} close={() => setLibrary(false)} />}
+    {library && <LibraryFiles record={record} section={section} changed={changed} close={() => setLibrary(false)} />}
     {removing && <RemoveFile record={record} file={removing} changed={value => { changed(value); setRemoving(null); }} close={() => setRemoving(null)} />}
     {preview && <Dialog title={preview.title} close={() => setPreview(null)}><img className="collaboration-image" src={preview.url} alt={preview.title} /></Dialog>}
   </div>;
@@ -67,11 +67,27 @@ function UploadFiles({ record, section, changed, close }: { record: Expedient; s
 function LibraryFiles({ record,section,changed,close }: { record: Expedient; section: AttachmentSection; changed: (value: Expedient) => void; close: () => void }) {
   const { api } = useCore();
   const [page,setPage] = useState(1), [search,setSearch] = useState(''), [query,setQuery] = useState(''), [busy,setBusy] = useState(false), [error,setError] = useState('');
-  const attempt = useRef<{ id: number; key: string } | null>(null);
+  const [selected, setSelected] = useState<{ file: CollaborationFile; key: string }[]>([]);
+  const [conflict, setConflict] = useState(false);
+  const version = useRef(record.version);
   useUnsavedChanges(false,busy);
   const result = useLoad(signal => api.request<FilePage<CollaborationFile>>(`/api/v1/colaboracion?trash=false&search=${encodeURIComponent(query)}&page=${page}&page_size=25`, { signal }), [query,page]);
   return <Dialog title="Seleccionar archivo de Colaboración" close={() => { if (!busy) close(); }}><p className="document-note">Sólo se muestran PDF e imágenes de las carpetas que puedes leer. Se crea una referencia al original en Colaboración; su disponibilidad y permisos se comprueban al abrirlo.</p><form className="row" onSubmit={event => { event.preventDefault(); setQuery(search); setPage(1); }}><label>Buscar archivo<input value={search} maxLength={200} onChange={event => setSearch(event.target.value)} /></label><button disabled={busy}>Buscar</button></form><Notice>{error || result.error}</Notice>
-    {result.data ? <><Table columns={['Archivo','Tamaño','Acción']} rows={result.data.items.filter(f => tenderMimes.includes(f.mime)).map(file => [file.filename,tenderSize(file.size_bytes),<button disabled={busy || file.size_bytes > maxTenderFileBytes} title={file.size_bytes > maxTenderFileBytes ? 'Supera 100 MB' : undefined} onClick={async () => { if (busy) return; setBusy(true); setError(''); if (attempt.current?.id !== file.id) attempt.current = { id:file.id,key:crypto.randomUUID() }; try { changed(await api.request<Expedient>(`/api/v1/licitaciones/${record.id}/archivos/desde-colaboracion`, { method:'POST', ifMatch:record.version, idempotencyKey:attempt.current.key, body:{ section,source_id:file.id } })); } catch (reason) { setError(message(reason)); } finally { setBusy(false); } }}>Incorporar archivo</button>])} /><DocumentPagination page={page} hasMore={result.data.has_more} change={setPage} busy={busy} /></> : !result.error && <Loading />}
+    {result.data ? <><Table columns={['Seleccionar','Título','Archivo','Tamaño']} rows={result.data.items.filter(f => tenderMimes.includes(f.mime)).map(file => [<input type="checkbox" aria-label={`Seleccionar ${file.title || file.filename}`} checked={selected.some(entry => entry.file.id === file.id)} disabled={busy || file.size_bytes > maxTenderFileBytes} title={file.size_bytes > maxTenderFileBytes ? 'Supera 100 MB' : undefined} onChange={event => { const checked = event.target.checked; setSelected(current => checked ? [...current, {file, key:crypto.randomUUID()}] : current.filter(entry => entry.file.id !== file.id)); }} />,file.title || file.filename,file.filename,tenderSize(file.size_bytes)])} /><DocumentPagination page={page} hasMore={result.data.has_more} change={setPage} busy={busy} /></> : !result.error && <Loading />}
+    {conflict && <button disabled={busy} onClick={async () => { setBusy(true); try { const current = await api.request<Expedient>(`/api/v1/licitaciones/${record.id}`); version.current = current.version; changed(current); setConflict(false); setError('Puedes reintentar los archivos pendientes.'); } catch (reason) { setError(message(reason)); } finally { setBusy(false); } }}>Actualizar versión para reintentar</button>}
+    <div className="actions"><span>{selected.length} archivos seleccionados</span><button className="primary" disabled={busy || conflict || selected.length === 0} onClick={async () => {
+      if (busy) return;
+      setBusy(true); setError('');
+      try {
+        for (const entry of selected) {
+          const updated = await api.request<Expedient>(`/api/v1/licitaciones/${record.id}/archivos/desde-colaboracion`, { method:'POST', ifMatch:version.current, idempotencyKey:entry.key, body:{ section,source_id:entry.file.id } });
+          version.current = updated.version;
+          changed(updated);
+          setSelected(current => current.filter(item => item.file.id !== entry.file.id));
+        }
+        close();
+      } catch (reason) { setError(message(reason)); setConflict(reason instanceof ApiError && reason.status === 412); } finally { setBusy(false); }
+    }}>{busy ? 'Incorporando…' : 'Incorporar seleccionados'}</button></div>
   </Dialog>;
 }
 function RemoveFile({ record,file,changed,close }: { record: Expedient; file: TenderAttachment; changed: (value: Expedient) => void; close: () => void }) {
