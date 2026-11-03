@@ -2,8 +2,6 @@
 
 Decisiones confirmadas por el usuario a partir de los archivos de `bastion formularios`, el 2026-10-28. Este documento define alcance; no acredita implementación ni despliegue.
 
-## Sustitución de formularios legales y técnicos
-
 ## Vista previa económica (2026-11-03)
 
 Oferta económica permite guardar los cambios y abrir una vista previa con la carta del estilo seleccionado y los lotes con ítems. Usa las plantillas y tamaños por lote, sin portada, índice ni documentos legales o técnicos. `total_paginas` cuenta exclusivamente la vista previa. La ruta `POST /api/v1/licitaciones/{id}/oferta-economica/preview` exige permisos de edición, CSRF y la versión vigente; utiliza el worker aislado y devuelve un PDF temporal de hasta 100 MB sin escribir en S3, crear trabajos finales o reemplazar un PDF final existente. Requiere actualizar tanto el backend como el worker.
