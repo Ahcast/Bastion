@@ -190,7 +190,11 @@ async fn isolated_job_generates_and_downloads_a_multipage_tiff() {
             .lines()
             .any(|line| line.split_whitespace().collect::<Vec<_>>() == vec!["Pages:", "2"])
     );
-    let text = std::process::Command::new("/usr/bin/pdftotext").arg(&output).arg("-").output().unwrap();
+    let text = std::process::Command::new("/usr/bin/pdftotext")
+        .arg(&output)
+        .arg("-")
+        .output()
+        .unwrap();
     assert!(text.status.success());
     let text = String::from_utf8(text.stdout).unwrap();
     assert!(text.contains("Paginas 2"));
