@@ -118,6 +118,34 @@ test('PDF preview uses the isolated browser viewer instead of a sandboxed iframe
 
 
 
+test('existing file title edit requires folder edit permission and only patches metadata', async () => {
+  const calls: { path: string; method: string; body: unknown }[] = [];
+  const record = { id: 22, scope: 'empresa', id_persona: null, title: 'Anterior', notes: 'Nota', filename: 'contrato.pdf', size_bytes: 1024, mime: 'application/pdf', created_at: '2026-11-02T12:00:00Z', trashed_at: null, purge_after: null };
+  const api = new ApiClient('https://example.test', async (url, init = {}) => {
+    const path = new URL(String(url)).pathname, method = init.method ?? 'GET';
+    calls.push({ path, method, body: init.body ? JSON.parse(String(init.body)) : null });
+    if (method === 'PATCH') return Response.json({ ...record, title: JSON.parse(String(init.body)).title });
+    if (path.endsWith('/settings')) return Response.json({ max_file_mb: 50, trash_retention_days: 30, allowed_extensions: ['pdf'], blocked_extensions: ['exe'] });
+    return Response.json({ items: [record], page: 1, page_size: 25, has_more: false });
+  });
+  const container = document.createElement('div'); document.body.append(container); const root = createRoot(container);
+  const render = async (canEdit: boolean) => act(async () => root.render(<NavigationGuardProvider><CoreContext.Provider value={{ api, access: { ...access, permissions: [{ module_id: 'colaboracion', scope_key: 'empresa', capability: 'ver' as const }, ...(canEdit ? [{ module_id: 'colaboracion', scope_key: 'empresa', capability: 'editar' as const } : [])] }, notify: () => {} }}><Colaboracion /></CoreContext.Provider></NavigationGuardProvider>));
+  const click = async (label: string) => { const button = [...container.querySelectorAll('button')].find(b => b.textContent === label); assert.ok(button, label); await act(async () => button.click()); };
+  try {
+    await render(false);
+    assert.equal([...container.querySelectorAll('button')].some(b => b.textContent === 'Editar título'), false);
+    await render(true);
+    await click('Editar título');
+    const input = container.querySelector<HTMLInputElement>('[name="edit_title"]'); assert.ok(input);
+    const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')!.set!;
+    await act(async () => { setter.call(input, '  DJ Derechos de autor  '); input.dispatchEvent(new Event('input', { bubbles: true })); });
+    await act(async () => { container.querySelector('form')!.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })); await window.happyDOM.whenAsyncComplete(); });
+    const request = calls.find(call => call.method === 'PATCH'); assert.ok(request);
+    assert.equal(request.path, '/api/v1/colaboracion/22');
+    assert.deepEqual(request.body, { title: 'DJ Derechos de autor' });
+  } finally { await act(async () => root.unmount()); container.remove(); }
+});
+
 test('person folders filter requests and upload targets; deletion requires explicit confirmation and its own permission', async () => {
   const calls: { url: URL; init: RequestInit }[] = [];
   const record = { mime: 'text/plain', trashed_at: null, purge_after: null, id: 9, scope: 'persona', id_persona: 7, title: '<script>Privado</script>', notes: 'Contrato', filename: 'contrato.txt', size_bytes: 2, created_at: '2026-10-23T12:00:00Z' };

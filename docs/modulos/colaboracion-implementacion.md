@@ -23,6 +23,8 @@ Despliegue de formatos, 2026-10-28: backend `43e65be2ec16b712b310abd3a47f6837151
 
 La lista se filtra antes de paginar usando los alcances efectivos del Core. Cada lectura/mutación verifica la carpeta del objeto concreto; acceder por ID a una carpeta ajena devuelve 404. El selector expone solo ID y nombre de personas autorizadas para ver/editar archivos. No otorga acceso a DNI, usuarios ni administración de Personas. No se infiere que un usuario pueda leer archivos de su persona por estar vinculado a ella. Esta aplicación tiene una empresa por base de datos, como el Core actual; no se añade multitenancy implícito.
 
+Los usuarios con permiso `editar` en la carpeta pueden cambiar el título de un archivo vigente. El endpoint valida y recorta el texto, registra el evento `file.title_edit`, y solo actualiza metadatos; contenido, hash y clave S3 no cambian. Los archivos en papelera no admiten cambios de título.
+
 ## Archivos privados y validación
 
 Se reutilizan `BASTION_DOCUMENTS_*` y `BASTION_AWS_CLI`. Objetos bajo `colaboracion/empresa/{aleatorio}` o `colaboracion/personas/{id}/{aleatorio}`. El nombre original nunca forma la clave ni una ruta local. Las respuestas no exponen claves S3, hashes ni rutas. Cifrado S3 AES256, bucket privado, sin URL pública ni caducidad de archivos vigentes. La disponibilidad de archivos no depende de instalar Typst.

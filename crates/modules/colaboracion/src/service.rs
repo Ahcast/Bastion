@@ -454,6 +454,43 @@ impl CollaborationService {
                 other => other,
             })
     }
+    pub async fn rename_title(
+        &self,
+        actor: u64,
+        id: u64,
+        title: String,
+    ) -> Result<FileRecord, CoreError> {
+        let title = title.trim().to_owned();
+        if id == 0
+            || title.is_empty()
+            || title.chars().count() > 255
+            || title.chars().any(char::is_control)
+        {
+            return Err(CoreError::Invalid);
+        }
+        let mut tx = self.begin().await?;
+        let record = load_state(&mut tx, id, "ready").await?;
+        self.authorize_record(&mut tx, actor, &record, "editar")
+            .await?;
+        if record.title == title {
+            tx.commit().await?;
+            return Ok(record);
+        }
+        let updated = sqlx::query(
+            "UPDATE colaboracion_files SET title=?,updated_at=UTC_TIMESTAMP(6) WHERE id=? AND state='ready'",
+        )
+        .bind(&title)
+        .bind(id)
+        .execute(&mut *tx)
+        .await?;
+        if updated.rows_affected() != 1 {
+            return Err(CoreError::Conflict);
+        }
+        audit(&mut tx, Some(actor), "file.title_edit", id).await?;
+        let renamed = load_state(&mut tx, id, "ready").await?;
+        tx.commit().await?;
+        Ok(renamed)
+    }
     pub async fn delete(&self, actor: u64, id: u64, confirm: u64) -> Result<(), CoreError> {
         if confirm != id || id == 0 {
             return Err(CoreError::Invalid);

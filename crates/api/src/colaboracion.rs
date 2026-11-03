@@ -1,5 +1,5 @@
 use super::*;
-use bastion_colaboracion::{FileFilter, FilePage, UploadInput};
+use bastion_colaboracion::{FileFilter, FilePage, FileRecord, UploadInput};
 static FILE_REQUEST_SLOTS: tokio::sync::Semaphore = tokio::sync::Semaphore::const_new(2);
 
 pub(super) fn routes(state: ApiState) -> Router<ApiState> {
@@ -15,7 +15,7 @@ pub(super) fn routes(state: ApiState) -> Router<ApiState> {
         .route("/api/v1/colaboracion/{id}/purge", post(purge))
         .route("/api/v1/colaboracion/{id}/preview", get(preview))
         .route("/api/v1/colaboracion/{id}/download", get(download))
-        .route("/api/v1/colaboracion/{id}", axum::routing::delete(remove))
+        .route("/api/v1/colaboracion/{id}", axum::routing::patch(rename_title).delete(remove))
         .layer(axum::extract::DefaultBodyLimit::max(140 * 1024 * 1024))
         .layer(RequestBodyLimitLayer::new(140 * 1024 * 1024))
         .route_layer(middleware::from_fn_with_state(state, guard))
@@ -286,6 +286,25 @@ async fn download(
     state
         .colaboracion
         .read(user.id, id, false)
+        .await
+        .map(Json)
+        .map_err(ApiError)
+}
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RenameTitleInput {
+    title: String,
+}
+async fn rename_title(
+    State(state): State<ApiState>,
+    headers: axum::http::HeaderMap,
+    Path(id): Path<u64>,
+    Json(input): Json<RenameTitleInput>,
+) -> Result<Json<FileRecord>, ApiError> {
+    let user = actor(&state, &headers).await?;
+    state
+        .colaboracion
+        .rename_title(user.id, id, input.title)
         .await
         .map(Json)
         .map_err(ApiError)

@@ -109,6 +109,34 @@ async fn mysql57_migrations_folder_isolation_deletion_and_limits() {
         Err(CoreError::NotFound)
     ));
     assert!(matches!(
+        service.rename_title(2, 2, "No permitido".into()).await,
+        Err(CoreError::NotFound)
+    ));
+    assert!(matches!(
+        service.rename_title(1, 1, "   ".into()).await,
+        Err(CoreError::Invalid)
+    ));
+    assert!(matches!(
+        service.rename_title(1, 1, format!("{}x", "a".repeat(255))).await,
+        Err(CoreError::Invalid)
+    ));
+    let old_object: String =
+        sqlx::query_scalar("SELECT object_key FROM colaboracion_files WHERE id=1")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    let renamed = service
+        .rename_title(1, 1, "  DJ Derechos de autor  ".into())
+        .await
+        .unwrap();
+    assert_eq!(renamed.title, "DJ Derechos de autor");
+    let new_object: String =
+        sqlx::query_scalar("SELECT object_key FROM colaboracion_files WHERE id=1")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!(new_object, old_object);
+    assert!(matches!(
         service.delete(1, 1, 2).await,
         Err(CoreError::Invalid)
     ));
@@ -136,6 +164,10 @@ async fn mysql57_migrations_folder_isolation_deletion_and_limits() {
         service.read(1, 3, false).await,
         Err(CoreError::NotFound)
     ));
+    assert!(matches!(
+        service.rename_title(1, 3, "Ya en papelera".into()).await,
+        Err(CoreError::NotFound)
+    ));
     let audit: i64 = sqlx::query_scalar(
         "SELECT COUNT(*) FROM audit_events WHERE module_id='colaboracion' AND action='file.trash'",
     )
@@ -143,6 +175,13 @@ async fn mysql57_migrations_folder_isolation_deletion_and_limits() {
     .await
     .unwrap();
     assert_eq!(audit, 1);
+    let title_audit: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM audit_events WHERE module_id='colaboracion' AND action='file.title_edit'",
+    )
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(title_audit, 1);
     #[cfg(unix)]
     verify_private_storage_lifecycle(&database, &core).await;
     for _ in 0..120 {

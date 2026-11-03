@@ -70,6 +70,25 @@ paths:
         '200': {description: Contenido privado base64}
         '404': {description: Archivo inexistente o carpeta no autorizada}
   /api/v1/colaboracion/{id}:
+    patch:
+      operationId: renameCollaborationFile
+      description: Editar sobre la carpeta del archivo vigente. Solo cambia el título del metadato; el contenido y la clave S3 permanecen intactos. Título recortado, 1..255 caracteres sin controles. La acción queda auditada.
+      parameters: [{$ref: '#/components/parameters/Id'}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [title]
+              properties:
+                title: {type: string, minLength: 1, maxLength: 255}
+      responses:
+        '200': {description: File actualizado}
+        '404': {description: Archivo inexistente, en papelera o carpeta sin permiso de edición}
+        '400': {description: Título inválido}
+        '409': {description: El archivo cambió de estado durante la edición}
     delete:
       operationId: deleteCollaborationFile
       description: Eliminar sobre carpeta; confirm_id debe coincidir con id. Mueve a papelera y registra retención efectiva (30 días por defecto). Mantiene el objeto privado hasta restauración o purga. Sin caducidad automática de archivos vigentes.
