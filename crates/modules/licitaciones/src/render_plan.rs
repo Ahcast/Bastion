@@ -186,14 +186,17 @@ mod tests {
             },
             order: vec![
                 PdfOrderItem {
+                    title_editable: true,
                     key: "lote:2".into(),
                     label: "Lote 2".into(),
                 },
                 PdfOrderItem {
+                    title_editable: true,
                     key: "oferta".into(),
                     label: "Carta".into(),
                 },
                 PdfOrderItem {
+                    title_editable: true,
                     key: format!("archivo:{}", "a".repeat(48)),
                     label: "Anexo".into(),
                 },

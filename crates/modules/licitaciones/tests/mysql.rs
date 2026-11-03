@@ -519,6 +519,7 @@ async fn mysql57_tenders_snapshots_permissions_races_receipts_and_deletion() {
                 exp.id,
                 8,
                 PdfOrderInput {
+                    titles: None,
                     items: vec!["archivo:no-pertenece".into()]
                 }
             )
@@ -531,6 +532,7 @@ async fn mysql57_tenders_snapshots_permissions_races_receipts_and_deletion() {
             exp.id,
             8,
             PdfOrderInput {
+                titles: None,
                 items: keys.clone(),
             },
         )
