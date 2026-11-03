@@ -11,6 +11,8 @@ use std::{
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct Request {
+    #[serde(default)]
+    economic_preview: bool,
     pieces: u32,
     #[serde(default)]
     sources: Vec<u32>,
@@ -28,6 +30,14 @@ fn request(bytes: &[u8]) -> Result<Request, ()> {
     }
     let value: Request = serde_json::from_slice(bytes).map_err(|_| ())?;
     if value.pieces == 0 || value.pieces > 4000 {
+        return Err(());
+    }
+    if value.economic_preview
+        && (value.layout.is_some()
+            || !value.global_sources.is_empty()
+            || !value.conversions.is_empty()
+            || value.sources != (1..=value.pieces).collect::<Vec<_>>())
+    {
         return Err(());
     }
     let mut seen = std::collections::BTreeSet::new();
@@ -165,6 +175,18 @@ fn perform() -> Result<u32, ()> {
             ()
         })?;
     }
+    if job.economic_preview {
+        return bastion_licitaciones::pdf_layout::assemble_economic_preview(
+            &typst,
+            &pdfinfo,
+            &qpdf,
+            &root,
+            job.pieces,
+            packages.as_deref(),
+            fonts.as_deref(),
+        )
+        .map_err(|_| ());
+    }
     if let Some(layout) = &job.layout {
         let plan = bastion_licitaciones::pdf_layout::assemble_laid_out_pdf(
             &typst,
@@ -225,6 +247,14 @@ mod tests {
     use super::*;
     #[test]
     fn worker_accepts_only_a_bounded_piece_count() {
+        assert!(request(br#"{"pieces":2,"sources":[1,2],"economic_preview":true}"#).is_ok());
+        assert!(request(br#"{"pieces":2,"sources":[1],"economic_preview":true}"#).is_err());
+        assert!(
+            request(
+                br#"{"pieces":2,"sources":[1,2],"global_sources":[1],"economic_preview":true}"#
+            )
+            .is_err()
+        );
         assert!(request(br#"{"pieces":3}"#).is_ok());
         assert!(request(br#"{"pieces":0}"#).is_err());
         assert!(request(br#"{"pieces":4001}"#).is_err());

@@ -83,7 +83,7 @@ impl TenderTemplateBundle {
             })
         }
     }
-    fn for_style(&self, style: &str) -> Result<(&str, &str), CoreError> {
+    pub(crate) fn for_style(&self, style: &str) -> Result<(&str, &str), CoreError> {
         let (offer, lot) = match style {
             "bid" => (&self.bid_offer, &self.bid_lot),
             "std" => (&self.std_offer, &self.std_lot),

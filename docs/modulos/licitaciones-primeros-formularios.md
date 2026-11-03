@@ -4,6 +4,12 @@ Decisiones confirmadas por el usuario a partir de los archivos de `bastion formu
 
 ## Sustitución de formularios legales y técnicos
 
+## Vista previa económica (2026-11-03)
+
+Oferta económica permite guardar los cambios y abrir una vista previa con la carta del estilo seleccionado y los lotes con ítems. Usa las plantillas y tamaños por lote, sin portada, índice ni documentos legales o técnicos. `total_paginas` cuenta exclusivamente la vista previa. La ruta `POST /api/v1/licitaciones/{id}/oferta-economica/preview` exige permisos de edición, CSRF y la versión vigente; utiliza el worker aislado y devuelve un PDF temporal de hasta 100 MB sin escribir en S3, crear trabajos finales o reemplazar un PDF final existente. Requiere actualizar tanto el backend como el worker.
+
+## Sustitución de formularios legales y técnicos
+
 El usuario decidió retirar las declaraciones legales originales y los formularios legales y técnicos publicados, incluso de los expedientes existentes, y eliminar sus originales de Colaboración. Se conservan la carta BID y la presentación STD, así como configuración, ítems, lotes, variables y funciones. Ajustes permite eliminar cada Typst publicado o retirar todos los legales y técnicos; las fuentes compartidas con formularios económicos impiden la operación para protegerlos. La limpieza de originales se realiza mediante el mecanismo existente de eliminación permanente de Colaboración. La migración retira únicamente las dos selecciones legales originales; los archivos privados originales deben retirarse del servidor después de desplegar el backend compatible. Estas decisiones no acreditan la ejecución de la eliminación ni el despliegue.
 
 El 2026-11-01 se desplegó el backend `62b4a9ec2048` y el frontend `427f44c00de0`, con CI aprobado. La migración 9 retiró las selecciones legales iniciales y se retiraron los dos archivos privados antiguos tras verificar un respaldo; las plantillas económicas y de soporte se conservaron. Un formulario legal archivado referenciaba una carta económica: se retiró del expediente y del catálogo por SSH, con respaldo y auditoría, conservando la fuente económica.

@@ -81,7 +81,7 @@ struct QueuedPdf {
 }
 
 #[cfg(target_os = "linux")]
-struct PrivateJobDir(std::path::PathBuf);
+pub(crate) struct PrivateJobDir(pub(crate) std::path::PathBuf);
 #[cfg(target_os = "linux")]
 impl Drop for PrivateJobDir {
     fn drop(&mut self) {
@@ -203,7 +203,7 @@ impl TenderService {
 
     #[cfg(target_os = "linux")]
     async fn run_pdf_job(&self, job: &QueuedPdf) -> Result<(), CoreError> {
-        use std::{fs, io::Write, os::unix::fs::DirBuilderExt, path::PathBuf};
+        use std::{fs, os::unix::fs::DirBuilderExt, path::PathBuf};
         job_id(&job.id)?;
         let base = PathBuf::from("/var/lib/bastion-tender/incoming");
         let root = base.join(&job.id);
@@ -224,46 +224,7 @@ impl TenderService {
                 &bundle,
             )
             .await?;
-        let bytes = serde_json::to_vec(&request).map_err(|_| CoreError::Invalid)?;
-        if bytes.len() > 2_000_000 {
-            return Err(CoreError::Invalid);
-        }
-        let mut f = fs::OpenOptions::new()
-            .write(true)
-            .create_new(true)
-            .open(root.join("request.json"))
-            .map_err(|_| CoreError::Overloaded)?;
-        f.write_all(&bytes).map_err(|_| CoreError::Overloaded)?;
-        drop(f);
-        let identifier = job.id.clone();
-        tokio::task::spawn_blocking(move || {
-            use std::{
-                io::{Read, Write},
-                os::unix::net::UnixStream,
-                time::Duration,
-            };
-            let mut stream = UnixStream::connect("/run/bastion-tender-launcher.sock")
-                .map_err(|_| CoreError::Overloaded)?;
-            stream
-                .set_read_timeout(Some(Duration::from_secs(1850)))
-                .map_err(|_| CoreError::Overloaded)?;
-            stream
-                .set_write_timeout(Some(Duration::from_secs(10)))
-                .map_err(|_| CoreError::Overloaded)?;
-            stream
-                .write_all(format!("{identifier}\n").as_bytes())
-                .map_err(|_| CoreError::Overloaded)?;
-            let mut response = [0u8; 3];
-            stream
-                .read_exact(&mut response)
-                .map_err(|_| CoreError::Overloaded)?;
-            if &response != b"ok\n" {
-                return Err(CoreError::Overloaded);
-            }
-            Ok(())
-        })
-        .await
-        .map_err(|_| CoreError::Overloaded)??;
+        run_isolated_request(&root, &job.id, &request).await?;
         let result = root.join("result.pdf");
         if !fs::symlink_metadata(&result)
             .map_err(|_| CoreError::Invalid)?
@@ -362,4 +323,55 @@ impl TenderService {
         sqlx::query("UPDATE licitaciones_pdf_jobs SET cleanup_pending=0,cleanup_after=NULL WHERE id=? AND cleanup_pending=1").bind(id).execute(self.database.pool()).await?;
         Ok(true)
     }
+}
+
+#[cfg(target_os = "linux")]
+pub(crate) async fn run_isolated_request(
+    root: &std::path::Path,
+    identifier: &str,
+    request: &(impl serde::Serialize + Sync),
+) -> Result<(), CoreError> {
+    use std::{fs, io::Write};
+    job_id(identifier)?;
+    let bytes = serde_json::to_vec(request).map_err(|_| CoreError::Invalid)?;
+    if bytes.len() > 2_000_000 {
+        return Err(CoreError::Invalid);
+    }
+    let mut f = fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(root.join("request.json"))
+        .map_err(|_| CoreError::Overloaded)?;
+    f.write_all(&bytes).map_err(|_| CoreError::Overloaded)?;
+    drop(f);
+    let identifier = identifier.to_owned();
+    tokio::task::spawn_blocking(move || {
+        use std::{
+            io::{Read, Write},
+            os::unix::net::UnixStream,
+            time::Duration,
+        };
+        let mut stream = UnixStream::connect("/run/bastion-tender-launcher.sock")
+            .map_err(|_| CoreError::Overloaded)?;
+        stream
+            .set_read_timeout(Some(Duration::from_secs(1850)))
+            .map_err(|_| CoreError::Overloaded)?;
+        stream
+            .set_write_timeout(Some(Duration::from_secs(10)))
+            .map_err(|_| CoreError::Overloaded)?;
+        stream
+            .write_all(format!("{identifier}\n").as_bytes())
+            .map_err(|_| CoreError::Overloaded)?;
+        let mut response = [0u8; 3];
+        stream
+            .read_exact(&mut response)
+            .map_err(|_| CoreError::Overloaded)?;
+        if &response != b"ok\n" {
+            return Err(CoreError::Overloaded);
+        }
+        Ok(())
+    })
+    .await
+    .map_err(|_| CoreError::Overloaded)??;
+    Ok(())
 }

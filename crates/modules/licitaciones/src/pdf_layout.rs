@@ -79,6 +79,52 @@ fn update_total(root: &Path, total: u32) -> Result<(), CoreError> {
     .map_err(|_| CoreError::Overloaded)
 }
 
+/// Render only the offer and populated lots, without front matter or annexes.
+/// This must run in the same restricted worker as final PDF composition.
+pub fn assemble_economic_preview(
+    typst: &Path,
+    pdfinfo: &Path,
+    qpdf: &Path,
+    root: &Path,
+    pieces: u32,
+    packages: Option<&Path>,
+    fonts: Option<&Path>,
+) -> Result<u32, CoreError> {
+    if pieces == 0 || pieces > 1001 {
+        return Err(CoreError::Invalid);
+    }
+    let sources = (1..=pieces).collect::<Vec<_>>();
+    let mut guess = 1;
+    let mut seen = BTreeSet::new();
+    for _ in 0..8 {
+        if !seen.insert(guess) {
+            return Err(CoreError::Conflict);
+        }
+        update_total(root, guess)?;
+        render_prepared_sources(typst, root, pieces, &sources, &[], packages, fonts)?;
+        let mut actual = 0u32;
+        for n in &sources {
+            actual = actual
+                .checked_add(pages(qpdf, &root.join(format!("piece-{n:06}.pdf")))?)
+                .filter(|n| *n <= 100_000)
+                .ok_or(CoreError::Invalid)?;
+        }
+        if actual == guess {
+            let total = measure_and_compose_pdf(typst, pdfinfo, qpdf, root, pieces)?;
+            if total != actual {
+                return Err(CoreError::Invalid);
+            }
+            return Ok(total);
+        }
+        guess = actual;
+        for n in &sources {
+            fs::remove_file(root.join(format!("piece-{n:06}.pdf")))
+                .map_err(|_| CoreError::Overloaded)?;
+        }
+    }
+    Err(CoreError::Conflict)
+}
+
 /// Complete a private job after sources and attachments are authorized and
 /// staged. All source names are internal numbers; the worker must be isolated.
 pub fn assemble_laid_out_pdf(

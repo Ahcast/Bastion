@@ -1,6 +1,7 @@
 #![forbid(unsafe_code)]
 
 mod attachments;
+mod economic_preview;
 mod folio;
 mod frontmatter;
 mod globals_typst;

@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import { Window } from 'happy-dom';
 import { ApiClient } from '../src/api.js';
 import { CoreContext } from '../src/ui.js';
-import { NavigationGuardProvider } from '../src/navigationGuard.js';
+import { NavigationGuardProvider, useUnsavedChanges } from '../src/navigationGuard.js';
+import TenderEconomicPreview from '../src/components/TenderEconomicPreview.js';
 import TenderLots from '../src/components/TenderLots.js';
 import TenderPdfOrder from '../src/components/TenderPdfOrder.js';
 import Licitaciones from '../src/pages/Licitaciones.js';
@@ -14,6 +15,27 @@ const window = new Window();
 for (const name of ['document', 'HTMLElement', 'HTMLInputElement', 'HTMLTextAreaElement', 'Event', 'MouseEvent', 'navigator'] as const) Object.defineProperty(globalThis, name, { configurable:true, value:window[name] });
 Object.assign(globalThis, { window, IS_REACT_ACT_ENVIRONMENT:true });
 const { act } = await import('react'); const { createRoot } = await import('react-dom/client');
+
+test('economic preview saves drafts first and requests only economic PDF with the new version', async () => {
+  let version = 1;
+  const writes: RequestInit[] = [];
+  const api = new ApiClient('https://example.test', async (url, init = {}) => {
+    assert.ok(String(url).endsWith('/oferta-economica/preview'));
+    writes.push(init);
+    return Response.json({ filename:'oferta.pdf', mime:'application/pdf', content_base64:btoa('%PDF-1.4') });
+  });
+  function Draft() { useUnsavedChanges(true, false, async () => { version = 2; return true; }); return null; }
+  const open = window.open;
+  window.open = (() => ({ closed:true, opener:null, document:{title:'',body:{textContent:''}} })) as unknown as typeof window.open;
+  const container = document.createElement('div'); document.body.append(container); const root = createRoot(container);
+  try {
+    await act(async () => root.render(<NavigationGuardProvider><CoreContext.Provider value={{api, access, notify:()=>{}}}><Draft /><TenderEconomicPreview latest={() => ({...record,version})} /></CoreContext.Provider></NavigationGuardProvider>));
+    await act(async () => container.querySelector('button')!.click());
+    assert.equal(writes.length, 1);
+    assert.equal(new Headers(writes[0]!.headers).get('if-match'), '"2"');
+    assert.equal(writes[0]!.method, 'POST');
+  } finally { window.open = open; await act(async () => root.unmount()); container.remove(); }
+});
 after(() => window.happyDOM.abort());
 const access: Access = { is_system_administrator:true, modules:[], permissions:[] };
 const record: Expedient = { id: 7, name:'', version:1, state:'borrador', forms:[], variables:[{key:'lotes', label:'Lotes', kind:'integer', value:'2'}, {key:'stylo', label:'Estilo', kind:'text', value:'bid'}] };
