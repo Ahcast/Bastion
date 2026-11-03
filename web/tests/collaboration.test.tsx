@@ -136,10 +136,10 @@ test('existing file title edit requires folder edit permission and only patches 
     assert.equal([...container.querySelectorAll('button')].some(b => b.textContent === 'Editar título'), false);
     await render(true);
     await click('Editar título');
-    const input = container.querySelector<HTMLInputElement>('[name="edit_title"]'); assert.ok(input);
+    const input = document.body.querySelector<HTMLInputElement>('[name="edit_title"]'); assert.ok(input);
     const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')!.set!;
     await act(async () => { setter.call(input, '  DJ Derechos de autor  '); input.dispatchEvent(new Event('input', { bubbles: true })); });
-    await act(async () => { container.querySelector('form')!.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })); await window.happyDOM.whenAsyncComplete(); });
+    await act(async () => { input.closest('form')!.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })); await window.happyDOM.whenAsyncComplete(); });
     const request = calls.find(call => call.method === 'PATCH'); assert.ok(request);
     assert.equal(request.path, '/api/v1/colaboracion/22');
     assert.deepEqual(request.body, { title: 'DJ Derechos de autor' });
