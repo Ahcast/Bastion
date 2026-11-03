@@ -106,7 +106,7 @@ pub fn prepare_folio_sources(pages: &[FolioPage]) -> Result<BTreeMap<String, Vec
 const FOLIOS: &str = r#"#let folios = json("folios.json")
 #for (index, p) in folios.enumerate() {
   page(width: p.width_pt * 1pt, height: p.height_pt * 1pt, margin: 0pt, fill: none)[
-    #place(bottom + center, dy: -12pt)[#text(size: 9pt)[#(index + 1)]]
+    #place(bottom + center, dy: -24pt)[#text(size: 9pt)[#(index + 1)]]
   ]
 }
 "#;
@@ -175,11 +175,48 @@ mod tests {
             .arg(root.join("folios.pdf"))
             .output()
             .unwrap();
-        let _ = std::fs::remove_dir_all(&root);
         assert!(
             output.status.success(),
             "{}",
             String::from_utf8_lossy(&output.stderr)
         );
+        if let Some(pdfinfo) = std::env::var_os("BASTION_PDFINFO_BIN") {
+            let pdftotext = std::path::PathBuf::from(pdfinfo).with_file_name("pdftotext");
+            let bbox = std::process::Command::new(pdftotext)
+                .arg("-bbox")
+                .arg(root.join("folios.pdf"))
+                .arg("-")
+                .output()
+                .unwrap();
+            assert!(bbox.status.success());
+            let bbox = String::from_utf8(bbox.stdout).unwrap();
+            let attribute = |line: &str, name: &str| -> f64 {
+                line.split(&format!("{name}=\""))
+                    .nth(1)
+                    .unwrap()
+                    .split('"')
+                    .next()
+                    .unwrap()
+                    .parse()
+                    .unwrap()
+            };
+            let mut height = 0.0;
+            let mut count = 0;
+            for line in bbox.lines() {
+                if line.contains("<page ") {
+                    height = attribute(line, "height");
+                }
+                if line.trim().ends_with(&format!(">{}</word>", count + 1)) {
+                    let clearance = height - attribute(line, "yMax");
+                    assert!(
+                        (18.0..=32.0).contains(&clearance),
+                        "Number too close to the page edge: {clearance}"
+                    );
+                    count += 1;
+                }
+            }
+            assert_eq!(count, 2);
+        }
+        let _ = std::fs::remove_dir_all(&root);
     }
 }

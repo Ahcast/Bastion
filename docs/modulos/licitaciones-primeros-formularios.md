@@ -4,6 +4,8 @@ Decisiones confirmadas por el usuario a partir de los archivos de `bastion formu
 
 ## Vista previa económica (2026-11-03)
 
+La numeración superpuesta se elevó de 12 a 24 pt desde el borde inferior (aproximadamente 4,2 mm adicionales), conservando el tamaño de 9 pt y el margen existente. Se verificó visualmente en páginas verticales y horizontales; una prueba de coordenadas exige espacio suficiente entre el número completo y el borde de la página. El ajuste se aplica al worker y requiere volver a generar los PDF existentes.
+
 En PDF final, cada entrada del orden muestra el título del documento y permite editarlo para el índice de ese expediente. Se guardan títulos y orden conjuntamente, con control de versión; no se cambia el título del original en Colaboración. Las referencias usan inicialmente el título de Colaboración y las cargas de PC usan su nombre como valor inicial editable. Se conservan los órdenes antiguos guardados como listas de claves en JSON, sin migración de esquema. El PDF usa los títulos guardados y las páginas calculadas por el worker.
 
 El 2026-11-03 se instaló el reemplazo de `presentacion-de-oferta.typ` adjunto por el usuario (SHA-256 `70b5fe3d6cdec5d26d0d02c8bef1a4053ef7bac13dc917fe8cd2962e1f6afebb`), que coincide con su archivo vigente de Colaboración. La ausencia de esa plantilla impedía generar expedientes STD antes de compilar. La presentación, las funciones autorizadas y el lote STD se compilaron con datos sintéticos y tamaño de 7 pt. Ya están instaladas ambas ofertas y los soportes autorizados; queda por comprobar el PDF completo de un expediente real con su sesión.
