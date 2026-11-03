@@ -2,6 +2,8 @@
 #let ink = rgb("263849")
 #let muted = rgb("687384")
 #let money(value) = "L " + value
+// Permit wrapping inside long model numbers and URLs without changing stored data.
+#let description(value) = value.replace(regex("\\S{24,}"), match => match.text.clusters().join("\u{200b}"))
 #set document(title: "Cotización " + q.number, author: q.company.name)
 #set page(paper: "us-letter", margin: 0.45in, numbering: "1 / 1", number-align: right)
 #set text(font: ("Arial", "Liberation Sans", "Libertinus Serif"), size: 9pt, fill: ink, lang: "es")
@@ -28,9 +30,9 @@
 )
 #v(12pt)
 #set table(inset: 6pt, stroke: (left: none, right: none, top: none, bottom: 0.4pt + rgb("edf1f5")))
-#table(columns: (1fr, auto, auto, auto, auto, auto), inset: (x: 4pt, y: 6pt), align: (left, right, right, right, right, right),
+#table(columns: (1fr, 70pt, 42pt, 56pt, 44pt, 72pt), inset: (x: 4pt, y: 6pt), align: (left, right, right, right, right, right),
   table.header(repeat: true, ..("Concepto / descripción", "Coste unitario", "Cantidad", "Descuento", "Impuesto", "Total").map(label => table.cell(fill: rgb("eef3f7"), text(weight: "bold", label)))),
-  ..q.items.map(item => (item.description, money(item.unit_price), item.quantity, money(item.discount_amount), item.tax_label, money(item.total))).flatten(),
+  ..q.items.map(item => (block(width: 100%, breakable: true, text(hyphenate: true, description(item.description))), money(item.unit_price), item.quantity, money(item.discount_amount), item.tax_label, money(item.total))).flatten(),
 )
 #v(14pt)
 #block(breakable: false)[
