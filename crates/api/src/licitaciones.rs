@@ -63,6 +63,10 @@ pub(super) fn routes(state: ApiState) -> Router<ApiState> {
 fn file_routes(state: ApiState) -> Router<ApiState> {
     Router::new()
         .route(
+            "/api/v1/licitaciones/{id}/oferta-economica/preview",
+            post(preview_economic_offer),
+        )
+        .route(
             "/api/v1/licitaciones/{id}/archivos",
             get(files).post(upload_file),
         )
@@ -610,6 +614,23 @@ async fn generate_pdf(
         .await
         .map_err(ApiError)?;
     Ok((StatusCode::ACCEPTED, Json(job)).into_response())
+}
+async fn preview_economic_offer(
+    State(state): State<ApiState>,
+    headers: axum::http::HeaderMap,
+    Path(id): Path<u64>,
+    Json(_input): Json<EmptyInput>,
+) -> Result<Json<bastion_licitaciones::AttachmentContent>, ApiError> {
+    if !bastion_licitaciones::TenderService::pdf_generation_enabled() {
+        return Err(ApiError(CoreError::NotFound));
+    }
+    let user = actor(&state, &headers).await?;
+    state
+        .licitaciones
+        .preview_economic_offer(user.id, id, expected(&headers)?)
+        .await
+        .map(Json)
+        .map_err(ApiError)
 }
 async fn latest_pdf(
     State(state): State<ApiState>,

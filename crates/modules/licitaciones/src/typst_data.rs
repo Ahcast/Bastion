@@ -184,6 +184,19 @@ impl crate::TenderService {
         total_pages: u32,
         lot_template: &str,
     ) -> Result<TenderTypstSnapshot, CoreError> {
+        self.prepare_typst_snapshot_scoped(actor, id, expected, total_pages, lot_template, false)
+            .await
+    }
+
+    pub(crate) async fn prepare_typst_snapshot_scoped(
+        &self,
+        actor: u64,
+        id: u64,
+        expected: u64,
+        total_pages: u32,
+        lot_template: &str,
+        economic_only: bool,
+    ) -> Result<TenderTypstSnapshot, CoreError> {
         let mut tx = self.begin(actor, "ver").await?;
         // load locks the expediente row: its variables, order and lots are a
         // consistent version while this transaction is reading them.
@@ -191,10 +204,11 @@ impl crate::TenderService {
         if expediente.version != expected {
             return Err(CoreError::PreconditionFailed);
         }
-        if expediente
-            .forms
-            .iter()
-            .any(|form| !form.missing_required.is_empty())
+        if !economic_only
+            && expediente
+                .forms
+                .iter()
+                .any(|form| !form.missing_required.is_empty())
         {
             return Err(CoreError::Invalid);
         }
@@ -216,7 +230,24 @@ impl crate::TenderService {
             total_pages,
             lot_template,
         )?;
-        let mut candidates = crate::order::candidates(self, &mut tx, actor, &expediente).await?;
+        let mut candidates = if economic_only {
+            let mut entries = vec![crate::PdfOrderItem {
+                key: "oferta".into(),
+                label: "Oferta económica".into(),
+            }];
+            entries.extend(
+                sources
+                    .offered_lots
+                    .iter()
+                    .map(|number| crate::PdfOrderItem {
+                        key: format!("lote:{number}"),
+                        label: format!("Lote {number}"),
+                    }),
+            );
+            entries
+        } else {
+            crate::order::candidates(self, &mut tx, actor, &expediente).await?
+        };
         let stored: Option<serde_json::Value> =
             sqlx::query_scalar("SELECT pdf_order_json FROM licitaciones_expedientes WHERE id=?")
                 .bind(id)

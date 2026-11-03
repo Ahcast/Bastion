@@ -168,6 +168,50 @@ async fn isolated_job_generates_and_downloads_a_multipage_tiff() {
         text.lines()
             .any(|line| line.split_whitespace().collect::<Vec<_>>() == vec!["Pages:", "7"])
     );
+    std::fs::remove_file(&output).unwrap();
+    // Preview ignores legal templates and does not replace the final job.
+    let preview = service
+        .preview_economic_offer(1, exp.id, exp.version)
+        .await
+        .unwrap();
+    use base64::{Engine, engine::general_purpose::STANDARD};
+    let bytes = STANDARD.decode(preview.content_base64).unwrap();
+    assert!(bytes.starts_with(b"%PDF-"));
+    std::fs::write(&output, bytes).unwrap();
+    let info = std::process::Command::new("/usr/bin/pdfinfo")
+        .arg(&output)
+        .output()
+        .unwrap();
+    assert!(info.status.success());
+    assert!(
+        String::from_utf8(info.stdout)
+            .unwrap()
+            .lines()
+            .any(|line| line.split_whitespace().collect::<Vec<_>>() == vec!["Pages:", "2"])
+    );
+    let text = std::process::Command::new("/usr/bin/pdftotext")
+        .arg(&output)
+        .arg("-")
+        .output()
+        .unwrap();
+    assert!(text.status.success());
+    let text = String::from_utf8(text.stdout).unwrap();
+    assert!(text.contains("Paginas 2"));
+    assert!(!text.contains("Integridad"));
+    assert_eq!(
+        service.latest_pdf_job(1, exp.id).await.unwrap().unwrap().id,
+        job.id
+    );
+    assert_eq!(
+        service.pdf_job(1, exp.id, &job.id).await.unwrap().state,
+        "ready"
+    );
+    assert!(matches!(
+        service
+            .preview_economic_offer(1, exp.id, exp.version + 1)
+            .await,
+        Err(bastion_core::CoreError::PreconditionFailed)
+    ));
     std::fs::remove_file(output).unwrap();
     service
         .delete(1, exp.id, exp.version, exp.id)
