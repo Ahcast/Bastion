@@ -232,6 +232,7 @@ impl crate::TenderService {
         )?;
         let mut candidates = if economic_only {
             let mut entries = vec![crate::PdfOrderItem {
+                title_editable: true,
                 key: "oferta".into(),
                 label: "Oferta económica".into(),
             }];
@@ -240,6 +241,7 @@ impl crate::TenderService {
                     .offered_lots
                     .iter()
                     .map(|number| crate::PdfOrderItem {
+                        title_editable: true,
                         key: format!("lote:{number}"),
                         label: format!("Lote {number}"),
                     }),

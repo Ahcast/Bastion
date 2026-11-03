@@ -61,8 +61,11 @@ test('PDF order can be changed with accessible controls and saved', async () => 
   try {
     await act(async()=>root.render(<NavigationGuardProvider><CoreContext.Provider value={{api,access,notify:()=>{}}}><TenderPdfOrder record={record} editable saved={()=>{}} /></CoreContext.Provider></NavigationGuardProvider>));
     await act(async()=>container.querySelector<HTMLButtonElement>('button[aria-label="Subir Lote 1"]')!.click());
-    await act(async()=>[...container.querySelectorAll('button')].find(b=>b.textContent==='Guardar orden')!.click());
-    assert.deepEqual(JSON.parse(String(writes[0]!.body)),{items:['lote:1','oferta']});
+    const title=container.querySelector<HTMLInputElement>('input[aria-label="Título del documento 1"]')!;
+    const setter=Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,'value')!.set!;
+    await act(async()=>{setter.call(title,'Lote de equipos');title.dispatchEvent(new Event('input',{bubbles:true}));});
+    await act(async()=>[...container.querySelectorAll('button')].find(b=>b.textContent==='Guardar orden y títulos')!.click());
+    assert.deepEqual(JSON.parse(String(writes[0]!.body)),{items:['lote:1','oferta'],titles:{'lote:1':'Lote de equipos',oferta:'Carta'}});
   } finally { await act(async()=>root.unmount());container.remove(); }
 });
 test('lot drafts survive changing the selected lot', async () => {

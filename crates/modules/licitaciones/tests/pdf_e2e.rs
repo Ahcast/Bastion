@@ -159,6 +159,31 @@ async fn isolated_job_generates_and_downloads_a_multipage_tiff() {
         )
         .await
         .unwrap();
+    let order = service.pdf_order(1, exp.id).await.unwrap();
+    let exp = service
+        .save_pdf_order(
+            1,
+            exp.id,
+            exp.version,
+            bastion_licitaciones::PdfOrderInput {
+                items: order.items.into_iter().map(|item| item.key).collect(),
+                titles: Some(std::collections::BTreeMap::from([(
+                    format!("archivo:{direct_id}"),
+                    "Documento legal personalizado".into(),
+                )])),
+            },
+        )
+        .await
+        .unwrap();
+    assert!(
+        service
+            .pdf_order(1, exp.id)
+            .await
+            .unwrap()
+            .items
+            .iter()
+            .any(|item| item.label == "Documento legal personalizado")
+    );
     // Isolate staging failures from broker failures, using only synthetic data.
     let stage = std::env::temp_dir().join(format!(
         "pdf-e2e-stage-{}",
@@ -204,6 +229,17 @@ async fn isolated_job_generates_and_downloads_a_multipage_tiff() {
     assert!(
         text.lines()
             .any(|line| line.split_whitespace().collect::<Vec<_>>() == vec!["Pages:", "8"])
+    );
+    let text = std::process::Command::new("/usr/bin/pdftotext")
+        .arg(&output)
+        .arg("-")
+        .output()
+        .unwrap();
+    assert!(text.status.success());
+    assert!(
+        String::from_utf8(text.stdout)
+            .unwrap()
+            .contains("Documento legal personalizado")
     );
     std::fs::remove_file(&output).unwrap();
     // Preview ignores legal templates and does not replace the final job.
