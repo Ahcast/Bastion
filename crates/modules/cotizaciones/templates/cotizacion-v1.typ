@@ -28,7 +28,7 @@
 )
 #v(12pt)
 #set table(inset: 6pt, stroke: (left: none, right: none, top: none, bottom: 0.4pt + rgb("edf1f5")))
-#table(columns: (2.8fr, 1fr, 0.65fr, 1fr, 0.8fr, 1fr), align: (left, right, right, right, right, right),
+#table(columns: (1fr, auto, auto, auto, auto, auto), inset: (x: 4pt, y: 6pt), align: (left, right, right, right, right, right),
   table.header(repeat: true, ..("Concepto / descripción", "Coste unitario", "Cantidad", "Descuento", "Impuesto", "Total").map(label => table.cell(fill: rgb("eef3f7"), text(weight: "bold", label)))),
   ..q.items.map(item => (item.description, money(item.unit_price), item.quantity, money(item.discount_amount), item.tax_label, money(item.total))).flatten(),
 )
