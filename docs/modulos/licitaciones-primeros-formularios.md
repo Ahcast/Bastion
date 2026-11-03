@@ -4,9 +4,13 @@ Decisiones confirmadas por el usuario a partir de los archivos de `bastion formu
 
 ## Vista previa económica (2026-11-03)
 
+El 2026-11-03 se instaló el reemplazo de `presentacion-de-oferta.typ` adjunto por el usuario (SHA-256 `70b5fe3d6cdec5d26d0d02c8bef1a4053ef7bac13dc917fe8cd2962e1f6afebb`), que coincide con su archivo vigente de Colaboración. La ausencia de esa plantilla impedía generar expedientes STD antes de compilar. La presentación, las funciones autorizadas y el lote STD se compilaron con datos sintéticos y tamaño de 7 pt. Ya están instaladas ambas ofertas y los soportes autorizados; queda por comprobar el PDF completo de un expediente real con su sesión.
+
 Oferta económica permite guardar los cambios y abrir una vista previa con la carta del estilo seleccionado y los lotes con ítems. Usa las plantillas y tamaños por lote, sin portada, índice ni documentos legales o técnicos. `total_paginas` cuenta exclusivamente la vista previa. La ruta `POST /api/v1/licitaciones/{id}/oferta-economica/preview` exige permisos de edición, CSRF y la versión vigente; utiliza el worker aislado y devuelve un PDF temporal de hasta 100 MB sin escribir en S3, crear trabajos finales o reemplazar un PDF final existente. Requiere actualizar tanto el backend como el worker.
 
 ## Sustitución de formularios legales y técnicos
+
+Los archivos `.typ` también se incorporan directamente desde Colaboración mediante referencias, junto con PDF e imágenes, y pueden subirse desde la PC. Se muestran en el listado de la sección con su título y nombre; pueden leerse como texto o quitarse sin eliminar el original de Colaboración. Al generar el PDF se compilan en el worker aislado con las variables globales del expediente. No necesitan publicarse en el catálogo para este flujo de archivos. Se mantienen los controles de lectura del original, huella del contenido, permisos del expediente y límites de tamaño existentes.
 
 El usuario decidió retirar las declaraciones legales originales y los formularios legales y técnicos publicados, incluso de los expedientes existentes, y eliminar sus originales de Colaboración. Se conservan la carta BID y la presentación STD, así como configuración, ítems, lotes, variables y funciones. Ajustes permite eliminar cada Typst publicado o retirar todos los legales y técnicos; las fuentes compartidas con formularios económicos impiden la operación para protegerlos. La limpieza de originales se realiza mediante el mecanismo existente de eliminación permanente de Colaboración. La migración retira únicamente las dos selecciones legales originales; los archivos privados originales deben retirarse del servidor después de desplegar el backend compatible. Estas decisiones no acreditan la ejecución de la eliminación ni el despliegue.
 

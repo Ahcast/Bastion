@@ -71,7 +71,7 @@ pub(crate) async fn candidates(
                 .file_metadata_in_transaction(tx, actor, source)
                 .await
             {
-                Ok(_) => name,
+                Ok((source, _)) => source.title,
                 Err(CoreError::NotFound | CoreError::Forbidden) => {
                     "Archivo de Colaboración no disponible".into()
                 }

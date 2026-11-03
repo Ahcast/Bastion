@@ -22,6 +22,7 @@ test('tender file limits use decimal MB and reject active formats before encodin
  assert.doesNotThrow(()=>validateTenderFile({name:'documento.pdf',size:maxTenderFileBytes}));
  assert.throws(()=>validateTenderFile({name:'documento.pdf',size:maxTenderFileBytes+1}));
  assert.throws(()=>validateTenderFile({name:'a.svg',size:10}));
+ assert.doesNotThrow(()=>validateTenderFile({name:'declaracion.typ',size:10}));
  assert.throws(()=>tenderContentBlob({filename:'a.svg',mime:'image/svg+xml',content_base64:btoa('<svg/>')},true));
 });
 test('PC batch uploads retain idempotency keys for pending files and advance the version',async()=>{
@@ -50,7 +51,7 @@ test('Collaboration checkboxes add several references and retry only pending fil
  const posts:RequestInit[]=[];
  const api=new ApiClient('https://example.test',async(url,init={})=>{
   if(init.method==='POST'){posts.push(init);if(posts.length===2)return Response.json({detail:'Temporal'},{status:503});return Response.json({...record,version:posts.length===1?2:3});}
-  if(new URL(String(url)).pathname==='/api/v1/colaboracion')return Response.json({items:[{id:4,title:'Constancia de proveedor',filename:'permitida.pdf',mime:'application/pdf',size_bytes:10},{id:5,filename:'grande.pdf',mime:'application/pdf',size_bytes:100_000_001},{id:7,filename:'segunda.png',mime:'image/png',size_bytes:10},{id:6,filename:'activo.svg',mime:'image/svg+xml',size_bytes:10}],page:1,page_size:25,has_more:false});
+  if(new URL(String(url)).pathname==='/api/v1/colaboracion')return Response.json({items:[{id:4,title:'Constancia de proveedor',filename:'permitida.pdf',mime:'application/pdf',size_bytes:10},{id:5,filename:'grande.pdf',mime:'application/pdf',size_bytes:100_000_001},{id:7,filename:'declaracion.typ',mime:'text/plain',size_bytes:10},{id:8,filename:'notas.txt',mime:'text/plain',size_bytes:10},{id:6,filename:'activo.svg',mime:'image/svg+xml',size_bytes:10}],page:1,page_size:25,has_more:false});
   return Response.json(list);
  });
  const container=document.createElement('div');document.body.append(container);const root=createRoot(container);
@@ -58,6 +59,8 @@ test('Collaboration checkboxes add several references and retry only pending fil
   await act(async()=>root.render(<NavigationGuardProvider><CoreContext.Provider value={{api,access,notify:()=>{}}}><TenderFiles record={record} section="tecnica" changed={()=>{}} start={action=>action()}/></CoreContext.Provider></NavigationGuardProvider>));
   await click('Seleccionar de Colaboración',container);const dialog=document.body.querySelector('[role="dialog"]')!;
   assert.ok(!dialog.textContent?.includes('activo.svg'));
+  assert.ok(!dialog.textContent?.includes('notas.txt'));
+  assert.ok(dialog.textContent?.includes('declaracion.typ'));
   assert.ok(dialog.textContent?.includes('Constancia de proveedor'));
   assert.ok(dialog.textContent?.includes('permitida.pdf'));
   const boxes=[...dialog.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')];assert.equal(boxes.length,3);assert.equal(boxes[1]!.disabled,true);
@@ -73,5 +76,25 @@ test('Collaboration checkboxes add several references and retry only pending fil
   assert.deepEqual(JSON.parse(String(posts[2]!.body)),{section:'tecnica',source_id:7});
   assert.equal(new Headers(posts[2]!.headers).get('idempotency-key'),retryKey);
   assert.equal(new Headers(posts[2]!.headers).get('if-match'),'"2"');
+ }finally{await act(async()=>root.unmount());container.remove();}
+});
+
+test('a referenced Typst is listed with its title, can be read safely and removed',async()=>{
+ const source='#variables.lpn <script>inert</script>';
+ let removed=false;
+ const api=new ApiClient('https://example.test',async(url,init={})=>{
+  const path=new URL(String(url)).pathname;
+  if(init.method==='DELETE'){removed=true;assert.equal(new Headers(init.headers).get('if-match'),'"1"');return Response.json({...record,version:2});}
+  if(path.endsWith('/preview'))return Response.json({filename:'declaracion.typ',mime:'text/plain',content_base64:btoa(source)});
+  return Response.json({...list,items:[{id:'a'.repeat(48),section:'legal',filename:'declaracion.typ',title:'Declaración de prueba',mime:'text/plain',byte_size:source.length,is_reference:true,available:true}]});
+ });
+ const container=document.createElement('div');document.body.append(container);const root=createRoot(container);
+ const context={...access,permissions:[...access.permissions,{module_id:'licitaciones',scope_key:'expedientes',capability:'eliminar'}]};
+ try{
+  await act(async()=>root.render(<NavigationGuardProvider><CoreContext.Provider value={{api,access:context,notify:()=>{}}}><TenderFiles record={record} section="legal" changed={()=>{}} start={action=>action()}/></CoreContext.Provider></NavigationGuardProvider>));
+  assert.ok(container.textContent?.includes('Declaración de prueba'));assert.ok(container.textContent?.includes('declaracion.typ'));
+  await click('Ver',container);assert.equal(document.body.querySelector('pre')?.textContent,source);assert.equal(document.body.querySelectorAll('script').length,0);
+  await act(async()=>document.body.querySelector<HTMLButtonElement>('[aria-label="Cerrar diálogo"]')!.click());
+  await click('Quitar archivo',container);await click('Confirmar quitar archivo',document.body.querySelector('[role="dialog"]')!);assert.equal(removed,true);
  }finally{await act(async()=>root.unmount());container.remove();}
 });
