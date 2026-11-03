@@ -117,7 +117,9 @@ async fn mysql57_migrations_folder_isolation_deletion_and_limits() {
         Err(CoreError::Invalid)
     ));
     assert!(matches!(
-        service.rename_title(1, 1, format!("{}x", "a".repeat(255))).await,
+        service
+            .rename_title(1, 1, format!("{}x", "a".repeat(255)))
+            .await,
         Err(CoreError::Invalid)
     ));
     let old_object: String =

@@ -15,7 +15,10 @@ pub(super) fn routes(state: ApiState) -> Router<ApiState> {
         .route("/api/v1/colaboracion/{id}/purge", post(purge))
         .route("/api/v1/colaboracion/{id}/preview", get(preview))
         .route("/api/v1/colaboracion/{id}/download", get(download))
-        .route("/api/v1/colaboracion/{id}", axum::routing::patch(rename_title).delete(remove))
+        .route(
+            "/api/v1/colaboracion/{id}",
+            axum::routing::patch(rename_title).delete(remove),
+        )
         .layer(axum::extract::DefaultBodyLimit::max(140 * 1024 * 1024))
         .layer(RequestBodyLimitLayer::new(140 * 1024 * 1024))
         .route_layer(middleware::from_fn_with_state(state, guard))

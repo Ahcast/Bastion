@@ -129,7 +129,7 @@ test('existing file title edit requires folder edit permission and only patches 
     return Response.json({ items: [record], page: 1, page_size: 25, has_more: false });
   });
   const container = document.createElement('div'); document.body.append(container); const root = createRoot(container);
-  const render = async (canEdit: boolean) => act(async () => root.render(<NavigationGuardProvider><CoreContext.Provider value={{ api, access: { ...access, permissions: [{ module_id: 'colaboracion', scope_key: 'empresa', capability: 'ver' as const }, ...(canEdit ? [{ module_id: 'colaboracion', scope_key: 'empresa', capability: 'editar' as const } : [])] }, notify: () => {} }}><Colaboracion /></CoreContext.Provider></NavigationGuardProvider>));
+  const render = async (canEdit: boolean) => act(async () => root.render(<NavigationGuardProvider><CoreContext.Provider value={{ api, access: { ...access, permissions: [{ module_id: 'colaboracion', scope_key: 'empresa', capability: 'ver' as const }, ...(canEdit ? [{ module_id: 'colaboracion', scope_key: 'empresa', capability: 'editar' as const }] : [])] }, notify: () => {} }}><Colaboracion /></CoreContext.Provider></NavigationGuardProvider>));
   const click = async (label: string) => { const button = [...container.querySelectorAll('button')].find(b => b.textContent === label); assert.ok(button, label); await act(async () => button.click()); };
   try {
     await render(false);
