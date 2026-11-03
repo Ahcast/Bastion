@@ -1,8 +1,9 @@
-use bastion_colaboracion::{CollaborationService, VariableKind};
+use base64::{Engine, engine::general_purpose::STANDARD};
+use bastion_colaboracion::{CollaborationService, UploadInput, VariableKind};
 use bastion_core::{CoreService, Database};
 use bastion_licitaciones::{
-    AttachmentSection, AttachmentUpload, GlobalVariable, GlobalVariablesInput, InitialFormsInput,
-    LotInput, LotItem, NameInput, TenderService,
+    AttachmentCopy, AttachmentSection, AttachmentUpload, GlobalVariable, GlobalVariablesInput,
+    InitialFormsInput, LotInput, LotItem, NameInput, TenderService,
 };
 use sqlx::mysql::MySqlPoolOptions;
 use std::io::Read;
@@ -30,7 +31,13 @@ async fn isolated_job_generates_and_downloads_a_multipage_tiff() {
         .unwrap();
     sqlx::query("INSERT INTO users (id,person_id,role_id,email,status) VALUES (1,1,1,'admin@example.test','active')").execute(&pool).await.unwrap();
     let core = CoreService::new(db.clone(), "x".repeat(32), [1; 32]).unwrap();
-    let service = TenderService::new(db, core.admin());
+    let service = TenderService::new(db.clone(), core.admin());
+    let library = CollaborationService::new(db, core.admin());
+    library.synchronize_release(true).await.unwrap();
+    core.admin()
+        .set_module_enabled(1, "colaboracion", true)
+        .await
+        .unwrap();
     service.synchronize_release(true).await.unwrap();
     core.admin()
         .set_module_enabled(1, "licitaciones", true)
@@ -107,6 +114,36 @@ async fn isolated_job_generates_and_downloads_a_multipage_tiff() {
         )
         .await
         .unwrap();
+    let source = library.upload(1, "direct-typst-source01", UploadInput { scope:"empresa".into(), id_persona:None, title:"Declaracion directa".into(), notes:String::new(), filename:"directo.typ".into(), content_base64:STANDARD.encode(b"#import \"config.typ\": datos_base\n= Typst legal directo\n#variables.lpn / Total #variables.total_paginas") }).await.unwrap();
+    let exp = service
+        .copy_attachment(
+            1,
+            exp.id,
+            exp.version,
+            "direct-typst-reference01",
+            AttachmentCopy {
+                section: AttachmentSection::Legal,
+                source_id: source.id,
+            },
+        )
+        .await
+        .unwrap();
+    let files = service.attachments(1, exp.id).await.unwrap();
+    let direct = files
+        .items
+        .iter()
+        .find(|f| f.source_id == Some(source.id))
+        .unwrap();
+    assert!(direct.is_reference && direct.available);
+    assert_eq!(direct.title.as_deref(), Some("Declaracion directa"));
+    let direct_id = direct.id.clone();
+    let object_key: Option<String> =
+        sqlx::query_scalar("SELECT object_key FROM licitaciones_archivos WHERE id=?")
+            .bind(&direct_id)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert!(object_key.is_none());
     let tiff = "SUkqAAgAAAAKAAABBAABAAAAAgAAAAEBBAABAAAAAgAAAAIBAwADAAAAhgAAAAMBAwABAAAAAQAAAAYBAwABAAAAAgAAABEBBAABAAAAjAAAABUBAwABAAAAAwAAABYBBAABAAAAAgAAABcBBAABAAAADAAAABwBAwABAAAAAQAAAKgAAAAIAAgACAD/AAD/AAD/AAD/AAAAAAAAAAAAAElJKgAIAAAACgAAAQQAAQAAAAIAAAABAQQAAQAAAAMAAAACAQMAAwAAACYBAAADAQMAAQAAAAEAAAAGAQMAAQAAAAIAAAARAQQAAQAAACwBAAAVAQMAAQAAAAMAAAAWAQQAAQAAAAMAAAAXAQQAAQAAABIAAAAcAQMAAQAAAAEAAAAAAAAACAAIAAgAAAD/AAD/AAD/AAD/AAD/AAD/AAA=";
     let exp = service
         .upload_attachment(
@@ -166,7 +203,7 @@ async fn isolated_job_generates_and_downloads_a_multipage_tiff() {
     let text = String::from_utf8(info.stdout).unwrap();
     assert!(
         text.lines()
-            .any(|line| line.split_whitespace().collect::<Vec<_>>() == vec!["Pages:", "7"])
+            .any(|line| line.split_whitespace().collect::<Vec<_>>() == vec!["Pages:", "8"])
     );
     std::fs::remove_file(&output).unwrap();
     // Preview ignores legal templates and does not replace the final job.
@@ -174,7 +211,6 @@ async fn isolated_job_generates_and_downloads_a_multipage_tiff() {
         .preview_economic_offer(1, exp.id, exp.version)
         .await
         .unwrap();
-    use base64::{Engine, engine::general_purpose::STANDARD};
     let bytes = STANDARD.decode(preview.content_base64).unwrap();
     assert!(bytes.starts_with(b"%PDF-"));
     std::fs::write(&output, bytes).unwrap();
@@ -198,6 +234,7 @@ async fn isolated_job_generates_and_downloads_a_multipage_tiff() {
     let text = String::from_utf8(text.stdout).unwrap();
     assert!(text.contains("Paginas 2"));
     assert!(!text.contains("Integridad"));
+    assert!(!text.contains("Typst legal directo"));
     assert_eq!(
         service.latest_pdf_job(1, exp.id).await.unwrap().unwrap().id,
         job.id
@@ -213,6 +250,11 @@ async fn isolated_job_generates_and_downloads_a_multipage_tiff() {
         Err(bastion_core::CoreError::PreconditionFailed)
     ));
     std::fs::remove_file(output).unwrap();
+    let exp = service
+        .remove_attachment(1, exp.id, &direct_id, exp.version, &direct_id)
+        .await
+        .unwrap();
+    assert!(library.file_snapshot(1, source.id, 100_000).await.is_ok());
     service
         .delete(1, exp.id, exp.version, exp.id)
         .await

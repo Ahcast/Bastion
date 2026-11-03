@@ -26,6 +26,8 @@ pub struct Attachment {
     pub id: String,
     pub section: String,
     pub filename: String,
+    #[sqlx(default)]
+    pub title: Option<String>,
     pub mime: String,
     pub byte_size: u64,
     pub sha256: String,
@@ -101,7 +103,7 @@ fn filename(value: &str) -> Result<String, CoreError> {
 fn policy() -> FilePolicy {
     FilePolicy {
         allowed_extensions: [
-            "pdf", "png", "jpg", "jpeg", "gif", "webp", "bmp", "tif", "tiff",
+            "pdf", "typ", "png", "jpg", "jpeg", "gif", "webp", "bmp", "tif", "tiff",
         ]
         .into_iter()
         .map(str::to_owned)
@@ -155,7 +157,8 @@ impl TenderService {
                     .file_metadata_in_transaction(&mut tx, actor, source)
                     .await
                 {
-                    Ok((_, hash)) => {
+                    Ok((source, hash)) => {
+                        file.title = Some(source.title);
                         hash.iter()
                             .map(|byte| format!("{byte:02x}"))
                             .collect::<String>()
@@ -170,6 +173,7 @@ impl TenderService {
             if !file.available {
                 file.filename = "Archivo de Colaboración no disponible".into();
                 file.mime = "application/octet-stream".into();
+                file.title = None;
                 file.sha256.clear();
                 file.source_sha256 = None;
             }
@@ -282,6 +286,11 @@ impl TenderService {
         let filename = filename(&input.filename)?;
         validate_input_budget(0, input.bytes.len() as u64)?;
         let mime = self.storage.detect_mime(input.bytes.clone()).await?;
+        let mime = if filename.to_ascii_lowercase().ends_with(".typ") && mime.starts_with("text/") {
+            "text/plain".to_owned()
+        } else {
+            mime
+        };
         policy().check(&filename, &mime, &input.bytes)?;
         if !self.storage.storage_configured() {
             return Err(CoreError::Overloaded);
@@ -571,6 +580,21 @@ mod tests {
     use super::*;
     #[test]
     fn attachments_reject_paths_active_formats_and_unapproved_sections() {
+        assert!(
+            policy()
+                .check("declaracion.typ", "text/plain", b"#variables.lpn")
+                .is_ok()
+        );
+        assert!(
+            policy()
+                .check("declaracion.typ", "text/plain", &[255, 254])
+                .is_err()
+        );
+        assert!(
+            policy()
+                .check("script.typ", "text/plain", b"<script>alert(1)</script>")
+                .is_err()
+        );
         for name in ["../a.pdf", "a\\b.png", "a:pdf", "a\npdf", ""] {
             assert!(filename(name).is_err());
         }

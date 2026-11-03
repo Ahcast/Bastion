@@ -297,7 +297,14 @@ impl TenderService {
                             Sha256::digest(&file.bytes).to_vec(),
                         ));
                     }
-                    if file.mime == "application/pdf" {
+                    if file.mime == "text/plain"
+                        && file.filename.to_ascii_lowercase().ends_with(".typ")
+                    {
+                        std::str::from_utf8(&file.bytes).map_err(|_| CoreError::Invalid)?;
+                        create(&root, &format!("source-{number:06}.typ"), file.bytes).await?;
+                        source_numbers.push(*number);
+                        global_numbers.push(*number);
+                    } else if file.mime == "application/pdf" {
                         if !file.bytes.starts_with(b"%PDF-") {
                             return Err(CoreError::Invalid);
                         }
