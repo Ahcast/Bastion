@@ -46,11 +46,11 @@ test('PC batch uploads retain idempotency keys for pending files and advance the
   assert.equal(JSON.parse(String(posts[2]!.body)).filename,'foto.png');assert.equal(JSON.parse(String(posts[0]!.body)).filename,'legal.pdf');
  }finally{await act(async()=>root.unmount());container.remove();}
 });
-test('Collaboration selection respects library read access and copies into the technical block',async()=>{
+test('Collaboration checkboxes add several references and retry only pending files',async()=>{
  const posts:RequestInit[]=[];
  const api=new ApiClient('https://example.test',async(url,init={})=>{
-  if(init.method==='POST'){posts.push(init);return Response.json({...record,version:2});}
-  if(new URL(String(url)).pathname==='/api/v1/colaboracion')return Response.json({items:[{id:4,filename:'permitida.pdf',mime:'application/pdf',size_bytes:10},{id:5,filename:'grande.pdf',mime:'application/pdf',size_bytes:100_000_001},{id:6,filename:'activo.svg',mime:'image/svg+xml',size_bytes:10}],page:1,page_size:25,has_more:false});
+  if(init.method==='POST'){posts.push(init);if(posts.length===2)return Response.json({detail:'Temporal'},{status:503});return Response.json({...record,version:posts.length===1?2:3});}
+  if(new URL(String(url)).pathname==='/api/v1/colaboracion')return Response.json({items:[{id:4,filename:'permitida.pdf',mime:'application/pdf',size_bytes:10},{id:5,filename:'grande.pdf',mime:'application/pdf',size_bytes:100_000_001},{id:7,filename:'segunda.png',mime:'image/png',size_bytes:10},{id:6,filename:'activo.svg',mime:'image/svg+xml',size_bytes:10}],page:1,page_size:25,has_more:false});
   return Response.json(list);
  });
  const container=document.createElement('div');document.body.append(container);const root=createRoot(container);
@@ -58,8 +58,18 @@ test('Collaboration selection respects library read access and copies into the t
   await act(async()=>root.render(<NavigationGuardProvider><CoreContext.Provider value={{api,access,notify:()=>{}}}><TenderFiles record={record} section="tecnica" changed={()=>{}} start={action=>action()}/></CoreContext.Provider></NavigationGuardProvider>));
   await click('Seleccionar de Colaboración',container);const dialog=document.body.querySelector('[role="dialog"]')!;
   assert.ok(!dialog.textContent?.includes('activo.svg'));
-  const buttons=[...dialog.querySelectorAll('button')].filter(b=>b.textContent==='Incorporar archivo');assert.equal(buttons.length,2);assert.equal(buttons[1]!.disabled,true);
-  await act(async()=>buttons[0]!.click());
+  const boxes=[...dialog.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')];assert.equal(boxes.length,3);assert.equal(boxes[1]!.disabled,true);
+  await act(async()=>{boxes[0]!.click();boxes[2]!.click();});
+  await click('Incorporar seleccionados',dialog);
+  assert.equal(posts.length,2);
   assert.deepEqual(JSON.parse(String(posts[0]!.body)),{section:'tecnica',source_id:4});assert.equal(new Headers(posts[0]!.headers).get('if-match'),'"1"');
+  assert.equal(new Headers(posts[1]!.headers).get('if-match'),'"2"');
+  const retryKey=new Headers(posts[1]!.headers).get('idempotency-key');
+  assert.ok(dialog.textContent?.includes('1 archivos seleccionados'));
+  await click('Incorporar seleccionados',dialog);
+  assert.equal(posts.length,3);
+  assert.deepEqual(JSON.parse(String(posts[2]!.body)),{section:'tecnica',source_id:7});
+  assert.equal(new Headers(posts[2]!.headers).get('idempotency-key'),retryKey);
+  assert.equal(new Headers(posts[2]!.headers).get('if-match'),'"2"');
  }finally{await act(async()=>root.unmount());container.remove();}
 });
