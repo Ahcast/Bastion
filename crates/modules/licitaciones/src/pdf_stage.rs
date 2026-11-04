@@ -14,8 +14,10 @@ use std::{
 pub struct TenderTemplateBundle {
     pub bid_offer: Option<String>,
     pub std_offer: Option<String>,
+    pub jica_offer: Option<String>,
     pub bid_lot: Option<String>,
     pub std_lot: Option<String>,
+    pub jica_lot: Option<String>,
     pub functions: String,
     pub legal_integridad: Option<String>,
     pub legal_oferente: Option<String>,
@@ -75,8 +77,10 @@ impl TenderTemplateBundle {
             Ok(Self {
                 bid_offer: read_optional("carta-de-oferta.typ")?,
                 std_offer: read_optional("presentacion-de-oferta.typ")?,
+                jica_offer: read_optional("presentacion-oferta-jica.typ")?,
                 bid_lot: read_optional("lote1-bid.typ")?,
                 std_lot: read_optional("lote1-std.typ")?,
+                jica_lot: read_optional("lote1-jica.typ")?,
                 functions: read("funciones.typ")?,
                 legal_integridad: read_optional("dj-integridad.typ")?,
                 legal_oferente: read_optional("informacion_sobre_el_oferente.typ")?,
@@ -87,6 +91,7 @@ impl TenderTemplateBundle {
         let (offer, lot) = match style {
             "bid" => (&self.bid_offer, &self.bid_lot),
             "std" => (&self.std_offer, &self.std_lot),
+            "jica" => (&self.jica_offer, &self.jica_lot),
             _ => return Err(CoreError::Invalid),
         };
         Ok((
@@ -102,6 +107,8 @@ mod template_tests {
     #[test]
     fn each_style_requires_only_its_own_offer_and_lot() {
         let mut bundle = TenderTemplateBundle {
+            jica_offer: None,
+            jica_lot: None,
             bid_offer: Some("BID".into()),
             bid_lot: Some("Lote BID".into()),
             std_offer: None,
@@ -118,6 +125,9 @@ mod template_tests {
         bundle.std_lot = Some("Lote STD".into());
         assert!(matches!(bundle.for_style("std"), Ok(("STD", "Lote STD"))));
         assert!(matches!(bundle.for_style("bid"), Err(CoreError::NotFound)));
+        bundle.jica_offer = Some("JICA".into());
+        bundle.jica_lot = Some("DDP".into());
+        assert!(matches!(bundle.for_style("jica"), Ok(("JICA", "DDP"))));
         assert!(matches!(
             bundle.for_style("invalid"),
             Err(CoreError::Invalid)

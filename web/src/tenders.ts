@@ -1,4 +1,5 @@
 export type FormSection = 'legal' | 'economica' | 'tecnica';
+export function changesDdpPricing(before: unknown, after: unknown) { return before !== after && (before === 'jica' || after === 'jica'); }
 export type VariableKind = 'text' | 'integer' | 'decimal' | 'date' | 'boolean';
 export interface FormVariable { key: string; label: string; kind: VariableKind; required: boolean }
 export interface FormDefinition { title: string; section: FormSection; variables: FormVariable[]; template_source_id?: number }

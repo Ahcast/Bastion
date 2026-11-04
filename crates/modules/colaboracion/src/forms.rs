@@ -431,6 +431,9 @@ fn protected_template_source(filename: &str) -> bool {
             | "funciones.typ"
             | "carta-de-oferta.typ"
             | "presentacion-de-oferta.typ"
+            | "presentacion-oferta-jica.typ"
+            | "presentacion oferta jica.typ"
+            | "plantilla_lista_precios_importados (1).typ"
     ) || name.starts_with("items")
         || name.starts_with("lote")
 }
