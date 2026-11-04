@@ -200,3 +200,10 @@ La auditoría del informe fue estática. Hacer revisión de amenazas y verificac
 - [NIST SP 800-63B-4, Authenticator Event Management](https://pages.nist.gov/800-63-4/sp800-63b/events/)
 
 Archivos de Órdenes: prefijo privado ordenes_compra/, máximo 10 MiB por producto. Ver/descargar requiere ver, cargar editar, retirar eliminar; sustituir requiere editar y eliminar. Cada acceso comprueba pertenencia a la orden. Cargar/retirar usa versión optimista, cargas con clave idempotente y limpieza durable. Ninguna respuesta expone una clave S3 o URL pública.
+
+
+## Reutilización de identidad dentro de una petición HTTP
+
+La API puede reutilizar la identidad autenticada entre el filtro y el controlador de una misma petición. El contexto es interno del servidor, está vinculado al token de sesión exacto y termina al responder o cancelar esa petición. No se comparte entre peticiones, usuarios, conexiones HTTP ni tareas de fondo. Un token diferente o una llamada fuera del contexto ejecuta de nuevo la autenticación completa; los errores no se almacenan. La siguiente petición vuelve a verificar revocación, estado activo, vencimiento y TOTP contra MySQL.
+
+Esto no almacena autorizaciones: cada dominio conserva sus comprobaciones de permisos, estado del módulo, cuotas, propiedad, versiones y auditoría. CSRF y origen siguen comprobándose antes de la operación. La actividad de sesión se actualiza durante la autenticación válida; no se introduce una ventana de revocación por caché compartida.

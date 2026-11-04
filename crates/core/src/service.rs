@@ -118,7 +118,7 @@ pub struct AuthCookies {
     pub keep_logged_in: bool,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Clone, Debug, Serialize)]
 pub struct AuthenticatedUser {
     pub id: u64,
     pub person_id: u64,
@@ -233,6 +233,7 @@ struct SessionRow {
     id: u64,
     user_id: u64,
     person_id: u64,
+    full_name: String,
     email: String,
     status: String,
     role_name: String,
@@ -763,7 +764,7 @@ impl CoreService {
         let now = Utc::now().naive_utc();
         let hash = token_hash(session_token).to_vec();
         let row = sqlx::query_as::<_, SessionRow>(
-            "SELECT s.id,s.user_id,u.person_id,u.email,u.status,r.name AS role_name,s.keep_logged_in,s.last_totp_at,s.last_activity_at,s.expires_at,s.revoked_at,s.revocation_reason FROM sessions s JOIN users u ON u.id=s.user_id JOIN roles r ON r.id=u.role_id WHERE s.token_hash=?"
+            "SELECT s.id,s.user_id,u.person_id,p.full_name,u.email,u.status,r.name AS role_name,s.keep_logged_in,s.last_totp_at,s.last_activity_at,s.expires_at,s.revoked_at,s.revocation_reason FROM sessions s JOIN users u ON u.id=s.user_id JOIN roles r ON r.id=u.role_id JOIN persons p ON p.id=u.person_id WHERE s.token_hash=?"
         ).bind(&hash).fetch_optional(&self.database.pool).await?.ok_or(CoreError::Unauthorized)?;
         if row.revoked_at.is_some() {
             return if row.revocation_reason.as_deref() == Some("replaced") {
@@ -790,20 +791,14 @@ impl CoreService {
         Ok(AuthenticatedUser {
             id: row.user_id,
             person_id: row.person_id,
-            name: String::new(),
+            name: row.full_name,
             email: row.email,
             role: row.role_name,
         })
     }
 
     pub async fn current_user(&self, session_token: &str) -> Result<AuthenticatedUser, CoreError> {
-        let mut user = self.authenticate(session_token).await?;
-        let person_name: String = sqlx::query_scalar("SELECT full_name FROM persons WHERE id=?")
-            .bind(user.person_id)
-            .fetch_one(&self.database.pool)
-            .await?;
-        user.name = person_name;
-        Ok(user)
+        self.authenticate(session_token).await
     }
 
     pub async fn profile(&self, session_token: &str) -> Result<ProfileInfo, CoreError> {

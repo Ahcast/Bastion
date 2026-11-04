@@ -42,6 +42,7 @@ mod ordenes_compra;
 mod procesos;
 mod proveedores;
 mod reportes;
+mod request_actor;
 mod sar;
 
 const GENERAL_REQUEST_BODY_LIMIT: usize = 1024 * 1024;
@@ -408,6 +409,7 @@ pub fn router(
         .fallback(not_found)
         .with_state(api_state)
         .layer(middleware::from_fn(problem_details))
+        .layer(middleware::from_fn(request_actor::scope))
         .layer(middleware::from_fn_with_state(
             CsrfGuardState {
                 core: core.clone(),
@@ -884,7 +886,9 @@ async fn actor(
 ) -> Result<bastion_core::AuthenticatedUser, ApiError> {
     let token =
         cookie_value(headers, "__Host-bastion_session").ok_or(ApiError(CoreError::Unauthorized))?;
-    state.core.current_user(&token).await.map_err(ApiError)
+    request_actor::resolve(&token, || state.core.current_user(&token))
+        .await
+        .map_err(ApiError)
 }
 
 fn page(query: &ListQuery) -> (u32, u32) {
