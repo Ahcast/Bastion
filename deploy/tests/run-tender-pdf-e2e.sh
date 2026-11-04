@@ -59,6 +59,8 @@ files={
  'presentacion-de-oferta.typ':'#import "variables.typ": datos\nPresentacion #datos.lpn / Paginas #datos.total_paginas',
  'lote1-std.typ':'#import "items1_std.typ": items\n#let total_lote = decimal("0.00")\nLote #items.len()',
  'funciones.typ':'#let f(x) = x',
+ 'presentacion-oferta-jica.typ':'#import "variables.typ": datos\n#let bienes = calc.round(datos.lpn_total / decimal("1.15"), digits: 2)\nJICA / #datos.destino / Total #datos.lpn_total / Bienes #bienes / Impuestos #(datos.lpn_total - bienes)',
+ 'lote1-jica.typ':'#import "items1_jica.typ": items\n#let total_lote = items.map(p => calc.round(p.cantidad * p.precio_unitario, digits: 2)).sum(default: decimal("0.00"))\nDDP #total_lote',
  'dj-integridad.typ':'= Integridad\n#variables.lpn',
  'informacion_sobre_el_oferente.typ':'= Oferente\n#variables.lpn',
 }

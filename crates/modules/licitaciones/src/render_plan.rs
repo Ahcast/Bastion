@@ -50,7 +50,7 @@ impl TenderTypstSnapshot {
                 .ok_or(CoreError::Invalid)
         };
         let style = value("stylo")?;
-        if !matches!(style, "bid" | "std") || self.order.len() > 3998 {
+        if !matches!(style, "bid" | "std" | "jica") || self.order.len() > 3998 {
             return Err(CoreError::Invalid);
         }
         let mut seen = BTreeSet::new();

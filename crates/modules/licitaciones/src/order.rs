@@ -97,11 +97,13 @@ pub(crate) async fn candidates(
         .find(|v| v.key == "stylo")
         .and_then(|v| v.value.as_ref())
         .and_then(|v| v.as_str());
-    if matches!(style, Some("bid" | "std")) {
+    if matches!(style, Some("bid" | "std" | "jica")) {
         items.push(PdfOrderItem {
             title_editable: true,
             key: "oferta".into(),
-            label: if style == Some("bid") {
+            label: if style == Some("jica") {
+                "Presentación de oferta JICA"
+            } else if style == Some("bid") {
                 "Carta de oferta"
             } else {
                 "Presentación de oferta"

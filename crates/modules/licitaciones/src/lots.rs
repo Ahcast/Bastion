@@ -72,6 +72,40 @@ fn nonempty(value: &str, max: usize) -> bool {
             .any(|c| c.is_control() && !matches!(c, '\n' | '\r' | '\t'))
 }
 impl LotInput {
+    pub(crate) fn total_for_style(&self, style: &str) -> Result<String, CoreError> {
+        self.calculate_for_style(style, true)
+    }
+    fn calculate_for_style(&self, style: &str, require_origin: bool) -> Result<String, CoreError> {
+        match style {
+            "bid" => self.calculate(true, require_origin),
+            "std" => self.calculate(false, require_origin),
+            "jica" => self.calculate_ddp(require_origin),
+            _ => Err(CoreError::Invalid),
+        }
+    }
+    fn calculate_ddp(&self, require_origin: bool) -> Result<String, CoreError> {
+        if self.items.len() > 1000 {
+            return Err(CoreError::Invalid);
+        }
+        let scale = 10_i128.pow(12);
+        let mut total = 0_i128;
+        for item in &self.items {
+            if !nonempty(&item.descripcion, 4000)
+                || !nonempty(&item.fecha_entrega, 255)
+                || !nonempty(&item.unidad, 255)
+                || (require_origin && !nonempty(&item.pais_origen, 255))
+                || item.transporte != "0.00"
+            {
+                return Err(CoreError::Invalid);
+            }
+            let product = scaled(&item.cantidad, 12)?
+                .checked_mul(scaled(&item.precio_unitario, 2)?)
+                .ok_or(CoreError::Invalid)?;
+            let cents = product.checked_add(scale / 2).ok_or(CoreError::Invalid)? / scale;
+            total = total.checked_add(cents).ok_or(CoreError::Invalid)?;
+        }
+        Ok(format!("{}.{:02}", total / 100, total % 100))
+    }
     pub fn total(&self, bid: bool) -> Result<String, CoreError> {
         self.calculate(bid, true)
     }
@@ -112,7 +146,7 @@ impl LotInput {
         Ok(format!("{}.{:02}", cents / 100, cents % 100))
     }
 }
-fn config(exp: &Expedient, number: u32) -> Result<bool, CoreError> {
+fn config(exp: &Expedient, number: u32) -> Result<&str, CoreError> {
     let get = |key: &str| {
         exp.variables
             .iter()
@@ -128,8 +162,7 @@ fn config(exp: &Expedient, number: u32) -> Result<bool, CoreError> {
         return Err(CoreError::Invalid);
     }
     match get("stylo") {
-        Some("bid") => Ok(true),
-        Some("std") => Ok(false),
+        Some(style @ ("bid" | "std" | "jica")) => Ok(style),
         _ => Err(CoreError::Invalid),
     }
 }
@@ -165,6 +198,15 @@ pub(crate) async fn reconcile(
                 return Err(CoreError::Conflict);
             }
             deletions.push(number);
+        } else if old_style != new_style
+            && (old_style.as_deref() == Some("jica") || new_style.as_deref() == Some("jica"))
+        {
+            if !items.is_empty() && !confirm {
+                return Err(CoreError::Conflict);
+            }
+            if !items.is_empty() {
+                changes.push((number, Vec::new()));
+            }
         } else if old_style.as_deref() == Some("bid") && new_style.as_deref() == Some("std") {
             let loses = items.iter().any(|item| {
                 !item.pais_origen.is_empty() || scaled(&item.transporte, 2).is_ok_and(|n| n != 0)
@@ -222,7 +264,7 @@ impl TenderService {
     pub async fn lot(&self, actor: u64, id: u64, numero: u32) -> Result<Lot, CoreError> {
         let mut tx = self.begin(actor, "ver").await?;
         let exp = load(&mut tx, id).await?;
-        let bid = config(&exp, numero)?;
+        let style = config(&exp, numero)?;
         let row: Option<(serde_json::Value, String)> = sqlx::query_as(
             "SELECT items_json,tamano_tabla FROM licitaciones_lotes WHERE expediente_id=? AND numero=?",
         )
@@ -242,7 +284,7 @@ impl TenderService {
         let total = LotInput {
             items: items.clone(),
         }
-        .calculate(bid, false)?;
+        .calculate_for_style(style, false)?;
         tx.commit().await?;
         Ok(Lot {
             numero,
@@ -278,7 +320,7 @@ impl TenderService {
         let mut tx = self.begin(actor, "editar").await?;
         let exp = load(&mut tx, id).await?;
         editable(&exp, version)?;
-        input.total(config(&exp, numero)?)?;
+        input.total_for_style(config(&exp, numero)?)?;
         sqlx::query("INSERT INTO licitaciones_lotes(expediente_id,numero,items_json,tamano_tabla) VALUES (?,?,?,COALESCE(?, '7')) ON DUPLICATE KEY UPDATE items_json=VALUES(items_json),tamano_tabla=COALESCE(?,tamano_tabla)")
             .bind(id).bind(numero).bind(serde_json::to_value(input.items).map_err(|_|CoreError::Invalid)?).bind(&tamano_tabla).bind(&tamano_tabla).execute(&mut *tx).await?;
         bump(&mut tx, actor, id, version).await?;
@@ -318,6 +360,44 @@ mod tests {
             .is_err()
         );
         assert_eq!(LotInput { items: vec![] }.total(false).unwrap(), "0.00");
+    }
+    #[test]
+    fn jica_ddp_includes_tax_and_transport_and_rounds_each_item() {
+        let mut row = item();
+        row.transporte = "0.00".into();
+        assert_eq!(
+            LotInput {
+                items: vec![row.clone()]
+            }
+            .total_for_style("jica")
+            .unwrap(),
+            "250.00"
+        );
+        row.cantidad = "0.005".into();
+        row.precio_unitario = "1.00".into();
+        assert_eq!(
+            LotInput {
+                items: vec![row.clone(), row.clone()]
+            }
+            .total_for_style("jica")
+            .unwrap(),
+            "0.02"
+        );
+        row.transporte = "0.01".into();
+        assert!(
+            LotInput {
+                items: vec![row.clone()]
+            }
+            .total_for_style("jica")
+            .is_err()
+        );
+        row.transporte = "0.00".into();
+        row.pais_origen.clear();
+        assert!(
+            LotInput { items: vec![row] }
+                .total_for_style("jica")
+                .is_err()
+        );
     }
     #[test]
     fn table_font_size_accepts_only_bounded_numeric_points() {

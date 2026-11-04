@@ -285,12 +285,88 @@ async fn isolated_job_generates_and_downloads_a_multipage_tiff() {
             .await,
         Err(bastion_core::CoreError::PreconditionFailed)
     ));
-    std::fs::remove_file(output).unwrap();
+    std::fs::remove_file(&output).unwrap();
     let exp = service
         .remove_attachment(1, exp.id, &direct_id, exp.version, &direct_id)
         .await
         .unwrap();
     assert!(library.file_snapshot(1, source.id, 100_000).await.is_ok());
+    // DDP prices have a different meaning: switching requires confirmation and
+    // clears previous items rather than charging the included ISV a second time.
+    let mut variables = exp.variables.clone();
+    variables
+        .iter_mut()
+        .find(|v| v.key == "stylo")
+        .unwrap()
+        .value = Some(serde_json::json!("jica"));
+    variables.push(GlobalVariable {
+        key: "destino".into(),
+        label: "Destino DDP".into(),
+        kind: VariableKind::Text,
+        value: Some(serde_json::json!("Tegucigalpa")),
+    });
+    assert!(
+        service
+            .save_global_variables(
+                1,
+                exp.id,
+                exp.version,
+                GlobalVariablesInput {
+                    variables: variables.clone()
+                },
+                false
+            )
+            .await
+            .is_err()
+    );
+    let exp = service
+        .save_global_variables(
+            1,
+            exp.id,
+            exp.version,
+            GlobalVariablesInput { variables },
+            true,
+        )
+        .await
+        .unwrap();
+    assert!(service.lot(1, exp.id, 1).await.unwrap().items.is_empty());
+    let exp = service
+        .save_lot(
+            1,
+            exp.id,
+            1,
+            exp.version,
+            LotInput {
+                items: vec![LotItem {
+                    descripcion: "Equipo JICA".into(),
+                    pais_origen: "Honduras".into(),
+                    fecha_entrega: "30 dias".into(),
+                    cantidad: "2.5".into(),
+                    unidad: "unidad".into(),
+                    transporte: "0.00".into(),
+                    precio_unitario: "100.00".into(),
+                }],
+            },
+        )
+        .await
+        .unwrap();
+    assert_eq!(service.lot(1, exp.id, 1).await.unwrap().total, "250.00");
+    let preview = service
+        .preview_economic_offer(1, exp.id, exp.version)
+        .await
+        .unwrap();
+    std::fs::write(&output, STANDARD.decode(preview.content_base64).unwrap()).unwrap();
+    let text = std::process::Command::new("/usr/bin/pdftotext")
+        .arg(&output)
+        .arg("-")
+        .output()
+        .unwrap();
+    assert!(text.status.success());
+    let text = String::from_utf8(text.stdout).unwrap();
+    for expected in ["JICA", "Tegucigalpa", "250", "217.39", "32.61"] {
+        assert!(text.contains(expected), "missing {expected}: {text}");
+    }
+    std::fs::remove_file(&output).unwrap();
     service
         .delete(1, exp.id, exp.version, exp.id)
         .await

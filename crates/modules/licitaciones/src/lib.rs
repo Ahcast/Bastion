@@ -161,7 +161,15 @@ impl GlobalVariablesInput {
         for variable in &self.variables {
             if !matches!(
                 variable.key.as_str(),
-                "lpn" | "inst" | "descripcion" | "mes" | "stylo" | "dia" | "year" | "lotes"
+                "lpn"
+                    | "inst"
+                    | "descripcion"
+                    | "destino"
+                    | "mes"
+                    | "stylo"
+                    | "dia"
+                    | "year"
+                    | "lotes"
             ) {
                 continue;
             }
@@ -170,11 +178,13 @@ impl GlobalVariablesInput {
             };
             let text = value.as_str().ok_or(CoreError::Invalid)?;
             let valid = match variable.key.as_str() {
-                "lpn" | "inst" | "descripcion" => {
+                "lpn" | "inst" | "descripcion" | "destino" => {
                     variable.kind == VariableKind::Text && !text.trim().is_empty()
                 }
                 "mes" => variable.kind == VariableKind::Text && months.contains(&text),
-                "stylo" => variable.kind == VariableKind::Text && matches!(text, "bid" | "std"),
+                "stylo" => {
+                    variable.kind == VariableKind::Text && matches!(text, "bid" | "std" | "jica")
+                }
                 "dia" => {
                     variable.kind == VariableKind::Integer
                         && text.parse::<u32>().is_ok_and(|n| (1..=31).contains(&n))

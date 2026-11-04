@@ -9,7 +9,7 @@ import TenderFiles from '../components/TenderFiles.js';
 import TenderLots from '../components/TenderLots.js';
 import TenderPdfOrder from '../components/TenderPdfOrder.js';
 import FormLibrary from './FormLibrary.js';
-import { fieldValue, kindLabels, sectionLabels } from '../tenders.js';
+import { changesDdpPricing, fieldValue, kindLabels, sectionLabels } from '../tenders.js';
 import type { Expedient, ExpedientSummary, GlobalVariable, FormSection, PublishedForm, TenderPage, VariableKind } from '../tenders.js';
 
 export default function Licitaciones() {
@@ -111,17 +111,18 @@ function GlobalVariablesEditor({ record, latest, onDraft, draftLots, editable, s
     {key:'lpn', label:'LPN', kind:'text', value:null}, {key:'inst', label:'Institución', kind:'text', value:null},
     {key:'dia', label:'Día', kind:'integer', value:null}, {key:'mes', label:'Mes', kind:'text', value:null},
     {key:'year', label:'Año', kind:'integer', value:null}, {key:'lotes', label:'Cantidad de lotes', kind:'integer', value:null},
-    {key:'stylo', label:'Estilo', kind:'text', value:null}, {key:'descripcion', label:'Descripción', kind:'text', value:null},
+    {key:'stylo', label:'Estilo', kind:'text', value:null}, {key:'destino', label:'Destino DDP (JICA)', kind:'text', value:null}, {key:'descripcion', label:'Descripción', kind:'text', value:null},
   ];
-  const [variables, setVariables] = useState<GlobalVariable[]>(() => [...fixed.filter(f => !(record.variables ?? []).some(v => v.key === f.key)), ...structuredClone(record.variables ?? [])]);
+  const [variables, setVariables] = useState<GlobalVariable[]>(() => [...fixed.filter(f => (f.key !== 'destino' || record.variables?.some(v => v.key === 'stylo' && v.value === 'jica')) && !(record.variables ?? []).some(v => v.key === f.key)), ...structuredClone(record.variables ?? [])]);
   const [discard, setDiscard] = useState<string[] | null>(null);
   const [busy, setBusy] = useState(false), [error, setError] = useState(''), [conflict, setConflict] = useState(false);
   const baseline = useRef(JSON.stringify(variables));
   useEffect(() => { onDraft(variables); }, [variables, onDraft]);
-  const change = (index: number, value: Partial<GlobalVariable>) => setVariables(current => current.map((item, i) => i === index ? { ...item, ...value } : item));
+  const change = (index: number, value: Partial<GlobalVariable>) => setVariables(current => { const next = current.map((item,i) => i === index ? {...item,...value} : item); if (next.some(v => v.key === 'stylo' && v.value === 'jica') && !next.some(v => v.key === 'destino')) next.push({...fixed.find(v => v.key === 'destino')!}); return next; });
   const save = async (confirmDiscard: boolean) => {
     setBusy(true); setError(''); setConflict(false);
     try {
+      if (variables.some(v => v.key === 'stylo' && v.value === 'jica') && !String(variables.find(v => v.key === 'destino')?.value ?? '').trim()) throw new Error('Completa el destino DDP de JICA.');
       if (!confirmDiscard) {
         const current = latest();
         const oldStyle = current.variables?.find(v => v.key === 'stylo')?.value ?? null;
@@ -129,8 +130,8 @@ function GlobalVariablesEditor({ record, latest, onDraft, draftLots, editable, s
         const nextCount = Number(variables.find(v => v.key === 'lotes')?.value ?? 0);
         if (oldStyle !== nextStyle || Number(current.variables?.find(v => v.key === 'lotes')?.value ?? 0) > nextCount) {
           const lots = await api.request<{numero:number;items:number;tamano_tabla?:string}[]>(`/api/v1/licitaciones/${record.id}/lotes`);
-          const affected = [...lots, ...draftLots].filter(l => ((l.numero > nextCount || !nextStyle) && (l.items > 0 || Number(l.tamano_tabla ?? '7') !== 7)) || (l.items > 0 && oldStyle === 'bid' && nextStyle === 'std')).filter((l, i, all) => all.findIndex(other => other.numero === l.numero) === i);
-          if (affected.length) { setDiscard(affected.map(l => `Lote ${l.numero}: ${l.items} ítem(s)${l.numero <= nextCount && nextStyle ? ', país de origen y transporte' : ', todos sus datos y tamaño de tabla'}`)); return false; }
+          const affected = [...lots, ...draftLots].filter(l => ((l.numero > nextCount || !nextStyle) && (l.items > 0 || Number(l.tamano_tabla ?? '7') !== 7)) || (l.items > 0 && ((oldStyle === 'bid' && nextStyle === 'std') || changesDdpPricing(oldStyle,nextStyle)))).filter((l, i, all) => all.findIndex(other => other.numero === l.numero) === i);
+          if (affected.length) { setDiscard(affected.map(l => `Lote ${l.numero}: ${l.items} ítem(s)${l.numero <= nextCount && nextStyle ? changesDdpPricing(oldStyle,nextStyle) ? ', todos sus ítems y precios por el cambio de estilo DDP' : ', país de origen y transporte' : ', todos sus datos y tamaño de tabla'}`)); return false; }
         }
       }
       const updated = await api.request<Expedient>(`/api/v1/licitaciones/${record.id}/variables`, { method: 'PUT', body: { variables, confirm_discard:confirmDiscard }, ifMatch: latest().version }); baseline.current = JSON.stringify(variables); setDiscard(null); saved(updated); return true;
@@ -144,7 +145,7 @@ function GlobalVariablesEditor({ record, latest, onDraft, draftLots, editable, s
         <label>Identificador<input value={variable.key} readOnly={fixed.some(f => f.key === variable.key)} required pattern="[a-z][a-z0-9_]{0,63}" maxLength={64} onChange={e => change(index, { key: e.target.value })} /></label>
         <label>Etiqueta<input value={variable.label} readOnly={fixed.some(f => f.key === variable.key)} required maxLength={255} onChange={e => change(index, { label: e.target.value })} /></label>
         <label>Tipo<select disabled={fixed.some(f => f.key === variable.key && f.kind === variable.kind)} value={variable.kind} onChange={e => change(index, { kind: e.target.value as VariableKind, value: null })}>{Object.entries(kindLabels).map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select></label>
-        <label>Valor{variable.key === 'total_paginas' ? <input value="Se calculará al generar el PDF" readOnly /> : variable.key === 'mes' || variable.key === 'stylo' ? <select value={String(variable.value ?? '')} onChange={e => change(index, { value:e.target.value || null })}><option value="">Seleccionar</option>{(variable.key === 'mes' ? ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'] : ['bid','std']).map(option => <option key={option} value={option}>{option}</option>)}</select> : variable.kind === 'boolean' ? <select value={variable.value === null ? '' : String(variable.value)} onChange={e => change(index, { value: e.target.value === '' ? null : fieldValue(variable.kind, e.target.value) })}><option value="">Sin completar</option><option value="true">Sí</option><option value="false">No</option></select> : <input type={variable.kind === 'date' ? 'date' : 'text'} value={String(variable.value ?? '')} onChange={e => change(index, { value: e.target.value === '' ? null : e.target.value })} />}</label>
+        <label>Valor{variable.key === 'total_paginas' ? <input value="Se calculará al generar el PDF" readOnly /> : variable.key === 'mes' || variable.key === 'stylo' ? <select value={String(variable.value ?? '')} onChange={e => change(index, { value:e.target.value || null })}><option value="">Seleccionar</option>{(variable.key === 'mes' ? ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'] : ['bid','std','jica']).map(option => <option key={option} value={option}>{option}</option>)}</select> : variable.kind === 'boolean' ? <select value={variable.value === null ? '' : String(variable.value)} onChange={e => change(index, { value: e.target.value === '' ? null : fieldValue(variable.kind, e.target.value) })}><option value="">Sin completar</option><option value="true">Sí</option><option value="false">No</option></select> : <input type={variable.kind === 'date' ? 'date' : 'text'} value={String(variable.value ?? '')} onChange={e => change(index, { value: e.target.value === '' ? null : e.target.value })} />}</label>
         {!fixed.some(f => f.key === variable.key) && <button type="button" onClick={() => setVariables(current => current.filter((_, i) => i !== index))}>Quitar variable</button>}
       </fieldset>)}
       <button type="button" disabled={variables.length >= 100} onClick={() => setVariables(current => [...current, { key: '', label: '', kind: 'text', value: null }])}>Añadir variable</button>

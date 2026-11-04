@@ -40,6 +40,22 @@ after(() => window.happyDOM.abort());
 const access: Access = { is_system_administrator:true, modules:[], permissions:[] };
 const record: Expedient = { id: 7, name:'', version:1, state:'borrador', forms:[], variables:[{key:'lotes', label:'Lotes', kind:'integer', value:'2'}, {key:'stylo', label:'Estilo', kind:'text', value:'bid'}] };
 const item = {descripcion:'Equipo', pais_origen:'China', fecha_entrega:'30 días', cantidad:'2.5', unidad:'und', transporte:'10.00', precio_unitario:'100.00'};
+
+test('JICA edits DDP prices and origin without a second transport or tax charge', async () => {
+  const jica = {...record, variables:record.variables!.map(v=>v.key==='stylo'?{...v,value:'jica'}:v)};
+  const row={...item,transporte:'0.00'}; const writes:RequestInit[]=[];
+  const api=new ApiClient('https://example.test',async (_url,init={})=>{if(init.method==='PUT'){writes.push(init);return Response.json({...jica,version:2});}return Response.json({numero:1,items:[row,row],total:'500.00',version:1});});
+  const container=document.createElement('div');document.body.append(container);const root=createRoot(container);
+  try {
+    await act(async()=>root.render(<NavigationGuardProvider><CoreContext.Provider value={{api,access,notify:()=>{}}}><TenderLots record={jica} editable saved={()=>{}} /></CoreContext.Provider></NavigationGuardProvider>));
+    const headings=[...container.querySelectorAll('th')].map(h=>h.textContent);
+    assert.ok(headings.includes('País de origen'));assert.ok(headings.includes('Precio unitario DDP'));assert.ok(!headings.includes('Transporte'));
+    assert.ok(container.textContent?.includes('DDP: incluye ISV y transporte'));
+    await act(async()=>[...container.querySelectorAll('button')].find(b=>b.textContent==='Quitar')!.click());
+    await act(async()=>container.querySelector('form')!.dispatchEvent(new Event('submit',{bubbles:true,cancelable:true})));
+    assert.deepEqual(JSON.parse(String(writes[0]!.body)),{items:[row],tamano_tabla:'7'});
+  } finally {await act(async()=>root.unmount());container.remove();}
+});
 test('lot editor shows BID fields, lists all lots and sends one versioned lot', async () => {
   const writes: RequestInit[] = [];
   const api = new ApiClient('https://example.test', async (_url, init={}) => { if (init.method === 'PUT') { writes.push(init); return Response.json({...record,version:2}); } return Response.json({numero:1,items:[item,item],total:'595.00',version:1}); });

@@ -58,7 +58,7 @@ fn prepare_typst_lot_sources_with_sizes(
         .parse::<u32>()
         .map_err(|_| CoreError::Invalid)?;
     let style = get("stylo")?;
-    if !(1..=1000).contains(&count) || !matches!(style, "bid" | "std") {
+    if !(1..=1000).contains(&count) || !matches!(style, "bid" | "std" | "jica") {
         return Err(CoreError::Invalid);
     }
     let marker = format!("items1_{style}.typ");
@@ -70,6 +70,9 @@ fn prepare_typst_lot_sources_with_sizes(
         data.insert(key.into(), Value::String(get(key)?.to_owned()));
     }
     data.insert("lotes".into(), json!(count));
+    if style == "jica" {
+        data.insert("destino".into(), Value::String(get("destino")?.to_owned()));
+    }
     data.insert("total_paginas".into(), json!(total_pages));
     let mut files = crate::globals_typst::prepare_global_typst_sources(variables, total_pages)?;
     files.insert(
@@ -86,7 +89,7 @@ fn prepare_typst_lot_sources_with_sizes(
         LotInput {
             items: items.clone(),
         }
-        .total(style == "bid")?;
+        .total_for_style(style)?;
         let json_name = format!("items{number}_{style}.json");
         let typ_name = format!("items{number}_{style}.typ");
         files.insert(
@@ -96,6 +99,8 @@ fn prepare_typst_lot_sources_with_sizes(
         // All user content is read as data; no value is interpolated into code.
         let country = if style == "bid" {
             "pais_origen: p.pais_origen, transporte: decimal(p.transporte),"
+        } else if style == "jica" {
+            "pais_origen: p.pais_origen,"
         } else {
             ""
         };
@@ -351,9 +356,17 @@ mod tests {
         };
         let root = std::env::temp_dir().join(format!("bastion-tender-font-{}", std::process::id()));
         std::fs::create_dir_all(&root).unwrap();
-        for style in ["bid", "std"] {
+        for style in ["bid", "std", "jica"] {
             let mut input = variables();
             input.iter_mut().find(|v| v.key == "stylo").unwrap().value = Some(json!(style));
+            if style == "jica" {
+                input.push(GlobalVariable {
+                    key: "destino".into(),
+                    label: "Destino".into(),
+                    kind: bastion_colaboracion::VariableKind::Text,
+                    value: Some(json!("Tegucigalpa")),
+                });
+            }
             let body = if style == "bid" {
                 "#{ set text(size: tamano_tabla)\n table(columns: 1, [Prueba]) }"
             } else {
@@ -365,6 +378,8 @@ mod tests {
             let mut sample = item();
             if style == "std" {
                 sample.pais_origen.clear();
+            }
+            if style != "bid" {
                 sample.transporte = "0.00".into();
             }
             let built = prepare_typst_lot_sources_with_sizes(
