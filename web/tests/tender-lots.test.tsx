@@ -169,3 +169,38 @@ test('reducing lots asks for confirmation and identifies the data to discard', a
     assert.equal(JSON.parse(String(writes[0]!.body)).confirm_discard,true);
   } finally { await act(async()=>root.unmount());container.remove(); }
 });
+
+test('marking a tender as sent requires confirmation and switches the workspace to read only', async () => {
+  const writes: RequestInit[] = [];
+  const api = new ApiClient('https://example.test', async (url, init = {}) => {
+    const path = new URL(String(url)).pathname;
+    if (path.endsWith('/marcar-enviada')) {
+      writes.push(init);
+      return Response.json({ ...record, version: 2, state: 'enviada' });
+    }
+    if (path === '/api/v1/licitaciones') return Response.json({ items: [record], page: 1, page_size: 25, has_more: false });
+    return Response.json(record);
+  });
+  const granted: Access = { ...access, modules: [{ module_id: 'licitaciones', display_name: 'Licitaciones' }], permissions: ['ver', 'editar', 'eliminar'].map(capability => ({ module_id: 'licitaciones', scope_key: 'expedientes', capability })) };
+  const container = document.createElement('div');
+  document.body.append(container);
+  const root = createRoot(container);
+  const button = (label: string, scope: ParentNode = container) => [...scope.querySelectorAll('button')].find(b => b.textContent === label);
+  try {
+    await act(async () => root.render(<NavigationGuardProvider><CoreContext.Provider value={{ api, access: granted, notify: () => {} }}><Licitaciones /></CoreContext.Provider></NavigationGuardProvider>));
+    await act(async () => button('Abrir expediente')!.click());
+    await act(async () => button('Marcar como enviada')!.click());
+    assert.equal(writes.length, 0);
+    const dialog = document.body.querySelector('[role="dialog"]')!;
+    await act(async () => button('Confirmar estado Enviada', dialog)!.click());
+    assert.equal(writes.length, 1);
+    assert.equal(new Headers(writes[0]!.headers).get('if-match'), '"1"');
+    assert.match(container.textContent ?? '', /Enviada · Versión 2/);
+    assert.equal(button('Marcar como enviada'), undefined);
+    assert.equal(button('Eliminar borrador'), undefined);
+    assert.equal(button('Guardar expediente'), undefined);
+  } finally {
+    await act(async () => root.unmount());
+    container.remove();
+  }
+});
