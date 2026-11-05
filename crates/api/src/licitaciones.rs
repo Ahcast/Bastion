@@ -7,6 +7,7 @@ use bastion_licitaciones::{
 pub(super) fn routes(state: ApiState) -> Router<ApiState> {
     Router::new()
         .route("/api/v1/licitaciones", get(list).post(create))
+        .route("/api/v1/licitaciones/{id}/marcar-enviada", post(mark_sent))
         .route(
             "/api/v1/licitaciones/plantillas-instaladas",
             get(installed_forms),
@@ -370,6 +371,21 @@ async fn create(
     );
     Ok(output)
 }
+async fn mark_sent(
+    State(state): State<ApiState>,
+    headers: axum::http::HeaderMap,
+    Path(id): Path<u64>,
+    Json(_): Json<EmptyInput>,
+) -> Result<Response, ApiError> {
+    let user = actor(&state, &headers).await?;
+    state
+        .licitaciones
+        .mark_sent(user.id, id, expected(&headers)?)
+        .await
+        .map(response)
+        .map_err(ApiError)
+}
+
 async fn rename(
     State(state): State<ApiState>,
     headers: axum::http::HeaderMap,

@@ -18,6 +18,11 @@ export default function Licitaciones() {
   if (!moduleCan(access, 'licitaciones', 'expedientes', 'ver')) return <Notice>No tienes acceso a Licitaciones.</Notice>;
   return <div className="document-workspace">{id === null ? <ExpedientList open={setId} /> : <ExpedientWorkspace key={id} id={id} back={() => setId(null)} />}</div>;
 }
+function stateLabel(state: string) {
+  if (state === 'borrador') return 'Borrador';
+  if (state === 'enviada') return 'Enviada';
+  return state;
+}
 function ExpedientList({ open }: { open: (id: number) => void }) {
   const { api, access } = useCore();
   const [page, setPage] = useState(1), [busy, setBusy] = useState(false), [error, setError] = useState('');
@@ -30,7 +35,7 @@ function ExpedientList({ open }: { open: (id: number) => void }) {
   }}>{busy ? 'Creando…' : 'Nuevo expediente'}</button>} />
     <DocumentSection title="Listado de expedientes" metadata={result.data ? `${result.data.items.length} en esta página` : undefined} list>
     <Notice>{error || result.error}</Notice>
-    {result.data ? <><Table columns={['Expediente', 'Estado', 'Versión', 'Acción']} rows={result.data.items.map(e => [<div className="document-record"><strong>{e.name || "Sin nombre"}</strong><small className="document-id">#{e.id}</small></div>, <span className="document-state">{e.state === 'borrador' ? 'Borrador' : e.state}</span>, <span className="document-id">{e.version}</span>, <button onClick={() => open(e.id)}>Abrir expediente</button>])} /><DocumentPagination page={page} hasMore={result.data.has_more} change={setPage} busy={busy} /></> : !result.error && <Loading />}
+    {result.data ? <><Table columns={['Expediente', 'Estado', 'Versión', 'Acción']} rows={result.data.items.map(e => [<div className="document-record"><strong>{e.name || "Sin nombre"}</strong><small className="document-id">#{e.id}</small></div>, <span className="document-state">{stateLabel(e.state)}</span>, <span className="document-id">{e.version}</span>, <button onClick={() => open(e.id)}>Abrir expediente</button>])} /><DocumentPagination page={page} hasMore={result.data.has_more} change={setPage} busy={busy} /></> : !result.error && <Loading />}
     </DocumentSection>
   </>;
 }
@@ -47,14 +52,35 @@ function ExpedientWorkspace({ id, back }: { id: number; back: () => void }) {
   const latest = () => currentRecord.current!;
   const saved = (value: Expedient) => { currentRecord.current = value; result.setData(value); };
   const [savingAll, setSavingAll] = useState(false);
+  const [confirmSent, setConfirmSent] = useState(false);
+  const [sendError, setSendError] = useState('');
+  const markSent = async () => {
+    setConfirmSent(false);
+    setSavingAll(true);
+    setSendError('');
+    try {
+      if (!await saveAll()) return;
+      const updated = await api.request<Expedient>(`/api/v1/licitaciones/${id}/marcar-enviada`, {
+        method: 'POST', ifMatch: latest().version, body: {},
+      });
+      saved(updated);
+      notify('Licitación marcada como enviada.');
+    } catch (reason) {
+      setSendError(reason instanceof ApiError && reason.status === 409
+        ? 'No se pudo marcar como enviada. Si hay un PDF en generación, espera a que termine. Si el estado cambió, vuelve a abrir el expediente.'
+        : message(reason));
+    } finally {
+      setSavingAll(false);
+    }
+  };
   const [draftVariables, setDraftVariables] = useState<GlobalVariable[] | null>(null);
   const [draftLots, setDraftLots] = useState<{numero:number; items:number; tamano_tabla?:string}[]>([]);
   const editable = record?.state === 'borrador' && moduleCan(access, 'licitaciones', 'expedientes', 'editar');
   const tabs: { id: Tab; label: string }[] = [{ id: 'resumen', label: 'Resumen' }, { id: 'variables', label: 'Variables' }, ...Object.entries(sectionLabels).map(([key, label]) => ({ id: key as FormSection, label })), { id: 'pdf', label: 'PDF final' }];
-  return <><Heading title={record?.name || `Expediente #${id}`} description={`Expediente #${id} · Cada formulario conserva su revisión de biblioteca.`} action={<div className="actions"><button disabled={savingAll} onClick={() => { void navigate(back); }}>Volver al listado</button>{editable && <button className="primary" disabled={savingAll} onClick={async () => { setSavingAll(true); try { if (await saveAll()) notify('Expediente guardado.'); } finally { setSavingAll(false); } }}>{savingAll ? 'Guardando…' : 'Guardar expediente'}</button>}</div>} />
-    <Notice>{result.error || saveError}</Notice>{!record && !result.error && <Loading />}
+  return <><Heading title={record?.name || `Expediente #${id}`} description={`Expediente #${id} · Cada formulario conserva su revisión de biblioteca.`} action={<div className="actions"><button disabled={savingAll} onClick={() => { void navigate(back); }}>Volver al listado</button>{editable && <button className="primary" disabled={savingAll} onClick={async () => { setSavingAll(true); try { if (await saveAll()) notify('Expediente guardado.'); } finally { setSavingAll(false); } }}>{savingAll ? 'Guardando…' : 'Guardar expediente'}</button>}{editable && <button disabled={savingAll} onClick={() => setConfirmSent(true)}>Marcar como enviada</button>}</div>} />
+    <Notice>{result.error || saveError || sendError}</Notice>{!record && !result.error && <Loading />}
     {record && <><div className="row section-tabs document-tabs" aria-label="Secciones del expediente">{tabs.map(entry => <button key={entry.id} aria-pressed={tab === entry.id} onClick={() => showTab(entry.id)}>{entry.label}</button>)}</div>
-      <div className="document-details"><span className="document-metadata">{record.state === 'borrador' ? 'Borrador' : record.state} · Versión {record.version}</span></div>
+      <div className="document-details"><span className="document-metadata">{stateLabel(record.state)} · Versión {record.version}</span></div>
       <div hidden={tab !== 'resumen'}><DocumentSection title="Contenido del expediente"><ExpedientName record={record} latest={latest} editable={Boolean(editable)} saved={saved} reload={() => { void navigate(result.reload); }} /><div className="stack"><p>{record.forms.length + (record.initial_forms?.length ?? 0)} formularios incorporados. {record.forms.reduce((n, c) => n + c.missing_required.length, 0)} valores obligatorios pendientes.</p><p>Las variables se definen una sola vez en la pestaña Variables y se comparten en el expediente.</p><p>Prepara los lotes y sus ítems en Oferta económica y genera el documento desde PDF final.</p>{moduleCan(access, 'licitaciones', 'expedientes', 'eliminar') && record.state === 'borrador' && <button className="danger" onClick={() => setDeleting(true)}>Eliminar borrador</button>}</div></DocumentSection></div>
       {visited.has('variables') && <div hidden={tab !== 'variables'}><DocumentSection title="Variables del expediente"><GlobalVariablesEditor record={record} latest={latest} onDraft={setDraftVariables} draftLots={draftLots} editable={Boolean(editable)} saved={saved} reload={() => { void navigate(result.reload); }} /></DocumentSection></div>}
       {visited.has('economica') && <div hidden={tab !== 'economica'}><DocumentSection title="Oferta económica"><TenderLots record={{ ...record, variables: draftVariables ?? record.variables }} latest={latest} onDraftInfo={setDraftLots} editable={Boolean(editable)} saved={saved} /></DocumentSection></div>}
@@ -63,6 +89,13 @@ function ExpedientWorkspace({ id, back }: { id: number; back: () => void }) {
         return <div hidden={tab !== section} key={section}><DocumentSection title={sectionLabels[section]} list>{section === 'legal' ? <InitialForms record={record} latest={latest} editable={Boolean(editable)} saved={saved}>{renderFiles}</InitialForms> : renderFiles()}</DocumentSection></div>;
       })}
       {visited.has('pdf') && <div hidden={tab !== 'pdf'}><DocumentSection title="PDF final"><TenderPdfOrder record={record} latest={latest} editable={Boolean(editable)} saved={saved} /></DocumentSection></div>}
+      {confirmSent && <Dialog title="Marcar como enviada" close={() => setConfirmSent(false)}>
+        <p>Confirma que ya presentaste la oferta. Se guardarán los cambios pendientes y el expediente quedará en modo de consulta.</p>
+        <div className="actions">
+          <button onClick={() => setConfirmSent(false)}>Cancelar</button>
+          <button className="primary" onClick={() => { void markSent(); }}>Confirmar estado Enviada</button>
+        </div>
+      </Dialog>}
       {deleting && <DeleteExpedient record={record} close={() => setDeleting(false)} deleted={back} />}
     </>}
   </>;

@@ -198,12 +198,19 @@ async fn mysql57_tenders_snapshots_permissions_races_receipts_and_deletion() {
             .await,
         Err(CoreError::Invalid)
     ));
-    // Simulate a future Sent state: current APIs cannot set state or delete it.
-    sqlx::query("UPDATE licitaciones_expedientes SET state='enviada' WHERE id=?")
-        .bind(first.id)
-        .execute(&pool)
+    assert!(matches!(
+        tenders.mark_sent(2, first.id, current.version - 1).await,
+        Err(CoreError::PreconditionFailed)
+    ));
+    let current = tenders
+        .mark_sent(2, first.id, current.version)
         .await
         .unwrap();
+    assert_eq!(current.state, "enviada");
+    assert!(matches!(
+        tenders.mark_sent(2, first.id, current.version).await,
+        Err(CoreError::Conflict)
+    ));
     assert!(matches!(
         tenders.delete(2, first.id, current.version, first.id).await,
         Err(CoreError::Conflict)

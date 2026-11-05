@@ -497,6 +497,34 @@ impl TenderService {
         tx.commit().await?;
         Ok(result)
     }
+    pub async fn mark_sent(
+        &self,
+        actor: u64,
+        id: u64,
+        expected: u64,
+    ) -> Result<Expedient, CoreError> {
+        let mut tx = self.begin(actor, "editar").await?;
+        let current = load(&mut tx, id).await?;
+        editable(&current, expected)?;
+        let generating: bool = sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM licitaciones_pdf_jobs WHERE expediente_id=? AND state IN ('queued','running','uploading'))")
+            .bind(id).fetch_one(&mut *tx).await?;
+        if generating {
+            return Err(CoreError::Conflict);
+        }
+        bump(&mut tx, actor, id, expected).await?;
+        sqlx::query("UPDATE licitaciones_expedientes SET state='enviada' WHERE id=?")
+            .bind(id)
+            .execute(&mut *tx)
+            .await?;
+        let sent = load(&mut tx, id).await?;
+        // Only the status changed. The current PDF still represents the same content.
+        sqlx::query("UPDATE licitaciones_pdf_jobs SET expediente_version=? WHERE expediente_id=? AND expediente_version=? AND state='ready'")
+            .bind(sent.version).bind(id).bind(expected).execute(&mut *tx).await?;
+        event(&mut tx, actor, "expedient.mark_sent", id, sent.version).await?;
+        tx.commit().await?;
+        Ok(sent)
+    }
+
     pub async fn delete(
         &self,
         actor: u64,

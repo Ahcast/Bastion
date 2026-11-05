@@ -19,7 +19,7 @@ export default function TenderPdfOrder({ record, latest = () => record, editable
     let active = true;
     api.request<PdfJob | null>(`/api/v1/licitaciones/${record.id}/pdf/ultimo`).then(value => { if (active) setJob(value); }).catch(reason => { if (active) setError(message(reason)); }).finally(() => { if (active) setJobsLoaded(true); });
     return () => { active = false; };
-  }, [api, record.id]);
+  }, [api, record.id, record.state]);
   useEffect(() => {
     if (!job || !['queued', 'running', 'uploading'].includes(job.state)) return;
     let active = true;

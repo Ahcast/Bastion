@@ -1,7 +1,7 @@
 //! Persisted PDF queue; source content and credentials are never stored here.
 use crate::{
     TenderService,
-    service::{event, load},
+    service::{editable, event, load},
 };
 use bastion_core::{CoreError, DocumentService};
 use serde::Serialize;
@@ -39,9 +39,7 @@ impl TenderService {
     ) -> Result<PdfJob, CoreError> {
         let mut tx = self.begin(actor, "editar").await?;
         let exp = load(&mut tx, id).await?;
-        if exp.version != expected {
-            return Err(CoreError::PreconditionFailed);
-        }
+        editable(&exp, expected)?;
         let current:Option<PdfJob>=sqlx::query_as("SELECT id,expediente_id,expediente_version,state,byte_size,created_at,updated_at FROM licitaciones_pdf_jobs WHERE expediente_id=? AND state IN ('queued','running','uploading') ORDER BY created_at DESC LIMIT 1")
             .bind(id).fetch_optional(&mut *tx).await?;
         if let Some(job) = current {

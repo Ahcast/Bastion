@@ -367,10 +367,26 @@ async fn isolated_job_generates_and_downloads_a_multipage_tiff() {
         assert!(text.contains(expected), "missing {expected}: {text}");
     }
     std::fs::remove_file(&output).unwrap();
-    service
-        .delete(1, exp.id, exp.version, exp.id)
+    let job = service
+        .create_pdf_job(1, exp.id, exp.version)
         .await
         .unwrap();
+    assert!(matches!(
+        service.mark_sent(1, exp.id, exp.version).await,
+        Err(bastion_core::CoreError::Conflict)
+    ));
+    assert!(service.process_one_pdf_job().await.unwrap());
+    let sent = service.mark_sent(1, exp.id, exp.version).await.unwrap();
+    assert_eq!(sent.state, "enviada");
+    assert_eq!(sent.version, exp.version + 1);
+    let ready = service.pdf_job(1, sent.id, &job.id).await.unwrap();
+    assert_eq!(ready.state, "ready");
+    assert_eq!(ready.expediente_version, sent.version);
+    assert!(service.download_pdf_job(1, sent.id, &job.id).await.is_ok());
+    assert!(matches!(
+        service.create_pdf_job(1, sent.id, sent.version).await,
+        Err(bastion_core::CoreError::Conflict)
+    ));
     while service.clean_one_pdf_job().await.unwrap() {}
     while service.clean_one_attachment().await.unwrap() {}
 }
