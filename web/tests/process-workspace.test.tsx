@@ -33,7 +33,7 @@ test('compact filters share the same exact query for list and export', () => {
   const markup = renderToStaticMarkup(<ProcessFilterBar values={values} entities={['Salud & Bienestar']} change={() => {}} />);
   assert.equal((markup.match(/type="checkbox"/g) ?? []).length, 2);
   assert.equal((markup.match(/<select/g) ?? []).length, 2);
-  assert.ok(markup.includes('Especificaciones o expediente'));
+  assert.ok(markup.includes('Buscar en todo el proceso'));
   assert.ok(!markup.includes('Recepción desde'));
 });
 test('statistics show explicit zero counts, calendar dates and the three delivery days', () => {
