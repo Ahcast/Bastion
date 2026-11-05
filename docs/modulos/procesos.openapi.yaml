@@ -441,7 +441,7 @@ components:
       name: q
       in: query
       schema: {type: string, maxLength: 200}
-      description: Texto literal en expediente, descripción e items_fuente del CSV; estos dos últimos son el contenido fuente disponible para especificaciones. No busca por texto IA.
+      description: Frase literal en expediente, entidad, descripción, ítems fuente, resumen de IA, rubro o ítems analizados. Usa el texto completo sin distinguir mayúsculas ni acentos.
     Entidad:
       name: entidad
       in: query

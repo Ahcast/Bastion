@@ -7,7 +7,7 @@ import { processItems } from '../process-items.js';
 export function ProcessFilterBar({ values, entities, change }: { values: ProcessFilters; entities: string[]; change: (values: ProcessFilters) => void }) {
   return <div className="process-filters" role="search" aria-label="Filtros de procesos">
     <label>Entidad<select value={values.entidad} onChange={event => change({ ...values, entidad: event.target.value })}><option value="">Todas las entidades</option>{entities.map(name => <option key={name} value={name}>{name}</option>)}</select></label>
-    <label>Palabras clave<input type="search" placeholder="Especificaciones o expediente" maxLength={200} value={values.q} onChange={event => change({ ...values, q: event.target.value })} /></label>
+    <label>Palabras clave<input type="search" placeholder="Buscar en todo el proceso" maxLength={200} value={values.q} onChange={event => change({ ...values, q: event.target.value })} /></label>
     <label>Ordenar por<select value={values.sort} onChange={event => change({ ...values, sort: event.target.value as ProcessSort })}>
       <option value="fecha_desc">Recepción: más recientes</option><option value="fecha_asc">Recepción: más antiguas</option><option value="puntaje_desc">Puntuación: mayor primero</option><option value="puntaje_asc">Puntuación: menor primero</option>
     </select></label>

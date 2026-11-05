@@ -748,14 +748,26 @@ fn append_filters(
     }
     if let Some(q) = filter.q.as_deref().filter(|s| !s.trim().is_empty()) {
         let value = format!("%{}%", escape_like(q.trim()));
-        query
-            .push(" AND (r.expediente LIKE ")
-            .push_bind(value.clone())
-            .push(" OR JSON_UNQUOTE(JSON_EXTRACT(r.source_json,'$.items_fuente')) LIKE ")
-            .push_bind(value.clone())
-            .push(" OR JSON_UNQUOTE(JSON_EXTRACT(r.source_json,'$.descripcion')) LIKE ")
-            .push_bind(value)
-            .push(")");
+        query.push(" AND (");
+        // Source fields are complete even when the list omits the source payload.
+        // JSON_UNQUOTE otherwise uses a binary collation, unlike the text columns.
+        let mut matches = query.separated(" OR ");
+        for field in [
+            "r.expediente",
+            "r.entidad",
+            "r.resumen_corto",
+            "r.rubro",
+            "JSON_UNQUOTE(JSON_EXTRACT(r.source_json,'$.descripcion')) COLLATE utf8mb4_unicode_ci",
+            "JSON_UNQUOTE(JSON_EXTRACT(r.source_json,'$.items_fuente')) COLLATE utf8mb4_unicode_ci",
+            "JSON_UNQUOTE(JSON_EXTRACT(r.source_json,'$.items')) COLLATE utf8mb4_unicode_ci",
+        ] {
+            matches
+                .push(field)
+                .push_unseparated(" LIKE ")
+                .push_bind_unseparated(value.clone())
+                .push_unseparated(" ESCAPE '!'");
+        }
+        matches.push_unseparated(")");
     }
     if let Some(entidad) = filter.entidad.as_deref().filter(|s| !s.trim().is_empty()) {
         query
@@ -780,9 +792,9 @@ fn append_filters(
 
 fn escape_like(value: &str) -> String {
     value
-        .replace('\\', "\\\\")
-        .replace('%', "\\%")
-        .replace('_', "\\_")
+        .replace('!', "!!")
+        .replace('%', "!%")
+        .replace('_', "!_")
 }
 
 fn safe_cell(value: &str) -> String {
@@ -833,6 +845,6 @@ mod tests {
             assert!(safe_cell(value).starts_with('\''));
         }
         assert_eq!(safe_cell("Un equipo, modelo A"), "Un equipo, modelo A");
-        assert_eq!(escape_like("50%_a"), "50\\%\\_a");
+        assert_eq!(escape_like("50%_a!"), "50!%!_a!!");
     }
 }

@@ -457,8 +457,10 @@ async fn mysql57_import_permissions_history_and_disable() {
             monday,
         ),
     ] {
-        sqlx::query("UPDATE procesos_rows SET entidad=?,fecha_recepcion=?,puntaje=?,primera_deteccion=?,expediente='TEST-SEARCH',resumen_corto='SOLO_IA',source_json=JSON_SET(source_json,'$.descripcion','Una descripción','$.items_fuente','[{\"especificacion\":\"osciloscopio 50%_\"}]') WHERE proceso_id=?")
-            .bind(entity).bind(date).bind(score as u8).bind(discovery).bind(key).execute(&pool).await.unwrap();
+        sqlx::query("UPDATE procesos_rows SET entidad=?,fecha_recepcion=?,puntaje=?,primera_deteccion=?,expediente='TEST-SEARCH',resumen_corto=CONCAT(REPEAT('x ',300),'Esterilización'),rubro='Instrumentación',source_json=JSON_SET(source_json,'$.descripcion',CONCAT(REPEAT('x ',300),'Aislación dieléctrica'),'$.items_fuente','[{\"especificacion\":\"osciloscopio 50%_\"}]','$.items',?) WHERE proceso_id=?")
+            .bind(entity).bind(date).bind(score as u8).bind(discovery)
+            .bind(if key == &municipality { r#"["Item histórico", "Bomba peristáltica"]"# } else { "1. Equipo de laboratorio\n2. Bomba peristáltica" })
+            .bind(key).execute(&pool).await.unwrap();
     }
     let dashboard = service
         .overview(
@@ -520,20 +522,40 @@ async fn mysql57_import_permissions_history_and_disable() {
     };
     assert_eq!(service.rows(1, &search).await.unwrap().items.len(), 2);
     assert_eq!(service.overview(1, &search).await.unwrap(), dashboard);
-    assert!(
-        service
-            .rows(
-                1,
-                &ProcessFilter {
-                    q: Some("SOLO_IA".into()),
-                    ..Default::default()
-                }
-            )
-            .await
-            .unwrap()
-            .items
-            .is_empty()
+    for (term, expected) in [
+        ("test-search", 2),
+        ("salud especial", 1),
+        ("  ESTERILIZACION  ", 2),
+        ("instrumentacion", 2),
+        ("aislacion DIELECTRICA", 2),
+        ("BOMBA PERISTALTICA", 2),
+        ("Item histórico", 1),
+        ("osciloscopio 50%X", 0),
+        ("%", 2),
+        ("no existe", 0),
+    ] {
+        let filter = ProcessFilter {
+            q: Some(term.into()),
+            ..Default::default()
+        };
+        let page = service.rows(1, &filter).await.unwrap();
+        assert_eq!(page.total, expected, "{term}");
+        assert_eq!(page.items.len() as i64, expected, "{term}");
+    }
+    let filtered_analysis = ProcessFilter {
+        q: Some("bomba peristaltica".into()),
+        hide_municipalities: Some(true),
+        ..Default::default()
+    };
+    assert_eq!(
+        service.rows(1, &filtered_analysis).await.unwrap().items[0].proceso_id,
+        bulk_first
     );
+    let exported = service.export(1, &filtered_analysis).await.unwrap();
+    let mut csv = csv::Reader::from_reader(exported.trim_start_matches('\u{feff}').as_bytes());
+    let records = csv.records().collect::<Result<Vec<_>, _>>().unwrap();
+    assert_eq!(records.len(), 1);
+    assert_eq!(&records[0][1], bulk_first.as_str());
     for (sort, first) in [
         (ProcessSort::FechaAsc, &municipality),
         (ProcessSort::FechaDesc, &bulk_first),
