@@ -64,6 +64,28 @@ paths:
       responses:
         '204': { description: Estado actualizado; se conservan los expedientes existentes }
         '403': { description: Requiere administrador del sistema }
+  /api/v1/licitaciones/{id}/marcar-enviada:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    post:
+      summary: Registrar una oferta ya presentada y pasar el expediente a Enviada
+      parameters:
+        - $ref: '#/components/parameters/Version'
+        - $ref: '#/components/parameters/Csrf'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, additionalProperties: false }
+      responses:
+        '200':
+          description: Expediente en estado Enviada con ETag actualizado. Si tenía un PDF vigente, conserva su descarga.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Expedient' }
+        '403': { description: Sin permiso de edición }
+        '409': { description: Expediente fuera de Borrador o PDF en generación }
+        '412': { description: Versión obsoleta }
   /api/v1/licitaciones/{id}:
     parameters:
       - $ref: '#/components/parameters/Id'
