@@ -552,8 +552,8 @@ async fn mysql57_import_permissions_history_and_disable() {
         bulk_first
     );
     let exported = service.export(1, &filtered_analysis).await.unwrap();
-    let mut csv = csv::Reader::from_reader(exported.trim_start_matches('\u{feff}').as_bytes());
-    let records = csv.records().collect::<Result<Vec<_>, _>>().unwrap();
+    let mut reader = csv::Reader::from_reader(exported.trim_start_matches('\u{feff}').as_bytes());
+    let records = reader.records().collect::<Result<Vec<_>, _>>().unwrap();
     assert_eq!(records.len(), 1);
     assert_eq!(&records[0][1], bulk_first.as_str());
     for (sort, first) in [
