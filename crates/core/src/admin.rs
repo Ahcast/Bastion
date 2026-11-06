@@ -1158,6 +1158,42 @@ impl CoreAdmin {
         }
     }
 
+    /// Preflight for callers that do not need to hold a module lock. Domain
+    /// operations still check access within their existing transaction flow.
+    pub async fn authorize_enabled_module(
+        &self,
+        actor: u64,
+        module: &str,
+        scope: &str,
+        capability: &str,
+    ) -> Result<(), CoreError> {
+        if !matches!(capability, "ver" | "editar" | "eliminar") {
+            return Err(CoreError::Forbidden);
+        }
+        let enabled: Option<bool> = sqlx::query_scalar(
+            "SELECT COALESCE(m.included_in_release AND m.environment_allowed AND m.enabled, 0)
+             FROM users u JOIN roles r ON r.id=u.role_id
+             LEFT JOIN module_registry m ON m.module_id=?
+             WHERE u.id=? AND u.status='active'
+               AND (r.system_key='system_administrator' OR EXISTS (
+                   SELECT 1 FROM role_permissions rp WHERE rp.role_id=u.role_id
+                   AND rp.module_id=? AND rp.capability=? AND (rp.scope_key=? OR rp.scope_key='*')
+               ))",
+        )
+        .bind(module)
+        .bind(actor)
+        .bind(module)
+        .bind(capability)
+        .bind(scope)
+        .fetch_optional(self.database.pool())
+        .await?;
+        match enabled {
+            Some(true) => Ok(()),
+            Some(false) => Err(CoreError::NotFound),
+            None => Err(CoreError::Forbidden),
+        }
+    }
+
     async fn audit(
         &self,
         actor: Option<u64>,

@@ -64,6 +64,14 @@ async fn mysql57_drafts_permissions_idempotency_versions_and_disable() {
     let service = QuoteService::new(database.clone(), core.admin());
     service.synchronize_release(true).await.unwrap();
     assert!(matches!(
+        service.check_access(1, "ver").await,
+        Err(CoreError::NotFound)
+    ));
+    assert!(matches!(
+        service.check_access(2, "ver").await,
+        Err(CoreError::Forbidden)
+    ));
+    assert!(matches!(
         service.list(1, &QuoteFilter::default()).await,
         Err(CoreError::NotFound)
     ));
@@ -88,6 +96,11 @@ async fn mysql57_drafts_permissions_idempotency_versions_and_disable() {
         .list(2, &QuoteFilter::default())
         .await
         .expect("A role with document read permission must access the enabled module");
+    service.check_access(2, "ver").await.unwrap();
+    assert!(matches!(
+        service.check_access(2, "editar").await,
+        Err(CoreError::Forbidden)
+    ));
     assert!(matches!(
         service
             .create(2, "synthetic-create-key-0001", input())

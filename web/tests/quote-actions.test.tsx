@@ -77,6 +77,7 @@ test('Ver opens a read-only quotation; Editar explicitly enables fields',async()
     const edit=Array.from(app.container.querySelectorAll('button')).find(button=>button.textContent==='Editar')!;await app.click(edit);
     assert.equal(app.container.querySelector<HTMLFieldSetElement>('.quote-form')?.disabled,false);
     assert.equal(app.calls.filter(call=>call.method!=='GET').length,0);
+    assert.equal(app.calls.filter(call=>call.path.endsWith('/document-readiness')).length,1);
   }finally{await app.dispose();}
 });
 test('marking and approving use versioned status commands and retain the table without list reloads',async()=>{

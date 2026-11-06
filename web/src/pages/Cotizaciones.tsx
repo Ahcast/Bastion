@@ -71,7 +71,22 @@ function Workspace({ processSeed, clearProcessSeed, openConverted }: ProcessQuot
     void api.request<QuotePdf>(`/api/v1/cotizaciones/${draft.id}/pdf`, { ifMatch: draft.version }).then(value => viewer.show(value))
       .catch(reason => { viewer.close(); setError(message(reason)); }).finally(() => setOpening(false));
   };
-  if (selected) return <Editor key={selected === 'new' ? 'new' : selected.id} initial={selected === 'new' ? null : selected} seed={seed} editable={editable && mode === 'edit'} edit={editable && mode === 'view' ? () => setMode('edit') : undefined} close={() => { setSelected(null); setSeed(null); clearProcessSeed?.(); result.reload(); }} />;
+  if (selected) {
+    return <Editor
+      key={selected === 'new' ? 'new' : selected.id}
+      initial={selected === 'new' ? null : selected}
+      seed={seed}
+      storageReady={Boolean(documents.data?.attachments ?? documents.data?.pdf)}
+      editable={editable && mode === 'edit'}
+      edit={editable && mode === 'view' ? () => setMode('edit') : undefined}
+      close={() => {
+        setSelected(null);
+        setSeed(null);
+        clearProcessSeed?.();
+        result.reload();
+      }}
+    />;
+  }
   return <><Heading title="Cotizaciones" description="Prepara y consulta tus cotizaciones." action={editable && <button className="primary" onClick={() => { setMode('edit'); setSelected('new'); }}>Nueva cotización</button>} />
     {documents.data && !documents.data.pdf && <p className="quote-stage">PDF requiere la configuración de Empresa en Ajustes del Core y el servicio de documentos del servidor.</p>}
     <Notice>{documents.error}</Notice>
@@ -105,12 +120,18 @@ function Workspace({ processSeed, clearProcessSeed, openConverted }: ProcessQuot
   </>;
 }
 
-function Editor({ initial, editable, edit, close, seed }: { seed?: ProcessQuoteSeed | null; initial: QuoteDraft | null; editable: boolean; edit?: () => void; close: () => void }) {
+function Editor({ initial, editable, edit, close, seed, storageReady }: {
+  initial: QuoteDraft | null;
+  editable: boolean;
+  edit?: () => void;
+  close: () => void;
+  seed?: ProcessQuoteSeed | null;
+  storageReady: boolean;
+}) {
   const { api, access, notify } = useCore();
   const [saved, setSaved] = useState(initial), [data, setData] = useState<QuoteInput>(() => initial?.data ?? seed?.data ?? newQuote()), [busy, setBusy] = useState(false), [error, setError] = useState(''), [dirty, setDirty] = useState(Boolean(seed)), [conflict, setConflict] = useState(false);
   const [attachmentBusy, setAttachmentBusy] = useState(false), [pendingFiles, setPendingFiles] = useState(0);
   useUnsavedChanges(dirty || pendingFiles > 0, busy || attachmentBusy);
-  const documents = useLoad(signal => api.request<DocumentReadiness>('/api/v1/cotizaciones/document-readiness', { signal }));
   const [preview, setPreview] = useState<{ input: QuoteInput; value: QuoteCalculation } | null>(null), [calculationError, setCalculationError] = useState('');
   const missingQuantities = seed ? data.items.filter(item => !item.quantity.trim()).length : 0;
   useEffect(() => {
@@ -177,7 +198,7 @@ function Editor({ initial, editable, edit, close, seed }: { seed?: ProcessQuoteS
 
       </fieldset>
       <QuoteAttachments quoteId={saved?.id ?? null} version={saved?.version ?? 0} editable={editable} disabled={busy || conflict}
-        storageReady={Boolean(documents.data?.attachments ?? documents.data?.pdf)} busyChanged={setAttachmentBusy} pendingChanged={setPendingFiles}
+        storageReady={storageReady} busyChanged={setAttachmentBusy} pendingChanged={setPendingFiles}
         versionChanged={version => setSaved(previous => previous ? { ...previous, version } : previous)} conflict={() => setConflict(true)} />
       {editable && <div className="quote-save"><button disabled={busy || attachmentBusy || conflict} className="primary" type="submit">{busy ? 'Guardando…' : 'Guardar cotización'}</button></div>}
     </form>

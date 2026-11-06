@@ -74,7 +74,12 @@ impl QuoteService {
             return Err(CoreError::Invalid);
         }
         let mut tx = self.begin(actor, "ver").await?;
-        let quote = load(&mut tx, id).await?;
+        let quote_version: u64 =
+            sqlx::query_scalar("SELECT version FROM cotizaciones_drafts WHERE id=?")
+                .bind(id)
+                .fetch_optional(&mut *tx)
+                .await?
+                .ok_or(CoreError::NotFound)?;
         let mut items: Vec<QuoteAttachment> = sqlx::query_as("SELECT attachment_id AS id,filename,title,mime,byte_size,created_at FROM cotizaciones_documents WHERE quote_id=? AND kind='attachment' ORDER BY created_at DESC,attachment_id DESC LIMIT 26 OFFSET ?")
             .bind(id).bind((page - 1) * 25).fetch_all(&mut *tx).await?;
         let has_more = items.len() > 25;
@@ -84,7 +89,7 @@ impl QuoteService {
             items,
             page,
             has_more,
-            quote_version: quote.version,
+            quote_version,
         })
     }
 
