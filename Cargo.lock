@@ -491,6 +491,7 @@ dependencies = [
  "bastion-procesos",
  "bastion-proveedores",
  "bastion-reportes",
+ "chrono",
  "dotenvy",
  "ipnet",
  "sqlx",

@@ -79,7 +79,7 @@ impl TenderShortlist {
         let mut feed: Feed =
             serde_json::from_slice(bytes).map_err(|_| LocalDeliveryError::Invalid)?;
         let mut identifiers = BTreeSet::new();
-        if feed.schema_version != 1
+        if feed.schema_version != 2
             || feed.items.len() > 5000
             || !matches!(feed.scan_status.as_str(), "exitoso" | "parcial")
             || feed
@@ -91,9 +91,11 @@ impl TenderShortlist {
         }
         feed.items.retain(|item| item.fecha_recepcion > now);
         feed.items.sort_by(|a, b| {
-            a.fecha_recepcion
-                .cmp(&b.fecha_recepcion)
-                .then(a.id.cmp(&b.id))
+            a.priority().cmp(&b.priority()).then(
+                a.fecha_recepcion
+                    .cmp(&b.fecha_recepcion)
+                    .then(a.id.cmp(&b.id)),
+            )
         });
         Ok(Self {
             availability: ReportAvailability::Available,
@@ -106,6 +108,25 @@ impl TenderShortlist {
 }
 
 impl ShortlistItem {
+    pub fn has_interest(&self) -> bool {
+        !self.coincidencias_interes.is_empty()
+    }
+
+    fn priority(&self) -> usize {
+        ["JICA", "BID", "UCP"]
+            .iter()
+            .position(|tag| {
+                self.coincidencias_interes
+                    .split(" | ")
+                    .any(|value| value == *tag)
+            })
+            .unwrap_or(if self.posibles_interes.is_empty() {
+                4
+            } else {
+                3
+            })
+    }
+
     fn valid(&self) -> bool {
         let url_valid = Url::parse(&self.url).is_ok_and(|url| {
             matches!(url.scheme(), "http" | "https")
@@ -119,24 +140,24 @@ impl ShortlistItem {
                 )
                 && url.query().is_some()
         });
-        let labels_valid = [&self.coincidencias_interes, &self.posibles_interes]
-            .iter()
-            .all(|value| {
-                value.is_empty()
-                    || value
-                        .split(" | ")
-                        .all(|tag| matches!(tag, "BID" | "UCP" | "JICA"))
-            });
+        let labels_valid = self.coincidencias_interes.len() <= "BID | UCP | JICA".len()
+            && (self.coincidencias_interes.is_empty()
+                || self
+                    .coincidencias_interes
+                    .split(" | ")
+                    .all(|tag| matches!(tag, "BID" | "UCP" | "JICA")))
+            && matches!(self.posibles_interes.as_str(), "" | "JICA");
         [&self.id, &self.version]
             .iter()
             .all(|value| value.len() == 64 && value.bytes().all(|byte| byte.is_ascii_hexdigit()))
             && url_valid
+            && self.url.len() <= 4096
             && labels_valid
-            && !(self.coincidencias_interes.is_empty() && self.posibles_interes.is_empty())
             && !self.expediente.trim().is_empty()
             && !self.entidad.trim().is_empty()
             && !self.objeto.trim().is_empty()
-            && !self.evidencia_interes.trim().is_empty()
+            && ((!self.has_interest() && self.posibles_interes.is_empty())
+                || !self.evidencia_interes.trim().is_empty())
     }
 }
 
@@ -146,7 +167,7 @@ mod tests {
     use serde_json::{Value, json};
 
     fn fixture() -> Value {
-        json!({"schema_version":1,"generated_at":"2026-11-06T12:00:00-06:00","scan_status":"parcial",
+        json!({"schema_version":2,"generated_at":"2026-11-06T12:00:00-06:00","scan_status":"parcial",
             "items":[{"id":"a".repeat(64),"version":"b".repeat(64),
             "first_seen_at":"2026-11-06T12:00:00-06:00","updated_at":"2026-11-06T12:00:00-06:00",
             "expediente":"LPN-1","entidad":"ENEE","unidad_compra":"Unidad de Proyectos BID",
@@ -175,6 +196,38 @@ mod tests {
     }
 
     #[test]
+    fn includes_unmatched_tenders_and_orders_jica_bid_ucp_first() {
+        let mut data = fixture();
+        let mut items = Vec::new();
+        for (index, (tags, possible)) in [
+            ("", ""),
+            ("UCP", ""),
+            ("BID", ""),
+            ("", "JICA"),
+            ("JICA", ""),
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            let mut item = data["items"][0].clone();
+            item["id"] = json!(format!("{index:064x}"));
+            item["coincidencias_interes"] = json!(tags);
+            item["posibles_interes"] = json!(possible);
+            items.push(item);
+        }
+        data["items"] = json!(items);
+        let before = "2026-11-06T18:00:00Z".parse().unwrap();
+        let feed = TenderShortlist::parse(data.to_string().as_bytes(), before).unwrap();
+        assert_eq!(
+            feed.items
+                .iter()
+                .map(ShortlistItem::priority)
+                .collect::<Vec<_>>(),
+            [0, 1, 2, 3, 4]
+        );
+    }
+
+    #[test]
     fn invalid_links_duplicates_and_unknown_schema_are_rejected() {
         for (key, value) in [
             ("url", "javascript:alert(1)"),
@@ -187,7 +240,7 @@ mod tests {
             assert!(TenderShortlist::parse(invalid.to_string().as_bytes(), Utc::now()).is_err());
         }
         let mut invalid = fixture();
-        invalid["schema_version"] = json!(2);
+        invalid["schema_version"] = json!(1);
         assert!(TenderShortlist::parse(invalid.to_string().as_bytes(), Utc::now()).is_err());
         let mut invalid = fixture();
         invalid["items"]

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import '../styles/procesos.css';
+import '../styles/shortlist.css';
 import { ApiError, message } from '../api.js';
 import { Form, Heading, Loading, Notice, useCore, useLoad } from '../ui.js';
 import { moduleCan } from '../types.js';
@@ -9,10 +10,38 @@ import { ProcessDetailContent, ProcessFilterBar, ProcessInsights, ProcessTable }
 
 import { quoteFromProcess } from '../processQuote.js';
 import type { ProcessQuoteSeed } from '../processQuote.js';
+import LicitacionesProcesos from '../components/LicitacionesProcesos.js';
+import { ShortlistProvider, useShortlist } from '../components/ShortlistAlerts.js';
 
 interface ImportResult { inserted: number; updated: number; unchanged: number; stale: number; replayed: boolean; deferred?: number }
 
-export default function Procesos({ openQuote }: { openQuote?: (seed: ProcessQuoteSeed) => void } = {}) {
+type ProcessProps = { openQuote?: (seed: ProcessQuoteSeed) => void; userId?: number };
+
+export default function Procesos({ openQuote, userId = 0 }: ProcessProps = {}) {
+  const { access } = useCore();
+  const [tenders, setTenders] = useState(false);
+  const [opened, setOpened] = useState(false);
+  const view = moduleCan(access, 'procesos', 'consulta', 'ver');
+  const select = (next: boolean) => {
+    if (next) setOpened(true);
+    setTenders(next);
+  };
+  return <ShortlistProvider key={userId} userId={userId} enabled={opened && view}>
+    {view && <ProcessTabs tenders={tenders} select={select} />}
+    <div hidden={view && tenders}><ComprasMenores openQuote={openQuote} /></div>
+    {view && tenders && <LicitacionesProcesos />}
+  </ShortlistProvider>;
+}
+
+function ProcessTabs({ tenders, select }: { tenders: boolean; select: (value: boolean) => void }) {
+  const { unread } = useShortlist();
+  return <div className="process-kind-tabs" role="group" aria-label="Tipo de proceso">
+    <button type="button" aria-pressed={!tenders} onClick={() => select(false)}>Compra menor</button>
+    <button type="button" aria-pressed={tenders} onClick={() => select(true)}>Licitación{unread > 0 && <span className="process-interest-count" aria-label={`${unread} por revisar`}>{unread}</span>}</button>
+  </div>;
+}
+
+function ComprasMenores({ openQuote }: ProcessProps) {
   const { api, access, notify } = useCore();
   const [filters, setFilters] = useState<ProcessFilters>(initialProcessFilters), [search, setSearch] = useState('');
   const [page, setPage] = useState(1), [refreshing, setRefreshing] = useState(false), [busy, setBusy] = useState(false), [selected, setSelected] = useState<string | null>(null);

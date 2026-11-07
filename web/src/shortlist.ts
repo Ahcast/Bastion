@@ -32,6 +32,9 @@ export type InterestTag = 'BID' | 'JICA' | 'UCP';
 export function interestTags(item: ShortlistItem): string[] {
   return [...new Set([item.coincidencias_interes, item.posibles_interes].join(' | ').split(' | ').filter(Boolean))];
 }
+export function needsShortlistReview(item: ShortlistItem, receipts: ShortlistReceipts): boolean {
+  return Boolean(item.coincidencias_interes || item.posibles_interes) && receipts[item.id] !== item.version;
+}
 export function shortlistMatches(item: ShortlistItem, query: string, tag: string): boolean {
   const text = [item.expediente, item.entidad, item.unidad_compra, item.objeto, item.fuente, item.lugar_recepcion].join(' ');
   const normalize = (value: string) => value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();

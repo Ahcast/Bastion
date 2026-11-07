@@ -1383,6 +1383,34 @@ impl CoreService {
             .execute(&self.database.pool).await?;
         Ok(result.rows_affected())
     }
+    /// Queue a tender alert in the transaction that records its domain receipt.
+    pub async fn enqueue_tender_alert(
+        &self,
+        tx: &mut Transaction<'_, MySql>,
+        recipient_id: u64,
+        subject: &str,
+        body: &str,
+    ) -> Result<u64, CoreError> {
+        if subject.chars().count() > 180
+            || subject.chars().any(char::is_control)
+            || body.len() > 32768
+        {
+            return Err(CoreError::Invalid);
+        }
+        let sender: Option<u64> = sqlx::query_scalar("SELECT u.id FROM settings s JOIN users u ON u.id=CAST(JSON_UNQUOTE(s.value_json) AS UNSIGNED) JOIN roles r ON r.id=u.role_id JOIN user_smtp_credentials c ON c.user_id=u.id WHERE s.module_id='core' AND s.scope_key='global' AND s.setting_key='smtp.designated_admin_user_id' AND u.status='active' AND r.system_key='system_administrator' FOR UPDATE")
+            .fetch_optional(&mut **tx).await?;
+        let sender = sender.ok_or(CoreError::Invalid)?;
+        let recipient: Option<String> =
+            sqlx::query_scalar("SELECT email FROM users WHERE id=? AND status='active' FOR UPDATE")
+                .bind(recipient_id)
+                .fetch_optional(&mut **tx)
+                .await?;
+        let recipient = recipient.ok_or(CoreError::Forbidden)?;
+        let encrypted = self.encrypt(body)?;
+        Ok(sqlx::query("INSERT INTO mail_outbox (kind,sender_user_id,recipient_email,subject,body_ciphertext,delivery_status,available_at) VALUES ('tender_alert',?,?,?,?,'pending',UTC_TIMESTAMP(6))")
+            .bind(sender).bind(recipient).bind(subject).bind(encrypted).execute(&mut **tx).await?.last_insert_id())
+    }
+
     pub async fn deliver_one_mail(&self) -> Result<bool, CoreError> {
         let now = Utc::now().naive_utc();
         let mut tx = self.database.pool.begin().await?;

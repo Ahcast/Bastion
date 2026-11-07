@@ -21,7 +21,7 @@ pub(super) fn routes(state: ApiState) -> Router<ApiState> {
         .route("/api/v1/procesos/dashboard", get(dashboard))
         .route("/api/v1/procesos/status", get(status))
         .route("/api/v1/procesos/scout-status", get(scout_status))
-        .route("/api/v1/procesos/lista-corta", get(shortlist))
+        .route("/api/v1/procesos/licitaciones", get(tender_list))
         .route(
             "/api/v1/procesos/scout-run",
             get(scout_run_status).post(scout_run),
@@ -66,7 +66,7 @@ async fn guarded_request(state: ApiState, request: Request, next: Next) -> Respo
         "/api/v1/procesos/refresh" => ("importacion", "editar", true),
         "/api/v1/procesos/export" => ("exportacion", "ver", true),
         "/api/v1/procesos/scout-status" => ("consulta", "ver", true),
-        "/api/v1/procesos/lista-corta" => ("consulta", "ver", true),
+        "/api/v1/procesos/licitaciones" => ("consulta", "ver", true),
         _ => ("consulta", "ver", false),
     };
     let access = if path.ends_with("/review") {
@@ -101,7 +101,7 @@ async fn guarded_request(state: ApiState, request: Request, next: Next) -> Respo
     next.run(request).await
 }
 
-async fn shortlist(
+async fn tender_list(
     State(state): State<ApiState>,
     headers: axum::http::HeaderMap,
     Query(_query): Query<ScoutStatusQuery>,

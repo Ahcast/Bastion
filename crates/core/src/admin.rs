@@ -307,7 +307,7 @@ impl CoreAdmin {
         mut details: serde_json::Value,
     ) -> Result<(), CoreError> {
         if matches!(actor, DomainActor::LocalScout) {
-            if module != "procesos" || action != "import" {
+            if module != "procesos" || !matches!(action, "import" | "tender.alert_queued") {
                 return Err(CoreError::Forbidden);
             }
             details["actor"] = serde_json::json!("bastion-scout");

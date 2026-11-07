@@ -8,6 +8,8 @@ use std::collections::BTreeMap;
 
 #[path = "dashboard.rs"]
 mod dashboard;
+#[path = "tender_alerts.rs"]
+mod tender_alerts;
 
 use crate::scout::{export_value, numbered_items};
 use crate::{MAX_ROWS, SCOUT_FIELDS, ScoutRow, parse_csv};

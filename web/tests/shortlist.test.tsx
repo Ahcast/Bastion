@@ -4,8 +4,8 @@ import { Window } from 'happy-dom';
 import { act } from 'react';
 import { ApiClient } from '../src/api.js';
 import { CoreContext } from '../src/ui.js';
-import { ShortlistAlert, ShortlistProvider } from '../src/components/ShortlistAlerts.js';
-import ListaCorta from '../src/pages/ListaCorta.js';
+import { ShortlistProvider } from '../src/components/ShortlistAlerts.js';
+import LicitacionesProcesos from '../src/components/LicitacionesProcesos.js';
 import type { ShortlistItem, TenderShortlist } from '../src/shortlist.js';
 import { mainNavigation } from '../src/navigation.js';
 import type { Access } from '../src/types.js';
@@ -35,7 +35,8 @@ const item: ShortlistItem = {
 
 async function workspace(userId: number, permitted = true) {
   let payload: TenderShortlist = { availability: 'available', checked_at: '2026-11-06T18:00:00Z',
-    generated_at: '2026-11-06T18:00:00Z', scan_status: 'parcial', items: [item] };
+    generated_at: '2026-11-06T18:00:00Z', scan_status: 'parcial', items: [item, { ...item, id: 'd'.repeat(64),
+      expediente: 'LPN sin prioridad', coincidencias_interes: '', evidencia_interes: '' }] };
   const calls: string[] = [];
   const api = new ApiClient('https://api.example.test', async url => {
     calls.push(String(url)); return Response.json(payload);
@@ -43,7 +44,7 @@ async function workspace(userId: number, permitted = true) {
   const container = document.createElement('div'); document.body.append(container);
   const root = createRoot(container);
   await act(async () => root.render(<CoreContext.Provider value={{ api, access: permitted ? access : { ...access, permissions: [] }, notify: () => {} }}>
-    <ShortlistProvider userId={userId}><ShortlistAlert open={() => {}} /><ListaCorta /></ShortlistProvider>
+    <ShortlistProvider userId={userId}><LicitacionesProcesos /></ShortlistProvider>
   </CoreContext.Provider>));
   const click = async (label: string) => {
     const button = Array.from(container.querySelectorAll('button')).find(button => button.textContent === label);
@@ -57,11 +58,12 @@ test('shortlist shows purchase unit, reception, evidence and an alert for partia
   const app = await workspace(11);
   try {
     assert.equal(app.calls.length, 1);
-    assert.ok(app.calls[0]?.endsWith('/api/v1/procesos/lista-corta'));
+    assert.ok(app.calls[0]?.endsWith('/api/v1/procesos/licitaciones'));
     for (const text of ['Unidad de Gestión', 'UCP-BID-JICA/ENEE', 'Extracción parcial', 'Nueva', 'Por revisar']) {
       assert.ok(app.container.textContent?.includes(text), text);
     }
-    assert.ok(app.container.querySelector('button[aria-label*="1 por revisar"]'));
+    assert.equal(app.container.querySelector('.shortlist-stats strong')?.textContent, '1');
+    assert.deepEqual(Array.from(app.container.querySelectorAll('.shortlist-code')).map(el => el.textContent), ['HOP6-ENEE', 'LPN sin prioridad']);
     assert.equal(app.container.querySelector('a')?.getAttribute('rel'), 'noreferrer');
   } finally { await app.dispose(); }
 });
@@ -69,7 +71,7 @@ test('shortlist shows purchase unit, reception, evidence and an alert for partia
 test('reviews survive reopening per user and changes reopen the alert', async () => {
   let app = await workspace(22);
   await app.click('Marcar revisada');
-  assert.equal(app.container.querySelector('button[aria-label*="por revisar"]'), null);
+  assert.equal(app.container.querySelector('.shortlist-stats strong')?.textContent, '0');
   await app.dispose();
   app = await workspace(22);
   try {
@@ -78,7 +80,7 @@ test('reviews survive reopening per user and changes reopen the alert', async ()
     await app.click('Actualizar');
     assert.ok(app.container.textContent?.includes('Actualizada'));
     assert.ok(app.container.textContent?.includes('Nueva oficina UCP'));
-    assert.ok(app.container.querySelector('button[aria-label*="1 por revisar"]'));
+    assert.equal(app.container.querySelector('.shortlist-stats strong')?.textContent, '1');
   } finally { await app.dispose(); }
   app = await workspace(23);
   try { assert.ok(app.container.textContent?.includes('Nueva')); }
@@ -90,14 +92,13 @@ test('missing sources and restricted users do not appear as a successful empty s
   try {
     app.update({ ...app.payload(), availability: 'missing', generated_at: null, scan_status: null, items: [] });
     await app.click('Actualizar');
-    assert.ok(app.container.textContent?.includes('todavía no tiene una extracción publicada'));
+    assert.ok(app.container.textContent?.includes('Todavía no hay una extracción de licitaciones publicada'));
     assert.equal(app.container.querySelector('.shortlist-stats'), null);
   } finally { await app.dispose(); }
   app = await workspace(34, false);
-  try { assert.equal(app.calls.length, 0); assert.equal(app.container.querySelector('.shortlist-alert'), null); }
+  try { assert.equal(app.calls.length, 0); assert.equal(app.container.querySelector('.shortlist-stats'), null); }
   finally { await app.dispose(); }
-  assert.ok(mainNavigation(access).some(entry => entry.id === 'lista_corta'));
-  assert.ok(!mainNavigation({ ...access, permissions: [] }).some(entry => entry.id === 'lista_corta'));
+  assert.deepEqual(mainNavigation(access).map(entry => entry.id), ['inicio', 'procesos', 'ajustes']);
 });
 
 test('background refresh uses a one minute interval', async context => {

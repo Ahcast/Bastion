@@ -2,7 +2,8 @@ use std::collections::BTreeMap;
 
 use bastion_core::{CoreError, CoreService, DashboardPeriod, Database, DomainActor};
 use bastion_procesos::{
-    FIELDS, ProcessFilter, ProcessService, ProcessSort, ReadyDelivery, SCOUT_FIELDS,
+    FIELDS, ProcessFilter, ProcessService, ProcessSort, ReadyDelivery, ReportAvailability,
+    SCOUT_FIELDS, ShortlistItem, TenderShortlist,
 };
 use chrono::{Datelike, Days, NaiveDate, NaiveDateTime};
 use sha2::{Digest, Sha256};
@@ -143,6 +144,84 @@ impl Drop for DeliveryFiles {
     }
 }
 
+async fn verify_tender_alerts(
+    core: &CoreService,
+    service: &ProcessService,
+    pool: &sqlx::MySqlPool,
+) {
+    let now = chrono::Utc::now();
+    let since = now - chrono::Duration::days(1);
+    let detected = now - chrono::Duration::hours(1);
+    let item: ShortlistItem = serde_json::from_value(serde_json::json!({
+        "id":"a".repeat(64),"version":"b".repeat(64),"first_seen_at":detected,
+        "updated_at":detected,"extraido_en":detected,
+        "expediente":"LPN-1","entidad":"ENEE","unidad_compra":"Unidad de Proyectos",
+        "modalidad":"Licitación pública nacional","tipo_adquisicion":"Servicios","etapa":"Recepción de Ofertas",
+        "objeto":"Equipos","tipo_fuente":"Préstamo","fuente":"BID","fecha_recepcion":now + chrono::Duration::days(7),
+        "lugar_recepcion":"UCP","coincidencias_interes":"BID | UCP","posibles_interes":"",
+        "evidencia_interes":"BID (fuente) BID","url":"http://sicc.honducompras.gob.hn/HC/Procesos/ProcesoHistorico.aspx?id=1"
+    })).unwrap();
+    let mut possible: ShortlistItem =
+        serde_json::from_value(serde_json::to_value(&item).unwrap()).unwrap();
+    possible.id = "c".repeat(64);
+    possible.coincidencias_interes.clear();
+    possible.posibles_interes = "JICA".into();
+    let mut feed = TenderShortlist {
+        availability: ReportAvailability::Available,
+        checked_at: chrono::Utc::now(),
+        generated_at: None,
+        scan_status: Some("parcial".into()),
+        items: vec![item, possible],
+    };
+    assert!(matches!(
+        service.queue_tender_alerts(core, 2, since, &feed).await,
+        Err(CoreError::Invalid)
+    ));
+    sqlx::query("INSERT INTO user_smtp_credentials (user_id,smtp_email,password_ciphertext) VALUES (1,'sender@example.test',X'01')")
+        .execute(pool).await.unwrap();
+    core.admin()
+        .set_core_setting(1, "smtp.designated_admin_user_id", serde_json::json!(1))
+        .await
+        .unwrap();
+    assert!(matches!(
+        service.queue_tender_alerts(core, 3, since, &feed).await,
+        Err(CoreError::Forbidden)
+    ));
+    assert_eq!(
+        service
+            .queue_tender_alerts(core, 2, now, &feed)
+            .await
+            .unwrap(),
+        0
+    );
+    let (first, repeated) = tokio::join!(
+        service.queue_tender_alerts(core, 2, since, &feed),
+        service.queue_tender_alerts(core, 2, since, &feed)
+    );
+    assert_eq!(first.unwrap() + repeated.unwrap(), 1);
+    feed.items[0].version = "f".repeat(64);
+    feed.items[0].id = "e".repeat(64);
+    feed.items[0].url.push_str("&renovado=1");
+    assert_eq!(
+        service
+            .queue_tender_alerts(core, 2, since, &feed)
+            .await
+            .unwrap(),
+        0
+    );
+    let mail: (u64, String, String, String) = sqlx::query_as("SELECT sender_user_id,recipient_email,delivery_status,subject FROM mail_outbox WHERE kind='tender_alert'")
+        .fetch_one(pool).await.unwrap();
+    assert_eq!(
+        mail,
+        (
+            1,
+            "admin2@example.test".into(),
+            "pending".into(),
+            "Nueva licitación BID | UCP · LPN-1".into()
+        )
+    );
+}
+
 #[tokio::test]
 async fn mysql57_import_permissions_history_and_disable() {
     let Ok(url) = std::env::var("BASTION_PROCESOS_TEST_URL") else {
@@ -182,6 +261,7 @@ async fn mysql57_import_permissions_history_and_disable() {
         .set_module_enabled(1, "procesos", true)
         .await
         .unwrap();
+    verify_tender_alerts(&core, &service, &pool).await;
     assert!(matches!(service.status(3).await, Err(CoreError::Forbidden)));
     let empty = service.status(1).await.unwrap();
     assert!(matches!(

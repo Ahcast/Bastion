@@ -79,10 +79,18 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
         return Err(std::io::Error::other("MCP requires an explicit notification sender").into());
     }
     let scout_config = scout_import::ScoutImportConfig::from_env()?;
+    let tender_alert_config = scout_import::TenderAlertConfig::from_env()?;
     let scout_csv_path = scout_config.csv_path.clone();
     if scout_config.enabled && !config.procesos_allowed {
         return Err(std::io::Error::other(
             "Local Scout import requires procesos in BASTION_ALLOWED_MODULES",
+        )
+        .into());
+    }
+    if tender_alert_config.is_some() && (!config.procesos_allowed || !scout_csv_path.is_absolute())
+    {
+        return Err(std::io::Error::other(
+            "Tender alerts require Procesos and an absolute Scout path",
         )
         .into());
     }
@@ -120,6 +128,14 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
         tokio::spawn(scout_import::run(
             bastion_procesos::ProcessService::new(core.database(), core.admin()),
             scout_config,
+        ));
+    }
+    if let Some(alerts) = tender_alert_config {
+        tokio::spawn(scout_import::run_tender_alerts(
+            bastion_procesos::ProcessService::new(core.database(), core.admin()),
+            core.clone(),
+            scout_csv_path.clone(),
+            alerts,
         ));
     }
     bastion_clientes::ClientService::new(core.database(), core.admin())

@@ -33,7 +33,8 @@ async function workspace(expires = false) {
       assert.equal(new Headers(init?.headers).get('If-Match'), `"${record.version}"`);
       record = { ...record, ...JSON.parse(String(init?.body)), version: record.version + 1 };
       data = { marked: record.marked, note: record.note, version: record.version };
-    } else if (path.endsWith('/status')) data = null;
+    } else if (path.endsWith('/licitaciones')) data = { availability: 'available', checked_at: new Date().toISOString(), generated_at: new Date().toISOString(), scan_status: 'exitoso', items: [] };
+    else if (path.endsWith('/status')) data = null;
     else if (path.endsWith('/entities')) data = { entities: ['Salud'] };
     else if (path.endsWith('/rows')) {
       listCalls++;
@@ -74,6 +75,24 @@ test('returning to the browser tab and marking retain the detail and note draft 
     assert.equal(app.listCalls(), 1);
     assert.equal(note.value, 'Borrador sin guardar');
     assert.ok(app.notices.includes('Nota compartida guardada.'));
+  } finally { await app.dispose(); }
+});
+
+test('Licitación opens inside Procesos and preserves the Compra menor draft', async () => {
+  const app = await workspace();
+  try {
+    await app.open();
+    const note = app.container.querySelector('textarea')!;
+    note.value = 'Borrador de compra menor';
+    const [buy, tenders] = app.container.querySelectorAll('.process-kind-tabs button');
+    await app.click(tenders ?? null);
+    assert.equal(tenders?.getAttribute('aria-pressed'), 'true');
+    assert.equal(app.calls.filter(call => call.path.endsWith('/licitaciones')).length, 1);
+    assert.ok(app.container.textContent?.includes('La extracción publicada no contiene licitaciones vigentes.'));
+    assert.ok(note.closest('[hidden]'));
+    await app.click(buy ?? null);
+    assert.equal(note.closest('[hidden]'), null);
+    assert.equal(note.value, 'Borrador de compra menor');
   } finally { await app.dispose(); }
 });
 

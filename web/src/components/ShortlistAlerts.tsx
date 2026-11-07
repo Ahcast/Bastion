@@ -2,7 +2,7 @@ import { createContext, useContext, useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { moduleCan } from '../types.js';
 import { useCore, useLoad } from '../ui.js';
-import { readShortlistReceipts } from '../shortlist.js';
+import { needsShortlistReview, readShortlistReceipts } from '../shortlist.js';
 import type { ShortlistItem, ShortlistReceipts, TenderShortlist } from '../shortlist.js';
 
 interface ShortlistState {
@@ -22,9 +22,9 @@ export function useShortlist() {
   return context;
 }
 
-export function ShortlistProvider({ userId, children }: { userId: number; children: ReactNode }) {
+export function ShortlistProvider({ userId, children, enabled = true }: { userId: number; children: ReactNode; enabled?: boolean }) {
   const { api, access } = useCore();
-  const allowed = moduleCan(access, 'procesos', 'consulta', 'ver');
+  const allowed = enabled && moduleCan(access, 'procesos', 'consulta', 'ver');
   const storageKey = `bastion.shortlist.${userId}`;
   const [receipts, setReceipts] = useState<ShortlistReceipts>(() => {
     try { return readShortlistReceipts(window.localStorage.getItem(storageKey)); } catch { return {}; }
@@ -34,7 +34,7 @@ export function ShortlistProvider({ userId, children }: { userId: number; childr
   const [clock, setClock] = useState(() => performance.now());
   const result = useLoad(async signal => {
     const requestedAt = performance.now();
-    const feed = allowed ? await api.request<TenderShortlist>('/api/v1/procesos/lista-corta', { signal }) : null;
+    const feed = allowed ? await api.request<TenderShortlist>('/api/v1/procesos/licitaciones', { signal }) : null;
     return { feed, requestedAt };
   }, [allowed, api], true);
   useEffect(() => {
@@ -69,16 +69,6 @@ export function ShortlistProvider({ userId, children }: { userId: number; childr
     catch { setStorageFailed(true); }
   };
   const value = { data, items, receipts, error: result.error, storageFailed, reload: result.reload, review,
-    unread: items.filter(item => receipts[item.id] !== item.version).length };
+    unread: items.filter(item => needsShortlistReview(item, receipts)).length };
   return <ShortlistContext.Provider value={value}>{children}</ShortlistContext.Provider>;
-}
-
-export function ShortlistAlert({ open }: { open: () => void }) {
-  const { access } = useCore();
-  const { unread } = useShortlist();
-  if (!moduleCan(access, 'procesos', 'consulta', 'ver')) return null;
-  return <button className={`shortlist-alert${unread ? ' has-unread' : ''}`} onClick={open}
-    aria-label={`Lista corta de licitaciones${unread ? `, ${unread} por revisar` : ''}`}>
-    Lista corta{unread > 0 && <strong aria-live="polite">{unread}</strong>}
-  </button>;
 }

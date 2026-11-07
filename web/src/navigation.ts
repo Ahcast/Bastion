@@ -1,7 +1,7 @@
 import { can, moduleCan } from './types.js';
 import type { Access, Page } from './types.js';
 import { collaborationCan } from './collaboration.js';
-export const pageLabels: Record<Page, string> = { inicio: 'Inicio', procesos: 'Procesos', lista_corta: 'Lista corta', cotizaciones: 'Cotizaciones', clientes: 'Clientes', proveedores: 'Proveedores', ordenes_compra: 'Órdenes de compra', facturas: 'Facturas', gastos: 'Gastos', reportes: 'Reportes', colaboracion: 'Colaboración', licitaciones: 'Licitaciones', ajustes: 'Ajustes' };
+export const pageLabels: Record<Page, string> = { inicio: 'Inicio', procesos: 'Procesos', cotizaciones: 'Cotizaciones', clientes: 'Clientes', proveedores: 'Proveedores', ordenes_compra: 'Órdenes de compra', facturas: 'Facturas', gastos: 'Gastos', reportes: 'Reportes', colaboracion: 'Colaboración', licitaciones: 'Licitaciones', ajustes: 'Ajustes' };
 export const reportScope = { ordenes: 'ordenes', facturas: 'facturas', gastos: 'gastos' } as const;
 export function reportCan(access: Access, kind: keyof typeof reportScope) {
   if (!moduleCan(access, 'reportes', reportScope[kind], 'ver')) return false;
@@ -17,7 +17,6 @@ export function mainNavigation(access: Access): { id: Page; label: string }[] {
   if (moduleCan(access, 'clientes', 'catalogo', 'ver')) pages.push('clientes');
   if (moduleCan(access, 'proveedores', 'catalogo', 'ver')) pages.push('proveedores');
   if (access.modules.some(module => module.module_id === 'procesos')) pages.push('procesos');
-  if (moduleCan(access, 'procesos', 'consulta', 'ver')) pages.push('lista_corta');
   if (moduleCan(access, 'cotizaciones', 'documentos', 'ver')) pages.push('cotizaciones');
   if (moduleCan(access, 'ordenes_compra', 'documentos', 'ver')) pages.push('ordenes_compra');
   if (moduleCan(access, 'facturas', 'documentos', 'ver')) pages.push('facturas');

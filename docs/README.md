@@ -14,9 +14,9 @@ Licitaciones, ampliación autorizada el 2026-10-27: nombre editable y copias pri
 
 ## Documentos
 
-La lista corta de licitaciones BID/JICA/UCP solicitada el 6 de noviembre de 2026 amplía
-Procesos con alertas dentro de Bastion y lectura de una instantánea local del nuevo
-escáner. [Contrato, comportamiento y preparación operativa](modulos/procesos-lista-corta.md).
+La pestaña Licitación amplía Procesos con todas las fichas vigentes del escáner,
+prioridad JICA/BID/UCP y correo para nuevas coincidencias.
+[Contrato, comportamiento y preparación operativa](modulos/procesos-lista-corta.md).
 
 | Archivo | Propósito |
 |---|---|
