@@ -270,3 +270,7 @@ El informe se obtuvo de una copia de frontend Angular compilado y backend Larave
 El Core centraliza la administración de copias y recuperación mediante un trabajador privado persistente en AWS. Se conserva frontend Bluehost y MySQL Bluehost. Véase [alcance, recuperación y límites](18-respaldo-mysql.md).
 
 - 2026-11-06: se define el flujo de adjudicación parcial de Licitaciones a un único borrador revisado de Facturas. El usuario selecciona ítems/cantidades, elige cliente de catálogo y captura precios e impuestos. Los propietarios conservan sus contratos y document-flows coordina la operación atómica. Véase [adjudicaciones](modulos/licitaciones-adjudicaciones.md).
+
+## Historial del sistema anterior
+
+El 2026-11-06 el usuario confirma que el traslado de datos históricos del sistema anterior a Bastion queda pendiente. El cierre operativo actual usa los datos de Bastion. Los cambios de esquema para funciones nuevas se evalúan por separado y no importan ese historial.

@@ -40,3 +40,9 @@ Código instalado en AWS y Bluehost: `879342c5c76a78fb65c13e2ac8ee82a2f57f964f`.
 El servicio permanente creó `backups/bastion-backup-2026-10-30-204701.zip`: 40.493.747 bytes, una exportación MySQL, diez archivos locales (incluidas las SQLite de Scout/control) y cuarenta objetos operativos S3. Se validaron inventario, checksums, firma y preparación tanto desde S3 como mediante recepción por bloques del ZIP real. El archivo y la clave de recuperación rechazaron acceso anónimo (403). Las preparaciones, subidas, cachés y paquetes temporales se retiraron. No se ejecutó la restauración destructiva ni se crearon cuentas o registros de negocio de prueba.
 
 El temporizador existente inicia a las 17:00 America/Tegucigalpa. Se configuró el ciclo de vida del prefijo reservado de ZIP a 30 días y un día adicional para versiones no actuales; los demás prefijos y las claves de recuperación quedan fuera de esas reglas. La primera copia automática por horario queda pendiente de su hora programada; la ejecución manual del mismo servicio terminó correctamente.
+
+## Validación del 2026-11-06
+
+Se verificó en AWS la copia programada `backups/bastion-backup-2026-11-06-170131.zip` (73.194.318 bytes). Coincidieron su SHA-256, el inventario, los hashes de las entradas y la firma comprobada con la clave independiente de S3. Contiene la exportación MySQL, 10 archivos locales y 83 objetos S3. La copia corresponde al backend `1e64d1c5f82ac49ce170c3c3108148c1074eccac`.
+
+En MySQL 5.7.44 portátil, aislado y sin conexiones TCP, se exportó y restauró una base ficticia de 87 tablas con factura, cotización y orden. Se ensayaron los tres cambios de esquema de Adjudicaciones → Facturas. Tras revertirlos, una nueva exportación coincidió byte por byte. Se detuvo el proceso temporal. No se exportaron datos reales fuera de AWS ni se importó el respaldo real; la recuperación completa sigue sin ensayar.

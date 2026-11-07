@@ -16,10 +16,14 @@ La creación del vínculo se limita a borradores a crédito sin pago inicial. Lo
 
 - GET y POST `/api/v1/licitaciones/{id}/adjudicaciones` consultan y registran adjudicaciones.
 - GET `/api/v1/licitaciones/{id}/adjudicaciones/{award}` consulta su instantánea.
-- POST `/api/v1/licitaciones/{id}/adjudicaciones/{award}/factura` guarda el borrador revisado.
+- GET y POST `/api/v1/licitaciones/{id}/adjudicaciones/{award}/factura` consultan el vínculo y guardan el borrador revisado, respectivamente.
 
 POST requiere sesión, origen, CSRF, clave idempotente y If-Match. El registro usa la versión del expediente y la factura usa la versión de adjudicación. Se conservan cuotas y auditoría. El contrato detallado está en licitaciones-adjudicaciones.openapi.yaml.
 
 ## Validación requerida
 
 La integración debe verificar permisos, desactivación, selección parcial, cantidades acumuladas, concurrencia, reintentos, cliente de catálogo, precisión decimal, unicidad y conservación de datos anteriores. Las migraciones se aplican después de CI y de un respaldo recuperable. La implementación y la disponibilidad en producción se registran por separado.
+
+## Corte verificado del 2026-11-06
+
+[`66dafea`](https://github.com/Ahcast/Bastion/commit/66dafeade74b4a183856c588d4271e746fec1ccd) está en `main`. [Core checks](https://github.com/Ahcast/Bastion/actions/runs/42342224059) aprobó el flujo en MySQL 5.7 aislado y generó los paquetes de AWS y Bluehost. Se cotejaron los 48 registros de migraciones instalados antes de publicar: el corte añade Facturas 6, Licitaciones 11 y Flujos de documentos 3. La aplicación de esos cambios y el despliegue en producción siguen pendientes. La base existente no requiere importar historial del sistema anterior.
