@@ -6,6 +6,8 @@ pub use control::{ScoutControl, ScoutControlStatus, ScoutJob, ScoutJobStatus, va
 mod local;
 mod scout;
 mod service;
+mod shortlist;
+pub use shortlist::{ShortlistItem, TenderShortlist};
 
 pub use diagnostics::{
     ReportAvailability, ScoutAttempt, ScoutDiagnostics, ScoutExtraction, ScoutIssue,

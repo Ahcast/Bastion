@@ -5,6 +5,17 @@ info:
 security:
   - session: []
 paths:
+  /api/v1/procesos/lista-corta:
+    get:
+      operationId: procesosListaCorta
+      x-permission: procesos/consulta/ver
+      x-limits: {bytes: 8388608, rows: 5000, timeout_seconds: 60, concurrency: 1}
+      description: Lista de licitaciones BID, UCP y JICA publicada por el escáner local. Lee únicamente licitaciones/lista_corta.json junto al maestro configurado. Sesión y módulo activo obligatorios. Sin parámetros ni rutas del cliente. Excluye ofertas vencidas y proyecta metadatos, coincidencias, evidencia e identificadores/versiones estables para las alertas. Una extracción parcial conserva las oportunidades anteriores hasta su vencimiento o una observación nueva. No inicia la extracción.
+      responses:
+        '200':
+          description: availability (available, missing, unreadable o invalid), checked_at, generated_at, scan_status (exitoso o parcial) e items. Cada item incluye id, version, first_seen_at, updated_at, expediente, entidad, unidad_compra, modalidad, tipo_adquisicion, etapa, objeto, tipo_fuente, fuente, fecha_recepcion, lugar_recepcion, coincidencias_interes, posibles_interes, evidencia_interes, url y extraido_en. Fechas RFC3339. La ausencia de archivo se informa con missing y sin fecha de extracción.
+        default:
+          $ref: '#/components/responses/Problem'
   /api/v1/procesos/scout-run:
     get:
       operationId: procesosScoutRunStatus

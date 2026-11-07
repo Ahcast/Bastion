@@ -21,6 +21,7 @@ pub(super) fn routes(state: ApiState) -> Router<ApiState> {
         .route("/api/v1/procesos/dashboard", get(dashboard))
         .route("/api/v1/procesos/status", get(status))
         .route("/api/v1/procesos/scout-status", get(scout_status))
+        .route("/api/v1/procesos/lista-corta", get(shortlist))
         .route(
             "/api/v1/procesos/scout-run",
             get(scout_run_status).post(scout_run),
@@ -65,6 +66,7 @@ async fn guarded_request(state: ApiState, request: Request, next: Next) -> Respo
         "/api/v1/procesos/refresh" => ("importacion", "editar", true),
         "/api/v1/procesos/export" => ("exportacion", "ver", true),
         "/api/v1/procesos/scout-status" => ("consulta", "ver", true),
+        "/api/v1/procesos/lista-corta" => ("consulta", "ver", true),
         _ => ("consulta", "ver", false),
     };
     let access = if path.ends_with("/review") {
@@ -97,6 +99,25 @@ async fn guarded_request(state: ApiState, request: Request, next: Next) -> Respo
         None
     };
     next.run(request).await
+}
+
+async fn shortlist(
+    State(state): State<ApiState>,
+    headers: axum::http::HeaderMap,
+    Query(_query): Query<ScoutStatusQuery>,
+) -> Result<Json<bastion_procesos::TenderShortlist>, ApiError> {
+    let user = actor(&state, &headers).await?;
+    let path = state.scout_csv_path.clone();
+    let result =
+        tokio::task::spawn_blocking(move || bastion_procesos::TenderShortlist::read(&path))
+            .await
+            .map_err(|_| ApiError(CoreError::Overloaded))?;
+    state
+        .procesos
+        .check_access(user.id, "consulta", "ver")
+        .await
+        .map_err(ApiError)?;
+    Ok(Json(result))
 }
 
 async fn status(
