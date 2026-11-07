@@ -105,8 +105,9 @@ impl ExpenseService {
     }
 
     pub async fn check_access(&self, actor: u64, capability: &str) -> Result<(), CoreError> {
-        self.begin(actor, capability).await?.commit().await?;
-        Ok(())
+        self.admin
+            .authorize_enabled_module(actor, "gastos", "registros", capability)
+            .await
     }
 
     pub async fn consume_request(&self, actor: u64) -> Result<(), CoreError> {

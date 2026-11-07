@@ -33,8 +33,10 @@ export default function App({ api, mcpEnabled = false, mcpQuery = null }: { api:
   const loggedIn = useRef(false), initialized = useRef(false);
   const clear = useCallback((text: string) => { loggedIn.current = false; setQuoteSeed(null); setDocumentTarget(null); setUser(null); setAccess(null); setReauth(false); setFlow({ kind: 'login' }); setAuthMessage(text); }, []);
   const authenticated = useCallback(async () => {
-    const current = await api.request<{ user: User }>('/api/v1/auth/me');
-    const catalog = await api.request<Access>('/api/v1/auth/access');
+    const [current, catalog] = await Promise.all([
+      api.request<{ user: User }>('/api/v1/auth/me'),
+      api.request<Access>('/api/v1/auth/access'),
+    ]);
     loggedIn.current = true; setUser(current.user); setAccess(catalog); setPage('inicio'); setDocumentTarget(null); setQuoteSeed(null); setSettingsSection('cuenta'); setReauth(false);
   }, [api]);
   useEffect(() => {

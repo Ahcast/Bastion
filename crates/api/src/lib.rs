@@ -3,12 +3,12 @@
 use std::{
     io,
     net::{IpAddr, SocketAddr},
-    time::Duration,
+    time::{Duration, Instant},
 };
 
 use axum::{
     Json, Router,
-    extract::{ConnectInfo, Extension, Path, Query, Request, State},
+    extract::{ConnectInfo, Extension, MatchedPath, Path, Query, Request, State},
     http::{
         HeaderName, HeaderValue, Method, StatusCode,
         header::{ACCEPT, AUTHORIZATION, CONTENT_TYPE, COOKIE, ORIGIN},
@@ -420,6 +420,7 @@ pub fn router(
         ))
         .layer(cors)
         .layer(PropagateRequestIdLayer::new(request_id.clone()))
+        .layer(middleware::from_fn(request_metrics))
         .layer(SetRequestIdLayer::new(request_id.clone(), MakeRequestUuid))
         .layer(middleware::from_fn(strip_untrusted_request_id))
         .layer(SetResponseHeaderLayer::overriding(
@@ -1598,6 +1599,27 @@ fn problem(status: StatusCode, title: &'static str, detail: &'static str) -> Res
     response.headers_mut().insert(
         "content-type",
         HeaderValue::from_static("application/problem+json"),
+    );
+    response
+}
+
+async fn request_metrics(request: Request, next: Next) -> Response {
+    let started = Instant::now();
+    let method = request.method().clone();
+    let route = request
+        .extensions()
+        .get::<MatchedPath>()
+        .map(|path| path.as_str().to_owned())
+        .unwrap_or_else(|| "<unmatched>".to_owned());
+    let response = next.run(request).await;
+    tracing::info!(
+        method = %method,
+        route = %route,
+        status = response.status().as_u16(),
+        duration_ms = started.elapsed().as_secs_f64() * 1000.0,
+        request_id = response.headers().get("x-request-id")
+            .and_then(|value| value.to_str().ok()).unwrap_or(""),
+        "http_request_completed",
     );
     response
 }

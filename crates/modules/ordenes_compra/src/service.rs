@@ -104,8 +104,9 @@ impl OrderService {
         scope: &str,
         capability: &str,
     ) -> Result<(), CoreError> {
-        self.begin(actor, scope, capability).await?.commit().await?;
-        Ok(())
+        self.admin
+            .authorize_enabled_module(actor, "ordenes_compra", scope, capability)
+            .await
     }
     async fn begin_destinations(&self, actor: u64) -> Result<Transaction<'_, MySql>, CoreError> {
         match self.begin(actor, "destinos", "ver").await {
