@@ -15,9 +15,9 @@ export function QuoteEmailComposer({ summary, close, sent }: { summary: QuoteSum
     if (draft.version !== summary.version || attachments.quote_version !== summary.version) throw new Error('La cotización cambió. Cierra y vuelve a abrir el envío desde la versión actual.');
     return { draft, pdf, attachments };
   }, [summary.id, summary.version]);
-  return <Dialog title={`Enviar ${summary.quote_number ?? 'cotización'} por correo`} close={() => { if (!submitting) close(); }}><Notice>{loaded.error}</Notice>{loaded.error && <button onClick={loaded.reload}>Reintentar PDF</button>}{loaded.data ? <Composer initial={loaded.data.draft} pdf={loaded.data.pdf} attachments={loaded.data.attachments} submitting={setSubmitting} sent={() => { sent(); notify('Cotización enviada.'); }} /> : !loaded.error && <Loading />}</Dialog>;
+  return <Dialog title={`Enviar ${summary.quote_number ?? 'cotización'} por correo`} close={() => { if (!submitting) close(); }}><Notice>{loaded.error}</Notice>{loaded.error && <button onClick={loaded.reload}>Reintentar PDF</button>}{loaded.data ? <Composer initial={loaded.data.draft} pdf={loaded.data.pdf} attachments={loaded.data.attachments} submitting={setSubmitting} queued={sent} sent={() => { sent(); notify('Cotización enviada.'); }} /> : !loaded.error && <Loading />}</Dialog>;
 }
-function Composer({ initial, pdf, attachments, sent, submitting }: { initial: QuoteDraft; pdf: QuotePdf; attachments: AttachmentPage; sent: () => void; submitting: (value: boolean) => void }) {
+function Composer({ initial, pdf, attachments, sent, queued, submitting }: { initial: QuoteDraft; pdf: QuotePdf; attachments: AttachmentPage; sent: () => void; queued: () => void; submitting: (value: boolean) => void }) {
   const { api, notify } = useCore();
   const process = initial.data.order_number || initial.quote_number || '';
   const [fields, setFields] = useState({ to: initial.data.client_email ?? '', cc: '', bcc: '', subject: `Cotización ${process}`, message: `Estimados ${initial.data.client_name || 'Cliente'}\n\nAdjunto la cotización correspondiente al proceso ${process}`, scheduled: '' });
@@ -44,6 +44,7 @@ function Composer({ initial, pdf, attachments, sent, submitting }: { initial: Qu
       const body = JSON.stringify(input);
       if (!attempt.current || attempt.current.body !== body) attempt.current = { body, key: crypto.randomUUID() };
       setJob(await api.request<QuoteEmailJob>(`/api/v1/cotizaciones/${initial.id}/emails`, { method: 'POST', body: input, ifMatch: initial.version, idempotencyKey: attempt.current.key }));
+      queued();
       notify(fields.scheduled ? 'Envío programado.' : 'Envío en cola.');
     } catch (reason) { setError(message(reason)); if (reason instanceof ApiError && reason.status === 412) setConflict(true); }
     finally { setBusy(false); submitting(false); }

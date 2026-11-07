@@ -47,6 +47,8 @@ Se guarda cifrado el mensaje y las referencias, tamaños y hashes del PDF y de t
 
 Sin asunto/mensaje se usan los defaults cotejados: referencia de orden o número de cotización, saludo al cliente y mención del PDF adjunto. El cliente manual no aporta correo de catálogo: se informa al preparar el envío. Un error o resultado incierto no se reenvía automáticamente; requiere revisar el correo enviado antes de preparar otro. La cola distingue pending/delivering/sent/failed/cancelled y registra auditoría sin texto ni destinos privados.
 
+El listado muestra junto al estado comercial la fecha y hora de Honduras del próximo envío programado pendiente (`pending_email_at`, UTC en la API). Conserva el permiso de lectura de Cotizaciones y no expone destinatarios ni contenido. Si hay varios, muestra el más próximo; al completarlo muestra el siguiente. Excluye fallidos, cancelados, enviados y envíos inmediatos. Actualiza la fila al programar y consulta cada minuto mientras el listado con pendientes está visible, sin vaciarlo. Los campos decimales rechazan caracteres no numéricos y admiten un punto con hasta cuatro decimales; los límites de negocio permanecen validados en servidor. El descuento por ítem permite alternar explícitamente entre HNL y %, conservando el valor introducido.
+
 Límites técnicos del corte: PDF hasta 8 MiB, hasta 50 destinatarios distintos; Para hasta 255 caracteres, CC/CCO hasta 1000 cada uno, asunto hasta 255 y mensaje hasta 5000. Generación/encolado hasta 60 segundos; demás operaciones conservan 30 segundos y cuota de 120 solicitudes por actor/minuto. Son topes de implementación. No se ejecutan envíos reales en las pruebas.
 
 ## Verificación y pendientes

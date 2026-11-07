@@ -13,6 +13,46 @@ for (const name of ['document','HTMLElement','FormData','Event','MouseEvent','Ke
 Object.assign(globalThis,{ window,IS_REACT_ACT_ENVIRONMENT:true });
 const { createRoot } = await import('react-dom/client');
 after(() => window.happyDOM.abort());
+async function enter(element: HTMLInputElement, value: string) {
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')!.set!.call(element, value);
+    element.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+}
+
+test('numeric quote fields reject letters, signs and malformed pasted decimals; discount type persists both ways', async () => {
+  const app = await workspace(); try {
+    await app.action('Editar');
+    for (const label of ['Precio unitario (HNL) del ítem 1', 'Cantidad del ítem 1', 'Descuento del ítem 1', 'Valor del descuento general']) {
+      const input = app.container.querySelector<HTMLInputElement>(`input[aria-label="${label}"]`)!;
+      await enter(input, '12.3456'); assert.equal(input.value, '12.3456');
+      for (const invalid of ['12abc', '1e3', '-1', '+2', '1,50', '1.2.3', '1.12345']) {
+        await enter(input, invalid); assert.equal(input.value, '12.3456', invalid);
+      }
+      await enter(input, ''); assert.equal(input.value, '');
+      await enter(input, '10'); assert.equal(input.value, '10');
+    }
+    const percent = app.container.querySelector('[aria-label="Descuento en porcentaje del ítem 1"]')!;
+    const amount = app.container.querySelector('[aria-label="Descuento en monto del ítem 1"]')!;
+    for (const [button, type] of [[percent, 'percent'], [amount, 'amount']] as const) {
+      await app.click(button); assert.equal(button.getAttribute('aria-pressed'), 'true');
+      await act(async () => { app.container.querySelector('form')!.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })); });
+      const items = app.calls.filter(call => call.method === 'PUT').at(-1)?.body?.items as { discount_type: string; discount_value: string }[];
+      assert.equal(items[0]?.discount_type, type); assert.equal(items[0]?.discount_value, '10');
+    }
+  } finally { await app.dispose(); }
+});
+
+test('scheduling refreshes the list and shows Honduras time alongside the commercial status', async () => {
+  const app = await workspace(true, true, true); try {
+    assert.equal(app.container.querySelector('.quote-state')?.textContent, 'Borrador');
+    await app.action('Enviar por correo');
+    const dialog = document.querySelector('[role="dialog"]')!;
+    await enter(dialog.querySelector<HTMLInputElement>('input[type="datetime-local"]')!, '2099-10-22T13:00');
+    await act(async () => { dialog.querySelector('form')!.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })); });
+    assert.match(app.container.querySelector('.quote-state')?.textContent ?? '', /BorradorEnvío programado.*22\/10\/2099.*13:00.*Honduras/);
+  } finally { await app.dispose(); }
+});
 const labels = ['Ver','Editar','Marcar como enviado','Convertir a orden de compra','Convertir a factura','Aprobar','Clonar','PDF','Enviar por correo','Eliminar'];
 
 async function workspace(editable = true, clients = false, linked = false) {
@@ -21,6 +61,7 @@ async function workspace(editable = true, clients = false, linked = false) {
   const totals = { subtotal:'100.00', importe_exonerado:'0.00',importe_exento:'0.00',importe_gravado_15:'100.00',importe_gravado_18:'0.00',descuentos_rebajas:'0.00',isv_15:'15.00',isv_18:'0.00',total:'115.00' };
   let draft: QuoteDraft = { id:1,version:1,status:'Borrador',currency:'HNL',quote_number:'COT-000001',data:input,calculation:{ data:input,valid_until:'2026-11-21',items:[],totals } };
   let failure = 0;
+  let pendingEmailAt: string | null = null;
   let attachments: {id:string;filename:string;title:string;mime:string;byte_size:number;created_at:string}[] = [];
   const calls: { path:string; query:string; method:string; match:string|null; key:string|null; body:Record<string,unknown>|null }[] = [];
   const api = new ApiClient('https://api.example.test',async (url,options) => {
@@ -42,13 +83,13 @@ async function workspace(editable = true, clients = false, linked = false) {
     if (method === 'DELETE') return new Response(null,{status:204});
     if (path.endsWith('/document-readiness')) return Response.json({pdf:true,company:true,email:true});
     if (path.endsWith('/pdf')) return Response.json({filename:'COT-000001.pdf',mime:'application/pdf',content_base64:btoa('%PDF-synthetic')});
-    if (path.endsWith('/emails')) return Response.json({id:8,delivery_status:'pending',scheduled_at:'2099-10-22T19:00:00',last_error_code:null},{status:202});
+    if (path.endsWith('/emails')) { pendingEmailAt='2099-10-22T19:00:00'; return Response.json({id:8,delivery_status:'pending',scheduled_at:'2099-10-22T19:00:00',last_error_code:null},{status:202}); }
     if (path.endsWith('/status')) { draft={...draft,version:draft.version+1,status:JSON.parse(String(options?.body)).status}; return Response.json(draft); }
     if (path.endsWith('/clone')) return Response.json({...draft,id:2,quote_number:'COT-000002',data:{...input,client_name:''}},{status:201});
     if (method === 'PUT' || (method === 'POST' && path.endsWith('/cotizaciones'))) {
       const data=JSON.parse(String(options?.body));draft={...draft,data,version:draft.version+1};return Response.json(draft);
     }
-    if (path.endsWith('/cotizaciones')) return Response.json({items:[{...draft,client_name:input.client_name,quote_date:input.quote_date,valid_until:'2026-11-21',total:'115.00',item_count:1}],page:1,page_size:25,has_more:false});
+    if (path.endsWith('/cotizaciones')) return Response.json({items:[{...draft,client_name:input.client_name,quote_date:input.quote_date,valid_until:'2026-11-21',total:'115.00',item_count:1,pending_email_at:pendingEmailAt}],page:1,page_size:25,has_more:false});
     return Response.json(draft);
   });
   const container=document.createElement('div');container.id='app';document.body.append(container);const root=createRoot(container);

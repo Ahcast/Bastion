@@ -549,6 +549,9 @@ components:
           type:
             - string
             - "null"
+        pending_email_at:
+          type: [string, "null"]
+          description: Próximo envío programado pendiente, UTC sin sufijo. Excluye envíos inmediatos, completados, fallidos y cancelados.
         status:
           $ref: "#/components/schemas/Status"
     Discount:

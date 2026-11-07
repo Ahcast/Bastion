@@ -115,6 +115,55 @@ async fn mysql57_drafts_permissions_idempotency_versions_and_disable() {
     assert_eq!(one.id, two.unwrap().id);
     assert_eq!(one.data.items[0].unit_price, "10.12");
     assert_eq!(one.quote_number.as_deref(), Some("COT-000001"));
+    assert!(
+        service
+            .list(2, &QuoteFilter::default())
+            .await
+            .unwrap()
+            .items[0]
+            .pending_email_at
+            .is_none()
+    );
+    for (key, status, date) in [
+        (201u8, "pending", "2026-01-02 13:00:00"),
+        (202, "pending", "2026-01-03 13:00:00"),
+        (203, "failed", "2026-01-01 14:00:00"),
+        (204, "pending", "2026-01-01 00:00:00"),
+    ] {
+        sqlx::query("INSERT INTO cotizaciones_email_jobs (quote_id,quote_version,actor_id,key_hash,request_hash,payload_ciphertext,scheduled_at,created_at,delivery_status) VALUES (?,1,1,?,?,'synthetic',?,'2026-01-01 00:00:00',?)")
+            .bind(one.id).bind(vec![key; 32]).bind(vec![key; 32]).bind(date).bind(status).execute(&pool).await.unwrap();
+    }
+    let scheduled = service.list(2, &QuoteFilter::default()).await.unwrap();
+    assert_eq!(
+        scheduled.items[0]
+            .pending_email_at
+            .map(|date| date.to_string())
+            .as_deref(),
+        Some("2026-01-02 13:00:00")
+    );
+    sqlx::query("UPDATE cotizaciones_email_jobs SET delivery_status='sent' WHERE quote_id=? AND scheduled_at='2026-01-02 13:00:00'").bind(one.id).execute(&pool).await.unwrap();
+    let scheduled = service.list(2, &QuoteFilter::default()).await.unwrap();
+    assert_eq!(
+        scheduled.items[0]
+            .pending_email_at
+            .map(|date| date.to_string())
+            .as_deref(),
+        Some("2026-01-03 13:00:00")
+    );
+    sqlx::query("DELETE FROM cotizaciones_email_jobs WHERE quote_id=?")
+        .bind(one.id)
+        .execute(&pool)
+        .await
+        .unwrap();
+    assert!(
+        service
+            .list(2, &QuoteFilter::default())
+            .await
+            .unwrap()
+            .items[0]
+            .pending_email_at
+            .is_none()
+    );
     assert_eq!(one.data.prepared_by_name, "Admin test");
     assert_eq!(one.data.contact_email, "admin@example.test");
     assert_eq!(one.calculation.valid_until, "2026-11-21");

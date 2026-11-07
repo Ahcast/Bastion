@@ -14,7 +14,7 @@ import { reservePdfViewer } from '../quoteDocuments.js';
 import type { DocumentReadiness, QuotePdf } from '../quoteDocuments.js';
 import { moduleCan } from '../types.js';
 import { useUnsavedChanges } from '../navigationGuard.js';
-import { newQuote, newQuoteItem, quoteStatuses } from '../quotes.js';
+import { newQuote, newQuoteItem, quoteStatuses, quoteSchedule } from '../quotes.js';
 import type { DiscountType, QuoteDraft, QuoteInput, QuoteItem, QuotePage, QuoteCalculation, QuoteStatus, QuoteSummary } from '../quotes.js';
 
 interface ProcessQuoteProps { openConverted?: OpenConverted; processSeed?: ProcessQuoteSeed | null; clearProcessSeed?: () => void }
@@ -41,6 +41,12 @@ function Workspace({ processSeed, clearProcessSeed, openConverted }: ProcessQuot
   const targetReason = (module: ConversionModule) => !editable ? 'Sin permiso de edición de Cotizaciones' : !targetAllowed(module) ? 'Requiere el módulo destino activo y permisos de lectura y edición' : undefined;
   const documents = useLoad(signal => api.request<DocumentReadiness>('/api/v1/cotizaciones/document-readiness', { signal }));
   const result = useLoad(signal => api.request<QuotePage>(`/api/v1/cotizaciones?q=${encodeURIComponent(query)}&page=${page}&page_size=25`, { signal }), [query, page], true);
+  const hasScheduledEmail = result.data?.items.some(row => row.pending_email_at) ?? false;
+  useEffect(() => {
+    if (selected || !hasScheduledEmail) return;
+    const timer = setInterval(() => { if (document.visibilityState !== 'hidden') result.reload(); }, 60_000);
+    return () => clearInterval(timer);
+  }, [selected, hasScheduledEmail, result.reload]);
   const open = async (draft: QuoteSummary, nextMode: 'view' | 'edit') => {
     setError(''); setOpening(true);
     try { setSelected(await api.request<QuoteDraft>(`/api/v1/cotizaciones/${draft.id}`)); setMode(nextMode); }
@@ -93,7 +99,7 @@ function Workspace({ processSeed, clearProcessSeed, openConverted }: ProcessQuot
     <section className="quote-list" aria-labelledby="quote-list-title"><div className="quote-list-heading"><h2 id="quote-list-title">Listado de cotizaciones</h2>{result.data && <span>{result.data.items.length} en esta página</span>}</div>
     <form className="quote-search" onSubmit={event => { event.preventDefault(); setQuery(search); setPage(1); }}><label><span className="quote-sr-only">Buscar cliente, referencia o ítem</span><input placeholder="Buscar por cliente, referencia o ítem" value={search} maxLength={200} onChange={event => setSearch(event.target.value)} /></label><button type="submit">Buscar</button></form>
     <Notice>{error || result.error}</Notice>
-    {result.data ? <><Table columns={['Número', 'Cliente', 'Fecha', 'Vence', 'Total (HNL)', 'Estado', 'Ítems', 'Acción']} rows={result.data.items.map(draft => [<span className="quote-number">{draft.quote_number ?? 'Sin numerar'}</span>, <div className="quote-list-client">{draft.client_name || 'Sin cliente'}{draft.order_number && <small>{draft.order_number}</small>}</div>, draft.quote_date, draft.valid_until, <span className="quote-money">{draft.total ?? '—'}</span>, <span className="quote-status" data-state={draft.status}>{draft.status}</span>, draft.item_count, <QuoteActions number={draft.quote_number ?? String(draft.id)} busy={opening} actions={[
+    {result.data ? <><Table columns={['Número', 'Cliente', 'Fecha', 'Vence', 'Total (HNL)', 'Estado', 'Ítems', 'Acción']} rows={result.data.items.map(draft => [<span className="quote-number">{draft.quote_number ?? 'Sin numerar'}</span>, <div className="quote-list-client">{draft.client_name || 'Sin cliente'}{draft.order_number && <small>{draft.order_number}</small>}</div>, draft.quote_date, draft.valid_until, <span className="quote-money">{draft.total ?? '—'}</span>, <div className="quote-state"><span className="quote-status" data-state={draft.status}>{draft.status}</span>{quoteSchedule(draft.pending_email_at) && <small>Envío programado<br />{quoteSchedule(draft.pending_email_at)}</small>}</div>, draft.item_count, <QuoteActions number={draft.quote_number ?? String(draft.id)} busy={opening} actions={[
       { label: 'Ver', run: () => void open(draft, 'view') },
       { label: 'Editar', disabled: !editable, reason: !editable ? 'Sin permiso de edición' : undefined, run: () => void open(draft, 'edit') },
       { label: 'Marcar como enviado', disabled: !editable, run: () => void status(draft, 'Enviada') },

@@ -216,6 +216,7 @@ pub struct QuoteSummary {
     pub quote_number: Option<String>,
     pub valid_until: Option<String>,
     pub total: Option<String>,
+    pub pending_email_at: Option<chrono::NaiveDateTime>,
 }
 
 #[cfg(test)]
