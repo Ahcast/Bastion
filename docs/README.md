@@ -268,3 +268,5 @@ El informe se obtuvo de una copia de frontend Angular compilado y backend Larave
 ## Respaldo integral de datos
 
 El Core centraliza la administración de copias y recuperación mediante un trabajador privado persistente en AWS. Se conserva frontend Bluehost y MySQL Bluehost. Véase [alcance, recuperación y límites](18-respaldo-mysql.md).
+
+- 2026-11-06: se define el flujo de adjudicación parcial de Licitaciones a un único borrador revisado de Facturas. El usuario selecciona ítems/cantidades, elige cliente de catálogo y captura precios e impuestos. Los propietarios conservan sus contratos y document-flows coordina la operación atómica. Véase [adjudicaciones](modulos/licitaciones-adjudicaciones.md).

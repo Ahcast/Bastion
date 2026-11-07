@@ -1,0 +1,191 @@
+openapi: 3.1.0
+info:
+  title: Adjudicaciones de Licitaciones y borrador revisado
+  version: 1.0.0
+security:
+  - session: []
+paths:
+  /api/v1/licitaciones/{id}/lotes/{numero}/adjudicacion:
+    parameters:
+      - $ref: '#/components/parameters/Expedient'
+      - {in: path, name: numero, required: true, schema: {type: integer, minimum: 1, maximum: 1000}}
+    get:
+      summary: Consultar cantidades disponibles con permiso de lectura de Licitaciones
+      responses:
+        '200':
+          description: Cantidades exactas pendientes de adjudicar
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [lot_number, version, items]
+                properties:
+                  lot_number: {type: integer}
+                  version: {type: integer}
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      required: [item_number, description, offered_quantity, remaining_quantity, unit]
+                      properties:
+                        item_number: {type: integer, minimum: 1}
+                        description: {type: string}
+                        offered_quantity: {type: string}
+                        remaining_quantity: {type: string}
+                        unit: {type: string}
+        default: {$ref: '#/components/responses/Problem'}
+  /api/v1/licitaciones/{id}/adjudicaciones:
+    parameters:
+      - $ref: '#/components/parameters/Expedient'
+    get:
+      summary: Listar adjudicaciones con lectura de Licitaciones
+      parameters:
+        - {in: query, name: page, schema: {type: integer, minimum: 1, maximum: 10000, default: 1}}
+      responses:
+        '200':
+          description: Página de 25 adjudicaciones, orden descendente por ID
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, page, page_size, has_more]
+                properties:
+                  items: {type: array, items: {$ref: '#/components/schemas/AwardSummary'}}
+                  page: {type: integer}
+                  page_size: {type: integer, const: 25}
+                  has_more: {type: boolean}
+        default: {$ref: '#/components/responses/Problem'}
+    post:
+      summary: Registrar selección parcial de oferta Enviada con lectura y edición de Licitaciones
+      parameters:
+        - $ref: '#/components/parameters/Version'
+        - $ref: '#/components/parameters/Key'
+        - $ref: '#/components/parameters/Csrf'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [items]
+              properties:
+                items:
+                  type: array
+                  minItems: 1
+                  maxItems: 200
+                  items:
+                    type: object
+                    additionalProperties: false
+                    required: [lot_number, item_number, quantity]
+                    properties:
+                      lot_number: {type: integer, minimum: 1, maximum: 1000}
+                      item_number: {type: integer, minimum: 1, maximum: 1000}
+                      quantity: {type: string, pattern: '^[0-9]{1,12}([.][0-9]{1,12})?$', description: Positiva y sin exceder la cantidad ofertada menos adjudicaciones previas}
+      responses:
+        '200': {$ref: '#/components/responses/Award'}
+        default: {$ref: '#/components/responses/Problem'}
+  /api/v1/licitaciones/{id}/adjudicaciones/{award}:
+    parameters:
+      - $ref: '#/components/parameters/Expedient'
+      - $ref: '#/components/parameters/Award'
+    get:
+      summary: Consultar instantánea autorizada
+      responses:
+        '200': {$ref: '#/components/responses/Award'}
+        default: {$ref: '#/components/responses/Problem'}
+  /api/v1/licitaciones/{id}/adjudicaciones/{award}/factura:
+    parameters:
+      - $ref: '#/components/parameters/Expedient'
+      - $ref: '#/components/parameters/Award'
+    get:
+      summary: Consultar vínculo con lectura vigente en Licitaciones y Facturas
+      responses:
+        '200':
+          description: Resultado vinculado o null si todavía no existe
+          content:
+            application/json:
+              schema:
+                anyOf:
+                  - {$ref: '#/components/schemas/InvoiceResult'}
+                  - {type: 'null'}
+        default: {$ref: '#/components/responses/Problem'}
+    post:
+      summary: Guardar un único borrador revisado con lectura y edición en ambos dominios
+      description: Exige cliente de catálogo vigente, crédito sin pago inicial y cantidades que conserven exactamente la adjudicación. Precios e impuestos se capturan en la revisión. Un reintento conserva el vínculo. La edición posterior usa las operaciones ordinarias de Facturas.
+      parameters:
+        - $ref: '#/components/parameters/Version'
+        - $ref: '#/components/parameters/Key'
+        - $ref: '#/components/parameters/Csrf'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: 'facturas.openapi.yaml#/components/schemas/Input'}
+      responses:
+        '200':
+          description: Borrador único creado o reutilizado
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/InvoiceResult'}
+        default: {$ref: '#/components/responses/Problem'}
+components:
+  securitySchemes:
+    session: {type: apiKey, in: cookie, name: __Host-bastion_session}
+  parameters:
+    Expedient: {in: path, name: id, required: true, schema: {type: integer, minimum: 1}}
+    Award: {in: path, name: award, required: true, schema: {type: integer, minimum: 1}}
+    Version: {in: header, name: If-Match, required: true, schema: {type: string}, description: Versión del expediente al registrar o de la adjudicación al crear factura}
+    Key: {in: header, name: Idempotency-Key, required: true, schema: {type: string, minLength: 16, maxLength: 128, pattern: '^[A-Za-z0-9_-]+$'}}
+    Csrf: {in: header, name: X-CSRF-Token, required: true, schema: {type: string}}
+  schemas:
+    AwardSummary:
+      type: object
+      required: [id, expedient_id, item_count]
+      properties:
+        id: {type: integer}
+        expedient_id: {type: integer}
+        item_count: {type: integer, minimum: 1, maximum: 200}
+    Award:
+      type: object
+      required: [id, expedient_id, version, snapshot]
+      properties:
+        id: {type: integer, minimum: 1}
+        expedient_id: {type: integer, minimum: 1}
+        version: {type: integer, const: 1}
+        snapshot:
+          type: object
+          required: [expedient_name, expedient_version, items]
+          properties:
+            expedient_name: {type: string}
+            expedient_version: {type: integer}
+            items:
+              type: array
+              items:
+                type: object
+                required: [lot_number, item_number, quantity, description, unit]
+                properties:
+                  lot_number: {type: integer}
+                  item_number: {type: integer}
+                  quantity: {type: string}
+                  description: {type: string}
+                  unit: {type: string}
+    InvoiceResult:
+      type: object
+      required: [target_module, target_id, award_id, reused]
+      properties:
+        target_module: {type: string, const: facturas}
+        target_id: {type: integer, minimum: 1}
+        award_id: {type: integer, minimum: 1}
+        reused: {type: boolean}
+  responses:
+    Award:
+      description: Instantánea de adjudicación
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/Award'}
+    Problem:
+      description: Error del Core. 400 validación o precisión, 401 sesión, 403 permisos u origen/CSRF, 404 registro o módulo, 409 cantidades acumuladas/estado/clave, 412 versión, 429 cuota y 503 dependencia.
+      content:
+        application/problem+json:
+          schema: {type: object}

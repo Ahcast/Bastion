@@ -1,6 +1,11 @@
 #![forbid(unsafe_code)]
 
 mod attachments;
+mod awards;
+pub use awards::{
+    AvailableAwardItem, AvailableAwardLot, Award, AwardInput, AwardItem, AwardSelection,
+    AwardSnapshot,
+};
 mod economic_preview;
 mod folio;
 mod frontmatter;

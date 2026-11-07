@@ -8,6 +8,7 @@ import { DocumentSection, DocumentPagination } from '../components/DocumentWorks
 import TenderFiles from '../components/TenderFiles.js';
 import TenderLots from '../components/TenderLots.js';
 import TenderPdfOrder from '../components/TenderPdfOrder.js';
+import TenderAwards from '../components/TenderAwards.js';
 import FormLibrary from './FormLibrary.js';
 import { changesDdpPricing, fieldValue, kindLabels, sectionLabels } from '../tenders.js';
 import type { Expedient, ExpedientSummary, GlobalVariable, FormSection, PublishedForm, TenderPage, VariableKind } from '../tenders.js';
@@ -39,7 +40,7 @@ function ExpedientList({ open }: { open: (id: number) => void }) {
     </DocumentSection>
   </>;
 }
-type Tab = 'resumen' | 'variables' | FormSection | 'pdf';
+type Tab = 'resumen' | 'variables' | FormSection | 'pdf' | 'adjudicaciones';
 function ExpedientWorkspace({ id, back }: { id: number; back: () => void }) {
   const { api, access, notify } = useCore(), { navigate, saveAll, saveError } = useNavigationGuard();
   const result = useLoad(signal => api.request<Expedient>(`/api/v1/licitaciones/${id}`, { signal }), [id]);
@@ -76,7 +77,7 @@ function ExpedientWorkspace({ id, back }: { id: number; back: () => void }) {
   const [draftVariables, setDraftVariables] = useState<GlobalVariable[] | null>(null);
   const [draftLots, setDraftLots] = useState<{numero:number; items:number; tamano_tabla?:string}[]>([]);
   const editable = record?.state === 'borrador' && moduleCan(access, 'licitaciones', 'expedientes', 'editar');
-  const tabs: { id: Tab; label: string }[] = [{ id: 'resumen', label: 'Resumen' }, { id: 'variables', label: 'Variables' }, ...Object.entries(sectionLabels).map(([key, label]) => ({ id: key as FormSection, label })), { id: 'pdf', label: 'PDF final' }];
+  const tabs: { id: Tab; label: string }[] = [{ id: 'resumen', label: 'Resumen' }, { id: 'variables', label: 'Variables' }, ...Object.entries(sectionLabels).map(([key, label]) => ({ id: key as FormSection, label })), { id: 'pdf', label: 'PDF final' }, { id: 'adjudicaciones', label: 'Adjudicaciones' }];
   return <><Heading title={record?.name || `Expediente #${id}`} description={`Expediente #${id} · Cada formulario conserva su revisión de biblioteca.`} action={<div className="actions"><button disabled={savingAll} onClick={() => { void navigate(back); }}>Volver al listado</button>{editable && <button className="primary" disabled={savingAll} onClick={async () => { setSavingAll(true); try { if (await saveAll()) notify('Expediente guardado.'); } finally { setSavingAll(false); } }}>{savingAll ? 'Guardando…' : 'Guardar expediente'}</button>}{editable && <button disabled={savingAll} onClick={() => setConfirmSent(true)}>Marcar como enviada</button>}</div>} />
     <Notice>{result.error || saveError || sendError}</Notice>{!record && !result.error && <Loading />}
     {record && <><div className="row section-tabs document-tabs" aria-label="Secciones del expediente">{tabs.map(entry => <button key={entry.id} aria-pressed={tab === entry.id} onClick={() => showTab(entry.id)}>{entry.label}</button>)}</div>
@@ -89,6 +90,7 @@ function ExpedientWorkspace({ id, back }: { id: number; back: () => void }) {
         return <div hidden={tab !== section} key={section}><DocumentSection title={sectionLabels[section]} list>{section === 'legal' ? <InitialForms record={record} latest={latest} editable={Boolean(editable)} saved={saved}>{renderFiles}</InitialForms> : renderFiles()}</DocumentSection></div>;
       })}
       {visited.has('pdf') && <div hidden={tab !== 'pdf'}><DocumentSection title="PDF final"><TenderPdfOrder record={record} latest={latest} editable={Boolean(editable)} saved={saved} /></DocumentSection></div>}
+      {visited.has('adjudicaciones') && <div hidden={tab !== 'adjudicaciones'}><TenderAwards record={record} /></div>}
       {confirmSent && <Dialog title="Marcar como enviada" close={() => setConfirmSent(false)}>
         <p>Confirma que ya presentaste la oferta. Se guardarán los cambios pendientes y el expediente quedará en modo de consulta.</p>
         <div className="actions">

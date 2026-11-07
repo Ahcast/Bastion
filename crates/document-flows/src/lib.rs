@@ -1,5 +1,6 @@
 #![forbid(unsafe_code)]
 mod order_invoice;
+mod tender_invoice;
 use bastion_core::{CoreError, Database};
 use bastion_cotizaciones::QuoteService;
 use bastion_facturas::InvoiceService;
@@ -7,10 +8,12 @@ use bastion_ordenes_compra::OrderService;
 pub use order_invoice::OrderInvoiceResult;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
+pub use tender_invoice::TenderInvoiceResult;
 
 #[derive(Clone)]
 pub struct ConversionService {
     database: Database,
+    tenders: bastion_licitaciones::TenderService,
     quotes: QuoteService,
     invoices: InvoiceService,
     orders: OrderService,
@@ -39,6 +42,7 @@ impl ConversionService {
     pub fn new(core: &bastion_core::CoreService) -> Self {
         Self {
             database: core.database(),
+            tenders: bastion_licitaciones::TenderService::new(core.database(), core.admin()),
             quotes: QuoteService::new(core.database(), core.admin()),
             invoices: InvoiceService::new(core.database(), core.admin()),
             orders: OrderService::new(core.database(), core.admin()),

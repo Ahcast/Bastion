@@ -8,10 +8,10 @@ impl InvoiceService {
         tx: &mut Transaction<'_, MySql>,
     ) -> Result<(), CoreError> {
         self.admin
-            .authorize(actor, "facturas", "documentos", "ver")
+            .authorize_in_transaction(tx, actor, "facturas", "documentos", "ver")
             .await?;
         self.admin
-            .authorize(actor, "facturas", "documentos", "editar")
+            .authorize_in_transaction(tx, actor, "facturas", "documentos", "editar")
             .await?;
         let enabled:Option<bool>=sqlx::query_scalar("SELECT (included_in_release AND environment_allowed AND enabled) FROM module_registry WHERE module_id='facturas' FOR UPDATE").fetch_optional(&mut **tx).await?;
         if enabled != Some(true) {
@@ -84,6 +84,7 @@ impl InvoiceService {
             payments: Vec::new(),
             sar_snapshot: None,
             company_snapshot: None,
+            source_tender: None,
             source_quote: Some(origin),
             source_order: None,
             data: calculation.data.clone(),
@@ -118,6 +119,7 @@ impl InvoiceService {
             payments: Vec::new(),
             sar_snapshot: None,
             company_snapshot: None,
+            source_tender: None,
             source_quote: None,
             source_order: Some(origin),
             data: c.data.clone(),
@@ -224,5 +226,84 @@ mod order_tests {
         let mut corrupted = source;
         corrupted.calculation.totals.total = "999.00".into();
         assert!(order_invoice_calculation(&corrupted).is_err());
+    }
+}
+
+impl InvoiceService {
+    pub async fn create_from_tender(
+        &self,
+        actor: u64,
+        tx: &mut Transaction<'_, MySql>,
+        mut input: InvoiceInput,
+        origin: crate::TenderOrigin,
+    ) -> Result<InvoiceDraft, CoreError> {
+        self.lock_conversion(actor, tx).await?;
+        if input.id_client.is_none()
+            || input.initial_payment.is_some()
+            || !matches!(input.payment_term_type, PaymentTerm::Credito)
+        {
+            return Err(CoreError::Invalid);
+        }
+        self.resolve_client(tx, actor, &mut input, None).await?;
+        let calculation = calculate(&input)?;
+        calculation.ensure_saveable()?;
+        let id = sqlx::query(
+            "INSERT INTO facturas_drafts(client_name,order_number,invoice_date,data_json,calculation_json,source_tender_json,created_by,updated_by,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,UTC_TIMESTAMP(6),UTC_TIMESTAMP(6))",
+        ).bind(&calculation.data.client_name).bind(&calculation.data.order_number)
+            .bind(calculation.data.invoice_date)
+            .bind(serde_json::to_value(&calculation.data).map_err(|_| CoreError::Invalid)?)
+            .bind(serde_json::to_value(&calculation).map_err(|_| CoreError::Invalid)?)
+            .bind(serde_json::to_value(&origin).map_err(|_| CoreError::Invalid)?)
+            .bind(actor).bind(actor).execute(&mut **tx).await?.last_insert_id();
+        CoreAdmin::record_domain_event(
+            tx,
+            actor,
+            "facturas",
+            "invoice.draft.create",
+            &id.to_string(),
+            serde_json::json!({"source_tender":origin,"version":1}),
+        )
+        .await?;
+        Ok(InvoiceDraft {
+            id,
+            version: 1,
+            status: "Borrador".into(),
+            currency: "HNL".into(),
+            invoice_number: None,
+            payments: Vec::new(),
+            sar_snapshot: None,
+            company_snapshot: None,
+            source_quote: None,
+            source_order: None,
+            source_tender: Some(origin),
+            data: calculation.data.clone(),
+            calculation,
+        })
+    }
+
+    pub async fn lock_conversion_read(
+        &self,
+        actor: u64,
+        tx: &mut Transaction<'_, MySql>,
+    ) -> Result<(), CoreError> {
+        self.admin
+            .authorize_in_transaction(tx, actor, "facturas", "documentos", "ver")
+            .await?;
+        let enabled:Option<bool> = sqlx::query_scalar("SELECT (included_in_release AND environment_allowed AND enabled) FROM module_registry WHERE module_id='facturas' FOR UPDATE")
+            .fetch_optional(&mut **tx).await?;
+        if enabled != Some(true) {
+            return Err(CoreError::NotFound);
+        }
+        Ok(())
+    }
+
+    pub async fn conversion_target(
+        &self,
+        actor: u64,
+        id: u64,
+        tx: &mut Transaction<'_, MySql>,
+    ) -> Result<InvoiceDraft, CoreError> {
+        self.lock_conversion_read(actor, tx).await?;
+        load(tx, id).await
     }
 }

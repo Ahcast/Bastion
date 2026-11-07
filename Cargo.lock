@@ -284,8 +284,11 @@ version = "0.1.0"
 dependencies = [
  "base64 0.22.1",
  "bastion-core",
+ "bastion-clientes",
+ "bastion-colaboracion",
  "bastion-cotizaciones",
  "bastion-facturas",
+ "bastion-licitaciones",
  "bastion-ordenes-compra",
  "serde",
  "serde_json",

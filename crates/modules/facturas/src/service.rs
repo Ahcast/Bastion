@@ -401,6 +401,7 @@ impl InvoiceService {
             payments,
             sar_snapshot: None,
             company_snapshot: None,
+            source_tender: None,
             source_quote: None,
             source_order: None,
             data: calculation.data.clone(),
@@ -514,6 +515,7 @@ impl InvoiceService {
             payments,
             sar_snapshot: current.sar_snapshot,
             company_snapshot: current.company_snapshot,
+            source_tender: current.source_tender,
             source_quote: current.source_quote,
             source_order: current.source_order,
             data: calculation.data.clone(),
@@ -551,7 +553,7 @@ impl InvoiceService {
 }
 
 async fn load(tx: &mut Transaction<'_, MySql>, id: u64) -> Result<InvoiceDraft, CoreError> {
-    let row = sqlx::query("SELECT id,version,status,data_json,calculation_json,source_quote_json,source_order_json,invoice_number,sar_snapshot_json,company_snapshot_json FROM facturas_drafts WHERE id=? AND deleted_at IS NULL FOR UPDATE").bind(id).fetch_optional(&mut **tx).await?.ok_or(CoreError::NotFound)?;
+    let row = sqlx::query("SELECT id,version,status,data_json,calculation_json,source_quote_json,source_order_json,source_tender_json,invoice_number,sar_snapshot_json,company_snapshot_json FROM facturas_drafts WHERE id=? AND deleted_at IS NULL FOR UPDATE").bind(id).fetch_optional(&mut **tx).await?.ok_or(CoreError::NotFound)?;
     let data: serde_json::Value = row.try_get("data_json")?;
     let calculation: serde_json::Value = row.try_get("calculation_json")?;
     let origin: Option<serde_json::Value> = row.try_get("source_quote_json")?;
@@ -577,6 +579,12 @@ async fn load(tx: &mut Transaction<'_, MySql>, id: u64) -> Result<InvoiceDraft, 
             .transpose()
             .map_err(|_| CoreError::Invalid)?,
         source_order: order_origin
+            .map(serde_json::from_value)
+            .transpose()
+            .map_err(|_| CoreError::Invalid)?,
+        source_tender: row
+            .try_get::<Option<serde_json::Value>, _>("source_tender_json")?
+            .filter(|value| !value.is_null())
             .map(serde_json::from_value)
             .transpose()
             .map_err(|_| CoreError::Invalid)?,

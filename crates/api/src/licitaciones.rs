@@ -9,6 +9,18 @@ pub(super) fn routes(state: ApiState) -> Router<ApiState> {
         .route("/api/v1/licitaciones", get(list).post(create))
         .route("/api/v1/licitaciones/{id}/marcar-enviada", post(mark_sent))
         .route(
+            "/api/v1/licitaciones/{id}/lotes/{numero}/adjudicacion",
+            get(available_award_lot),
+        )
+        .route(
+            "/api/v1/licitaciones/{id}/adjudicaciones",
+            get(list_awards).post(register_award),
+        )
+        .route(
+            "/api/v1/licitaciones/{id}/adjudicaciones/{award}",
+            get(get_award),
+        )
+        .route(
             "/api/v1/licitaciones/plantillas-instaladas",
             get(installed_forms),
         )
@@ -59,6 +71,15 @@ pub(super) fn routes(state: ApiState) -> Router<ApiState> {
         )
         .layer(RequestBodyLimitLayer::new(256 * 1024))
         .route_layer(middleware::from_fn_with_state(state.clone(), guard))
+        .merge(
+            Router::new()
+                .route(
+                    "/api/v1/licitaciones/{id}/adjudicaciones/{award}/factura",
+                    get(award_invoice_link).post(create_award_invoice),
+                )
+                .layer(RequestBodyLimitLayer::new(GENERAL_REQUEST_BODY_LIMIT))
+                .route_layer(middleware::from_fn_with_state(state.clone(), guard)),
+        )
         .merge(file_routes(state))
 }
 fn file_routes(state: ApiState) -> Router<ApiState> {
@@ -1177,4 +1198,107 @@ mod tests {
         headers.append("if-match", HeaderValue::from_static("\"3\""));
         assert!(expected(&headers).is_err());
     }
+}
+
+async fn list_awards(
+    State(state): State<ApiState>,
+    headers: axum::http::HeaderMap,
+    Path(id): Path<u64>,
+    Query(query): Query<PageQuery>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    let user = actor(&state, &headers).await?;
+    let (page, _) = query.bounds().map_err(ApiError)?;
+    let mut items = state
+        .licitaciones
+        .awards(user.id, id, page)
+        .await
+        .map_err(ApiError)?;
+    let has_more = items.len() > 25;
+    items.truncate(25);
+    Ok(Json(
+        serde_json::json!({"items":items,"page":page,"page_size":25,"has_more":has_more}),
+    ))
+}
+
+async fn get_award(
+    State(state): State<ApiState>,
+    headers: axum::http::HeaderMap,
+    Path((id, award)): Path<(u64, u64)>,
+) -> Result<Json<bastion_licitaciones::Award>, ApiError> {
+    let user = actor(&state, &headers).await?;
+    state
+        .licitaciones
+        .award(user.id, id, award)
+        .await
+        .map(Json)
+        .map_err(ApiError)
+}
+
+async fn register_award(
+    State(state): State<ApiState>,
+    headers: axum::http::HeaderMap,
+    Path(id): Path<u64>,
+    Json(input): Json<bastion_licitaciones::AwardInput>,
+) -> Result<Json<bastion_licitaciones::Award>, ApiError> {
+    let user = actor(&state, &headers).await?;
+    state
+        .licitaciones
+        .register_award(
+            user.id,
+            id,
+            expected(&headers)?,
+            single_header(&headers, "idempotency-key")?,
+            input,
+        )
+        .await
+        .map(Json)
+        .map_err(ApiError)
+}
+
+async fn award_invoice_link(
+    State(state): State<ApiState>,
+    headers: axum::http::HeaderMap,
+    Path((id, award)): Path<(u64, u64)>,
+) -> Result<Json<Option<bastion_document_flows::TenderInvoiceResult>>, ApiError> {
+    let user = actor(&state, &headers).await?;
+    bastion_document_flows::ConversionService::new(&state.core)
+        .tender_invoice_link(user.id, id, award)
+        .await
+        .map(Json)
+        .map_err(ApiError)
+}
+
+async fn create_award_invoice(
+    State(state): State<ApiState>,
+    headers: axum::http::HeaderMap,
+    Path((id, award)): Path<(u64, u64)>,
+    Json(input): Json<bastion_facturas::InvoiceInput>,
+) -> Result<Json<bastion_document_flows::TenderInvoiceResult>, ApiError> {
+    let user = actor(&state, &headers).await?;
+    bastion_document_flows::ConversionService::new(&state.core)
+        .tender_invoice(
+            user.id,
+            id,
+            award,
+            expected(&headers)?,
+            single_header(&headers, "idempotency-key")?,
+            input,
+        )
+        .await
+        .map(Json)
+        .map_err(ApiError)
+}
+
+async fn available_award_lot(
+    State(state): State<ApiState>,
+    headers: axum::http::HeaderMap,
+    Path((id, number)): Path<(u64, u32)>,
+) -> Result<Json<bastion_licitaciones::AvailableAwardLot>, ApiError> {
+    let user = actor(&state, &headers).await?;
+    state
+        .licitaciones
+        .available_award_lot(user.id, id, number)
+        .await
+        .map(Json)
+        .map_err(ApiError)
 }

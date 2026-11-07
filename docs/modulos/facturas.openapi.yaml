@@ -299,6 +299,15 @@ components:
         payments: {type: array, maxItems: 200, items: {$ref: '#/components/schemas/StoredPayment'}}
         sar_snapshot: {type: [object, 'null'], readOnly: true, description: Información SAR capturada al emitir}
         company_snapshot: {type: [object, 'null'], readOnly: true, description: Empresa capturada al emitir}
+        source_tender:
+          type: [object, 'null']
+          readOnly: true
+          required: [id, version, name, award_id]
+          properties:
+            id: {type: integer}
+            version: {type: integer}
+            name: {type: string}
+            award_id: {type: integer}
         source_order: {$ref: '#/components/schemas/OrderOrigin'}
         source_quote:
           type: [object, 'null']

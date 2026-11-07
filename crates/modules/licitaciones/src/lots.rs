@@ -35,7 +35,7 @@ pub struct LotSummary {
 }
 
 // Return an exact nonnegative integer at a fixed scale. Never round user input.
-fn scaled(value: &str, scale: u32) -> Result<i128, CoreError> {
+pub(crate) fn scaled(value: &str, scale: u32) -> Result<i128, CoreError> {
     let (whole, fraction) = value.split_once('.').unwrap_or((value, ""));
     if whole.is_empty()
         || whole.len() > 12
@@ -146,7 +146,7 @@ impl LotInput {
         Ok(format!("{}.{:02}", cents / 100, cents % 100))
     }
 }
-fn config(exp: &Expedient, number: u32) -> Result<&str, CoreError> {
+pub(crate) fn config(exp: &Expedient, number: u32) -> Result<&str, CoreError> {
     let get = |key: &str| {
         exp.variables
             .iter()

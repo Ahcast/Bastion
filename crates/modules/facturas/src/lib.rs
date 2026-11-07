@@ -78,8 +78,18 @@ pub struct OrderOrigin {
     pub number: String,
 }
 
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct TenderOrigin {
+    pub id: u64,
+    pub version: u64,
+    pub name: String,
+    pub award_id: u64,
+}
+
 #[derive(Debug, Deserialize, Serialize)]
 pub struct InvoiceDraft {
+    #[serde(default)]
+    pub source_tender: Option<TenderOrigin>,
     #[serde(default)]
     pub payments: Vec<InvoicePayment>,
     #[serde(default)]

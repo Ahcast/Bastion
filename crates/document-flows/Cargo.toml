@@ -4,6 +4,7 @@ version.workspace = true
 edition.workspace = true
 
 [dependencies]
+bastion-licitaciones = { path = "../modules/licitaciones" }
 bastion-core = { path = "../core" }
 bastion-cotizaciones = { path = "../modules/cotizaciones" }
 bastion-facturas = { path = "../modules/facturas" }
@@ -14,6 +15,8 @@ sha2.workspace = true
 sqlx.workspace = true
 
 [dev-dependencies]
+bastion-clientes = { path = "../modules/clientes" }
+bastion-colaboracion = { path = "../modules/colaboracion" }
 base64.workspace = true
 bastion-core = { path = "../core", features = ["test-support"] }
 tokio.workspace = true

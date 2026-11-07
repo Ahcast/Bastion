@@ -72,10 +72,17 @@ function Workspace({ initialId }: { initialId?: number }) {
   </>;
 }
 
-export function InvoiceEditor({ initial, editable, edit, close }: { initial: InvoiceDraft | null; editable: boolean; edit?: () => void; close: () => void }) {
+export function InvoiceEditor({ initial, editable, edit, close, seed, saveDraft }: {
+  initial: InvoiceDraft | null;
+  editable: boolean;
+  edit?: () => void;
+  close: () => void;
+  seed?: InvoiceInput;
+  saveDraft?: (input: InvoiceInput, key: string) => Promise<InvoiceDraft>;
+}) {
   const { api, access, notify } = useCore(), { navigate } = useNavigationGuard();
-  const [saved, setSaved] = useState(initial), [data, setData] = useState<InvoiceInput>(() => initial?.data ?? newInvoice());
-  const [dirty, setDirty] = useState(false), [busy, setBusy] = useState(false), [conflict, setConflict] = useState(false), [error, setError] = useState('');
+  const [saved, setSaved] = useState(initial), [data, setData] = useState<InvoiceInput>(() => initial?.data ?? seed ?? newInvoice());
+  const [dirty, setDirty] = useState(Boolean(seed)), [busy, setBusy] = useState(false), [conflict, setConflict] = useState(false), [error, setError] = useState('');
   const [preview, setPreview] = useState<{ input: InvoiceInput; value: InvoiceCalculation } | null>(null), [calculationError, setCalculationError] = useState('');
   const attempt = useRef<{ body: string; key: string } | null>(null);
   const heading = useRef<HTMLHeadingElement>(null);
@@ -95,7 +102,7 @@ export function InvoiceEditor({ initial, editable, edit, close }: { initial: Inv
   const change = <K extends keyof InvoiceInput>(key: K, value: InvoiceInput[K]) => { setData(previous => ({ ...previous, [key]: value })); setDirty(true); };
   const item = <K extends keyof InvoiceItem>(index: number, key: K, value: InvoiceItem[K]) => change('items', data.items.map((row, i) => i === index ? { ...row, [key]: value } : row));
   return <><Heading title={saved ? saved.invoice_number ?? `Borrador de factura · ${saved.id}` : 'Nueva factura'} description={`Estado: ${saved?.status ?? 'Borrador'} · Moneda: HNL`} action={<div className="actions">{edit && <button onClick={edit}>Editar</button>}<button disabled={busy} onClick={() => void navigate(close)}>Volver</button></div>} />
-    <h2 className="invoice-focus-heading" tabIndex={-1} ref={heading}>{saved?.status === 'Enviado' ? 'Editor de factura enviada' : 'Editor de borrador de factura'}</h2><p className="quote-stage">{stage}</p>{saved?.source_quote && <p className="quote-note">Origen: {saved.source_quote.number ?? ("Cotización " + saved.source_quote.id)} · revisión {saved.source_quote.version}</p>}<Notice>{error}</Notice>{saved?.source_order&&<p className="quote-note">Origen: Orden {saved.source_order.number} · revisión {saved.source_order.version}</p>}
+    <h2 className="invoice-focus-heading" tabIndex={-1} ref={heading}>{saved?.status === 'Enviado' ? 'Editor de factura enviada' : 'Editor de borrador de factura'}</h2><p className="quote-stage">{stage}</p>{saved?.source_quote && <p className="quote-note">Origen: {saved.source_quote.number ?? ("Cotización " + saved.source_quote.id)} · revisión {saved.source_quote.version}</p>}{saved?.source_tender && <p className="quote-note">Origen: {saved.source_tender.name || `Licitación #${saved.source_tender.id}`} · Adjudicación #{saved.source_tender.award_id}</p>}<Notice>{error}</Notice>{saved?.source_order&&<p className="quote-note">Origen: Orden {saved.source_order.number} · revisión {saved.source_order.version}</p>}
     {conflict && <div role="status"><p>Tus cambios se conservan en pantalla. Abre la versión actual para revisarlos antes de guardar.</p><button disabled={busy} onClick={() => void navigate(() => {
       setBusy(true); setError('');
       void api.request<InvoiceDraft>(`/api/v1/facturas/${saved!.id}`).then(latest => { setSaved(latest); setData(latest.data); setDirty(false); setConflict(false); attempt.current = null; }).catch(reason => setError(message(reason))).finally(() => setBusy(false));
@@ -109,7 +116,9 @@ export function InvoiceEditor({ initial, editable, edit, close }: { initial: Inv
         else {
           const body = JSON.stringify(data);
           if (!attempt.current || attempt.current.body !== body) attempt.current = { body, key: crypto.randomUUID() };
-          updated = await api.request<InvoiceDraft>('/api/v1/facturas', { method: 'POST', body: data, idempotencyKey: attempt.current.key });
+          updated = saveDraft
+            ? await saveDraft(data, attempt.current.key)
+            : await api.request<InvoiceDraft>('/api/v1/facturas', { method: 'POST', body: data, idempotencyKey: attempt.current.key });
         }
         setSaved(updated); setData(updated.data); setDirty(false); attempt.current = null; notify(updated.status === 'Borrador' ? 'Borrador de factura guardado.' : 'Factura guardada.');
       } catch (reason) { setError(message(reason)); if (reason instanceof ApiError && reason.status === 412) setConflict(true); }
@@ -122,7 +131,7 @@ export function InvoiceEditor({ initial, editable, edit, close }: { initial: Inv
             change={(name, client) => { setData(previous => ({ ...previous, id_client: client?.id ?? null, client_name: name, client_rtn: client?.rtn ?? '', client_email: client?.email ?? '' })); setDirty(true); }} />
           <label className="quote-order-reference">Referencia de orden<input maxLength={100} value={data.order_number} onChange={e => change('order_number', e.target.value)} /></label>
           <label>Fecha<input type="date" min="1000-01-01" max="9999-12-31" required value={data.invoice_date} onChange={e => change('invoice_date', e.target.value)} /></label>
-          <label>Términos<select name="payment_term_type" value={data.payment_term_type} onChange={e => { const value = e.target.value as InvoiceInput['payment_term_type']; setData(old => ({ ...old, payment_term_type: value, credit_days: value === 'contado' ? 0 : old.credit_days })); setDirty(true); }}><option value="contado">Contado</option><option value="credito">Crédito</option></select></label>
+          <label>Términos<select name="payment_term_type" value={data.payment_term_type} onChange={e => { const value = e.target.value as InvoiceInput['payment_term_type']; setData(old => ({ ...old, payment_term_type: value, credit_days: value === 'contado' ? 0 : old.credit_days })); setDirty(true); }}><option value="contado" disabled={Boolean(saveDraft && !saved)}>Contado</option><option value="credito">Crédito</option></select></label>
           {data.payment_term_type === 'credito' && <label>Días de crédito<input type="number" required min={0} max={3650} value={data.credit_days} onChange={e => change('credit_days', Number(e.target.value))} /></label>}
           <label>Orden de Compra / Exenta No.<input maxLength={150} value={data.purchase_order_exempt_number} onChange={e => change('purchase_order_exempt_number', e.target.value)} /></label>
           <label>Constancia de Registro No.<input maxLength={150} value={data.registration_certificate_number} onChange={e => change('registration_certificate_number', e.target.value)} /></label>
@@ -131,8 +140,8 @@ export function InvoiceEditor({ initial, editable, edit, close }: { initial: Inv
         <p className="quote-note">Al ingresar cualquiera de estos tres números, se exonera el impuesto de todos los ítems.</p>
         {data.payment_term_type === 'contado' && <p className="quote-note" role="status">Contado exige pago total antes de guardar. Registra el pago inicial debajo de los datos de factura.</p>}
       </section>
-      {editable && (!saved || saved.status === 'Borrador') && !(saved?.payments?.length) && <section className="quote-section"><h2>Pago inicial</h2><label><input type="checkbox" checked={Boolean(data.initial_payment)} onChange={event=>change('initial_payment',event.target.checked?newPayment():null)} /> Registrar pago al guardar</label>{data.initial_payment && <InvoicePaymentFields value={data.initial_payment} change={value=>change('initial_payment',value)} />}</section>}
-      <InvoiceItems items={data.items} calculation={calculation} change={item} remove={index => change('items', data.items.filter((_, i) => i !== index))} add={() => change('items', [...data.items, newInvoiceItem()])} />
+      {editable && (!saveDraft || saved) && (!saved || saved.status === 'Borrador') && !(saved?.payments?.length) && <section className="quote-section"><h2>Pago inicial</h2><label><input type="checkbox" checked={Boolean(data.initial_payment)} onChange={event=>change('initial_payment',event.target.checked?newPayment():null)} /> Registrar pago al guardar</label>{data.initial_payment && <InvoicePaymentFields value={data.initial_payment} change={value=>change('initial_payment',value)} />}</section>}
+      <InvoiceItems lockSelection={Boolean(saveDraft && !saved)} items={data.items} calculation={calculation} change={item} remove={index => change('items', data.items.filter((_, i) => i !== index))} add={() => change('items', [...data.items, newInvoiceItem()])} />
       <section className="quote-section" aria-labelledby="invoice-expenses-title"><div className="quote-section-heading"><h2 id="invoice-expenses-title">Gastos</h2><span>{data.expenses.length} / 200</span></div>
         <div className="invoice-expenses">{data.expenses.map((expense, index) => <fieldset className="invoice-expense" key={index}><legend>Gasto {index + 1}</legend><label>Descripción del gasto<input aria-label={`Descripción del gasto ${index + 1}`} maxLength={1000} value={expense.description} onChange={e => change('expenses', data.expenses.map((row, i) => i === index ? { ...row, description: e.target.value } : row))} /></label><Decimal label={`Monto del gasto ${index + 1} (HNL)`} caption="Monto (HNL)" value={expense.amount} change={v => change('expenses', data.expenses.map((row, i) => i === index ? { ...row, amount: v } : row))} /><button type="button" className="quote-remove" aria-label={`Quitar gasto ${index + 1}`} onClick={() => change('expenses', data.expenses.filter((_, i) => i !== index))}>Quitar gasto</button></fieldset>)}</div>
         <button type="button" className="quote-add-item" disabled={data.expenses.length >= 200} onClick={() => change('expenses', [...data.expenses, { description: 'Gasto', amount: '0' }])}><span aria-hidden="true">＋</span> Agregar gasto</button>

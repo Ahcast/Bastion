@@ -184,3 +184,7 @@ La selección por expediente incluye «Declaración de integridad» e «Informac
 ### Estilo JICA
 
 JICA utiliza presentación y lista de precios de importados privadas, independientes de BID y STD. La variable global `destino` define el destino DDP. Cada ítem incluye país de origen, entrega, cantidad decimal, unidad y precio unitario DDP; el precio incluye transporte e ISV. El importe se redondea a dos decimales por renglón y se suman únicamente lotes ofertados. La presentación muestra el total en cifras y letras, bienes = total / 1,15 redondeado a centavos e impuestos = total menos bienes. No se agrega otro impuesto. El tamaño de tabla permanece por lote, con 7 pt iniciales. El cambio entre JICA y otros estilos requiere confirmar el descarte de los ítems existentes, preservando el tamaño de tabla. Los originales privados no se publican en Git.
+
+### Adjudicaciones y borrador revisado
+
+El 2026-11-06 el usuario confirma seleccionar ítems y cantidades adjudicadas, elegir cliente del catálogo y capturar precios e impuestos durante la revisión. El contrato nuevo está en [Adjudicaciones](licitaciones-adjudicaciones.md) y su [OpenAPI](licitaciones-adjudicaciones.openapi.yaml). Sustituye los pendientes de selección y captura de precios del mapeo inicial. Cada adjudicación conserva cantidades e instantánea y puede generar un único borrador, con autorización de ambos dominios y persistencia transaccional. Su estado de despliegue se registra en el documento de despliegue.
