@@ -57,6 +57,7 @@ export default function LicitacionesProcesos() {
 
 function ShortlistCard({ item, reviewState, review }: { item: ShortlistItem; reviewState: string; review: () => void }) {
   const pending = Boolean(reviewState && reviewState !== 'Revisada');
+  const score = item.clasificacion;
   return <article className={`shortlist-card${pending ? ' is-unread' : ''}`}>
     <header><div><span className="shortlist-code">{item.expediente}</span><span className="shortlist-review">{reviewState}</span></div>
       <div className="shortlist-tags">{interestTags(item).map(tag => <span key={tag}>{item.posibles_interes.split(' | ').includes(tag) ? `Posible ${tag}` : tag}</span>)}</div></header>
@@ -66,9 +67,11 @@ function ShortlistCard({ item, reviewState, review }: { item: ShortlistItem; rev
       <div><dt>Lugar de recepción</dt><dd>{item.lugar_recepcion || 'Sin publicar'}</dd></div>
       <div><dt>Recepción de ofertas</dt><dd>{processDate(item.fecha_recepcion)}</dd></div>
       <div><dt>Fuente de financiamiento</dt><dd>{item.fuente || 'Sin publicar'}{item.tipo_fuente && <small>{item.tipo_fuente}</small>}</dd></div>
+      <div><dt>Puntaje comercial</dt><dd>{score ? <>{score.puntaje}/100<small>{score.rubro}</small></> : 'Pendiente'}</dd></div>
     </dl>
     <details><summary>{item.evidencia_interes ? 'Ver coincidencias y datos del proceso' : 'Ver datos del proceso'}</summary>
       {item.evidencia_interes && <p className="shortlist-evidence">{item.evidencia_interes}</p>}
+      {score && <><p>{score.resumen}</p>{score.items.length > 0 && <ol>{score.items.map((line, index) => <li key={index}>{line}</li>)}</ol>}</>}
       <p>{item.modalidad} · {item.tipo_adquisicion} · {item.etapa}</p>
       <p>Ficha consultada el {processDate(item.extraido_en)}.</p>
     </details>

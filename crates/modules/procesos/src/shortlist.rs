@@ -47,6 +47,15 @@ pub struct ShortlistItem {
     pub evidencia_interes: String,
     pub url: String,
     pub extraido_en: DateTime<Utc>,
+    pub clasificacion: Option<ShortlistScore>,
+}
+
+#[derive(Deserialize, Serialize)]
+pub struct ShortlistScore {
+    pub puntaje: u8,
+    pub rubro: String,
+    pub resumen: String,
+    pub items: Vec<String>,
 }
 
 impl TenderShortlist {
@@ -156,6 +165,7 @@ impl ShortlistItem {
             && !self.expediente.trim().is_empty()
             && !self.entidad.trim().is_empty()
             && !self.objeto.trim().is_empty()
+            && self.clasificacion.as_ref().is_none_or(|score| score.puntaje <= 100)
             && ((!self.has_interest() && self.posibles_interes.is_empty())
                 || !self.evidencia_interes.trim().is_empty())
     }
@@ -225,6 +235,20 @@ mod tests {
                 .collect::<Vec<_>>(),
             [0, 1, 2, 3, 4]
         );
+    }
+
+    #[test]
+    fn reads_optional_commercial_score() {
+        let mut data = fixture();
+        let before = "2026-11-06T18:00:00Z".parse().unwrap();
+        let feed = TenderShortlist::parse(data.to_string().as_bytes(), before).unwrap();
+        assert!(feed.items[0].clasificacion.is_none());
+        data["items"][0]["clasificacion"] = json!({"puntaje":0,"rubro":"Obras",
+            "resumen":"Rehabilitación de compuertas.","items":[]});
+        let feed = TenderShortlist::parse(data.to_string().as_bytes(), before).unwrap();
+        assert_eq!(feed.items[0].clasificacion.as_ref().unwrap().puntaje, 0);
+        data["items"][0]["clasificacion"]["puntaje"] = json!(101);
+        assert!(TenderShortlist::parse(data.to_string().as_bytes(), before).is_err());
     }
 
     #[test]

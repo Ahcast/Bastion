@@ -19,6 +19,7 @@ export interface ShortlistItem {
   evidencia_interes: string;
   url: string;
   extraido_en: string;
+  clasificacion?: { puntaje: number; rubro: string; resumen: string; items: string[] } | null;
 }
 export interface TenderShortlist {
   availability: 'available' | 'missing' | 'unreadable' | 'invalid';
