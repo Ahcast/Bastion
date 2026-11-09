@@ -165,7 +165,10 @@ impl ShortlistItem {
             && !self.expediente.trim().is_empty()
             && !self.entidad.trim().is_empty()
             && !self.objeto.trim().is_empty()
-            && self.clasificacion.as_ref().is_none_or(|score| score.puntaje <= 100)
+            && self
+                .clasificacion
+                .as_ref()
+                .is_none_or(|score| score.puntaje <= 100)
             && ((!self.has_interest() && self.posibles_interes.is_empty())
                 || !self.evidencia_interes.trim().is_empty())
     }
