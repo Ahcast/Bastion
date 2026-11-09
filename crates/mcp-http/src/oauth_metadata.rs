@@ -236,12 +236,14 @@ mod tests {
             doc.authorization_server()["authorization_response_iss_parameter_supported"],
             true
         );
+        let resource = doc.protected_resource();
+        let scopes = resource["scopes_supported"].as_array().unwrap();
+        assert_eq!(scopes.len(), 16);
+        assert!(scopes.contains(&json!("procesos:read")));
+        assert!(scopes.contains(&json!("reportes:gastos:read")));
         assert_eq!(
-            doc.protected_resource()["scopes_supported"]
-                .as_array()
-                .unwrap()
-                .len(),
-            8
+            resource["scopes_supported"],
+            doc.authorization_server()["scopes_supported"]
         );
     }
 

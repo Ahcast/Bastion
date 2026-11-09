@@ -7,6 +7,7 @@ use bastion_licitaciones::TenderService;
 use bastion_mcp::{AuthenticatedAccess, Credential};
 use bastion_mcp_core::{DraftReadExecutor, ReadToolError};
 use bastion_ordenes_compra::OrderService;
+use bastion_procesos::ProcessService;
 use serde_json::json;
 use sqlx::mysql::MySqlPoolOptions;
 
@@ -26,6 +27,7 @@ async fn mysql57_read_tools_reuse_domain_authorization_and_validate_arguments() 
     InvoiceService::migrate(&db).await.unwrap();
     OrderService::migrate(&db).await.unwrap();
     TenderService::migrate(&db).await.unwrap();
+    ProcessService::migrate(&db).await.unwrap();
     let core = CoreService::new(
         db.clone(),
         Credential::generate().unwrap().expose(),
@@ -35,12 +37,14 @@ async fn mysql57_read_tools_reuse_domain_authorization_and_validate_arguments() 
     let quotes = QuoteService::new(db.clone(), core.admin());
     let invoices = InvoiceService::new(db.clone(), core.admin());
     let orders = OrderService::new(db.clone(), core.admin());
-    let tenders = TenderService::new(db, core.admin());
+    let tenders = TenderService::new(db.clone(), core.admin());
+    let processes = ProcessService::new(db.clone(), core.admin());
     quotes.synchronize_release(true).await.unwrap();
     invoices.synchronize_release(true).await.unwrap();
     orders.synchronize_release(true).await.unwrap();
     tenders.synchronize_release(true).await.unwrap();
-    sqlx::query("UPDATE module_registry SET enabled=1 WHERE module_id IN ('cotizaciones','facturas','ordenes_compra','licitaciones')").execute(&pool).await.unwrap();
+    processes.synchronize_release(true).await.unwrap();
+    sqlx::query("UPDATE module_registry SET enabled=1 WHERE module_id IN ('cotizaciones','facturas','ordenes_compra','licitaciones','procesos')").execute(&pool).await.unwrap();
     let role = sqlx::query("INSERT INTO roles (name) VALUES ('MCP read fixture role')")
         .execute(&pool)
         .await
@@ -68,7 +72,37 @@ async fn mysql57_read_tools_reuse_domain_authorization_and_validate_arguments() 
             "licitaciones:write".into(),
         ]),
     };
-    let executor = DraftReadExecutor::new(quotes, invoices, orders).with_tenders(tenders);
+    let executor = DraftReadExecutor::new(quotes, invoices, orders)
+        .with_tenders(tenders)
+        .with_additional_reads(db, core.admin());
+    assert_eq!(
+        executor.call(&access, "procesos.listar", json!({})).await,
+        Err(ReadToolError::Denied)
+    );
+    let process_access = AuthenticatedAccess {
+        user_id: access.user_id,
+        client_id: access.client_id,
+        grant_id: access.grant_id,
+        scopes: BTreeSet::from(["procesos:read".into()]),
+    };
+    assert_eq!(
+        executor
+            .call(&process_access, "procesos.listar", json!({}))
+            .await,
+        Err(ReadToolError::Denied)
+    );
+    sqlx::query("INSERT INTO role_permissions (role_id,module_id,scope_key,scope_hash,capability) VALUES (?,'procesos','consulta',UNHEX(SHA2('consulta',256)),'ver')").bind(role).execute(&pool).await.unwrap();
+    let processes_page = executor
+        .call(&process_access, "procesos.listar", json!({"page_size":5}))
+        .await
+        .unwrap();
+    assert_eq!(processes_page["page_size"], 5);
+    assert_eq!(
+        executor
+            .call(&process_access, "procesos.consultar", json!({"id":1}))
+            .await,
+        Err(ReadToolError::Invalid)
+    );
     let page = executor
         .call(&access, "cotizaciones.listar", json!({"page_size":5}))
         .await

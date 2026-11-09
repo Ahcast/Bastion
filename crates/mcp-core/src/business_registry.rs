@@ -5,27 +5,61 @@ use serde_json::json;
 
 use crate::PermissionRequirement;
 
+const READ_MODULES: [(&str, &str, &str); 9] = [
+    ("cotizaciones", "cotizaciones", "documentos"),
+    ("facturas", "facturas", "documentos"),
+    ("ordenes_compra", "órdenes de compra", "documentos"),
+    ("licitaciones", "licitaciones", "expedientes"),
+    ("procesos", "procesos vigentes", "consulta"),
+    ("clientes", "clientes", "catalogo"),
+    ("proveedores", "proveedores", "catalogo"),
+    ("gastos", "gastos", "registros"),
+    (
+        "colaboracion",
+        "archivos de empresa (solo metadatos)",
+        "empresa",
+    ),
+];
+
+pub(crate) const REPORTS: [(&str, &str, &str); 3] = [
+    ("ordenes", "ordenes_compra", "documentos"),
+    ("facturas", "facturas", "documentos"),
+    ("gastos", "gastos", "registros"),
+];
+
 /// User-approved read-only modules. A scope does not grant permissions: the
 /// Core still checks the user's current `documentos/ver` permission, module
 /// status and grant on every invocation.
 pub fn approved_read_requirements() -> BTreeMap<String, Vec<PermissionRequirement>> {
-    ["cotizaciones", "facturas", "ordenes_compra", "licitaciones"]
+    READ_MODULES
         .into_iter()
-        .map(|module| {
+        .map(|(module, _, scope_key)| {
             (
                 format!("{module}:read"),
                 vec![PermissionRequirement {
                     module_id: module.into(),
-                    scope_key: if module == "licitaciones" {
-                        "expedientes"
-                    } else {
-                        "documentos"
-                    }
-                    .into(),
+                    scope_key: scope_key.into(),
                     capability: "ver".into(),
                 }],
             )
         })
+        .chain(REPORTS.map(|(report, module, scope_key)| {
+            (
+                format!("reportes:{report}:read"),
+                vec![
+                    PermissionRequirement {
+                        module_id: "reportes".into(),
+                        scope_key: report.into(),
+                        capability: "ver".into(),
+                    },
+                    PermissionRequirement {
+                        module_id: module.into(),
+                        scope_key: scope_key.into(),
+                        capability: "ver".into(),
+                    },
+                ],
+            )
+        }))
         .chain(
             ["cotizaciones", "facturas", "ordenes_compra", "licitaciones"]
                 .into_iter()
@@ -54,14 +88,8 @@ pub fn approved_read_requirements() -> BTreeMap<String, Vec<PermissionRequiremen
 /// Descriptors only. Do not add these to a live router until typed dispatch,
 /// per-object authorization, quotas, output limits and auditing are wired.
 pub fn draft_read_tool_registry() -> Result<ToolRegistry, RegistryError> {
-    let modules = [
-        ("cotizaciones", "cotizaciones"),
-        ("facturas", "facturas"),
-        ("ordenes_compra", "órdenes de compra"),
-        ("licitaciones", "licitaciones"),
-    ];
     let mut tools = Vec::new();
-    for (module, label) in modules {
+    for (module, label, _) in READ_MODULES {
         let scope = format!("{module}:read");
         tools.push(ToolDescriptor {
             name: format!("{module}.listar"), module_id:module.into(),
@@ -70,12 +98,40 @@ pub fn draft_read_tool_registry() -> Result<ToolRegistry, RegistryError> {
             input_schema:if module == "licitaciones" { json!({"type":"object","properties":{"page":{"type":"integer","minimum":1,"maximum":10000},"page_size":{"type":"integer","minimum":1,"maximum":25}},"additionalProperties":false}) } else { json!({"type":"object","properties":{"search":{"type":"string","maxLength":200},"page":{"type":"integer","minimum":1,"maximum":10000},"page_size":{"type":"integer","minimum":1,"maximum":25}},"additionalProperties":false}) },
             output_schema:None,risk:ToolRisk::ReadOnly,idempotent:true,max_response_bytes:262144,max_duration_ms:10000,
         });
+        if module == "colaboracion" {
+            continue;
+        }
+        let id = if module == "procesos" {
+            json!({"type":"string","minLength":67,"maxLength":67})
+        } else {
+            json!({"type":"integer","minimum":1,"maximum":9007199254740991_u64})
+        };
         tools.push(ToolDescriptor {
             name:format!("{module}.consultar"),module_id:module.into(),
             description:format!("Consultar una de las {label} por su identificador, sujeto a los permisos del usuario."),
             required_scope:scope,
-            input_schema:json!({"type":"object","properties":{"id":{"type":"integer","minimum":1,"maximum":9007199254740991_u64}},"required":["id"],"additionalProperties":false}),
+            input_schema:json!({"type":"object","properties":{"id":id},"required":["id"],"additionalProperties":false}),
             output_schema:None,risk:ToolRisk::ReadOnly,idempotent:true,max_response_bytes:262144,max_duration_ms:10000,
+        });
+    }
+    for (report, _, _) in REPORTS {
+        tools.push(ToolDescriptor {
+            name: format!("reportes.{report}"),
+            module_id: "reportes".into(),
+            description: format!("Consultar el reporte paginado de {report} por rango de fechas."),
+            required_scope: format!("reportes:{report}:read"),
+            input_schema: json!({"type":"object","properties":{
+                "date_from":{"type":"string","format":"date"},
+                "date_to":{"type":"string","format":"date"},
+                "search":{"type":"string","maxLength":200},
+                "page":{"type":"integer","minimum":1,"maximum":10000},
+                "page_size":{"type":"integer","minimum":1,"maximum":25}
+            },"required":["date_from","date_to"],"additionalProperties":false}),
+            output_schema: None,
+            risk: ToolRisk::ReadOnly,
+            idempotent: true,
+            max_response_bytes: 262144,
+            max_duration_ms: 10000,
         });
     }
     for (operation, description, schema) in [
@@ -226,14 +282,13 @@ mod tests {
     #[test]
     fn exposes_only_approved_read_tools_for_active_modules_and_scopes() {
         let requirements = approved_read_requirements();
-        assert_eq!(requirements.len(), 8);
-        assert!(requirements.values().flatten().all(|r| matches!(
-            r.scope_key.as_str(),
-            "documentos" | "expedientes"
-        ) && matches!(
-            r.capability.as_str(),
-            "ver" | "editar"
-        )));
+        assert_eq!(requirements.len(), 16);
+        let process = &requirements["procesos:read"][0];
+        assert_eq!(process.scope_key, "consulta");
+        assert_eq!(process.capability, "ver");
+        let report = &requirements["reportes:gastos:read"];
+        assert_eq!(report[0].module_id, "reportes");
+        assert_eq!(report[1].module_id, "gastos");
         let registry = draft_read_tool_registry().unwrap();
         let user = AuthenticatedAccess {
             user_id: 1,

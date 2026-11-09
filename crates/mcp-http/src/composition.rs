@@ -100,7 +100,8 @@ pub fn compose_draft_router<F: ClientMetadataSource>(
             InvoiceService::new(db.clone(), admin.clone()),
             OrderService::new(db.clone(), admin.clone()),
         )
-        .with_tenders(TenderService::new(db, admin)),
+        .with_tenders(TenderService::new(db.clone(), admin.clone()))
+        .with_additional_reads(db, admin),
     );
     let mcp = DraftMcpState::new(
         pool.clone(),

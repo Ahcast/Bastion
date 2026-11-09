@@ -23,6 +23,10 @@ flowchart LR
 
 ## Registro de herramienta
 
+El catálogo incorpora consultas de Procesos vigentes, Clientes, Proveedores y Gastos con listado paginado, búsqueda y detalle por identificador. Colaboración ofrece un listado de metadatos de archivos activos de empresa, sujeto a `colaboracion/empresa/ver`. Los reportes de órdenes, facturas y gastos se consultan por rango de fechas y página. Cada reporte requiere su alcance OAuth, el permiso de Reportes y el permiso de lectura del módulo de origen.
+
+Los alcances nuevos se solicitan en Ajustes. El administrador aprueba el máximo por cliente y cada usuario consiente la ampliación de su conexión. Las herramientas de Licitaciones, Cotizaciones, Facturas y Órdenes de compra conservan sus alcances existentes.
+
 Cada herramienta declara nombre estable y módulo propietario, propósito, esquema de argumentos tipado, salida, permiso requerido, alcance de datos, nivel de riesgo, idempotencia y límites. Las herramientas describen claramente si consultan o cambian datos.
 
 ## Seguridad

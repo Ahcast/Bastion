@@ -9,6 +9,10 @@ use bastion_ordenes_compra::{OrderFilter, OrderInput, OrderService, ProductStatu
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
+#[path = "additional_reads.rs"]
+mod additional_reads;
+use additional_reads::AdditionalReads;
+
 const MAX_RESPONSE_BYTES: usize = 262_144;
 const MAX_SAFE_ID: u64 = 9_007_199_254_740_991;
 
@@ -29,6 +33,23 @@ struct ListArguments {
     search: Option<String>,
     page: Option<u32>,
     page_size: Option<u32>,
+}
+
+impl ListArguments {
+    fn bounds(&self) -> Result<(u32, u32), ReadToolError> {
+        let page = self.page.unwrap_or(1);
+        let size = self.page_size.unwrap_or(25);
+        if !(1..=10000).contains(&page)
+            || !(1..=25).contains(&size)
+            || self
+                .search
+                .as_ref()
+                .is_some_and(|s| s.chars().count() > 200)
+        {
+            return Err(ReadToolError::Invalid);
+        }
+        Ok((page, size))
+    }
 }
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -93,6 +114,7 @@ pub struct DraftReadExecutor {
     invoices: InvoiceService,
     orders: OrderService,
     tenders: Option<TenderService>,
+    additional: Option<AdditionalReads>,
 }
 
 impl DraftReadExecutor {
@@ -102,6 +124,7 @@ impl DraftReadExecutor {
             invoices,
             orders,
             tenders: None,
+            additional: None,
         }
     }
 
@@ -117,6 +140,14 @@ impl DraftReadExecutor {
         arguments: Value,
     ) -> Result<Value, ReadToolError> {
         let (module, operation) = tool.split_once('.').ok_or(ReadToolError::Invalid)?;
+        if matches!(
+            module,
+            "procesos" | "clientes" | "proveedores" | "gastos" | "colaboracion" | "reportes"
+        ) {
+            return self
+                .call_additional(access, module, operation, arguments)
+                .await;
+        }
         if !matches!(
             module,
             "cotizaciones" | "facturas" | "ordenes_compra" | "licitaciones"
@@ -191,17 +222,7 @@ impl DraftReadExecutor {
         if operation == "listar" {
             let args: ListArguments =
                 serde_json::from_value(arguments).map_err(|_| ReadToolError::Invalid)?;
-            let page = args.page.unwrap_or(1);
-            let size = args.page_size.unwrap_or(25);
-            if !(1..=10000).contains(&page)
-                || !(1..=25).contains(&size)
-                || args
-                    .search
-                    .as_ref()
-                    .is_some_and(|s| s.chars().count() > 200)
-            {
-                return Err(ReadToolError::Invalid);
-            }
+            let (page, size) = args.bounds()?;
             match module {
                 "cotizaciones" => {
                     self.quotes

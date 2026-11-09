@@ -4,12 +4,19 @@ version.workspace = true
 edition.workspace = true
 
 [dependencies]
+bastion-clientes = { path = "../modules/clientes" }
+bastion-colaboracion = { path = "../modules/colaboracion" }
 bastion-core = { path = "../core" }
 bastion-mcp = { path = "../mcp" }
 bastion-cotizaciones = { path = "../modules/cotizaciones" }
 bastion-facturas = { path = "../modules/facturas" }
+bastion-gastos = { path = "../modules/gastos" }
 bastion-licitaciones = { path = "../modules/licitaciones" }
 bastion-ordenes-compra = { path = "../modules/ordenes_compra" }
+bastion-procesos = { path = "../modules/procesos" }
+bastion-proveedores = { path = "../modules/proveedores" }
+bastion-reportes = { path = "../modules/reportes" }
+chrono.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 sqlx.workspace = true

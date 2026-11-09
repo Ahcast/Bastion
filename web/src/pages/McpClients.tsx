@@ -2,21 +2,29 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { ApiClient, message } from '../api.js';
 import { Notice } from '../ui.js';
 
-type Scope = 'cotizaciones:read' | 'facturas:read' | 'ordenes_compra:read' | 'licitaciones:read' | 'cotizaciones:write' | 'facturas:write' | 'ordenes_compra:write' | 'licitaciones:write';
 type Entry = { id: number; client_name: string; client_id: string; scopes: string[]; approved_scopes?: string[] | null; status: string };
 type Page = { items: Entry[]; next_before: number | null };
 type Managed = { id: number; client_id: string; client_name: string; scopes: string[] };
 type ManagedPage = { items: Managed[]; next_before: number | null };
-const options: { scope: Scope; label: string }[] = [
+const options = [
   { scope: 'cotizaciones:read', label: 'Consultar cotizaciones' },
   { scope: 'facturas:read', label: 'Consultar facturas' },
   { scope: 'ordenes_compra:read', label: 'Consultar órdenes de compra' },
   { scope: 'licitaciones:read', label: 'Consultar licitaciones' },
+  { scope: 'procesos:read', label: 'Consultar procesos vigentes' },
+  { scope: 'clientes:read', label: 'Consultar clientes' },
+  { scope: 'proveedores:read', label: 'Consultar proveedores' },
+  { scope: 'gastos:read', label: 'Consultar gastos' },
+  { scope: 'colaboracion:read', label: 'Consultar metadatos de archivos de empresa' },
+  { scope: 'reportes:ordenes:read', label: 'Consultar reportes de órdenes de compra' },
+  { scope: 'reportes:facturas:read', label: 'Consultar reportes de facturas' },
+  { scope: 'reportes:gastos:read', label: 'Consultar reportes de gastos' },
   { scope: 'cotizaciones:write', label: 'Crear y editar cotizaciones en borrador' },
   { scope: 'facturas:write', label: 'Crear y editar facturas en borrador' },
   { scope: 'ordenes_compra:write', label: 'Crear y editar órdenes pendientes sin compras ni entregas' },
   { scope: 'licitaciones:write', label: 'Crear y editar licitaciones en borrador' },
-];
+] as const;
+type Scope = (typeof options)[number]['scope'];
 function label(scope: string) { return options.find(option => option.scope === scope)?.label ?? scope; }
 function validClientId(value: string) {
   try { const url = new URL(value); return url.protocol === 'https:' && !!url.hostname && !url.username && !url.password && !url.hash && url.pathname !== '/'; }
