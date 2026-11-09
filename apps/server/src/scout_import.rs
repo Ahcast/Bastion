@@ -11,29 +11,39 @@ pub struct ScoutImportConfig {
 }
 
 pub struct TenderAlertConfig {
-    recipient_id: u64,
+    sender_id: u64,
+    recipient_email: String,
     since: DateTime<Utc>,
 }
 
 impl TenderAlertConfig {
     pub fn from_env() -> std::io::Result<Option<Self>> {
-        let recipient = std::env::var("BASTION_TENDER_ALERT_RECIPIENT_USER_ID").unwrap_or_default();
+        let sender = std::env::var("BASTION_TENDER_ALERT_SENDER_USER_ID").unwrap_or_default();
+        let recipient_email =
+            std::env::var("BASTION_TENDER_ALERT_RECIPIENT_EMAIL").unwrap_or_default();
         let since = std::env::var("BASTION_TENDER_ALERT_SINCE").unwrap_or_default();
-        if recipient.is_empty() && since.is_empty() {
+        if sender.is_empty() && recipient_email.is_empty() && since.is_empty() {
             return Ok(None);
         }
-        let recipient_id = recipient
+        let sender_id = sender
             .parse::<u64>()
             .ok()
             .filter(|id| *id > 0)
             .ok_or_else(|| {
-                std::io::Error::other("BASTION_TENDER_ALERT_RECIPIENT_USER_ID must be a user ID")
+                std::io::Error::other("BASTION_TENDER_ALERT_SENDER_USER_ID must be a user ID")
+            })?;
+        let recipient_email =
+            CoreService::tender_alert_recipient(&recipient_email).map_err(|_| {
+                std::io::Error::other(
+                    "BASTION_TENDER_ALERT_RECIPIENT_EMAIL must be an email address",
+                )
             })?;
         let since = since
             .parse()
             .map_err(|_| std::io::Error::other("BASTION_TENDER_ALERT_SINCE must be RFC3339"))?;
         Ok(Some(Self {
-            recipient_id,
+            sender_id,
+            recipient_email,
             since,
         }))
     }
@@ -63,7 +73,13 @@ pub async fn run_tender_alerts(
                 return Err("feed_unavailable");
             }
             service
-                .queue_tender_alerts(&core, config.recipient_id, config.since, &feed)
+                .queue_tender_alerts(
+                    &core,
+                    config.sender_id,
+                    &config.recipient_email,
+                    config.since,
+                    &feed,
+                )
                 .await
                 .map_err(|_| "enqueue_failed")
         })

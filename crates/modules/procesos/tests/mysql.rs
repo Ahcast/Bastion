@@ -173,30 +173,31 @@ async fn verify_tender_alerts(
         scan_status: Some("parcial".into()),
         items: vec![item, possible],
     };
+    let recipient = "alerts@example.test";
     assert!(matches!(
-        service.queue_tender_alerts(core, 2, since, &feed).await,
+        service
+            .queue_tender_alerts(core, 1, recipient, since, &feed)
+            .await,
         Err(CoreError::Invalid)
     ));
     sqlx::query("INSERT INTO user_smtp_credentials (user_id,smtp_email,password_ciphertext) VALUES (1,'sender@example.test',X'01')")
         .execute(pool).await.unwrap();
-    core.admin()
-        .set_core_setting(1, "smtp.designated_admin_user_id", serde_json::json!(1))
-        .await
-        .unwrap();
     assert!(matches!(
-        service.queue_tender_alerts(core, 3, since, &feed).await,
+        service
+            .queue_tender_alerts(core, 3, recipient, since, &feed)
+            .await,
         Err(CoreError::Forbidden)
     ));
     assert_eq!(
         service
-            .queue_tender_alerts(core, 2, now, &feed)
+            .queue_tender_alerts(core, 1, recipient, now, &feed)
             .await
             .unwrap(),
         0
     );
     let (first, repeated) = tokio::join!(
-        service.queue_tender_alerts(core, 2, since, &feed),
-        service.queue_tender_alerts(core, 2, since, &feed)
+        service.queue_tender_alerts(core, 1, recipient, since, &feed),
+        service.queue_tender_alerts(core, 1, " ALERTS@example.test ", since, &feed)
     );
     assert_eq!(first.unwrap() + repeated.unwrap(), 1);
     feed.items[0].version = "f".repeat(64);
@@ -204,7 +205,7 @@ async fn verify_tender_alerts(
     feed.items[0].url.push_str("&renovado=1");
     assert_eq!(
         service
-            .queue_tender_alerts(core, 2, since, &feed)
+            .queue_tender_alerts(core, 1, recipient, since, &feed)
             .await
             .unwrap(),
         0
@@ -215,7 +216,7 @@ async fn verify_tender_alerts(
         mail,
         (
             1,
-            "admin2@example.test".into(),
+            recipient.into(),
             "pending".into(),
             "Nueva licitación BID | UCP · LPN-1".into()
         )

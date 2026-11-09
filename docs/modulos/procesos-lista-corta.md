@@ -36,10 +36,10 @@ El contrato HTTP está en `procesos.openapi.yaml`.
 El trabajador del servidor consulta la entrega cada minuto, incluso con Bastion
 cerrado. Solo encola coincidencias explícitas JICA, BID o UCP, vigentes y detectadas
 desde la fecha de activación. Los posibles JICA quedan visibles para revisar. Se
-registra un correo por identidad de licitación y cuenta destinataria en la misma
+registra un correo por identidad de licitación y dirección destinataria en la misma
 transacción que la bandeja de salida cifrada. Las relecturas, cambios de versión y
-reinicios reutilizan ese registro. El destinatario debe ser una cuenta activa con
-`procesos/consulta/ver`. Los fallos de entrega se gestionan desde la bandeja de
+reinicios reutilizan ese registro. El remitente debe ser un administrador activo con
+SMTP y `procesos/consulta/ver`. Los fallos de entrega se gestionan desde la bandeja de
 correo de Bastion.
 
 Para la instalación, publicar Scout y Bastion, verificar CI, respaldar las versiones
@@ -53,11 +53,12 @@ Los ejemplos systemd del repositorio Scout proponen un recorrido por hora con un
 presupuesto de 45 minutos. El temporizador se instala explícitamente en AWS.
 
 Tras publicar la primera extracción, configurar en el backend
-`BASTION_TENDER_ALERT_RECIPIENT_USER_ID` con el ID de la cuenta de destino y
+`BASTION_TENDER_ALERT_SENDER_USER_ID` con el ID del administrador remitente,
+`BASTION_TENDER_ALERT_RECIPIENT_EMAIL` con la dirección confirmada y
 `BASTION_TENDER_ALERT_SINCE` con la fecha y hora de activación RFC3339. Así la lista
-inicial queda visible y los correos empiezan con nuevas detecciones. El remitente usa
-la cuenta SMTP de `smtp.designated_admin_user_id` y la configuración SMTP global
-existente. Dejar las dos variables vacías mantiene los correos desactivados.
+inicial queda visible y los correos empiezan con nuevas detecciones. El trabajador usa
+la cuenta SMTP del administrador remitente y la configuración SMTP global existente.
+Dejar las tres variables vacías mantiene los correos desactivados.
 
 La comprobación local usa las fichas reales obtenidas en la prueba anterior y cubre
 versiones estables, cambios, conservación parcial, enlaces, vencimiento, permisos,

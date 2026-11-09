@@ -13,7 +13,8 @@ impl ProcessService {
     pub async fn queue_tender_alerts(
         &self,
         core: &CoreService,
-        recipient_id: u64,
+        sender_id: u64,
+        recipient_email: &str,
         since: DateTime<Utc>,
         snapshot: &TenderShortlist,
     ) -> Result<usize, CoreError> {
@@ -35,11 +36,13 @@ impl ProcessService {
             return Ok(0);
         }
         // The module lock serializes with other workers and administrative disable.
-        let mut tx = self.begin(recipient_id, "consulta", "ver").await?;
+        let recipient = CoreService::tender_alert_recipient(recipient_email)?;
+        let recipient_key = hex::encode(Sha256::digest(recipient.as_bytes()));
+        let mut tx = self.begin(sender_id, "consulta", "ver").await?;
         let mut query = QueryBuilder::<MySql>::new(
-            "SELECT tender_id FROM procesos_tender_alerts WHERE recipient_user_id=",
+            "SELECT tender_id FROM procesos_tender_alerts WHERE recipient_key=",
         );
-        query.push_bind(recipient_id).push(" AND tender_id IN (");
+        query.push_bind(&recipient_key).push(" AND tender_id IN (");
         let mut identifiers = query.separated(",");
         for (id, _) in &candidates {
             identifiers.push_bind(id);
@@ -59,17 +62,17 @@ impl ProcessService {
         {
             let (subject, body) = alert_message(item);
             let mail = core
-                .enqueue_tender_alert(&mut tx, recipient_id, &subject, &body)
+                .enqueue_tender_alert(&mut tx, sender_id, &recipient, &subject, &body)
                 .await?;
-            sqlx::query("INSERT INTO procesos_tender_alerts (recipient_user_id,tender_id,mail_outbox_id) VALUES (?,?,?)")
-                .bind(recipient_id).bind(&id).bind(mail).execute(&mut *tx).await?;
+            sqlx::query("INSERT INTO procesos_tender_alerts (recipient_key,tender_id,mail_outbox_id) VALUES (?,?,?)")
+                .bind(&recipient_key).bind(&id).bind(mail).execute(&mut *tx).await?;
             CoreAdmin::record_actor_event(
                 &mut tx,
                 DomainActor::LocalScout,
                 "procesos",
                 "tender.alert_queued",
                 &item.id,
-                serde_json::json!({"recipient_user_id": recipient_id, "mail_outbox_id": mail}),
+                serde_json::json!({"sender_user_id": sender_id, "mail_outbox_id": mail}),
             )
             .await?;
             count += 1;
