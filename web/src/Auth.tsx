@@ -28,8 +28,8 @@ export default function Auth({ api, initial, initialMessage = '', authenticated 
       content = <><Form key={flow.kind} fields={[flow.kind === 'totp' ? code : { name: 'code', label: 'Código de recuperación', required: true, autocomplete: 'one-time-code' }]} submit="Verificar" onSubmit={async values => { await api.request(flow.kind === 'totp' ? '/api/v1/auth/totp' : '/api/v1/auth/recovery-code', { method: 'POST', body: values }); await authenticated(); }} /><div className="auth-links"><button className="text-button" onClick={() => change({ kind: flow.kind === 'totp' ? 'recovery' : 'totp' })}>{flow.kind === 'totp' ? 'Usar código de recuperación' : 'Usar TOTP'}</button><span>Vence en 5 minutos</span></div>{back}</>;
       break;
     case 'reset':
-      title = 'Restablecer contraseña'; description = 'Si la cuenta existe, enviaremos instrucciones.';
-      content = <><Form fields={[email]} submit="Enviar enlace" onSubmit={async values => { await api.request('/api/v1/auth/password-reset', { method: 'POST', body: values }); setNotice('Si la cuenta está activa, recibirás instrucciones.'); }} />{back}</>;
+      title = 'Restablecer contraseña'; description = 'Solicita un enlace para restablecer la contraseña o terminar de activar tu cuenta.';
+      content = <><Form fields={[email]} submit="Enviar enlace" onSubmit={async values => { await api.request('/api/v1/auth/password-reset', { method: 'POST', body: values }); setNotice('Si podemos enviar instrucciones a ese correo, recibirás un enlace para continuar.'); }} />{back}</>;
       break;
     case 'bootstrap':
       title = 'Primera configuración'; description = 'El asistente se desactiva al crear el primer Administrador.';

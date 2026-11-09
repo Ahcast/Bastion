@@ -1036,23 +1036,30 @@ impl CoreService {
         user_id: u64,
     ) -> Result<(), CoreError> {
         self.require_system_administrator(administrator_id).await?;
-        let user =
-            sqlx::query_as::<_, (String, String)>("SELECT email,status FROM users WHERE id=?")
-                .bind(user_id)
-                .fetch_optional(&self.database.pool)
-                .await?
-                .ok_or(CoreError::Invalid)?;
-        if !matches!(user.1.as_str(), "invitation_pending" | "totp_setup_pending") {
+        let mut tx = self.database.pool.begin().await?;
+        let (email, status) = sqlx::query_as::<_, (String, String)>(
+            "SELECT email,status FROM users WHERE id=? FOR UPDATE",
+        )
+        .bind(user_id)
+        .fetch_optional(&mut *tx)
+        .await?
+        .ok_or(CoreError::Invalid)?;
+        if !matches!(status.as_str(), "invitation_pending" | "totp_setup_pending") {
             return Err(CoreError::Conflict);
         }
-        if user.1 == "totp_setup_pending" {
-            let mut tx = self.database.pool.begin().await?;
-            let now = Utc::now().naive_utc();
-            sqlx::query("UPDATE totp_enrollment_tokens SET consumed_at=? WHERE user_id=? AND consumed_at IS NULL").bind(now).bind(user_id).execute(&mut *tx).await?;
-            sqlx::query("UPDATE users SET status='invitation_pending',password_hash=NULL,totp_secret_enc=NULL,totp_enabled=0 WHERE id=?").bind(user_id).execute(&mut *tx).await?;
-            tx.commit().await?;
+        let now = Utc::now().naive_utc();
+        if status == "totp_setup_pending" {
+            sqlx::query("UPDATE totp_enrollment_tokens SET consumed_at=? WHERE user_id=? AND consumed_at IS NULL")
+                .bind(now).bind(user_id).execute(&mut *tx).await?;
+            sqlx::query("UPDATE users SET status='invitation_pending',password_hash=NULL,totp_secret_enc=NULL,totp_enabled=0 WHERE id=?")
+                .bind(user_id).execute(&mut *tx).await?;
         }
-        self.enqueue_account_email(administrator_id,user_id,"invitation",None,&user.0,"Activa tu cuenta de Bastion","Se creó una cuenta para ti. Actívala y configura tu autenticador TOTP desde el siguiente enlace. El enlace vence 24 horas después de su envío.").await
+        Self::supersede_account_links(&mut tx, user_id, "invitation", now).await?;
+        self.queue_account_email(&mut tx, administrator_id, user_id, "invitation", None, &email,
+            "Activa tu cuenta de Bastion",
+            "Se creó una cuenta para ti. Actívala y configura tu autenticador TOTP desde el siguiente enlace. El enlace vence 24 horas después de su envío.", now).await?;
+        tx.commit().await?;
+        Ok(())
     }
 
     pub async fn request_password_reset(&self, email: &str, ip: &str) -> Result<(), CoreError> {
@@ -1066,20 +1073,42 @@ impl CoreService {
         if requests >= 5 {
             return Ok(());
         }
-        let user = sqlx::query_as::<_, (u64, Option<u64>)>(
-            "SELECT id,created_by FROM users WHERE email=? AND status='active'",
+        let user = sqlx::query_as::<_, (u64, Option<u64>, String)>(
+            "SELECT id,created_by,status FROM users WHERE email=? AND status IN ('active','invitation_pending','totp_setup_pending')",
         )
-        .bind(email)
+        .bind(&email)
         .fetch_optional(&self.database.pool)
         .await?;
-        let Some((user_id, Some(sender_id))) = user else {
+        let Some((user_id, Some(sender_id), status)) = user else {
             return Ok(());
         };
-        let address: String = sqlx::query_scalar("SELECT email FROM users WHERE id=?")
-            .bind(user_id)
-            .fetch_one(&self.database.pool)
-            .await?;
-        self.enqueue_account_email(sender_id,user_id,"password_reset",None,&address,"Restablece tu contraseña de Bastion","Recibimos una solicitud para cambiar la contraseña de tu cuenta. Si la hiciste, continúa desde este enlace. Vence una hora después de su envío. Si no solicitaste el cambio, ignora este mensaje.").await?;
+        if status == "active" {
+            let address: String = sqlx::query_scalar("SELECT email FROM users WHERE id=?")
+                .bind(user_id)
+                .fetch_one(&self.database.pool)
+                .await?;
+            self.enqueue_account_email(sender_id,user_id,"password_reset",None,&address,"Restablece tu contraseña de Bastion","Recibimos una solicitud para cambiar la contraseña de tu cuenta. Si la hiciste, continúa desde este enlace. Vence una hora después de su envío. Si no solicitaste el cambio, ignora este mensaje.").await?;
+            return Ok(());
+        }
+
+        let mut tx = self.database.pool.begin().await?;
+        let address: Option<String> = sqlx::query_scalar("SELECT email FROM users WHERE id=? AND email=? AND status IN ('invitation_pending','totp_setup_pending') FOR UPDATE")
+            .bind(user_id).bind(&email).fetch_optional(&mut *tx).await?;
+        let Some(address) = address else {
+            return Ok(());
+        };
+        let recent: bool = sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM security_events WHERE user_id=? AND event_type='activation_link_request' AND created_at>?)")
+            .bind(user_id).bind(now - chrono::Duration::minutes(1)).fetch_one(&mut *tx).await?;
+        if recent {
+            return Ok(());
+        }
+        // The existing setup and delivered links remain valid until one link is used.
+        self.queue_account_email(&mut tx, sender_id, user_id, "invitation", None, &address,
+            "Continúa la activación de tu cuenta de Bastion",
+            "Usa este enlace para definir tu contraseña y completar el autenticador TOTP. Vence 24 horas después de su envío. Si no lo solicitaste, ignora este mensaje.", now).await?;
+        sqlx::query("INSERT INTO security_events (user_id,event_type,result,ip_address,device_label,created_at) VALUES (?,'activation_link_request','success',?,'',?)")
+            .bind(user_id).bind(ip).bind(now).execute(&mut *tx).await?;
+        tx.commit().await?;
         Ok(())
     }
 
@@ -1160,12 +1189,27 @@ impl CoreService {
         let expires_at = now + chrono::Duration::minutes(10);
         let mut tx = self.database.pool.begin().await?;
         let invitation_hash = token_hash(invitation_token).to_vec();
-        let row=sqlx::query_as::<_,(u64,String)>("SELECT t.id,u.email FROM account_tokens t JOIN users u ON u.id=t.user_id WHERE t.token_hash=? AND t.token_type='invitation' AND t.mailed_at IS NOT NULL AND t.expires_at>? AND t.consumed_at IS NULL AND u.status='invitation_pending' FOR UPDATE")
-            .bind(&invitation_hash).bind(now).fetch_optional(&mut *tx).await?;
+        let candidate: Option<u64> = sqlx::query_scalar(
+            "SELECT user_id FROM account_tokens WHERE token_hash=? AND token_type='invitation'",
+        )
+        .bind(&invitation_hash)
+        .fetch_optional(&mut *tx)
+        .await?;
+        let row = if let Some(user_id) = candidate {
+            let email: Option<String> = sqlx::query_scalar("SELECT email FROM users WHERE id=? AND status IN ('invitation_pending','totp_setup_pending') FOR UPDATE")
+                .bind(user_id).fetch_optional(&mut *tx).await?;
+            let eligible: Option<u64> = sqlx::query_scalar("SELECT id FROM account_tokens WHERE user_id=? AND token_hash=? AND token_type='invitation' AND mailed_at IS NOT NULL AND expires_at>? AND consumed_at IS NULL FOR UPDATE")
+                .bind(user_id).bind(&invitation_hash).bind(now).fetch_optional(&mut *tx).await?;
+            email
+                .filter(|_| eligible.is_some())
+                .map(|email| (user_id, email))
+        } else {
+            None
+        };
         let Some(row) = row else {
             // Restricted diagnostics only: never log the link, token/hash, password,
             // email, or account identifier. Keep the public failure indistinguishable.
-            let reason: Option<String> = sqlx::query_scalar("SELECT CASE WHEN t.consumed_at IS NOT NULL THEN 'consumed_or_replaced' WHEN t.mailed_at IS NULL THEN 'not_mailed' WHEN t.expires_at IS NULL OR t.expires_at<=? THEN 'expired' WHEN u.status<>'invitation_pending' THEN 'account_not_pending' ELSE 'eligibility_query_mismatch' END FROM account_tokens t JOIN users u ON u.id=t.user_id WHERE t.token_hash=? AND t.token_type='invitation'")
+            let reason: Option<String> = sqlx::query_scalar("SELECT CASE WHEN t.consumed_at IS NOT NULL THEN 'consumed_or_replaced' WHEN t.mailed_at IS NULL THEN 'not_mailed' WHEN t.expires_at IS NULL OR t.expires_at<=? THEN 'expired' WHEN u.status NOT IN ('invitation_pending','totp_setup_pending') THEN 'account_not_pending' ELSE 'eligibility_query_mismatch' END FROM account_tokens t JOIN users u ON u.id=t.user_id WHERE t.token_hash=? AND t.token_type='invitation'")
                 .bind(now).bind(&invitation_hash).fetch_optional(&mut *tx).await?;
             tracing::warn!(
                 action = "account.invitation.accept",
@@ -1180,15 +1224,10 @@ impl CoreService {
             );
             return Err(CoreError::Unauthorized);
         };
-        let user_id: u64 = sqlx::query_scalar("SELECT user_id FROM account_tokens WHERE id=?")
-            .bind(row.0)
-            .fetch_one(&mut *tx)
-            .await?;
-        sqlx::query("UPDATE account_tokens SET consumed_at=? WHERE id=?")
-            .bind(now)
-            .bind(row.0)
-            .execute(&mut *tx)
-            .await?;
+        let (user_id, email) = row;
+        Self::supersede_account_links(&mut tx, user_id, "invitation", now).await?;
+        sqlx::query("UPDATE totp_enrollment_tokens SET consumed_at=? WHERE user_id=? AND token_type='invitation' AND consumed_at IS NULL")
+            .bind(now).bind(user_id).execute(&mut *tx).await?;
         sqlx::query("UPDATE users SET password_hash=?,totp_secret_enc=?,totp_enabled=0,status='totp_setup_pending' WHERE id=?")
             .bind(password_hash).bind(&encrypted_seed).bind(user_id).execute(&mut *tx).await?;
         sqlx::query("INSERT INTO totp_enrollment_tokens (user_id,token_hash,secret_ciphertext,token_type,expires_at) VALUES (?,?,?,'invitation',?)")
@@ -1204,7 +1243,7 @@ impl CoreService {
         )
         .await?;
         tx.commit().await?;
-        let label = url::form_urlencoded::byte_serialize(row.1.as_bytes()).collect::<String>();
+        let label = url::form_urlencoded::byte_serialize(email.as_bytes()).collect::<String>();
         Ok(BootstrapBegin {
             setup_token,
             totp_secret: seed.clone(),
@@ -1222,52 +1261,57 @@ impl CoreService {
     ) -> Result<BootstrapComplete, CoreError> {
         let now = Utc::now().naive_utc();
         let mut tx = self.database.pool.begin().await?;
-        let setup=sqlx::query_as::<_,(u64,u64,Vec<u8>,u8)>("SELECT id,user_id,secret_ciphertext,failed_attempts FROM totp_enrollment_tokens WHERE token_hash=? AND token_type='invitation' AND consumed_at IS NULL AND expires_at>? FOR UPDATE")
-            .bind(token_hash(setup_token).to_vec()).bind(now).fetch_optional(&mut *tx).await?.ok_or(CoreError::Unauthorized)?;
+        let setup_hash = token_hash(setup_token).to_vec();
+        let user_id: u64 = sqlx::query_scalar("SELECT user_id FROM totp_enrollment_tokens WHERE token_hash=? AND token_type='invitation'")
+            .bind(&setup_hash).fetch_optional(&mut *tx).await?.ok_or(CoreError::Unauthorized)?;
         let last: Option<i64> = sqlx::query_scalar::<_, Option<i64>>(
-            "SELECT last_totp_counter FROM users WHERE id=? AND status='totp_setup_pending'",
+            "SELECT last_totp_counter FROM users WHERE id=? AND status='totp_setup_pending' FOR UPDATE",
         )
-        .bind(setup.1)
-        .fetch_one(&mut *tx)
-        .await?;
-        let secret = self.decrypt(&setup.2)?;
+        .bind(user_id)
+        .fetch_optional(&mut *tx)
+        .await?
+        .ok_or(CoreError::Unauthorized)?;
+        let (setup_id, ciphertext, attempts)=sqlx::query_as::<_,(u64,Vec<u8>,u8)>("SELECT id,secret_ciphertext,failed_attempts FROM totp_enrollment_tokens WHERE user_id=? AND token_hash=? AND token_type='invitation' AND consumed_at IS NULL AND expires_at>? FOR UPDATE")
+            .bind(user_id).bind(&setup_hash).bind(now).fetch_optional(&mut *tx).await?.ok_or(CoreError::Unauthorized)?;
+        let secret = self.decrypt(&ciphertext)?;
         let Some(counter) = verify_totp(&secret, code, last.unwrap_or(-1)) else {
-            let attempts = setup.3.saturating_add(1);
+            let attempts = attempts.saturating_add(1);
             sqlx::query("UPDATE totp_enrollment_tokens SET failed_attempts=?,consumed_at=IF(?, ?, consumed_at) WHERE id=?")
-                .bind(attempts).bind(attempts>=3).bind(now).bind(setup.0).execute(&mut *tx).await?;
+                .bind(attempts).bind(attempts>=3).bind(now).bind(setup_id).execute(&mut *tx).await?;
             if attempts >= 3 {
                 sqlx::query("UPDATE users SET status='invitation_pending',password_hash=NULL,totp_secret_enc=NULL,totp_enabled=0 WHERE id=? AND status='totp_setup_pending'")
-                    .bind(setup.1).execute(&mut *tx).await?;
+                    .bind(user_id).execute(&mut *tx).await?;
             }
             sqlx::query("INSERT INTO security_events (user_id,event_type,result,ip_address,device_label,created_at) VALUES (?,'totp_enrollment','failed','','',?)")
-                .bind(setup.1).bind(now).execute(&mut *tx).await?;
+                .bind(user_id).bind(now).execute(&mut *tx).await?;
             tx.commit().await?;
             return Err(CoreError::Unauthorized);
         };
         let recovery_codes = (0..10).map(|_| recovery_code()).collect::<Vec<_>>();
         for recovery_code in &recovery_codes {
             sqlx::query("INSERT INTO totp_recovery_codes (user_id,code_hash) VALUES (?,?)")
-                .bind(setup.1)
+                .bind(user_id)
                 .bind(token_hash(recovery_code).to_vec())
                 .execute(&mut *tx)
                 .await?;
         }
         sqlx::query("UPDATE users SET status='active',totp_enabled=1,last_totp_counter=? WHERE id=? AND status='totp_setup_pending'")
-            .bind(counter as i64).bind(setup.1).execute(&mut *tx).await?;
+            .bind(counter as i64).bind(user_id).execute(&mut *tx).await?;
+        Self::supersede_account_links(&mut tx, user_id, "invitation", now).await?;
         sqlx::query("UPDATE totp_enrollment_tokens SET consumed_at=? WHERE id=?")
             .bind(now)
-            .bind(setup.0)
+            .bind(setup_id)
             .execute(&mut *tx)
             .await?;
         sqlx::query("INSERT INTO security_events (user_id,event_type,result,ip_address,device_label,created_at) VALUES (?,'totp_enrollment','success','','',?)")
-            .bind(setup.1).bind(now).execute(&mut *tx).await?;
+            .bind(user_id).bind(now).execute(&mut *tx).await?;
         insert_audit(
             &mut tx,
-            Some(setup.1),
+            Some(user_id),
             "core",
             "account.activation.complete",
             "user",
-            Some(setup.1.to_string()),
+            Some(user_id.to_string()),
             "success",
         )
         .await?;
@@ -1288,15 +1332,53 @@ impl CoreService {
         subject: &str,
         body_intro: &str,
     ) -> Result<(), CoreError> {
-        let raw_token = random_token();
         let now = Utc::now().naive_utc();
         let mut tx = self.database.pool.begin().await?;
+        Self::supersede_account_links(&mut tx, user_id, token_type, now).await?;
+        self.queue_account_email(
+            &mut tx,
+            sender_user_id,
+            user_id,
+            token_type,
+            target_email,
+            recipient,
+            subject,
+            body_intro,
+            now,
+        )
+        .await?;
+        tx.commit().await?;
+        Ok(())
+    }
+
+    async fn supersede_account_links(
+        tx: &mut Transaction<'_, MySql>,
+        user_id: u64,
+        token_type: &str,
+        now: NaiveDateTime,
+    ) -> Result<(), CoreError> {
         sqlx::query("UPDATE account_tokens SET consumed_at=? WHERE user_id=? AND token_type=? AND consumed_at IS NULL")
-            .bind(now).bind(user_id).bind(token_type).execute(&mut *tx).await?;
+            .bind(now).bind(user_id).bind(token_type).execute(&mut **tx).await?;
         sqlx::query("UPDATE mail_outbox SET delivery_status='cancelled',body_ciphertext='' WHERE account_token_id IN (SELECT id FROM account_tokens WHERE user_id=? AND token_type=? AND consumed_at=?) AND delivery_status IN ('pending','failed','delivering')")
-            .bind(user_id).bind(token_type).bind(now).execute(&mut *tx).await?;
+            .bind(user_id).bind(token_type).bind(now).execute(&mut **tx).await?;
+        Ok(())
+    }
+
+    async fn queue_account_email(
+        &self,
+        tx: &mut Transaction<'_, MySql>,
+        sender_user_id: u64,
+        user_id: u64,
+        token_type: &str,
+        target_email: Option<&str>,
+        recipient: &str,
+        subject: &str,
+        body_intro: &str,
+        now: NaiveDateTime,
+    ) -> Result<(), CoreError> {
+        let raw_token = random_token();
         let token_id=sqlx::query("INSERT INTO account_tokens (user_id,token_hash,token_type,target_email,created_by,created_at) VALUES (?,?,?,?,?,?)")
-            .bind(user_id).bind(token_hash(&raw_token).to_vec()).bind(token_type).bind(target_email).bind(sender_user_id).bind(now).execute(&mut *tx).await?.last_insert_id();
+            .bind(user_id).bind(token_hash(&raw_token).to_vec()).bind(token_type).bind(target_email).bind(sender_user_id).bind(now).execute(&mut **tx).await?.last_insert_id();
         let route = if token_type == "invitation" {
             "activate"
         } else {
@@ -1306,9 +1388,9 @@ impl CoreService {
         let body = format!("{body_intro}\n\n{link}");
         let encrypted_body = self.encrypt(&body)?;
         sqlx::query("INSERT INTO mail_outbox (kind,sender_user_id,recipient_email,subject,body_ciphertext,account_token_id,delivery_status,available_at,created_at) VALUES (?,?,?,?,?,?,'pending',?,?)")
-            .bind(token_type).bind(sender_user_id).bind(recipient).bind(subject).bind(encrypted_body).bind(token_id).bind(now).bind(now).execute(&mut *tx).await?;
+            .bind(token_type).bind(sender_user_id).bind(recipient).bind(subject).bind(encrypted_body).bind(token_id).bind(now).bind(now).execute(&mut **tx).await?;
         insert_audit(
-            &mut tx,
+            tx,
             Some(sender_user_id),
             "core",
             "account.email.queued",
@@ -1317,7 +1399,6 @@ impl CoreService {
             "success",
         )
         .await?;
-        tx.commit().await?;
         Ok(())
     }
 
@@ -1524,12 +1605,16 @@ impl CoreService {
         match transport.send(message).await {
             Ok(_) => {
                 let mut tx = self.database.pool.begin().await?;
-                sqlx::query("UPDATE mail_outbox SET delivery_status='sent',sent_at=?,last_error_code=NULL,body_ciphertext='' WHERE id=? AND delivery_status='delivering'")
-                    .bind(Utc::now().naive_utc()).bind(mail.id).execute(&mut *tx).await?;
+                let sent_at = Utc::now().naive_utc();
                 if let Some(token_id) = mail.account_token_id {
-                    let sent_at = Utc::now().naive_utc();
                     sqlx::query("UPDATE account_tokens SET mailed_at=?,expires_at=CASE token_type WHEN 'invitation' THEN ?+INTERVAL 24 HOUR WHEN 'password_reset' THEN ?+INTERVAL 1 HOUR WHEN 'email_change' THEN ?+INTERVAL 1 HOUR ELSE expires_at END WHERE id=? AND consumed_at IS NULL")
                         .bind(sent_at).bind(sent_at).bind(sent_at).bind(sent_at).bind(token_id).execute(&mut *tx).await?;
+                }
+                let delivery = sqlx::query("UPDATE mail_outbox SET delivery_status='sent',sent_at=?,last_error_code=NULL,body_ciphertext='' WHERE id=? AND delivery_status='delivering'")
+                    .bind(sent_at).bind(mail.id).execute(&mut *tx).await?;
+                if delivery.rows_affected() == 0 {
+                    tx.rollback().await?;
+                    return Ok(true);
                 }
                 tx.commit().await?;
             }
@@ -2403,6 +2488,70 @@ mod tests {
                 .unwrap();
         assert_eq!(status, "totp_setup_pending");
         assert!(verify_password(password, &hash));
+        let original_setup_hash = token_hash(&setup.setup_token).to_vec();
+        let original_counter = Utc::now().timestamp().max(0) as u64 / 30;
+        core.request_password_reset("invited@example.test", "192.0.2.51")
+            .await
+            .unwrap();
+        let (replacement_id, replacement) = queued_token(&core, &pool, dispatch.user.id).await;
+        assert_ne!(replacement_id, id);
+        core.request_password_reset("invited@example.test", "192.0.2.52")
+            .await
+            .unwrap();
+        assert_eq!(
+            queued_token(&core, &pool, dispatch.user.id).await.0,
+            replacement_id
+        );
+        let consumed: Option<NaiveDateTime> =
+            sqlx::query_scalar("SELECT consumed_at FROM totp_enrollment_tokens WHERE token_hash=?")
+                .bind(&original_setup_hash)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert!(
+            consumed.is_none(),
+            "Requesting a link must keep the current setup usable"
+        );
+        sqlx::query("UPDATE totp_enrollment_tokens SET expires_at=UTC_TIMESTAMP(6)-INTERVAL 1 SECOND WHERE token_hash=?")
+            .bind(&original_setup_hash).execute(&pool).await.unwrap();
+        assert!(matches!(
+            core.complete_invitation_activation(
+                &setup.setup_token,
+                &totp_for_counter(&setup.totp_secret, original_counter)
+            )
+            .await,
+            Err(CoreError::Unauthorized)
+        ));
+        mark_mailed(
+            &pool,
+            replacement_id,
+            Utc::now().naive_utc() + chrono::Duration::hours(24),
+        )
+        .await;
+        let setup = core
+            .begin_invitation_activation(&replacement, password)
+            .await
+            .expect("A new link must restart interrupted TOTP enrollment");
+        let consumed: Option<NaiveDateTime> =
+            sqlx::query_scalar("SELECT consumed_at FROM totp_enrollment_tokens WHERE token_hash=?")
+                .bind(&original_setup_hash)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert!(consumed.is_some());
+        sqlx::query("UPDATE security_events SET created_at=UTC_TIMESTAMP(6)-INTERVAL 2 MINUTE WHERE user_id=? AND event_type='activation_link_request'")
+            .bind(dispatch.user.id).execute(&pool).await.unwrap();
+        core.request_password_reset("invited@example.test", "192.0.2.53")
+            .await
+            .unwrap();
+        let (unused_id, unused) = queued_token(&core, &pool, dispatch.user.id).await;
+        assert_ne!(unused_id, replacement_id);
+        mark_mailed(
+            &pool,
+            unused_id,
+            Utc::now().naive_utc() + chrono::Duration::hours(24),
+        )
+        .await;
         let counter = Utc::now().timestamp().max(0) as u64 / 30;
         let completed = core
             .complete_invitation_activation(
@@ -2413,6 +2562,21 @@ mod tests {
             .unwrap();
         assert_eq!(completed.status, "active");
         assert_eq!(completed.recovery_codes.len(), 10);
+        assert!(matches!(
+            core.begin_invitation_activation(&unused, password).await,
+            Err(CoreError::Unauthorized)
+        ));
+        core.request_password_reset("invited@example.test", "192.0.2.51")
+            .await
+            .unwrap();
+        let reset_kind: String = sqlx::query_scalar(
+            "SELECT token_type FROM account_tokens WHERE user_id=? ORDER BY id DESC LIMIT 1",
+        )
+        .bind(dispatch.user.id)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(reset_kind, "password_reset");
         assert!(matches!(
             core.complete_invitation_activation(
                 &setup.setup_token,
