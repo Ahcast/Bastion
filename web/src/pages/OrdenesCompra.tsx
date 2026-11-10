@@ -10,14 +10,15 @@ import { newOrder, newProduct } from '../orders.js';
 import type { Destination, OrderCalculation, OrderInput, OrderPage, OrderProduct, PurchaseOrder } from '../orders.js';
 
 const base = '/api/v1/ordenes-compra';
-const stage = 'Primera etapa: cliente manual, productos, gastos y destinos. Documentos privados por producto, clonación y conversión a borrador de factura disponibles. Proveedores y eliminación de órdenes pendientes.';
+const stage = 'Cliente manual, productos, gastos y destinos. Puedes archivar órdenes pendientes sin factura, entrega ni archivos.';
 export default function OrdenesCompra({ initialId,openInvoice }: { initialId?: number;openInvoice?:(id:number)=>void } = {}) {
   const { access } = useCore();
   return moduleCan(access, 'ordenes_compra', 'documentos', 'ver') ? <Workspace initialId={initialId} openInvoice={openInvoice} /> : <Notice>No tienes acceso a Órdenes de compra.</Notice>;
 }
 function Workspace({ initialId,openInvoice }: { initialId?: number;openInvoice?:(id:number)=>void }) {
-  const { api, access } = useCore();
+  const { api, access, notify } = useCore();
   const editable = moduleCan(access, 'ordenes_compra', 'documentos', 'editar');
+  const removable = moduleCan(access, 'ordenes_compra', 'documentos', 'eliminar');
   const invoiceEditable=moduleCan(access,'facturas','documentos','editar')&&moduleCan(access,'facturas','documentos','ver');
   const [documentsId,setDocumentsId]=useState<number|null>(null);
   const attempts=useRef(new Map<string,{key:string;version:number}>()),running=useRef(false);
@@ -47,6 +48,18 @@ function Workspace({ initialId,openInvoice }: { initialId?: number;openInvoice?:
   const [query, setQuery] = useState(''), [page, setPage] = useState(1), [error, setError] = useState(''), [busy, setBusy] = useState(false);
   useUnsavedChanges(uncertain,busy);
   const result = useLoad(signal => api.request<OrderPage>(`${base}?${query}&page=${page}&page_size=25`, { signal }), [query, page]);
+  const archive = async (id: number, version: number, number: string) => {
+    if (running.current || !window.confirm(`¿Archivar la orden ${number}?`)) return;
+    running.current = true; setBusy(true); setError('');
+    try {
+      await api.request(`${base}/${id}`, { method: 'DELETE', ifMatch: version });
+      result.reload(); notify('Orden archivada.');
+    } catch (reason) {
+      setError(reason instanceof ApiError && reason.status === 409
+        ? 'Solo puedes archivar órdenes pendientes sin factura vinculada, entrega ni archivos.' : message(reason));
+      if (reason instanceof ApiError && reason.status === 412) result.reload();
+    } finally { running.current = false; setBusy(false); }
+  };
   const open = async (id: number, next: 'view' | 'edit') => { setBusy(true); setError(''); try { setSelected(await api.request<PurchaseOrder>(`${base}/${id}`)); setMode(next); } catch (reason) { setError(message(reason)); } finally { setBusy(false); } };
   useEffect(() => { if (initialId) void open(initialId, 'edit'); }, [initialId, api]);
   if(documentsId!==null)return <OrderDocuments id={documentsId} close={()=>{setDocumentsId(null);result.reload();}}/>;
@@ -63,7 +76,7 @@ function Workspace({ initialId,openInvoice }: { initialId?: number;openInvoice?:
     {result.data ? <><Table columns={['Orden', 'Factura', 'Cliente', 'Fecha', 'Total (HNL)', 'Estado', 'Acciones']} rows={result.data.items.map(row => [<span className="quote-number">{row.n_orders}</span>, <span className="quote-number">{row.n_bill || '—'}</span>, <div className="quote-list-client">{row.client_name || 'Sin cliente'}</div>, row.order_date, <span className="quote-money">{row.total}</span>, <span className="quote-status" data-state={row.status}>{row.status}</span>, <QuoteActions number={row.n_orders} busy={busy} actions={[
       { label: 'Ver', run: () => void open(row.id, 'view') }, { label: 'Editar', disabled: !editable, reason: !editable ? 'Sin permiso de edición' : undefined, run: () => void open(row.id, 'edit') },
       { label: 'Documentos', run:()=>setDocumentsId(row.id) }, { label: 'Convertir a factura', disabled:!editable||!invoiceEditable, reason:!editable||!invoiceEditable?'Requiere ver y editar en Órdenes y Facturas':undefined, run:()=>{if(window.confirm('¿Crear o abrir el borrador de factura vinculado a esta orden?'))void action(row.id,row.version,'convert/invoice');} },
-      { label: 'Clonar', disabled:!editable,reason:!editable?'Sin permiso de edición':undefined,run:()=>void action(row.id,row.version,'clone') }, { label: 'Eliminar', disabled: true, danger: true, reason: moduleCan(access, 'ordenes_compra', 'documentos', 'eliminar') ? 'Eliminación de órdenes pendiente' : 'Sin permiso de eliminación' },
+      { label: 'Clonar', disabled:!editable,reason:!editable?'Sin permiso de edición':undefined,run:()=>void action(row.id,row.version,'clone') }, { label: 'Archivar', disabled: !removable || row.status !== 'Pendiente' || Boolean(row.n_bill.trim()), danger: true, reason: !removable ? 'Sin permiso de eliminación' : 'Requiere una orden pendiente sin factura, entrega ni archivos', run: () => void archive(row.id, row.version, row.n_orders) },
     ]} />])} /><nav className="quote-pagination" aria-label="Paginación de órdenes"><button disabled={busy || page === 1} onClick={() => setPage(p => p - 1)}>Anterior</button><span role="status">Página {page}</span><button disabled={busy || !result.data.has_more} onClick={() => setPage(p => p + 1)}>Siguiente</button></nav></> : !result.error && <Loading />}
     </section>
   </>;

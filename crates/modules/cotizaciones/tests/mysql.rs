@@ -420,6 +420,54 @@ async fn mysql57_drafts_permissions_idempotency_versions_and_disable() {
     .unwrap();
     assert_eq!(failed.0, "failed");
     assert_eq!(failed.1.as_deref(), Some("authorization_changed"));
+    let mail = QuoteMailService::new(core.clone());
+    let job = sqlx::query("INSERT INTO cotizaciones_email_jobs (quote_id,quote_version,actor_id,key_hash,request_hash,payload_ciphertext,scheduled_at,created_at) VALUES (?,?,1,UNHEX(SHA2('editable-job',256)),UNHEX(SHA2('payload',256)),X'01',UTC_TIMESTAMP(6)+INTERVAL 1 HOUR,UTC_TIMESTAMP(6))")
+        .bind(one.id).bind(approved.version).execute(&pool).await.unwrap().last_insert_id();
+    assert!(matches!(
+        mail.change_job(2, one.id, job, false).await,
+        Err(CoreError::Forbidden)
+    ));
+    assert_eq!(mail.jobs(1, one.id).await.unwrap().len(), 1);
+    for _ in 0..2 {
+        assert_eq!(
+            mail.change_job(1, one.id, job, false)
+                .await
+                .unwrap()
+                .delivery_status,
+            "cancelled"
+        );
+    }
+    sqlx::query("INSERT INTO user_smtp_credentials(user_id,smtp_email,password_ciphertext) VALUES (1,'synthetic@example.test',X'00')").execute(&pool).await.unwrap();
+    for (key, value) in [
+        ("smtp.host", serde_json::json!("mail.example.test")),
+        ("smtp.port", serde_json::json!(465)),
+        ("smtp.tls_mode", serde_json::json!("implicit_tls")),
+    ] {
+        core.admin().set_core_setting(1, key, value).await.unwrap();
+    }
+    sqlx::query("UPDATE cotizaciones_email_jobs SET delivery_status='failed',last_error_code='delivery_unconfirmed',payload_ciphertext=X'01' WHERE id=?").bind(job).execute(&pool).await.unwrap();
+    assert!(matches!(
+        mail.change_job(1, one.id, job, true).await,
+        Err(CoreError::Conflict)
+    ));
+    sqlx::query(
+        "UPDATE cotizaciones_email_jobs SET last_error_code='configuration_invalid' WHERE id=?",
+    )
+    .bind(job)
+    .execute(&pool)
+    .await
+    .unwrap();
+    assert_eq!(
+        mail.change_job(1, one.id, job, true)
+            .await
+            .unwrap()
+            .delivery_status,
+        "pending"
+    );
+    assert!(matches!(
+        mail.change_job(1, one.id, job, true).await,
+        Err(CoreError::Conflict)
+    ));
     core.admin()
         .set_module_enabled(1, "cotizaciones", false)
         .await

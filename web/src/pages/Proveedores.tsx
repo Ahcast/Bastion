@@ -30,6 +30,7 @@ function Workspace() {
   const attempt = useRef<{ body: string; key: string } | null>(null);
   const heading = useRef<HTMLHeadingElement>(null);
   const editable = moduleCan(access, 'proveedores', 'catalogo', 'editar');
+  const removable = moduleCan(access, 'proveedores', 'catalogo', 'eliminar');
   useUnsavedChanges(dirty, busy);
   const result = useLoad(signal => api.request<SupplierPage>(`/api/v1/proveedores?search=${encodeURIComponent(query)}&page=${page}&page_size=25`, { signal }), [query, page]);
 
@@ -43,6 +44,18 @@ function Workspace() {
     finally { setBusy(false); }
   };
   const openAfterGuard = (id: number) => { void navigate(() => { void open(id); }); };
+  const archive = async (item: Supplier) => {
+    if (busy || !window.confirm('¿Archivar ' + item.supplier_name + '? Se conservarán sus vínculos existentes.')) return;
+    setBusy(true); setError('');
+    try {
+      await api.request('/api/v1/proveedores/' + item.id, { method: 'DELETE', ifMatch: item.version });
+      if (saved?.id === item.id) { setSaved(null); setData(emptySupplier()); setDirty(false); setConflict(false); attempt.current = null; }
+      result.reload(); notify('Proveedor archivado.');
+    } catch (reason) {
+      setError(message(reason));
+      if (reason instanceof ApiError && reason.status === 412) result.reload();
+    } finally { setBusy(false); }
+  };
   const change = (key: keyof SupplierInput, value: string) => { setData(previous => ({ ...previous, [key]: value })); setDirty(true); };
 
   return <>
@@ -79,7 +92,7 @@ function Workspace() {
       <div className="supplier-section-heading"><h2 id="supplier-list-title">Listado de proveedores</h2><span>{result.data ? `PÁGINA ${page}` : 'CATÁLOGO'}</span></div>
       <form className="supplier-search" onSubmit={event => { event.preventDefault(); setQuery(search); setPage(1); }}><label>Buscar proveedor<input name="search" value={search} maxLength={200} onChange={event => setSearch(event.target.value)} /></label><button type="submit">Buscar</button></form>
       {result.data ? <>
-        <Table columns={['Proveedor', 'Contacto', 'Correo', 'Móvil / teléfono', 'Acciones']} rows={result.data.items.map(supplier => [supplier.supplier_name, supplier.user_contact || '—', supplier.email || '—', supplier.mobile_number || supplier.phone_number || '—', editable ? <button className="supplier-edit" disabled={busy} onClick={() => openAfterGuard(supplier.id)}>Editar</button> : '—'])} />
+        <Table columns={['Proveedor', 'Contacto', 'Correo', 'Móvil / teléfono', 'Acciones']} rows={result.data.items.map(supplier => [supplier.supplier_name, supplier.user_contact || '—', supplier.email || '—', supplier.mobile_number || supplier.phone_number || '—', (editable || removable) ? <div className="actions">{editable ? <button className="supplier-edit" disabled={busy} onClick={() => openAfterGuard(supplier.id)}>Editar</button> : null}{removable && <button disabled={busy || dirty} onClick={() => void archive(supplier)}>Archivar</button>}</div> : '—'])} />
         <nav className="supplier-pagination" aria-label="Paginación de proveedores"><button disabled={page === 1 || busy} onClick={() => setPage(value => value - 1)}>Anterior</button><span role="status">Página {page}</span><button disabled={!result.data.has_more || busy} onClick={() => setPage(value => value + 1)}>Siguiente</button></nav>
       </> : !result.error && <Loading />}
     </section>

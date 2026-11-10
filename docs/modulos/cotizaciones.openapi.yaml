@@ -390,6 +390,14 @@ paths:
         "412": *a1
         default: *a1
   /api/v1/cotizaciones/{id}/emails:
+    get:
+      summary: Consulta hasta los últimos 25 envíos propios para esta cotización.
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer, format: int64 } }
+      responses:
+        '200': { description: Lista de trabajos con id, delivery_status, scheduled_at y last_error_code }
+        '403': { description: Requiere editar }
+        '404': { description: Cotización no disponible }
     parameters:
       - *a4
     post:
@@ -438,6 +446,31 @@ paths:
               schema:
                 $ref: "#/components/schemas/EmailJob"
         default: *a1
+  /api/v1/cotizaciones/{id}/emails/{job}/cancel:
+    post:
+      summary: Cancela un envío propio pendiente.
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer, format: int64 } }
+        - { name: job, in: path, required: true, schema: { type: integer, format: int64 } }
+      responses:
+        '200': { description: Estado del trabajo }
+        '403': { description: Requiere editar y CSRF válido }
+        '404': { description: Trabajo o cotización no disponible para el usuario }
+        '409': { description: Transición no permitida para el estado actual }
+        '412': { description: La versión de la cotización cambió }
+  /api/v1/cotizaciones/{id}/emails/{job}/retry:
+    post:
+      summary: Vuelve a encolar un fallo anterior a SMTP si se conserva la revisión.
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer, format: int64 } }
+        - { name: job, in: path, required: true, schema: { type: integer, format: int64 } }
+      responses:
+        '200': { description: Estado del trabajo }
+        '403': { description: Requiere editar y CSRF válido }
+        '404': { description: Trabajo o cotización no disponible para el usuario }
+        '409': { description: Transición no permitida para el estado actual }
+        '412': { description: La versión de la cotización cambió }
+
 components:
   securitySchemes:
     session:

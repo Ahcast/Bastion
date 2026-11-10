@@ -226,6 +226,39 @@ async fn mysql57_clients_merge_catalog_permissions_concurrency_and_disable() {
     assert_eq!(events, 3);
     let leaked: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM audit_events WHERE module_id='clientes' AND CAST(details_json AS CHAR) LIKE '%example.test%'").fetch_one(&pool).await.unwrap();
     assert_eq!(leaked, 0);
+    let latest = service.detail(1, id).await.unwrap();
+    assert!(matches!(
+        service.archive(2, id, latest.version).await,
+        Err(CoreError::Forbidden)
+    ));
+    assert!(matches!(
+        service.archive(1, id, latest.version + 1).await,
+        Err(CoreError::PreconditionFailed)
+    ));
+    service.archive(1, id, latest.version).await.unwrap();
+    assert!(matches!(
+        service.detail(1, id).await,
+        Err(CoreError::NotFound)
+    ));
+    assert!(
+        !service
+            .catalog(1, &ClientFilter::default())
+            .await
+            .unwrap()
+            .items
+            .iter()
+            .any(|client| client.id == id)
+    );
+    assert_eq!(
+        sqlx::query_scalar::<_, u64>(
+            "SELECT id FROM clientes_records WHERE id=? AND archived_at IS NOT NULL"
+        )
+        .bind(id)
+        .fetch_one(&pool)
+        .await
+        .unwrap(),
+        id
+    );
     for _ in 0..120 {
         service.consume_request(2).await.unwrap();
     }

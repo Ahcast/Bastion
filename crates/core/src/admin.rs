@@ -1262,11 +1262,14 @@ fn valid_name(value: &str, max: usize) -> Result<String, CoreError> {
     }
 }
 fn valid_email(value: &str) -> Result<String, CoreError> {
+    if value.chars().any(char::is_control) {
+        return Err(CoreError::Invalid);
+    }
     let value = value.trim().to_lowercase();
     if value.len() > 254
         || !value.is_ascii()
-        || !value.contains('@')
-        || value.chars().any(char::is_control)
+        || value.bytes().filter(|&byte| byte == b'@').count() != 1
+        || value.parse::<lettre::Address>().is_err()
     {
         Err(CoreError::Invalid)
     } else {

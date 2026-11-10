@@ -1,0 +1,20 @@
+diff --git a/common.py b/common.py
+--- a/common.py
++++ b/common.py
+@@ -119,8 +119,16 @@ def atomic_text(path, encoding="utf-8"):
+     fd, temporary = tempfile.mkstemp(prefix=path.name + ".", suffix=".tmp", dir=path.parent)
+     try:
+         with os.fdopen(fd, "w", encoding=encoding, newline="") as f:
+             yield f
+             f.flush()
++            # The delivery directory inherits group bastion. Set access before
++            # rename so readers never see a published file with mkstemp's 0600.
++            shared_outputs = {
++                "main.json", "maestro.csv", "scout.json", "combiner.json",
++                "clasificador.json", "lista_corta.json",
++            }
++            if path.name in shared_outputs:
++                os.fchmod(f.fileno(), 0o640)
+             os.fsync(f.fileno())
+         os.replace(temporary, path)
+     finally:

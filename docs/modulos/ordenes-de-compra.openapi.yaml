@@ -57,6 +57,20 @@ paths:
       responses:
         '200': {description: Orden con versión incrementada y ETag}
         '412': {description: Versión obsoleta; no se modifica el registro}
+    delete:
+      summary: Archiva solo una orden pendiente sin factura, entrega ni archivos. Requiere ordenes_compra/documentos/eliminar.
+      parameters:
+        - name: If-Match
+          in: header
+          required: true
+          schema: { type: string }
+      responses:
+        '204': { description: Archivado }
+        '403': { description: Sin permiso }
+        '404': { description: Registro inexistente o archivado }
+        '409': { description: Estado incompatible }
+        '412': { description: Versión desactualizada }
+
   /api/v1/ordenes-compra/destinations:
     get:
       summary: Catálogo con documentos/ver o destinos/ver

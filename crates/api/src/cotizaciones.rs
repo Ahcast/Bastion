@@ -28,8 +28,19 @@ pub(super) fn routes(state: ApiState) -> Router<ApiState> {
             get(document_readiness),
         )
         .route("/api/v1/cotizaciones/{id}/pdf", get(pdf))
-        .route("/api/v1/cotizaciones/{id}/emails", post(queue_email))
+        .route(
+            "/api/v1/cotizaciones/{id}/emails",
+            get(email_jobs).post(queue_email),
+        )
         .route("/api/v1/cotizaciones/{id}/emails/{job}", get(email_job))
+        .route(
+            "/api/v1/cotizaciones/{id}/emails/{job}/cancel",
+            post(cancel_email_job),
+        )
+        .route(
+            "/api/v1/cotizaciones/{id}/emails/{job}/retry",
+            post(retry_email_job),
+        )
         .route(
             "/api/v1/cotizaciones/{id}",
             get(detail).put(replace).delete(remove),
@@ -253,6 +264,19 @@ async fn queue_email(
         .map(|job| (StatusCode::ACCEPTED, Json(job)))
         .map_err(ApiError)
 }
+async fn email_jobs(
+    State(state): State<ApiState>,
+    headers: axum::http::HeaderMap,
+    Path(id): Path<u64>,
+) -> Result<Json<Vec<bastion_cotizaciones::QuoteEmailJob>>, ApiError> {
+    let user = actor(&state, &headers).await?;
+    QuoteMailService::new(state.core)
+        .jobs(user.id, id)
+        .await
+        .map(Json)
+        .map_err(ApiError)
+}
+
 async fn email_job(
     State(state): State<ApiState>,
     headers: axum::http::HeaderMap,
@@ -261,6 +285,37 @@ async fn email_job(
     let user = actor(&state, &headers).await?;
     QuoteMailService::new(state.core)
         .job(user.id, id, job)
+        .await
+        .map(Json)
+        .map_err(ApiError)
+}
+
+async fn cancel_email_job(
+    State(state): State<ApiState>,
+    headers: axum::http::HeaderMap,
+    Path((id, job)): Path<(u64, u64)>,
+) -> Result<Json<bastion_cotizaciones::QuoteEmailJob>, ApiError> {
+    change_email_job(state, headers, id, job, false).await
+}
+
+async fn retry_email_job(
+    State(state): State<ApiState>,
+    headers: axum::http::HeaderMap,
+    Path((id, job)): Path<(u64, u64)>,
+) -> Result<Json<bastion_cotizaciones::QuoteEmailJob>, ApiError> {
+    change_email_job(state, headers, id, job, true).await
+}
+
+async fn change_email_job(
+    state: ApiState,
+    headers: axum::http::HeaderMap,
+    id: u64,
+    job: u64,
+    retry: bool,
+) -> Result<Json<bastion_cotizaciones::QuoteEmailJob>, ApiError> {
+    let user = actor(&state, &headers).await?;
+    QuoteMailService::new(state.core)
+        .change_job(user.id, id, job, retry)
         .await
         .map(Json)
         .map_err(ApiError)

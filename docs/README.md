@@ -278,3 +278,7 @@ El Core centraliza la administración de copias y recuperación mediante un trab
 ## Historial del sistema anterior
 
 El 2026-11-06 el usuario confirma que el traslado de datos históricos del sistema anterior a Bastion queda pendiente. El cierre operativo actual usa los datos de Bastion. Los cambios de esquema para funciones nuevas se evalúan por separado y no importan ese historial.
+
+## Bajas y telemetría confirmadas el 2026-11-09
+
+Clientes y proveedores se archivan y salen del catálogo activo. Los vínculos y las instantáneas de documentos existentes se conservan. Órdenes de compra permite archivar únicamente registros pendientes sin factura, entrega ni archivos. Las bajas requieren permiso eliminar, versión vigente y auditoría. La consulta operativa de solicitudes continúa en el journal de Lightsail.

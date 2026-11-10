@@ -170,6 +170,71 @@ impl QuoteMailService {
         self.quotes.check_access(actor, "ver").await?;
         sqlx::query_as("SELECT id,delivery_status,scheduled_at,last_error_code FROM cotizaciones_email_jobs WHERE id=? AND quote_id=?").bind(job).bind(quote).fetch_optional(self.core.database().pool()).await?.ok_or(CoreError::NotFound)
     }
+
+    pub async fn jobs(&self, actor: u64, quote: u64) -> Result<Vec<QuoteEmailJob>, CoreError> {
+        let mut tx = self.quotes.begin(actor, "editar").await?;
+        load(&mut tx, quote).await?;
+        let jobs = sqlx::query_as("SELECT id,delivery_status,scheduled_at,last_error_code FROM cotizaciones_email_jobs WHERE quote_id=? AND actor_id=? ORDER BY id DESC LIMIT 25")
+            .bind(quote).bind(actor).fetch_all(&mut *tx).await?;
+        tx.commit().await?;
+        Ok(jobs)
+    }
+
+    pub async fn change_job(
+        &self,
+        actor: u64,
+        quote: u64,
+        job: u64,
+        retry: bool,
+    ) -> Result<QuoteEmailJob, CoreError> {
+        self.quotes.check_access(actor, "editar").await?;
+        if retry && !self.core.business_mail_configured(actor).await? {
+            return Err(CoreError::Invalid);
+        }
+        let mut tx = self.quotes.begin(actor, "editar").await?;
+        let draft = load(&mut tx, quote).await?;
+        let (version, status, error, has_payload) = sqlx::query_as::<_, (u64, String, Option<String>, bool)>("SELECT quote_version,delivery_status,last_error_code,(OCTET_LENGTH(payload_ciphertext)>0) FROM cotizaciones_email_jobs WHERE id=? AND quote_id=? AND actor_id=? FOR UPDATE")
+            .bind(job).bind(quote).bind(actor).fetch_optional(&mut *tx).await?.ok_or(CoreError::NotFound)?;
+        let event = if retry {
+            if draft.version != version {
+                return Err(CoreError::PreconditionFailed);
+            }
+            // SMTP acceptance can be ambiguous. Only errors raised before SMTP are retryable.
+            if status != "failed"
+                || error.as_deref() != Some("configuration_invalid")
+                || !has_payload
+            {
+                return Err(CoreError::Conflict);
+            }
+            sqlx::query("UPDATE cotizaciones_email_jobs SET delivery_status='pending',scheduled_at=UTC_TIMESTAMP(6),claimed_at=NULL,completed_at=NULL,last_error_code=NULL WHERE id=?")
+                .bind(job).execute(&mut *tx).await?;
+            "quote.email.retried"
+        } else {
+            if status == "cancelled" {
+                tx.commit().await?;
+                return self.job(actor, quote, job).await;
+            }
+            if status != "pending" {
+                return Err(CoreError::Conflict);
+            }
+            sqlx::query("UPDATE cotizaciones_email_jobs SET delivery_status='cancelled',payload_ciphertext='',completed_at=UTC_TIMESTAMP(6) WHERE id=?")
+                .bind(job).execute(&mut *tx).await?;
+            "quote.email.cancelled"
+        };
+        CoreAdmin::record_domain_event(
+            &mut tx,
+            actor,
+            "cotizaciones",
+            event,
+            &quote.to_string(),
+            serde_json::json!({"job_id":job,"version":version}),
+        )
+        .await?;
+        let result = sqlx::query_as("SELECT id,delivery_status,scheduled_at,last_error_code FROM cotizaciones_email_jobs WHERE id=?")
+            .bind(job).fetch_one(&mut *tx).await?;
+        tx.commit().await?;
+        Ok(result)
+    }
     /// Claims one scheduled snapshot; uncertain SMTP results are never retried automatically.
     pub async fn deliver_one(&self) -> Result<bool, CoreError> {
         let database = self.core.database();

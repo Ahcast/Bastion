@@ -132,3 +132,9 @@ Las acciones de Órdenes de compra agregan clonación, archivos privados por pro
 La [ficha de diseño](modulos/licitaciones.md) incorpora la propuesta de expedientes, variables, copias, oferta y versiones PDF. Las rutas/DTO de su documento fuente son candidatos; no se anuncian en OpenAPI integrado ni se exponen endpoints hasta cerrar campos, permisos, límites e idempotencia/concurrencia. El contrato futuro restringe aprobación/publicación de plantillas al Administrador y edición de usuario a valores de variables; rechaza borrado de ofertas Enviadas incluso con permiso genérico de eliminación. Crear el único borrador vinculado exige adjudicación registrada, contrato de Facturas y coordinación interna con autorización de ambos dominios; no es emisión fiscal. MCP permanece pospuesto.
 
 La integración en verificación añade selección de formularios iniciales, cola, estado y descarga del PDF final al [OpenAPI de Licitaciones](modulos/licitaciones.openapi.yaml). La disponibilidad efectiva requiere aplicar la migración, instalar el trabajador aislado y habilitarlo; no implica que esté desplegada.
+
+## Cambio de autenticador en Mi cuenta
+
+POST /api/v1/account/totp/change requiere sesión, origen, CSRF, contraseña actual y código TOTP vigente sin usar. Devuelve un secreto nuevo y un token de enrolamiento vinculado a la sesión que inició el cambio. El token vence en diez minutos.
+
+POST /api/v1/account/totp/change/complete recibe el token y un código del nuevo autenticador. Al confirmar, invalida el secreto anterior, los códigos de recuperación anteriores, las sesiones, los desafíos de acceso, los dispositivos confiables y las autorizaciones OAuth de la cuenta. Devuelve diez códigos nuevos una sola vez. Tres códigos incorrectos invalidan el intento.

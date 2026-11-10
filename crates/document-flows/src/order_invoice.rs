@@ -8,6 +8,25 @@ pub struct OrderInvoiceResult {
     pub reused: bool,
 }
 impl ConversionService {
+    pub async fn archive_order(&self, actor: u64, id: u64, expected: u64) -> Result<(), CoreError> {
+        let mut tx = self.database.pool().begin().await?;
+        // The same order lock also serializes conversion to an invoice.
+        self.orders
+            .archive_in_transaction(&mut tx, actor, id, expected)
+            .await?;
+        let has_invoice: bool = sqlx::query_scalar(
+            "SELECT EXISTS(SELECT 1 FROM document_order_invoices WHERE order_id=?)",
+        )
+        .bind(id)
+        .fetch_one(&mut *tx)
+        .await?;
+        if has_invoice {
+            return Err(CoreError::Conflict);
+        }
+        tx.commit().await?;
+        Ok(())
+    }
+
     pub async fn order_invoice(
         &self,
         actor: u64,

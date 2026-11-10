@@ -191,7 +191,7 @@ impl ClientService {
             return Ok(result);
         }
         let mut matching: Option<u64> = sqlx::query_scalar(
-            "SELECT id FROM clientes_records WHERE name_hash=? ORDER BY id LIMIT 1",
+            "SELECT id FROM clientes_records WHERE name_hash=? AND archived_at IS NULL ORDER BY id LIMIT 1",
         )
         .bind(name_hash(&input.cliente_name))
         .fetch_optional(&mut *tx)
@@ -199,7 +199,7 @@ impl ClientService {
         let digits = rtn_digits(&input.rtn);
         if matching.is_none() && !digits.is_empty() {
             matching = sqlx::query_scalar(
-                "SELECT id FROM clientes_records WHERE rtn_digits=? ORDER BY id LIMIT 1",
+                "SELECT id FROM clientes_records WHERE rtn_digits=? AND archived_at IS NULL ORDER BY id LIMIT 1",
             )
             .bind(&digits)
             .fetch_optional(&mut *tx)
@@ -245,6 +245,31 @@ impl ClientService {
         .await?;
         tx.commit().await?;
         Ok(result)
+    }
+
+    pub async fn archive(&self, actor: u64, id: u64, expected: u64) -> Result<(), CoreError> {
+        let mut tx = self.begin(actor, "eliminar").await?;
+        self.admin
+            .authorize_in_transaction(&mut tx, actor, "clientes", "catalogo", "eliminar")
+            .await?;
+        let current = load(&mut tx, id).await?;
+        if current.version != expected {
+            return Err(CoreError::PreconditionFailed);
+        }
+        let version = expected.checked_add(1).ok_or(CoreError::Invalid)?;
+        sqlx::query("UPDATE clientes_records SET archived_at=UTC_TIMESTAMP(6),updated_at=UTC_TIMESTAMP(6),updated_by=?,version=? WHERE id=?")
+            .bind(actor).bind(version).bind(id).execute(&mut *tx).await?;
+        CoreAdmin::record_domain_event(
+            &mut tx,
+            actor,
+            "clientes",
+            "client.archive",
+            &id.to_string(),
+            serde_json::json!({"version":version}),
+        )
+        .await?;
+        tx.commit().await?;
+        Ok(())
     }
 
     pub async fn replace(
@@ -295,9 +320,11 @@ fn search(query: &mut QueryBuilder<MySql>, alias: &str, term: Option<&str>) {
 
 fn list_query(fields: &str, filter: &ClientFilter) -> Result<QueryBuilder<MySql>, CoreError> {
     let (page, size) = filter.bounds()?;
-    let mut query = QueryBuilder::new(format!("SELECT {fields} FROM clientes_records c WHERE 1=1"));
+    let mut query = QueryBuilder::new(format!(
+        "SELECT {fields} FROM clientes_records c WHERE c.archived_at IS NULL"
+    ));
     search(&mut query, "c", filter.search());
-    query.push(" AND NOT EXISTS (SELECT 1 FROM clientes_records d WHERE d.name_hash=c.name_hash");
+    query.push(" AND NOT EXISTS (SELECT 1 FROM clientes_records d WHERE d.name_hash=c.name_hash AND d.archived_at IS NULL");
     search(&mut query, "d", filter.search());
     query.push(" AND (d.catalog_score>c.catalog_score OR (d.catalog_score=c.catalog_score AND d.id<c.id))) ORDER BY c.sort_key,c.id LIMIT ")
         .push_bind(size + 1).push(" OFFSET ").push_bind((page - 1) * size);
@@ -321,7 +348,7 @@ fn client_from_row(row: &MySqlRow) -> Result<Client, sqlx::Error> {
 }
 
 async fn load(tx: &mut Transaction<'_, MySql>, id: u64) -> Result<Client, CoreError> {
-    let row = sqlx::query("SELECT c.id,c.version,c.cliente_name,c.user_contact,c.email,c.rtn,c.phone_number,c.mobile_number,c.direction FROM clientes_records c WHERE c.id=?")
+    let row = sqlx::query("SELECT c.id,c.version,c.cliente_name,c.user_contact,c.email,c.rtn,c.phone_number,c.mobile_number,c.direction FROM clientes_records c WHERE c.id=? AND c.archived_at IS NULL")
     .bind(id)
     .fetch_optional(&mut **tx)
     .await?

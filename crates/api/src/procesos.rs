@@ -283,11 +283,17 @@ async fn refresh(
         .await
         .map_err(IntoResponse::into_response)?;
     let path = state.scout_csv_path.clone();
-    let delivery =
-        tokio::task::spawn_blocking(move || bastion_procesos::ReadyDelivery::read(&path))
-            .await
-            .map_err(|_| local_delivery_problem(bastion_procesos::LocalDeliveryError::Io))?
-            .map_err(local_delivery_problem)?;
+    let control = state.scout_control.clone();
+    let delivery = tokio::task::spawn_blocking(move || {
+        use bastion_procesos::LocalDeliveryError::{Io, Missing, Pending};
+        match bastion_procesos::ReadyDelivery::read(&path) {
+            Err(Io | Missing) if control.status().busy => Err(Pending),
+            result => result,
+        }
+    })
+    .await
+    .map_err(|_| local_delivery_problem(bastion_procesos::LocalDeliveryError::Io))?
+    .map_err(local_delivery_problem)?;
     state
         .procesos
         .import_scout_for_user(actor.id, &delivery)
@@ -306,6 +312,10 @@ fn local_delivery_problem(error: bastion_procesos::LocalDeliveryError) -> Respon
         LocalDeliveryError::Invalid => (
             StatusCode::UNPROCESSABLE_ENTITY,
             "Los resultados de Scout no cumplen el contrato de entrega. No se importaron registros.",
+        ),
+        LocalDeliveryError::Failed => (
+            StatusCode::SERVICE_UNAVAILABLE,
+            "La última ejecución de Scout terminó con un error. Consulta el estado de Scout antes de volver a importar.",
         ),
         LocalDeliveryError::Missing | LocalDeliveryError::Io => (
             StatusCode::SERVICE_UNAVAILABLE,

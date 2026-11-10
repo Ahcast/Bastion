@@ -5,7 +5,10 @@ pub(super) fn routes(state: ApiState) -> Router<ApiState> {
     Router::new()
         .route("/api/v1/clientes", get(list).post(create))
         .route("/api/v1/clientes/catalogo", get(catalog))
-        .route("/api/v1/clientes/{id}", get(detail).put(replace))
+        .route(
+            "/api/v1/clientes/{id}",
+            get(detail).put(replace).delete(archive),
+        )
         .layer(RequestBodyLimitLayer::new(16 * 1024))
         .route_layer(middleware::from_fn_with_state(state, guard))
 }
@@ -13,7 +16,9 @@ pub(super) fn routes(state: ApiState) -> Router<ApiState> {
 async fn guard(State(state): State<ApiState>, request: Request, next: Next) -> Response {
     match tokio::time::timeout(Duration::from_secs(30), async {
         let user = actor(&state, request.headers()).await?;
-        let capability = if request.method() == Method::GET || request.method() == Method::HEAD {
+        let capability = if request.method() == Method::DELETE {
+            "eliminar"
+        } else if request.method() == Method::GET || request.method() == Method::HEAD {
             "ver"
         } else {
             "editar"
@@ -77,6 +82,24 @@ async fn detail(
         .map(client_response)
         .map_err(ApiError)
 }
+async fn archive(
+    State(state): State<ApiState>,
+    headers: axum::http::HeaderMap,
+    Path(id): Path<u64>,
+) -> Result<StatusCode, ApiError> {
+    let user = actor(&state, &headers).await?;
+    state
+        .clientes
+        .archive(
+            user.id,
+            id,
+            version(single_header(&headers, "if-match")?).ok_or(ApiError(CoreError::Invalid))?,
+        )
+        .await
+        .map_err(ApiError)?;
+    Ok(StatusCode::NO_CONTENT)
+}
+
 async fn create(
     State(state): State<ApiState>,
     headers: axum::http::HeaderMap,

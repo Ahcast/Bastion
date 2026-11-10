@@ -35,7 +35,10 @@ pub(super) fn routes(state: ApiState) -> Router<ApiState> {
             "/api/v1/ordenes-compra/destinations/{id}",
             axum::routing::put(update_destination),
         )
-        .route("/api/v1/ordenes-compra/{id}", get(detail).put(replace))
+        .route(
+            "/api/v1/ordenes-compra/{id}",
+            get(detail).put(replace).delete(archive),
+        )
         .layer(RequestBodyLimitLayer::new(1024 * 1024))
         .merge(documents)
         .route_layer(middleware::from_fn_with_state(state, guard))
@@ -111,6 +114,23 @@ async fn list(
         .map(Json)
         .map_err(ApiError)
 }
+async fn archive(
+    State(state): State<ApiState>,
+    headers: axum::http::HeaderMap,
+    Path(id): Path<u64>,
+) -> Result<StatusCode, ApiError> {
+    let user = actor(&state, &headers).await?;
+    bastion_document_flows::ConversionService::new(&state.core)
+        .archive_order(
+            user.id,
+            id,
+            version(single_header(&headers, "if-match")?).ok_or(ApiError(CoreError::Invalid))?,
+        )
+        .await
+        .map_err(ApiError)?;
+    Ok(StatusCode::NO_CONTENT)
+}
+
 async fn dashboard(
     State(state): State<ApiState>,
     headers: axum::http::HeaderMap,

@@ -131,7 +131,7 @@ impl FilePolicy {
             ext,
             "zip" | "docx" | "xlsx" | "pptx" | "odt" | "ods" | "odp"
         ) {
-            check_zip_names(bytes, self)?;
+            check_zip_entries(bytes, self, matches!(ext, "docx" | "xlsx" | "pptx"))?;
         }
         Ok(())
     }
@@ -164,7 +164,7 @@ fn expected_mime(ext: &str) -> Option<&'static [&'static str]> {
 }
 // Inspect the bounded ZIP central directory without extracting user files.
 // Encrypted, split, ZIP64, nested archives and >2000 entries fail closed.
-fn check_zip_names(bytes: &[u8], policy: &FilePolicy) -> Result<(), CoreError> {
+fn check_zip_entries(bytes: &[u8], policy: &FilePolicy, office: bool) -> Result<(), CoreError> {
     let invalid = || CoreError::Invalid;
     let end = bytes.len().checked_sub(22).ok_or_else(invalid)?;
     let eocd = (end.saturating_sub(65535)..=end)
@@ -212,7 +212,12 @@ fn check_zip_names(bytes: &[u8], policy: &FilePolicy) -> Result<(), CoreError> {
         {
             return Err(invalid());
         }
-        let base = name.rsplit('/').next().unwrap_or("");
+        // OOXML uses this exact path for standard application metadata.
+        let base = if office && name == "docprops/app.xml" {
+            "xml"
+        } else {
+            name.rsplit('/').next().unwrap_or("")
+        };
         if base.split('.').any(|ext| {
             BLOCKED_EXTENSIONS.contains(&ext) || policy.blocked_extensions.iter().any(|v| v == ext)
         }) || ["zip", "7z", "rar", "tar", "gz"].contains(&base.rsplit('.').next().unwrap_or(""))
@@ -341,7 +346,27 @@ mod tests {
             b
         }
         let p = FilePolicy::default();
-        assert!(check_zip_names(&archive("manual.pdf", 0), &p).is_ok());
+        assert!(check_zip_entries(&archive("manual.pdf", 0), &p, false).is_ok());
+        for ext in ["docx", "xlsx", "pptx"] {
+            let mime = expected_mime(ext).unwrap()[0];
+            assert!(
+                p.check(
+                    &format!("documento.{ext}"),
+                    mime,
+                    &archive("docProps/app.xml", 0)
+                )
+                .is_ok()
+            );
+            assert!(
+                p.check(
+                    &format!("documento.{ext}"),
+                    mime,
+                    &archive("word/payload.exe.xml", 0)
+                )
+                .is_err()
+            );
+        }
+        assert!(check_zip_entries(&archive("docProps/app.xml", 0), &p, false).is_err());
         for name in [
             "folder/invoice.exe",
             "../manual.pdf",
@@ -350,9 +375,12 @@ mod tests {
             "folder/script.ps1",
             "file.pdf:payload.exe",
         ] {
-            assert!(check_zip_names(&archive(name, 0), &p).is_err(), "{name}");
+            assert!(
+                check_zip_entries(&archive(name, 0), &p, true).is_err(),
+                "{name}"
+            );
         }
-        assert!(check_zip_names(&archive("manual.pdf", 1), &p).is_err());
-        assert!(check_zip_names(b"PK invalid", &p).is_err());
+        assert!(check_zip_entries(&archive("manual.pdf", 1), &p, false).is_err());
+        assert!(check_zip_entries(b"PK invalid", &p, false).is_err());
     }
 }

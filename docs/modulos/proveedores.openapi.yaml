@@ -132,6 +132,20 @@ paths:
         '400': { description: ID, If-Match, cuerpo o campo inválidos. }
         '412': { description: La versión cambió y la edición fue rechazada. }
         '429': { description: Cuota de solicitudes por actor alcanzada. }
+    delete:
+      summary: Archiva el proveedor y conserva sus vínculos. Requiere proveedores/catalogo/eliminar.
+      parameters:
+        - name: If-Match
+          in: header
+          required: true
+          schema: { type: string }
+      responses:
+        '204': { description: Archivado }
+        '403': { description: Sin permiso }
+        '404': { description: Registro inexistente o archivado }
+        '409': { description: Estado incompatible }
+        '412': { description: Versión desactualizada }
+
 components:
   securitySchemes:
     bastionSession:

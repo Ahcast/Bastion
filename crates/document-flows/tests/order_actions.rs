@@ -375,6 +375,29 @@ async fn mysql57_order_actions_private_files_clone_and_invoice_are_atomic() {
             .await
             .unwrap()
     );
+    assert!(matches!(
+        flows.archive_order(1, order.id, changed.version).await,
+        Err(CoreError::Conflict)
+    ));
+    assert!(matches!(
+        flows.archive_order(1, precision.id, 2).await,
+        Err(CoreError::PreconditionFailed)
+    ));
+    flows.archive_order(1, precision.id, 1).await.unwrap();
+    assert!(matches!(
+        orders.detail(1, precision.id).await,
+        Err(CoreError::NotFound)
+    ));
+    assert_eq!(
+        sqlx::query_scalar::<_, u64>(
+            "SELECT id FROM ordenes_orders WHERE id=? AND archived_at IS NOT NULL"
+        )
+        .bind(precision.id)
+        .fetch_one(&pool)
+        .await
+        .unwrap(),
+        precision.id
+    );
     core.admin()
         .set_module_enabled(1, "facturas", false)
         .await

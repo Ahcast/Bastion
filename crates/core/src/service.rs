@@ -33,6 +33,8 @@ type HmacSha1 = Hmac<Sha1>;
 #[path = "business_mail.rs"]
 mod business_mail;
 pub use business_mail::{BusinessMail, BusinessMailAttachment};
+#[path = "totp_change.rs"]
+mod totp_change;
 
 #[derive(Debug)]
 pub enum CoreError {
@@ -527,13 +529,11 @@ impl CoreService {
         }
         sqlx::query("UPDATE users SET failed_password_count=0, lock_level=0, locked_until=NULL, incident_alerted_at=NULL WHERE id=?")
             .bind(user.id).execute(&mut *tx).await?;
-        tx.commit().await?;
-
         let now = Utc::now().naive_utc();
         let known = if let Some(raw) = device_token.filter(|t| !t.is_empty()) {
             sqlx::query_as::<_, (u64, String, NaiveDateTime, NaiveDateTime)>(
                 "SELECT id,ip_address,expires_at,last_totp_at FROM trusted_devices WHERE user_id=? AND token_hash=? AND revoked_at IS NULL AND expires_at>?"
-            ).bind(user.id).bind(token_hash(raw).to_vec()).bind(now).fetch_optional(&self.database.pool).await?
+            ).bind(user.id).bind(token_hash(raw).to_vec()).bind(now).fetch_optional(&mut *tx).await?
         } else {
             None
         };
@@ -549,10 +549,11 @@ impl CoreService {
             sqlx::query("UPDATE trusted_devices SET last_used_at=? WHERE id=?")
                 .bind(now)
                 .bind(device_id)
-                .execute(&self.database.pool)
+                .execute(&mut *tx)
                 .await?;
             let cookies = self
                 .create_session(
+                    &mut tx,
                     user.id,
                     ip,
                     &safe_agent,
@@ -562,6 +563,7 @@ impl CoreService {
                     Some(device_token.unwrap_or_default().to_owned()),
                 )
                 .await?;
+            tx.commit().await?;
             self.log_security(Some(user.id), "password_login", "success", ip, safe_agent)
                 .await?;
             Ok(LoginStart::Authenticated(cookies))
@@ -570,7 +572,8 @@ impl CoreService {
             let expires = now + chrono::Duration::minutes(5);
             sqlx::query("INSERT INTO otp_challenges (user_id,challenge_hash,client_ip,user_agent,keep_logged_in,expires_at) VALUES (?,?,?,?,?,?)")
                 .bind(user.id).bind(token_hash(&challenge_token).to_vec()).bind(ip).bind(&safe_agent).bind(keep_logged_in).bind(expires)
-                .execute(&self.database.pool).await?;
+                .execute(&mut *tx).await?;
+            tx.commit().await?;
             self.log_security(Some(user.id), "totp_required", "pending", ip, safe_agent)
                 .await?;
             Ok(LoginStart::TotpRequired { challenge_token })
@@ -585,6 +588,8 @@ impl CoreService {
     ) -> Result<AuthCookies, CoreError> {
         let now = Utc::now().naive_utc();
         let mut tx = self.database.pool.begin().await?;
+        let auth = sqlx::query_as::<_, (Option<Vec<u8>>, Option<i64>)>("SELECT totp_secret_enc,last_totp_counter FROM users WHERE id=(SELECT user_id FROM otp_challenges WHERE challenge_hash=?) AND status='active' AND totp_enabled=1 FOR UPDATE")
+            .bind(token_hash(challenge_token).to_vec()).fetch_optional(&mut *tx).await?.ok_or(CoreError::Unauthorized)?;
         let challenge = sqlx::query_as::<_, ChallengeRow>(
             "SELECT id,user_id,client_ip,user_agent,keep_logged_in,attempts FROM otp_challenges WHERE challenge_hash=? AND consumed_at IS NULL AND expires_at>? FOR UPDATE"
         ).bind(token_hash(challenge_token).to_vec()).bind(now).fetch_optional(&mut *tx).await?.ok_or(CoreError::Unauthorized)?;
@@ -594,8 +599,6 @@ impl CoreService {
         {
             return Err(CoreError::Locked);
         }
-        let auth = sqlx::query_as::<_, (Option<Vec<u8>>, Option<i64>)>("SELECT totp_secret_enc,last_totp_counter FROM users WHERE id=? AND status='active' AND totp_enabled=1 FOR UPDATE")
-            .bind(challenge.user_id).fetch_optional(&mut *tx).await?.ok_or(CoreError::Unauthorized)?;
         let seed = auth.0.ok_or(CoreError::Unauthorized)?;
         let seed = self.decrypt(&seed)?;
         let accepted = verify_totp(&seed, code, auth.1.unwrap_or(-1));
@@ -620,10 +623,9 @@ impl CoreService {
             .await?;
         sqlx::query("INSERT INTO security_events (user_id,event_type,result,ip_address,device_label,created_at) VALUES (?,'totp_login','success',?,?,?)")
             .bind(challenge.user_id).bind(&challenge.client_ip).bind(&challenge.user_agent).bind(now).execute(&mut *tx).await?;
-        tx.commit().await?;
-
         let (device, is_new_device) = self
             .trust_device(
+                &mut tx,
                 challenge.user_id,
                 device_token,
                 &challenge.client_ip,
@@ -633,6 +635,7 @@ impl CoreService {
             .await?;
         let mut cookies = self
             .create_session(
+                &mut tx,
                 challenge.user_id,
                 &challenge.client_ip,
                 &challenge.user_agent,
@@ -642,6 +645,7 @@ impl CoreService {
                 None,
             )
             .await?;
+        tx.commit().await?;
         cookies.device_token = device;
         if is_new_device {
             self.notify_new_device(challenge.user_id).await;
@@ -669,6 +673,15 @@ impl CoreService {
         }
         let now = Utc::now().naive_utc();
         let mut tx = self.database.pool.begin().await?;
+        let active: Option<u64> = sqlx::query_scalar(
+            "SELECT id FROM users WHERE id=(SELECT user_id FROM otp_challenges WHERE challenge_hash=?) AND status='active' AND totp_enabled=1 FOR UPDATE",
+        )
+        .bind(token_hash(challenge_token).to_vec())
+        .fetch_optional(&mut *tx)
+        .await?;
+        if active.is_none() {
+            return Err(CoreError::Unauthorized);
+        }
         let challenge=sqlx::query_as::<_,ChallengeRow>("SELECT id,user_id,client_ip,user_agent,keep_logged_in,attempts FROM otp_challenges WHERE challenge_hash=? AND consumed_at IS NULL AND expires_at>? FOR UPDATE")
             .bind(token_hash(challenge_token).to_vec()).bind(now).fetch_optional(&mut *tx).await?.ok_or(CoreError::Unauthorized)?;
         if self
@@ -676,15 +689,6 @@ impl CoreService {
             .await?
         {
             return Err(CoreError::Locked);
-        }
-        let active: Option<u64> = sqlx::query_scalar(
-            "SELECT id FROM users WHERE id=? AND status='active' AND totp_enabled=1 FOR UPDATE",
-        )
-        .bind(challenge.user_id)
-        .fetch_optional(&mut *tx)
-        .await?;
-        if active.is_none() {
-            return Err(CoreError::Unauthorized);
         }
         let code_hash = token_hash(&code.to_ascii_uppercase()).to_vec();
         let recovery=sqlx::query_scalar::<_,u64>("SELECT id FROM totp_recovery_codes WHERE user_id=? AND code_hash=? AND consumed_at IS NULL FOR UPDATE")
@@ -720,9 +724,9 @@ impl CoreService {
             .execute(&mut *tx)
             .await?;
         sqlx::query("INSERT INTO security_events (user_id,event_type,result,ip_address,device_label,created_at) VALUES (?,'recovery_login','success',?,?,?)").bind(challenge.user_id).bind(&challenge.client_ip).bind(&challenge.user_agent).bind(now).execute(&mut *tx).await?;
-        tx.commit().await?;
         let (device, is_new_device) = self
             .trust_device(
+                &mut tx,
                 challenge.user_id,
                 device_token,
                 &challenge.client_ip,
@@ -732,6 +736,7 @@ impl CoreService {
             .await?;
         let mut cookies = self
             .create_session(
+                &mut tx,
                 challenge.user_id,
                 &challenge.client_ip,
                 &challenge.user_agent,
@@ -741,6 +746,7 @@ impl CoreService {
                 None,
             )
             .await?;
+        tx.commit().await?;
         cookies.device_token = device;
         if is_new_device {
             self.notify_new_device(challenge.user_id).await;
@@ -1846,6 +1852,7 @@ impl CoreService {
 
     async fn create_session(
         &self,
+        tx: &mut Transaction<'_, MySql>,
         user_id: u64,
         ip: &str,
         agent: &str,
@@ -1857,22 +1864,14 @@ impl CoreService {
         let session_token = random_token();
         let csrf_token = random_token();
         let expires_at = None;
-        let mut tx = self.database.pool.begin().await?;
-        let active: Option<String> =
-            sqlx::query_scalar("SELECT status FROM users WHERE id=? FOR UPDATE")
-                .bind(user_id)
-                .fetch_optional(&mut *tx)
-                .await?;
-        if active.as_deref() != Some("active") {
-            return Err(CoreError::Unauthorized);
-        }
+        // The caller holds the active user lock from credential verification.
         sqlx::query("UPDATE sessions SET revoked_at=?,revocation_reason='replaced' WHERE user_id=? AND revoked_at IS NULL")
-            .bind(now).bind(user_id).execute(&mut *tx).await?;
+            .bind(now).bind(user_id).execute(&mut **tx).await?;
         sqlx::query("INSERT INTO sessions (user_id,token_hash,csrf_hash,user_agent,ip_address,keep_logged_in,started_at,last_activity_at,last_totp_at,expires_at) VALUES (?,?,?,?,?,?,?,?,?,?)")
             .bind(user_id).bind(token_hash(&session_token).to_vec()).bind(token_hash(&csrf_token).to_vec()).bind(agent).bind(ip).bind(keep).bind(now).bind(now).bind(last_totp_at).bind(expires_at)
-            .execute(&mut *tx).await?;
+            .execute(&mut **tx).await?;
         insert_audit(
-            &mut tx,
+            tx,
             Some(user_id),
             "core",
             "auth.login",
@@ -1881,7 +1880,6 @@ impl CoreService {
             "success",
         )
         .await?;
-        tx.commit().await?;
         Ok(AuthCookies {
             session_token,
             csrf_token,
@@ -1893,6 +1891,7 @@ impl CoreService {
 
     async fn trust_device(
         &self,
+        tx: &mut Transaction<'_, MySql>,
         user_id: u64,
         prior_token: Option<&str>,
         ip: &str,
@@ -1904,7 +1903,7 @@ impl CoreService {
             .map(|s| token_hash(s).to_vec());
         let existing_id = if let Some(hash) = &prior_hash {
             sqlx::query_scalar::<_, u64>("SELECT id FROM trusted_devices WHERE user_id=? AND token_hash=? AND revoked_at IS NULL")
-                .bind(user_id).bind(hash).fetch_optional(&self.database.pool).await?
+                .bind(user_id).bind(hash).fetch_optional(&mut **tx).await?
         } else {
             None
         };
@@ -1915,10 +1914,10 @@ impl CoreService {
         };
         if let Some(id) = existing_id {
             sqlx::query("UPDATE trusted_devices SET ip_address=?,device_label=?,last_used_at=?,last_totp_at=?,expires_at=? WHERE id=?")
-                .bind(ip).bind(agent).bind(now).bind(now).bind(now + chrono::Duration::days(15)).bind(id).execute(&self.database.pool).await?;
+                .bind(ip).bind(agent).bind(now).bind(now).bind(now + chrono::Duration::days(15)).bind(id).execute(&mut **tx).await?;
         } else {
             sqlx::query("INSERT INTO trusted_devices (user_id,token_hash,device_label,ip_address,created_at,last_used_at,last_totp_at,expires_at) VALUES (?,?,?,?,?,?,?,?)")
-                .bind(user_id).bind(token_hash(&token).to_vec()).bind(agent).bind(ip).bind(now).bind(now).bind(now).bind(now + chrono::Duration::days(15)).execute(&self.database.pool).await?;
+                .bind(user_id).bind(token_hash(&token).to_vec()).bind(agent).bind(ip).bind(now).bind(now).bind(now).bind(now + chrono::Duration::days(15)).execute(&mut **tx).await?;
         }
         Ok((token, existing_id.is_none()))
     }
@@ -2384,6 +2383,19 @@ mod tests {
         let core = CoreService::new(database, "test-bootstrap-secret".repeat(2), [7; 32])
             .unwrap()
             .with_public_app_origin("https://app.example.test".into());
+        assert!(matches!(
+            core.create_user_with_invitation(
+                administrator,
+                person,
+                role_id,
+                "invited@@example.test"
+            )
+            .await,
+            Err(CoreError::Invalid)
+        ));
+        let invalid_writes: i64 = sqlx::query_scalar("SELECT (SELECT COUNT(*) FROM users WHERE person_id=?) + (SELECT COUNT(*) FROM mail_outbox WHERE sender_user_id=?)")
+            .bind(person).bind(administrator).fetch_one(&pool).await.unwrap();
+        assert_eq!(invalid_writes, 0);
         let dispatch = core
             .create_user_with_invitation(administrator, person, role_id, "invited@example.test")
             .await
@@ -2703,12 +2715,85 @@ mod tests {
         assert_eq!(access.permissions.len(), 1);
         assert_eq!(access.permissions[0].capability, "ver");
         assert_eq!(access.permissions[0].scope_key, "personas");
+        let last_counter = Utc::now().timestamp().max(0) as u64 / 30;
+        sqlx::query("UPDATE users SET last_totp_counter=? WHERE id=?")
+            .bind(last_counter.saturating_sub(1) as i64)
+            .bind(dispatch.user.id)
+            .execute(&pool)
+            .await
+            .unwrap();
+        let rotation = core
+            .begin_totp_change(
+                &returning.session_token,
+                password,
+                &totp_for_counter(&setup.totp_secret, last_counter),
+                ip,
+                "Rotation regression",
+            )
+            .await
+            .unwrap();
+        assert_ne!(rotation.totp_secret, setup.totp_secret);
+        assert!(core.current_user(&returning.session_token).await.is_ok());
+        assert!(matches!(
+            core.complete_totp_change(
+                &cookies.session_token,
+                &rotation.setup_token,
+                &totp_for_counter(&rotation.totp_secret, last_counter),
+                ip,
+                "Rotation regression"
+            )
+            .await,
+            Err(CoreError::Unauthorized)
+        ));
+        let result = core
+            .complete_totp_change(
+                &returning.session_token,
+                &rotation.setup_token,
+                &totp_for_counter(&rotation.totp_secret, last_counter),
+                ip,
+                "Rotation regression",
+            )
+            .await
+            .unwrap();
+        assert_eq!(result.recovery_codes.len(), 10);
+        assert!(core.current_user(&returning.session_token).await.is_err());
+        let devices = core.list_trusted_devices(dispatch.user.id).await.unwrap();
+        assert!(devices.is_empty());
+        let old_code = &completed.recovery_codes[0];
+        let challenge = match core
+            .start_login(
+                "invited@example.test",
+                password,
+                ip,
+                "Rotation regression",
+                false,
+                Some(&returning.device_token),
+            )
+            .await
+            .unwrap()
+        {
+            LoginStart::TotpRequired { challenge_token } => challenge_token,
+            LoginStart::Authenticated(_) => panic!("The former trusted device must be revoked"),
+        };
+        assert!(matches!(
+            core.verify_login_recovery_code(&challenge, old_code, None)
+                .await,
+            Err(CoreError::Unauthorized)
+        ));
+        let rotated = core
+            .verify_login_recovery_code(&challenge, &result.recovery_codes[0], None)
+            .await
+            .unwrap();
+        assert_eq!(
+            core.current_user(&rotated.session_token).await.unwrap().id,
+            dispatch.user.id
+        );
         admin
             .update_user(administrator, dispatch.user.id, None, None, Some(false))
             .await
             .expect("An administrator must be able to disable a custom-role account");
         assert!(matches!(
-            core.authenticate(&returning.session_token).await,
+            core.authenticate(&rotated.session_token).await,
             Err(CoreError::Unauthorized)
         ));
     }

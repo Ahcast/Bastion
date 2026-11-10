@@ -26,6 +26,7 @@ function Workspace() {
   const attempt = useRef<{ body: string; key: string } | null>(null);
   const heading = useRef<HTMLHeadingElement>(null);
   const editable = moduleCan(access, 'clientes', 'catalogo', 'editar');
+  const removable = moduleCan(access, 'clientes', 'catalogo', 'eliminar');
   useUnsavedChanges(dirty, busy);
   const result = useLoad(signal => api.request<ClientPage>(`/api/v1/clientes?search=${encodeURIComponent(query)}&page=${page}&page_size=25`, { signal }), [query, page]);
   const reset = () => { setSaved(null); setData(emptyClient()); setEditing(false); setDirty(false); setConflict(false); attempt.current = null; };
@@ -38,6 +39,18 @@ function Workspace() {
       heading.current?.focus();
     } catch (reason) { setError(message(reason)); }
     finally { setBusy(false); }
+  };
+  const archive = async (item: Client) => {
+    if (busy || !window.confirm('¿Archivar ' + item.cliente_name + '? Se conservarán sus vínculos existentes.')) return;
+    setBusy(true); setError('');
+    try {
+      await api.request('/api/v1/clientes/' + item.id, { method: 'DELETE', ifMatch: item.version });
+      if (saved?.id === item.id) { reset(); }
+      result.reload(); notify('Cliente archivado.');
+    } catch (reason) {
+      setError(message(reason));
+      if (reason instanceof ApiError && reason.status === 412) result.reload();
+    } finally { setBusy(false); }
   };
   const change = (key: keyof ClientInput, value: string) => { setData(old => ({ ...old, [key]: value })); setDirty(true); };
   return <><Heading title="Clientes" description="Catálogo de clientes y contactos." action={editable && <button className="primary" disabled={busy} onClick={() => void navigate(() => { reset(); setEditing(true); })}>Nuevo</button>} />
@@ -64,6 +77,6 @@ function Workspace() {
         finally { setBusy(false); }
       }}><fieldset disabled={busy || conflict} className="form-fields"><div className="client-fields">{fields.map(([key, label, max, type]) => <label key={key}>{label}{key === 'cliente_name' ? ' *' : ''}<input name={key} type={type} maxLength={max} required={key === 'cliente_name'} value={data[key]} onChange={event => change(key, event.target.value)} /></label>)}<label className="client-address">Dirección<textarea name="direction" rows={3} maxLength={1500} value={data.direction} onChange={event => change('direction', event.target.value)} /></label></div><button type="submit" className="primary">{busy ? 'Guardando…' : 'Guardar'}</button></fieldset><button type="button" disabled={busy} onClick={() => void navigate(reset)}>Cancelar</button></form>
     </section>}
-    {result.data ? <><Table columns={['Cliente', 'Contacto', 'Correo', 'Móvil / teléfono', 'Acciones']} rows={result.data.items.map(client => [client.cliente_name, client.user_contact || '—', client.email || '—', client.mobile_number || client.phone_number || '—', editable ? <button disabled={busy} onClick={() => void navigate(() => void open(client.id))}>Editar</button> : '—'])} /><nav className="row client-pagination" aria-label="Paginación de clientes"><button disabled={page === 1 || busy} onClick={() => setPage(p => p - 1)}>Anterior</button><span role="status">Página {page}</span><button disabled={!result.data.has_more || busy} onClick={() => setPage(p => p + 1)}>Siguiente</button></nav></> : !result.error && <Loading />}
+    {result.data ? <><Table columns={['Cliente', 'Contacto', 'Correo', 'Móvil / teléfono', 'Acciones']} rows={result.data.items.map(client => [client.cliente_name, client.user_contact || '—', client.email || '—', client.mobile_number || client.phone_number || '—', (editable || removable) ? <div className="actions">{editable ? <button disabled={busy} onClick={() => void navigate(() => void open(client.id))}>Editar</button> : null}{removable && <button disabled={busy || dirty} onClick={() => void archive(client)}>Archivar</button>}</div> : '—'])} /><nav className="row client-pagination" aria-label="Paginación de clientes"><button disabled={page === 1 || busy} onClick={() => setPage(p => p - 1)}>Anterior</button><span role="status">Página {page}</span><button disabled={!result.data.has_more || busy} onClick={() => setPage(p => p + 1)}>Siguiente</button></nav></> : !result.error && <Loading />}
   </>;
 }

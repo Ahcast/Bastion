@@ -11,7 +11,7 @@ use sqlx::{MySql, QueryBuilder, Row, Transaction};
 
 fn dashboard_query(select: &str, window: &DashboardWindow) -> QueryBuilder<MySql> {
     let mut query = QueryBuilder::new(select.to_owned());
-    query.push(" FROM ordenes_orders WHERE 1=1");
+    query.push(" FROM ordenes_orders WHERE archived_at IS NULL");
     if let Some(from) = window.from {
         query.push(" AND order_date>=").push_bind(from);
     }
@@ -136,7 +136,7 @@ impl OrderService {
         let (page, page_size) = filter.bounds()?;
         let mut tx = self.begin(actor, "documentos", "ver").await?;
         let mut query = QueryBuilder::<MySql>::new(
-            "SELECT id,version,n_orders,n_bill,client_name,CAST(order_date AS CHAR) AS order_date,status,CAST(total AS CHAR) AS total FROM ordenes_orders WHERE 1=1",
+            "SELECT id,version,n_orders,n_bill,client_name,CAST(order_date AS CHAR) AS order_date,status,CAST(total AS CHAR) AS total FROM ordenes_orders WHERE archived_at IS NULL",
         );
         if let Some(term) = filter
             .search
@@ -192,7 +192,7 @@ impl OrderService {
         let (page, page_size) = filter.bounds()?;
         let mut tx = self.begin(actor, "documentos", "ver").await?;
         let mut totals_query = QueryBuilder::<MySql>::new(
-            "SELECT CAST(COUNT(*) AS UNSIGNED) AS records,CAST(COALESCE(SUM(CAST(JSON_UNQUOTE(JSON_EXTRACT(calculation_json,'$.totals.subtotal')) AS DECIMAL(30,2))),0) AS CHAR) AS subtotal,CAST(COALESCE(SUM(CAST(JSON_UNQUOTE(JSON_EXTRACT(calculation_json,'$.totals.tax')) AS DECIMAL(30,2))),0) AS CHAR) AS isv,CAST(COALESCE(SUM(CAST(JSON_UNQUOTE(JSON_EXTRACT(calculation_json,'$.totals.total')) AS DECIMAL(30,2))),0) AS CHAR) AS total,CAST(COALESCE(SUM(CAST(JSON_UNQUOTE(JSON_EXTRACT(calculation_json,'$.totals.products_investment')) AS DECIMAL(30,2))),0) AS CHAR) AS products_investment,CAST(COALESCE(SUM(CAST(JSON_UNQUOTE(JSON_EXTRACT(calculation_json,'$.totals.other_expenses')) AS DECIMAL(30,2))),0) AS CHAR) AS other_expenses,CAST(COALESCE(SUM(CAST(JSON_UNQUOTE(JSON_EXTRACT(calculation_json,'$.totals.investment_total')) AS DECIMAL(30,2))),0) AS CHAR) AS investment_total,CAST(COALESCE(SUM(CAST(JSON_UNQUOTE(JSON_EXTRACT(calculation_json,'$.totals.profit')) AS DECIMAL(30,2))),0) AS CHAR) AS profit FROM ordenes_orders WHERE order_date>=",
+            "SELECT CAST(COUNT(*) AS UNSIGNED) AS records,CAST(COALESCE(SUM(CAST(JSON_UNQUOTE(JSON_EXTRACT(calculation_json,'$.totals.subtotal')) AS DECIMAL(30,2))),0) AS CHAR) AS subtotal,CAST(COALESCE(SUM(CAST(JSON_UNQUOTE(JSON_EXTRACT(calculation_json,'$.totals.tax')) AS DECIMAL(30,2))),0) AS CHAR) AS isv,CAST(COALESCE(SUM(CAST(JSON_UNQUOTE(JSON_EXTRACT(calculation_json,'$.totals.total')) AS DECIMAL(30,2))),0) AS CHAR) AS total,CAST(COALESCE(SUM(CAST(JSON_UNQUOTE(JSON_EXTRACT(calculation_json,'$.totals.products_investment')) AS DECIMAL(30,2))),0) AS CHAR) AS products_investment,CAST(COALESCE(SUM(CAST(JSON_UNQUOTE(JSON_EXTRACT(calculation_json,'$.totals.other_expenses')) AS DECIMAL(30,2))),0) AS CHAR) AS other_expenses,CAST(COALESCE(SUM(CAST(JSON_UNQUOTE(JSON_EXTRACT(calculation_json,'$.totals.investment_total')) AS DECIMAL(30,2))),0) AS CHAR) AS investment_total,CAST(COALESCE(SUM(CAST(JSON_UNQUOTE(JSON_EXTRACT(calculation_json,'$.totals.profit')) AS DECIMAL(30,2))),0) AS CHAR) AS profit FROM ordenes_orders WHERE archived_at IS NULL AND order_date>=",
         );
         totals_query
             .push_bind(filter.date_from)
@@ -219,7 +219,7 @@ impl OrderService {
         let totals: OrderReportTotals = totals_query.build_query_as().fetch_one(&mut *tx).await?;
 
         let mut rows_query = QueryBuilder::<MySql>::new(
-            "SELECT id,n_orders,n_bill,client_name,CAST(order_date AS CHAR) AS order_date,status,JSON_UNQUOTE(JSON_EXTRACT(calculation_json,'$.totals.subtotal')) AS subtotal,JSON_UNQUOTE(JSON_EXTRACT(calculation_json,'$.totals.tax')) AS isv,JSON_UNQUOTE(JSON_EXTRACT(calculation_json,'$.totals.total')) AS total,JSON_UNQUOTE(JSON_EXTRACT(calculation_json,'$.totals.products_investment')) AS products_investment,JSON_UNQUOTE(JSON_EXTRACT(calculation_json,'$.totals.other_expenses')) AS other_expenses,JSON_UNQUOTE(JSON_EXTRACT(calculation_json,'$.totals.investment_total')) AS investment_total,JSON_UNQUOTE(JSON_EXTRACT(calculation_json,'$.totals.profit')) AS profit FROM ordenes_orders WHERE order_date>=",
+            "SELECT id,n_orders,n_bill,client_name,CAST(order_date AS CHAR) AS order_date,status,JSON_UNQUOTE(JSON_EXTRACT(calculation_json,'$.totals.subtotal')) AS subtotal,JSON_UNQUOTE(JSON_EXTRACT(calculation_json,'$.totals.tax')) AS isv,JSON_UNQUOTE(JSON_EXTRACT(calculation_json,'$.totals.total')) AS total,JSON_UNQUOTE(JSON_EXTRACT(calculation_json,'$.totals.products_investment')) AS products_investment,JSON_UNQUOTE(JSON_EXTRACT(calculation_json,'$.totals.other_expenses')) AS other_expenses,JSON_UNQUOTE(JSON_EXTRACT(calculation_json,'$.totals.investment_total')) AS investment_total,JSON_UNQUOTE(JSON_EXTRACT(calculation_json,'$.totals.profit')) AS profit FROM ordenes_orders WHERE archived_at IS NULL AND order_date>=",
         );
         rows_query
             .push_bind(filter.date_from)
@@ -286,7 +286,7 @@ impl OrderService {
             .await?;
         let mut chart = QueryBuilder::<MySql>::new("SELECT DATE_FORMAT(order_date,");
         chart.push_bind(period.sql_format()).push(
-            ") AS bucket,COUNT(*) AS count,CAST(COALESCE(SUM(total),0) AS CHAR) AS amount FROM ordenes_orders WHERE 1=1",
+            ") AS bucket,COUNT(*) AS count,CAST(COALESCE(SUM(total),0) AS CHAR) AS amount FROM ordenes_orders WHERE archived_at IS NULL",
         );
         if let Some(from) = window.from {
             chart.push(" AND order_date>=").push_bind(from);
@@ -420,6 +420,54 @@ impl OrderService {
         result.source_quote = current.source_quote;
         Ok(result)
     }
+    pub async fn archive_in_transaction(
+        &self,
+        tx: &mut Transaction<'_, MySql>,
+        actor: u64,
+        id: u64,
+        expected: u64,
+    ) -> Result<(), CoreError> {
+        let enabled: Option<bool> = sqlx::query_scalar("SELECT (included_in_release AND environment_allowed AND enabled) FROM module_registry WHERE module_id='ordenes_compra' FOR UPDATE")
+            .fetch_optional(&mut **tx).await?;
+        if enabled != Some(true) {
+            return Err(CoreError::NotFound);
+        }
+        self.admin
+            .authorize_in_transaction(tx, actor, "ordenes_compra", "documentos", "eliminar")
+            .await?;
+        let order = load(tx, id).await?;
+        if order.version != expected {
+            return Err(CoreError::PreconditionFailed);
+        }
+        if order.status != "Pendiente"
+            || !order.data.n_bill.trim().is_empty()
+            || order.data.received_date.is_some()
+        {
+            return Err(CoreError::Conflict);
+        }
+        let has_files: bool =
+            sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM ordenes_documents WHERE order_id=?)")
+                .bind(id)
+                .fetch_one(&mut **tx)
+                .await?;
+        if has_files {
+            return Err(CoreError::Conflict);
+        }
+        let version = expected.checked_add(1).ok_or(CoreError::Invalid)?;
+        sqlx::query("UPDATE ordenes_orders SET archived_at=UTC_TIMESTAMP(6),updated_at=UTC_TIMESTAMP(6),updated_by=?,version=? WHERE id=?")
+            .bind(actor).bind(version).bind(id).execute(&mut **tx).await?;
+        CoreAdmin::record_domain_event(
+            tx,
+            actor,
+            "ordenes_compra",
+            "order.archive",
+            &id.to_string(),
+            serde_json::json!({"version":version}),
+        )
+        .await?;
+        Ok(())
+    }
+
     pub async fn destinations(&self, actor: u64) -> Result<Vec<Destination>, CoreError> {
         let mut tx = self.begin_destinations(actor).await?;
         let rows=sqlx::query_as("SELECT id,version,destination FROM ordenes_destinations ORDER BY destination,id LIMIT 1000").fetch_all(&mut *tx).await?;
@@ -551,7 +599,7 @@ async fn validate_destination(
 }
 async fn load(tx: &mut Transaction<'_, MySql>, id: u64) -> Result<PurchaseOrder, CoreError> {
     let row =
-        sqlx::query("SELECT id,version,calculation_json,source_quote_json FROM ordenes_orders WHERE id=? FOR UPDATE")
+        sqlx::query("SELECT id,version,calculation_json,source_quote_json FROM ordenes_orders WHERE id=? AND archived_at IS NULL FOR UPDATE")
             .bind(id)
             .fetch_optional(&mut **tx)
             .await?

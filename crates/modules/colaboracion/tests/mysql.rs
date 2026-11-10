@@ -253,6 +253,42 @@ else:
     let default_policy = service.policy(1).await.unwrap();
     assert_eq!(default_policy.max_file_mb, 50);
     assert_eq!(default_policy.trash_retention_days, 30);
+    for (extension, bytes, mime) in [
+        (
+            "docx",
+            include_bytes!("fixtures/office-fixture.docx").as_slice(),
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        ),
+        (
+            "xlsx",
+            include_bytes!("fixtures/office-fixture.xlsx").as_slice(),
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        ),
+        (
+            "pptx",
+            include_bytes!("fixtures/office-fixture.pptx").as_slice(),
+            "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+        ),
+    ] {
+        let record = service
+            .upload(
+                1,
+                &format!("synthetic-office-upload-{extension}"),
+                UploadInput {
+                    scope: "empresa".into(),
+                    id_persona: None,
+                    title: format!("Office {extension}"),
+                    notes: String::new(),
+                    filename: format!("office-fixture.{extension}"),
+                    content_base64: STANDARD.encode(bytes),
+                },
+            )
+            .await
+            .unwrap();
+        assert_eq!(record.mime, mime);
+        let download = service.read(1, record.id, false).await.unwrap();
+        assert_eq!(STANDARD.decode(download.content_base64).unwrap(), bytes);
+    }
     assert!(matches!(
         service.save_policy(2, default_policy.clone()).await,
         Err(CoreError::Forbidden)

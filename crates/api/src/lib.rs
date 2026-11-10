@@ -11,7 +11,7 @@ use axum::{
     extract::{ConnectInfo, Extension, MatchedPath, Path, Query, Request, State},
     http::{
         HeaderName, HeaderValue, Method, StatusCode,
-        header::{ACCEPT, AUTHORIZATION, CONTENT_TYPE, COOKIE, ORIGIN},
+        header::{ACCEPT, AUTHORIZATION, CACHE_CONTROL, CONTENT_TYPE, COOKIE, ORIGIN},
     },
     middleware::{self, Next},
     response::{IntoResponse, Response},
@@ -138,6 +138,13 @@ struct PasswordChangeRequest {
     current_password: String,
     new_password: String,
     totp_code: String,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct TotpChangeRequest {
+    current_password: String,
+    current_code: String,
 }
 
 #[derive(Deserialize)]
@@ -390,6 +397,11 @@ pub fn router(
             get(get_profile).put(update_profile),
         )
         .route("/api/v1/account/password", post(change_password))
+        .route("/api/v1/account/totp/change", post(begin_totp_change))
+        .route(
+            "/api/v1/account/totp/change/complete",
+            post(complete_totp_change),
+        )
         .route(
             "/api/v1/account/smtp",
             get(get_smtp_credentials).put(save_smtp_credentials),
@@ -744,6 +756,66 @@ async fn change_password(
         .await
         .map_err(ApiError)?;
     let mut response = StatusCode::NO_CONTENT.into_response();
+    for name in [
+        "__Host-bastion_session",
+        "__Host-bastion_device",
+        "__Host-bastion_challenge",
+    ] {
+        set_cookie(
+            &mut response,
+            name,
+            "",
+            "Path=/; Secure; HttpOnly; SameSite=Lax",
+            Some(0),
+        );
+    }
+    Ok(response)
+}
+
+async fn begin_totp_change(
+    State(state): State<ApiState>,
+    headers: axum::http::HeaderMap,
+    Extension(ip): Extension<ClientIp>,
+    Json(body): Json<TotpChangeRequest>,
+) -> Result<Response, ApiError> {
+    let session = cookie_value(&headers, "__Host-bastion_session")
+        .ok_or(ApiError(CoreError::Unauthorized))?;
+    let agent = headers
+        .get("user-agent")
+        .and_then(|value| value.to_str().ok())
+        .unwrap_or("");
+    let enrollment = state
+        .core
+        .begin_totp_change(
+            &session,
+            &body.current_password,
+            &body.current_code,
+            &ip.0,
+            agent,
+        )
+        .await
+        .map_err(ApiError)?;
+    Ok(([(CACHE_CONTROL, "no-store")], Json(enrollment)).into_response())
+}
+
+async fn complete_totp_change(
+    State(state): State<ApiState>,
+    headers: axum::http::HeaderMap,
+    Extension(ip): Extension<ClientIp>,
+    Json(body): Json<BootstrapCompleteRequest>,
+) -> Result<Response, ApiError> {
+    let session = cookie_value(&headers, "__Host-bastion_session")
+        .ok_or(ApiError(CoreError::Unauthorized))?;
+    let agent = headers
+        .get("user-agent")
+        .and_then(|value| value.to_str().ok())
+        .unwrap_or("");
+    let result = state
+        .core
+        .complete_totp_change(&session, &body.setup_token, &body.code, &ip.0, agent)
+        .await
+        .map_err(ApiError)?;
+    let mut response = ([(CACHE_CONTROL, "no-store")], Json(result)).into_response();
     for name in [
         "__Host-bastion_session",
         "__Host-bastion_device",

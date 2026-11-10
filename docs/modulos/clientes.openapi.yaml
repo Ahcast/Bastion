@@ -114,6 +114,20 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/Client' }
         default: { $ref: '#/components/responses/Error' }
+    delete:
+      summary: Archiva el cliente y conserva sus vínculos. Requiere clientes/catalogo/eliminar.
+      parameters:
+        - name: If-Match
+          in: header
+          required: true
+          schema: { type: string }
+      responses:
+        '204': { description: Archivado }
+        '403': { description: Sin permiso }
+        '404': { description: Registro inexistente o archivado }
+        '409': { description: Estado incompatible }
+        '412': { description: Versión desactualizada }
+
 components:
   securitySchemes:
     session: { type: apiKey, in: cookie, name: __Host-bastion_session }

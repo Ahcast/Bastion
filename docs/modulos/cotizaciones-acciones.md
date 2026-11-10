@@ -91,3 +91,7 @@ AWS y Bluehost se publicaron desde artifacts de ese commit con verificación de 
 La revisión local del navegador usó únicamente archivos sintéticos: selección múltiple de PDF y texto, subida de ambos y apertura del PDF en otra pestaña con URL Blob, sin activar descarga. La herramienta de inspección no permite observar el contenido de una pestaña Blob; no se eludió esa restricción. No se crearon documentos sintéticos ni se enviaron correos en producción.
 
 La autorización posterior del 2026-10-23 habilita la integración de conversiones descrita en cotizaciones-conversiones.md y su OpenAPI. Sustituye la deshabilitación inicial por dependencias y permisos reales. Facturas sigue limitado a borradores sin emisión fiscal.
+
+## Gestionar envíos
+
+El usuario puede consultar sus propios envíos desde la cotización. Un envío pendiente se puede cancelar mientras el trabajador aún no lo haya tomado. Se puede volver a encolar un fallo anterior a SMTP cuando la cotización conserva la misma revisión. El sistema conserva los resultados de entrega no confirmada para evitar duplicados y audita las dos acciones.

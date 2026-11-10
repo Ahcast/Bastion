@@ -7,6 +7,7 @@ import { QuoteConversionDialog } from '../components/QuoteConversionDialog.js';
 import type { ConversionModule, ConversionAttempt, OpenConverted } from '../conversions.js';
 import { QuoteActions } from '../components/QuoteActions.js';
 import { QuoteEmailComposer } from '../components/QuoteEmailComposer.js';
+import { QuoteEmailJobs } from '../components/QuoteEmailJobs.js';
 import { QuoteClientPicker } from '../components/QuoteClientPicker.js';
 import { QuoteAttachments } from '../components/QuoteAttachments.js';
 import { Decimal, QuoteItems } from '../components/QuoteItems.js';
@@ -32,6 +33,7 @@ function Workspace({ processSeed, clearProcessSeed, openConverted }: ProcessQuot
   const [search, setSearch] = useState(''), [query, setQuery] = useState(''), [page, setPage] = useState(1), [error, setError] = useState(''), [opening, setOpening] = useState(false);
   const [mode, setMode] = useState<'view' | 'edit'>(processSeed ? 'edit' : 'view'), [deleting, setDeleting] = useState<QuoteSummary | null>(null);
   const [email, setEmail] = useState<QuoteSummary | null>(null);
+  const [emailJobs, setEmailJobs] = useState<QuoteSummary | null>(null);
   const [conversion, setConversion] = useState<{ summary: QuoteSummary; kind: ConversionModule } | null>(null);
   const conversionAttempts = useRef(new Map<string, ConversionAttempt>());
   const cloneAttempt = useRef<{ id: number; version: number; key: string } | null>(null);
@@ -109,6 +111,7 @@ function Workspace({ processSeed, clearProcessSeed, openConverted }: ProcessQuot
       { label: 'Clonar', disabled: !editable, run: () => void clone(draft) },
       { label: 'PDF', disabled: !documents.data?.pdf, reason: !documents.data?.pdf ? 'Configura Empresa y el servicio de documentos' : undefined, run: () => previewPdf(draft) },
       { label: 'Enviar por correo', disabled: !editable || !documents.data?.pdf || !documents.data?.email, reason: !editable ? 'Sin permiso de edición' : !documents.data?.pdf ? 'Configura Empresa y documentos' : !documents.data?.email ? 'Configura SMTP global y tus credenciales en Mi cuenta' : undefined, run: () => setEmail(draft) },
+      { label: 'Gestionar envíos', disabled: !editable, reason: !editable ? 'Sin permiso de edición' : undefined, run: () => setEmailJobs(draft) },
       { label: 'Eliminar', disabled: !removable, danger: true, run: () => setDeleting(draft) },
     ]} />])} /><div className="quote-pagination"><button disabled={page === 1 || opening} onClick={() => setPage(p => p - 1)}>Anterior</button><span>Página {page}</span><button disabled={!result.data.has_more || opening} onClick={() => setPage(p => p + 1)}>Siguiente</button></div></> : !result.error && <Loading />}
     </section>
@@ -117,6 +120,7 @@ function Workspace({ processSeed, clearProcessSeed, openConverted }: ProcessQuot
       openConverted?.(value.target_module,value.target_id);
     }} />}
     {email && <QuoteEmailComposer summary={email} close={() => setEmail(null)} sent={result.reload} />}
+    {emailJobs && <QuoteEmailJobs quote={emailJobs} close={() => setEmailJobs(null)} changed={result.reload} />}
     {deleting && <Dialog title={`Eliminar ${deleting.quote_number ?? 'cotización'}`} close={() => { if (!opening) setDeleting(null); }}><p>Esta acción elimina la cotización y no se puede deshacer.</p><Notice>{error}</Notice><div className="actions"><button disabled={opening} onClick={() => setDeleting(null)}>Cancelar</button><button disabled={opening} className="danger" onClick={async () => {
       setError(''); setOpening(true);
       try { await api.request(`/api/v1/cotizaciones/${deleting.id}`, { method: 'DELETE', ifMatch: deleting.version }); setDeleting(null); setPage(1); result.reload(); notify('Cotización eliminada.'); }

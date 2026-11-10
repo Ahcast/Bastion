@@ -222,6 +222,31 @@ impl SupplierService {
         Ok(supplier)
     }
 
+    pub async fn archive(&self, actor: u64, id: u64, expected: u64) -> Result<(), CoreError> {
+        let mut tx = self.begin(actor, "eliminar").await?;
+        self.admin
+            .authorize_in_transaction(&mut tx, actor, "proveedores", "catalogo", "eliminar")
+            .await?;
+        let current = load(&mut tx, id).await?;
+        if current.version != expected {
+            return Err(CoreError::PreconditionFailed);
+        }
+        let version = expected.checked_add(1).ok_or(CoreError::Invalid)?;
+        sqlx::query("UPDATE proveedores_records SET archived_at=UTC_TIMESTAMP(6),updated_at=UTC_TIMESTAMP(6),updated_by=?,version=? WHERE id=?")
+            .bind(actor).bind(version).bind(id).execute(&mut *tx).await?;
+        CoreAdmin::record_domain_event(
+            &mut tx,
+            actor,
+            "proveedores",
+            "supplier.archive",
+            &id.to_string(),
+            serde_json::json!({"version":version}),
+        )
+        .await?;
+        tx.commit().await?;
+        Ok(())
+    }
+
     pub async fn replace(
         &self,
         actor: u64,
@@ -270,7 +295,7 @@ impl SupplierService {
 fn list_query(fields: &str, filter: &SupplierFilter) -> Result<QueryBuilder<MySql>, CoreError> {
     let (page, size) = filter.bounds()?;
     let mut query = QueryBuilder::new(format!(
-        "SELECT {fields} FROM proveedores_records s WHERE 1=1"
+        "SELECT {fields} FROM proveedores_records s WHERE s.archived_at IS NULL"
     ));
     if let Some(term) = filter.search() {
         query
@@ -315,7 +340,7 @@ fn supplier_from_row(row: &MySqlRow) -> Result<Supplier, sqlx::Error> {
 }
 
 async fn load(tx: &mut Transaction<'_, MySql>, id: u64) -> Result<Supplier, CoreError> {
-    let row = sqlx::query("SELECT s.id,s.version,s.supplier_name,s.user_contact,s.email,s.rtn,s.phone_number,s.mobile_number,s.direction FROM proveedores_records s WHERE s.id=?")
+    let row = sqlx::query("SELECT s.id,s.version,s.supplier_name,s.user_contact,s.email,s.rtn,s.phone_number,s.mobile_number,s.direction FROM proveedores_records s WHERE s.id=? AND s.archived_at IS NULL")
         .bind(id)
         .fetch_optional(&mut **tx)
         .await?

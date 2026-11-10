@@ -16,6 +16,7 @@ const MAX_MANIFEST_BYTES: usize = 32 * 1024;
 pub enum LocalDeliveryError {
     Missing,
     Pending,
+    Failed,
     Invalid,
     Changed,
     Io,
@@ -26,6 +27,7 @@ impl LocalDeliveryError {
         match self {
             Self::Missing => "missing",
             Self::Pending => "pending",
+            Self::Failed => "failed",
             Self::Invalid => "invalid",
             Self::Changed => "changed",
             Self::Io => "io",
@@ -66,6 +68,9 @@ impl ReadyDelivery {
         let before = read_regular(&manifest_path, MAX_MANIFEST_BYTES)?;
         let manifest: Manifest =
             serde_json::from_slice(&before).map_err(|_| LocalDeliveryError::Invalid)?;
+        if manifest.status == "error" {
+            return Err(LocalDeliveryError::Failed);
+        }
         let partial = manifest.status == "parcial" && !manifest.output_ready;
         let complete = manifest.status == "exitoso" && manifest.output_ready;
         let accepted_stage = |name: &str| {
@@ -416,6 +421,12 @@ mod tests {
         assert!(matches!(
             ReadyDelivery::read(&path),
             Err(LocalDeliveryError::Pending)
+        ));
+        manifest["status"] = serde_json::json!("error");
+        fs::write(&manifest_path, manifest.to_string()).unwrap();
+        assert!(matches!(
+            ReadyDelivery::read(&path),
+            Err(LocalDeliveryError::Failed)
         ));
     }
 
