@@ -32,10 +32,10 @@ test('numeric quote fields reject letters, signs and malformed pasted decimals; 
       await enter(input, ''); assert.equal(input.value, '');
       await enter(input, '10'); assert.equal(input.value, '10');
     }
-    const percent = app.container.querySelector('[aria-label="Descuento en porcentaje del ítem 1"]')!;
-    const amount = app.container.querySelector('[aria-label="Descuento en monto del ítem 1"]')!;
-    for (const [button, type] of [[percent, 'percent'], [amount, 'amount']] as const) {
-      await app.click(button); assert.equal(button.getAttribute('aria-pressed'), 'true');
+    const kind = app.container.querySelector<HTMLSelectElement>('[aria-label="Tipo de descuento del ítem 1"]')!;
+    for (const type of ['percent', 'amount'] as const) {
+      await act(async () => { kind.value = type; kind.dispatchEvent(new Event('change', { bubbles: true })); });
+      assert.equal(kind.value, type);
       await act(async () => { app.container.querySelector('form')!.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })); });
       const items = app.calls.filter(call => call.method === 'PUT').at(-1)?.body?.items as { discount_type: string; discount_value: string }[];
       assert.equal(items[0]?.discount_type, type); assert.equal(items[0]?.discount_value, '10');

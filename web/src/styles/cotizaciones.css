@@ -66,10 +66,8 @@
 .quote-items-table textarea{resize:vertical;min-height:64px}
 .quote-items-table label>span,.quote-item-total>span{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}
 .quote-items-table input,.quote-items-table select{font-size:13px;padding:8px}
-.quote-item-discount{display:grid;grid-template-columns:minmax(0,1fr);gap:5px;align-items:end}
-.quote-discount-kind{display:flex;gap:4px}
-.quote-discount-kind button{flex:1;min-width:0;padding:5px 7px;font-size:12px;line-height:1.4}
-.quote-discount-kind button[aria-pressed=true]{background:var(--ink);color:var(--panel);border-color:var(--ink)}
+.quote-item-discount{display:grid;grid-template-columns:minmax(0,1fr) 68px;gap:4px;align-items:end}
+.quote-item-discount>label{min-width:0}
 .quote-state small{display:block;margin-top:5px;font-size:11px;line-height:1.5;color:var(--muted)}
 .quote-item-total{text-align:right}
 .quote-item-total output{font:500 12px/1.5 var(--mono);white-space:nowrap}
@@ -119,7 +117,6 @@
  .quote-general-fields>label:last-child{grid-column:1/-1}
  .quote-section-heading{margin-bottom:14px}
  .quote-items-table tr{padding:14px;gap:14px 12px}
- .quote-item-discount{grid-template-columns:minmax(0,1fr)}
  .quote-items-table th,.quote-items-table td{max-width:none}
  .quote-editor-bottom{gap:24px}
  .quote-save button{width:100%}
