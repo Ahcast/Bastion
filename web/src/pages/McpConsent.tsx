@@ -18,7 +18,7 @@ const scopeLabels: Record<string, string> = {
   'reportes:ordenes:read': 'Consultar reportes de órdenes de compra',
   'reportes:facturas:read': 'Consultar reportes de facturas',
   'reportes:gastos:read': 'Consultar reportes de gastos',
-  'cotizaciones:write': 'Crear y editar cotizaciones en borrador',
+  'cotizaciones:write': 'Crear y editar cotizaciones en borrador y solicitar envíos con confirmación',
   'facturas:write': 'Crear y editar facturas en borrador',
   'ordenes_compra:write': 'Crear y editar órdenes pendientes sin compras ni entregas',
   'licitaciones:write': 'Crear y editar licitaciones en borrador',

@@ -115,6 +115,7 @@ pub struct DraftReadExecutor {
     orders: OrderService,
     tenders: Option<TenderService>,
     additional: Option<AdditionalReads>,
+    quote_mail: Option<crate::QuoteMailConfirmation>,
 }
 
 impl DraftReadExecutor {
@@ -125,11 +126,17 @@ impl DraftReadExecutor {
             orders,
             tenders: None,
             additional: None,
+            quote_mail: None,
         }
     }
 
     pub fn with_tenders(mut self, tenders: TenderService) -> Self {
         self.tenders = Some(tenders);
+        self
+    }
+
+    pub fn with_quote_mail(mut self, mail: crate::QuoteMailConfirmation) -> Self {
+        self.quote_mail = Some(mail);
         self
     }
 
@@ -140,6 +147,40 @@ impl DraftReadExecutor {
         arguments: Value,
     ) -> Result<Value, ReadToolError> {
         let (module, operation) = tool.split_once('.').ok_or(ReadToolError::Invalid)?;
+        if module == "cotizaciones" && matches!(operation, "preparar_envio" | "consultar_envio") {
+            let service = self.quote_mail.as_ref().ok_or(ReadToolError::Unavailable)?;
+            if operation == "consultar_envio" {
+                #[derive(Deserialize)]
+                #[serde(deny_unknown_fields)]
+                struct Status {
+                    handle: String,
+                }
+                let args: Status =
+                    serde_json::from_value(arguments).map_err(|_| ReadToolError::Invalid)?;
+                return bounded(
+                    &service
+                        .status(access, &args.handle)
+                        .await
+                        .map_err(map_error)?,
+                );
+            }
+            #[derive(Deserialize)]
+            #[serde(deny_unknown_fields)]
+            struct Prepare {
+                id: u64,
+                version: u64,
+                data: bastion_cotizaciones::QuoteEmailInput,
+            }
+            let args: Prepare =
+                serde_json::from_value(arguments).map_err(|_| ReadToolError::Invalid)?;
+            valid_version(args.id, args.version)?;
+            return bounded(
+                &service
+                    .prepare(access, args.id, args.version, args.data)
+                    .await
+                    .map_err(map_error)?,
+            );
+        }
         if matches!(
             module,
             "procesos" | "clientes" | "proveedores" | "gastos" | "colaboracion" | "reportes"

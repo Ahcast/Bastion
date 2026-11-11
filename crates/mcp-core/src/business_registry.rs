@@ -89,6 +89,41 @@ pub fn approved_read_requirements() -> BTreeMap<String, Vec<PermissionRequiremen
 /// per-object authorization, quotas, output limits and auditing are wired.
 pub fn draft_read_tool_registry() -> Result<ToolRegistry, RegistryError> {
     let mut tools = Vec::new();
+    tools.push(ToolDescriptor {
+        name: "cotizaciones.preparar_envio".into(),
+        module_id: "cotizaciones".into(),
+        description: "Preparar envío programado de una cotización y devolver un enlace para confirmación humana en Bastion. No encola ni envía correo hasta que el usuario apruebe. Entregar el enlace al usuario; el agente no puede aprobarlo.".into(),
+        required_scope: "cotizaciones:write".into(),
+        input_schema: json!({"type":"object","additionalProperties":false,"properties":{
+            "id":{"type":"integer","minimum":1,"maximum":9007199254740991_u64},
+            "version":{"type":"integer","minimum":1},
+            "data":{"type":"object","additionalProperties":false,"properties":{
+                "to":{"type":"string","minLength":1,"maxLength":255},
+                "cc":{"type":"string","maxLength":1000},
+                "bcc":{"type":"string","maxLength":1000},
+                "subject":{"type":"string","maxLength":255},
+                "message":{"type":"string","maxLength":5000},
+                "scheduled_at":{"type":"string","format":"date-time","description":"Fecha futura RFC3339 con zona explícita. Para Honduras usar -06:00."}
+            },"required":["to","cc","bcc","subject","message","scheduled_at"]}
+        },"required":["id","version","data"]}),
+        output_schema: None,
+        risk: ToolRisk::Mutation,
+        idempotent: false,
+        max_response_bytes: 262144,
+        max_duration_ms: 10000,
+    });
+    tools.push(ToolDescriptor {
+        name: "cotizaciones.consultar_envio".into(),
+        module_id: "cotizaciones".into(),
+        description: "Consultar si el usuario confirmó el envío y el estado real de la cola de correo. Usa el handle devuelto por preparar_envio, con la misma autorización OAuth.".into(),
+        required_scope: "cotizaciones:write".into(),
+        input_schema: json!({"type":"object","properties":{"handle":{"type":"string","minLength":43,"maxLength":43}},"required":["handle"],"additionalProperties":false}),
+        output_schema: None,
+        risk: ToolRisk::ReadOnly,
+        idempotent: true,
+        max_response_bytes: 262144,
+        max_duration_ms: 10000,
+    });
     for (module, label, _) in READ_MODULES {
         let scope = format!("{module}:read");
         tools.push(ToolDescriptor {

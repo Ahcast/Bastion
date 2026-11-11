@@ -68,4 +68,10 @@ jobs:
       - name: Test egress guard safety and rollback
         run: python3 tests/test_mcp_egress.py
       - name: Test MCP against disposable MySQL 5.7
+        env:
+          BASTION_DOCUMENTS_ENABLED: 'true'
+          BASTION_AWS_CLI: ${{ github.workspace }}/crates/modules/cotizaciones/tests/fixtures/private_storage.py
+          BASTION_TYPST_BIN: ${{ github.workspace }}/crates/mcp-core/tests/fixtures/typst.py
+          BASTION_DOCUMENTS_BUCKET: bastion-synthetic-attachment-test
+          BASTION_DOCUMENTS_REGION: synthetic-region
         run: cargo test --locked --package bastion-mcp --package bastion-mcp-core --package bastion-mcp-http --package bastion-server

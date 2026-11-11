@@ -9,6 +9,7 @@ mod metadata_integrity;
 mod modern;
 mod oauth_metadata;
 mod perimeter;
+mod quote_mail_http;
 pub use authorization_http::{DraftAuthorizationState, draft_authorization_router};
 pub use client_requests_http::{
     ClientMetadataSource, DraftClientRequestState, draft_client_request_router,

@@ -19,7 +19,7 @@ const options = [
   { scope: 'reportes:ordenes:read', label: 'Consultar reportes de órdenes de compra' },
   { scope: 'reportes:facturas:read', label: 'Consultar reportes de facturas' },
   { scope: 'reportes:gastos:read', label: 'Consultar reportes de gastos' },
-  { scope: 'cotizaciones:write', label: 'Crear y editar cotizaciones en borrador' },
+  { scope: 'cotizaciones:write', label: 'Crear y editar cotizaciones en borrador y solicitar envíos con confirmación' },
   { scope: 'facturas:write', label: 'Crear y editar facturas en borrador' },
   { scope: 'ordenes_compra:write', label: 'Crear y editar órdenes pendientes sin compras ni entregas' },
   { scope: 'licitaciones:write', label: 'Crear y editar licitaciones en borrador' },

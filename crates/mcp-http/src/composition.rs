@@ -94,6 +94,13 @@ pub fn compose_draft_router<F: ClientMetadataSource>(
             .map_err(|_| DraftCompositionError)?,
     );
     let registry = Arc::new(draft_read_tool_registry().map_err(|_| DraftCompositionError)?);
+    let quote_mail =
+        bastion_mcp_core::QuoteMailConfirmation::new(core.clone(), config.frontend_origin.clone());
+    let quote_mail_state = crate::quote_mail_http::QuoteMailState {
+        core: core.clone(),
+        origin: config.frontend_origin.clone(),
+        mail: quote_mail.clone(),
+    };
     let executor = Arc::new(
         DraftReadExecutor::new(
             QuoteService::new(db.clone(), admin.clone()),
@@ -101,7 +108,8 @@ pub fn compose_draft_router<F: ClientMetadataSource>(
             OrderService::new(db.clone(), admin.clone()),
         )
         .with_tenders(TenderService::new(db.clone(), admin.clone()))
-        .with_additional_reads(db, admin),
+        .with_additional_reads(db, admin)
+        .with_quote_mail(quote_mail),
     );
     let mcp = DraftMcpState::new(
         pool.clone(),
@@ -163,6 +171,7 @@ pub fn compose_draft_router<F: ClientMetadataSource>(
         .allow_origin(Any)
         .allow_methods([Method::GET, Method::OPTIONS]);
     let browser = draft_consent_router(consent)
+        .merge(crate::quote_mail_http::quote_mail_router(quote_mail_state))
         .merge(draft_client_request_router(requests))
         .layer(browser_cors);
     let protocol = draft_mcp_router(mcp)

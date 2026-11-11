@@ -61,6 +61,8 @@ El informe se obtuvo de una copia de frontend Angular compilado y backend Larave
 
 ## Registro de decisiones
 
+- 2026-11-11. El usuario autoriza programación de correo de Cotizaciones desde MCP con confirmación humana, pruebas, push y despliegue. El agente prepara una propuesta inmutable y el usuario la revisa/confirma en Bastion mediante sesión y CSRF. Se reutilizan correo, PDF, adjuntos, permisos e idempotencia del módulo. Migración Core 12 para propuestas cifradas vinculadas a actor/grant y vencimiento de 15 minutos. Ver `06-mcp.md`. El estado de despliegue se verifica al instalar los artifacts.
+
 - 2026-11-01: se solicita editar y eliminar clientes MCP desde Ajustes. La eliminación desactiva al cliente y revoca sus autorizaciones, sin borrar el historial; ver `06-mcp.md`.
 
 - 2026-11-01: el usuario autoriza consultas MCP de Licitaciones y creación y edición de borradores. Para órdenes, autoriza usar Pendiente como etapa inicial, sin productos comprados ni entregas. Los alcances de escritura son independientes y requieren aprobación y consentimiento; ver `06-mcp.md`.

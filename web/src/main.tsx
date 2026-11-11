@@ -4,7 +4,7 @@ import type { ReactNode } from 'react';
 import App, { ConfigurationError } from './App.js';
 import { NavigationGuardProvider } from './navigationGuard.js';
 import { ApiClient, apiOrigin } from './api.js';
-import { takeMcpQuery } from './mcpNavigation.js';
+import { takeMailConfirmation, takeMcpQuery } from './mcpNavigation.js';
 import './styles/panel.css';
 import './styles/dashboard.css';
 import './styles/cotizaciones.css';
@@ -19,7 +19,7 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { failed: boolean
   render() { return this.state.failed ? <section className="auth-wrap"><div className="auth-card"><h1>No se pudo cargar la pantalla</h1><p>Recarga la página para recuperar la interfaz.</p><button onClick={() => location.reload()}>Recargar</button></div></section> : this.props.children; }
 }
 const root = createRoot(document.getElementById('app')!);
-try { const mcpEnabled = window.BASTION_MCP_ENABLED === true; const mcpQuery = takeMcpQuery(mcpEnabled, location, path => history.replaceState(null, '', path)); const api = new ApiClient(apiOrigin(window.BASTION_API_BASE)); root.render(<ErrorBoundary><NavigationGuardProvider><App api={api} mcpEnabled={mcpEnabled} mcpQuery={mcpQuery} /></NavigationGuardProvider></ErrorBoundary>); }
+try { const mcpEnabled = window.BASTION_MCP_ENABLED === true; const mailConfirmation = takeMailConfirmation(mcpEnabled, location, path => history.replaceState(null, '', path)); const mcpQuery = takeMcpQuery(mcpEnabled, location, path => history.replaceState(null, '', path)); const api = new ApiClient(apiOrigin(window.BASTION_API_BASE)); root.render(<ErrorBoundary><NavigationGuardProvider><App api={api} mcpEnabled={mcpEnabled} mcpQuery={mcpQuery} mailConfirmation={mailConfirmation} /></NavigationGuardProvider></ErrorBoundary>); }
 catch (error) { root.render(<ConfigurationError error={error} />); }
 import './styles/clientes.css';
 import './styles/gastos.css';

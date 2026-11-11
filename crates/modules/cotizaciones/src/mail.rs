@@ -78,32 +78,7 @@ impl QuoteMailService {
             }
             return self.job(actor, id, job).await;
         }
-        if !self.core.business_mail_configured(actor).await? {
-            return Err(CoreError::Invalid);
-        }
-        let current = self.quotes.detail(actor, id).await?;
-        if current.version != expected {
-            return Err(CoreError::PreconditionFailed);
-        }
-        let mut input = input;
-        let reference = if current.data.order_number.trim().is_empty() {
-            current.quote_number.as_deref().unwrap_or("")
-        } else {
-            current.data.order_number.trim()
-        };
-        if input.subject.trim().is_empty() {
-            input.subject = format!("Cotización {reference}");
-        }
-        if input.message.trim().is_empty() {
-            input.message = format!(
-                "Estimados {}\n\nAdjunto la cotización correspondiente al proceso {reference}",
-                if current.data.client_name.trim().is_empty() {
-                    "Cliente"
-                } else {
-                    current.data.client_name.trim()
-                }
-            );
-        }
+        let input = self.prepare_input(actor, id, expected, input).await?;
         let document = self.quotes.pdf(actor, id, expected).await?;
         let raw = base64::Engine::decode(
             &base64::engine::general_purpose::STANDARD,
@@ -156,6 +131,47 @@ impl QuoteMailService {
         .await?;
         tx.commit().await?;
         self.job(actor, id, job).await
+    }
+
+    /// Resolve the exact message shown before a human confirms an MCP request.
+    /// This performs validation without generating a PDF or enqueuing mail.
+    pub async fn prepare_input(
+        &self,
+        actor: u64,
+        id: u64,
+        expected: u64,
+        input: QuoteEmailInput,
+    ) -> Result<QuoteEmailInput, CoreError> {
+        self.quotes.check_access(actor, "editar").await?;
+        validate(&input)?;
+        if !self.core.business_mail_configured(actor).await? {
+            return Err(CoreError::Invalid);
+        }
+        let current = self.quotes.detail(actor, id).await?;
+        if current.version != expected {
+            return Err(CoreError::PreconditionFailed);
+        }
+        let mut input = input;
+        let reference = if current.data.order_number.trim().is_empty() {
+            current.quote_number.as_deref().unwrap_or("")
+        } else {
+            current.data.order_number.trim()
+        };
+        if input.subject.trim().is_empty() {
+            input.subject = format!("Cotización {reference}");
+        }
+        if input.message.trim().is_empty() {
+            input.message = format!(
+                "Estimados {}\n\nAdjunto la cotización correspondiente al proceso {reference}",
+                if current.data.client_name.trim().is_empty() {
+                    "Cliente"
+                } else {
+                    current.data.client_name.trim()
+                }
+            );
+        }
+        validate(&input)?;
+        Ok(input)
     }
     async fn receipt(&self, actor: u64, key: &[u8]) -> Result<Option<(u64, Vec<u8>)>, CoreError> {
         Ok(sqlx::query_as(

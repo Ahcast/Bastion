@@ -1,8 +1,10 @@
 #![forbid(unsafe_code)]
 
 mod business_registry;
+mod quote_mail;
 mod read_executor;
 pub use business_registry::{approved_read_requirements, draft_read_tool_registry};
+pub use quote_mail::QuoteMailConfirmation;
 pub use read_executor::{DraftReadExecutor, ReadToolError};
 
 use std::collections::{BTreeMap, BTreeSet};

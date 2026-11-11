@@ -23,6 +23,8 @@ flowchart LR
 
 ## Registro de herramienta
 
+El agente puede usar `cotizaciones.preparar_envio` con `cotizaciones:read` y `cotizaciones:write` para proponer un correo con fecha futura RFC3339 y zona explícita. Recibe un enlace de confirmación de 15 minutos, con el identificador en el fragmento. La propuesta cifra destinatarios y mensaje, fija cotización/revisión y se vincula al usuario y grant. La preparación no encola correo. El usuario inicia sesión en Bastion, revisa los datos y confirma mediante POST con origen exacto y CSRF. La decisión no acepta nuevos destinatarios ni datos del correo. Rechazo, vencimiento, revocación de grant, retirada de permisos y cambio de revisión bloquean la operación. El encolado usa el servicio existente, adjunta PDF y archivos guardados, y conserva una clave de idempotencia estable por confirmación. `cotizaciones.consultar_envio` permite al mismo grant consultar confirmación y estado real de la cola. El agente no dispone de una herramienta para aprobar.
+
 El catálogo incorpora consultas de Procesos vigentes, Clientes, Proveedores y Gastos con listado paginado, búsqueda y detalle por identificador. Colaboración ofrece un listado de metadatos de archivos activos de empresa, sujeto a `colaboracion/empresa/ver`. Los reportes de órdenes, facturas y gastos se consultan por rango de fechas y página. Cada reporte requiere su alcance OAuth, el permiso de Reportes y el permiso de lectura del módulo de origen.
 
 Los alcances nuevos se solicitan en Ajustes. El administrador aprueba el máximo por cliente y cada usuario consiente la ampliación de su conexión. Las herramientas de Licitaciones, Cotizaciones, Facturas y Órdenes de compra conservan sus alcances existentes.
