@@ -62,10 +62,7 @@ impl ClientService {
             .await?;
         let mut tx = self.database.pool().begin().await?;
         // Serialize writes/merges and Core activation changes using the same row.
-        let enabled: Option<bool> = sqlx::query_scalar("SELECT (included_in_release AND environment_allowed AND enabled) FROM module_registry WHERE module_id='clientes' FOR UPDATE").fetch_optional(&mut *tx).await?;
-        if enabled != Some(true) {
-            return Err(CoreError::NotFound);
-        }
+        CoreAdmin::lock_enabled_module(&mut tx, "clientes", capability != "ver").await?;
         Ok(tx)
     }
 

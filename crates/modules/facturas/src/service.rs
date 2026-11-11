@@ -96,10 +96,7 @@ impl InvoiceService {
             .authorize(actor, "facturas", "documentos", capability)
             .await?;
         let mut tx = self.database.pool().begin().await?;
-        let enabled: Option<bool> = sqlx::query_scalar("SELECT (included_in_release AND environment_allowed AND enabled) FROM module_registry WHERE module_id='facturas' FOR UPDATE").fetch_optional(&mut *tx).await?;
-        if enabled != Some(true) {
-            return Err(CoreError::NotFound);
-        }
+        CoreAdmin::lock_enabled_module(&mut tx, "facturas", capability != "ver").await?;
         Ok(tx)
     }
 

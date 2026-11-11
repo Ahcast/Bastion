@@ -1,5 +1,13 @@
 # Despliegue del Core
 
+## Preparación de seguridad y rendimiento — 2026-11-10
+
+El cambio actualiza Tokio, autenticación, autorización y bloqueos de lectura. Incluye la migración **Cotizaciones 5**, que añade `quote_date_search` generada e índice `cotizaciones_date_id`. No modifica datos comerciales, estados de módulos, numeración, permisos ni configuración del frontend.
+
+Antes de instalar el backend: verificar CI y hashes del commit, respaldar MySQL y comprobar restauración, aplicar únicamente la migración pendiente con identidad de migración y verificar la columna derivada contra `data_json`. Añadir una columna almacenada puede reconstruir la tabla en MySQL 5.7: planificar la pausa según tamaño y probar primero sobre una copia. Conservar el backend anterior; el esquema añadido es compatible con sus consultas, pero su comprobación estricta de migraciones requiere un procedimiento de reversión ensayado para mantener la disponibilidad del módulo. No retirar el índice/columna durante uso concurrente.
+
+Validar acceso, recuperación, TOTP, lecturas concurrentes, desactivación, edición/versiones, conversiones y reportes. Medir p50/p95 y esperas SQL con datos de prueba representativos, sin realizar pruebas de carga sobre producción. El frontend no necesita cambios. Esta sección registra preparación de código; no acredita instalación ni ejecución de migraciones en AWS/Bluehost.
+
 ## Arquitectura acordada
 
 - Frontend React + TypeScript estricto y Vite, compilado como archivos estáticos para Bluehost (ADR-0002).

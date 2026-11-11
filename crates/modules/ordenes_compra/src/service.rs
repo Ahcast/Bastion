@@ -92,10 +92,7 @@ impl OrderService {
             .authorize(actor, "ordenes_compra", scope, capability)
             .await?;
         let mut tx = self.database.pool().begin().await?;
-        let enabled: Option<bool> = sqlx::query_scalar("SELECT (included_in_release AND environment_allowed AND enabled) FROM module_registry WHERE module_id='ordenes_compra' FOR UPDATE").fetch_optional(&mut *tx).await?;
-        if enabled != Some(true) {
-            return Err(CoreError::NotFound);
-        }
+        CoreAdmin::lock_enabled_module(&mut tx, "ordenes_compra", capability != "ver").await?;
         Ok(tx)
     }
     pub async fn check_access(

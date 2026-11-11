@@ -3,7 +3,7 @@ use std::collections::BTreeSet;
 use chrono::{NaiveDateTime, Utc};
 use serde::Serialize;
 use sha2::{Digest, Sha256};
-use sqlx::{FromRow, MySql, QueryBuilder};
+use sqlx::{FromRow, MySql, QueryBuilder, Transaction};
 
 use crate::{CoreError, Database};
 
@@ -1146,16 +1146,35 @@ impl CoreAdmin {
         if !matches!(capability, "ver" | "editar" | "eliminar") {
             return Err(CoreError::Forbidden);
         }
-        if self.require_admin(actor).await.is_ok() {
-            return Ok(());
-        }
-        let allowed:Option<i64>=sqlx::query_scalar("SELECT 1 FROM users u JOIN role_permissions rp ON rp.role_id=u.role_id WHERE u.id=? AND u.status='active' AND rp.module_id=? AND rp.capability=? AND (rp.scope_key=? OR rp.scope_key='*') LIMIT 1")
+        let allowed:Option<i64>=sqlx::query_scalar("SELECT 1 FROM users u JOIN roles r ON r.id=u.role_id WHERE u.id=? AND u.status='active' AND (r.system_key='system_administrator' OR EXISTS (SELECT 1 FROM role_permissions rp WHERE rp.role_id=u.role_id AND rp.module_id=? AND rp.capability=? AND (rp.scope_key=? OR rp.scope_key='*'))) LIMIT 1")
             .bind(actor).bind(module).bind(capability).bind(scope).fetch_optional(&self.database.pool).await?;
         if allowed.is_some() {
             Ok(())
         } else {
             Err(CoreError::Forbidden)
         }
+    }
+
+    /// Readers can coexist. Writers and administrative activation changes keep
+    /// the exclusive lock; both modes prevent a disable until the transaction ends.
+    pub async fn lock_enabled_module(
+        tx: &mut Transaction<'_, MySql>,
+        module: &str,
+        write: bool,
+    ) -> Result<(), CoreError> {
+        let query = if write {
+            "SELECT (included_in_release AND environment_allowed AND enabled) FROM module_registry WHERE module_id=? FOR UPDATE"
+        } else {
+            "SELECT (included_in_release AND environment_allowed AND enabled) FROM module_registry WHERE module_id=? LOCK IN SHARE MODE"
+        };
+        let enabled: Option<bool> = sqlx::query_scalar(query)
+            .bind(module)
+            .fetch_optional(&mut **tx)
+            .await?;
+        if enabled != Some(true) {
+            return Err(CoreError::NotFound);
+        }
+        Ok(())
     }
 
     /// Preflight for callers that do not need to hold a module lock. Domain

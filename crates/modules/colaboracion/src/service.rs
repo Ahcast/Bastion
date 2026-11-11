@@ -98,8 +98,13 @@ impl CollaborationService {
         }
         Ok(tx)
     }
+    pub(crate) async fn begin_read(&self) -> Result<Transaction<'_, MySql>, CoreError> {
+        let mut tx = self.database.pool().begin().await?;
+        CoreAdmin::lock_enabled_module(&mut tx, "colaboracion", false).await?;
+        Ok(tx)
+    }
     pub async fn check_access(&self, actor: u64, capability: &str) -> Result<(), CoreError> {
-        self.begin().await?.commit().await?;
+        self.begin_read().await?.commit().await?;
         self.admin
             .allowed_module_scopes(actor, "colaboracion", capability)
             .await?;
@@ -138,7 +143,7 @@ impl CollaborationService {
             .admin
             .allowed_module_scopes(actor, "colaboracion", "ver")
             .await?;
-        let mut tx = self.begin().await?;
+        let mut tx = self.begin_read().await?;
         let mut query = QueryBuilder::<MySql>::new(format!(
             "SELECT {FIELDS} FROM colaboracion_files f WHERE f.state= "
         ));
@@ -305,7 +310,7 @@ impl CollaborationService {
         Ok(record)
     }
     pub async fn read(&self, actor: u64, id: u64, preview: bool) -> Result<FileContent, CoreError> {
-        let mut tx = self.begin().await?;
+        let mut tx = self.begin_read().await?;
         let record = load(&mut tx, id).await?;
         self.authorize_record(&mut tx, actor, &record, "ver")
             .await?;
@@ -324,7 +329,7 @@ impl CollaborationService {
             return Err(CoreError::Overloaded);
         }
         // Recheck after object I/O so disable, delete and permission changes deny delivery.
-        let mut tx = self.begin().await?;
+        let mut tx = self.begin_read().await?;
         let current = load(&mut tx, id).await?;
         self.authorize_record(&mut tx, actor, &current, "ver")
             .await?;

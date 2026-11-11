@@ -58,18 +58,17 @@ impl ReportService {
             .authorize(actor, "reportes", scope, "ver")
             .await?;
         let mut tx = self.database.pool().begin().await?;
-        let enabled: Option<bool> = sqlx::query_scalar("SELECT (included_in_release AND environment_allowed AND enabled) FROM module_registry WHERE module_id='reportes' FOR UPDATE")
-            .fetch_optional(&mut *tx)
-            .await?;
-        if enabled != Some(true) {
-            return Err(CoreError::NotFound);
-        }
+        CoreAdmin::lock_enabled_module(&mut tx, "reportes", false).await?;
         Ok(tx)
     }
 
     pub async fn check_access(&self, actor: u64, scope: &str) -> Result<(), CoreError> {
-        self.begin(actor, scope).await?.commit().await?;
-        Ok(())
+        if !["ordenes", "facturas", "gastos"].contains(&scope) {
+            return Err(CoreError::Invalid);
+        }
+        self.admin
+            .authorize_enabled_module(actor, "reportes", scope, "ver")
+            .await
     }
 
     pub async fn consume_request(&self, actor: u64) -> Result<(), CoreError> {

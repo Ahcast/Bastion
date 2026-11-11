@@ -81,11 +81,7 @@ impl QuoteService {
             .await?;
         let mut tx = self.database.pool().begin().await?;
         // Same lock used by Core's administrative module toggle.
-        let enabled: Option<bool> = sqlx::query_scalar("SELECT (included_in_release AND environment_allowed AND enabled) FROM module_registry WHERE module_id='cotizaciones' FOR UPDATE")
-            .fetch_optional(&mut *tx).await?;
-        if enabled != Some(true) {
-            return Err(CoreError::NotFound);
-        }
+        CoreAdmin::lock_enabled_module(&mut tx, "cotizaciones", capability != "ver").await?;
         Ok(tx)
     }
 
@@ -115,7 +111,7 @@ impl QuoteService {
         let (page, page_size) = filter.bounds()?;
         let mut tx = self.begin(actor, "ver").await?;
         let mut query = QueryBuilder::<MySql>::new(
-            "SELECT id,version,client_name,order_number,quote_number,JSON_UNQUOTE(JSON_EXTRACT(data_json,'$.quote_date')) AS quote_date,CAST(JSON_LENGTH(data_json,'$.items') AS UNSIGNED) AS item_count,COALESCE(JSON_UNQUOTE(JSON_EXTRACT(data_json,'$.status')),'Borrador') AS status,JSON_UNQUOTE(JSON_EXTRACT(calculation_json,'$.valid_until')) AS valid_until,JSON_UNQUOTE(JSON_EXTRACT(calculation_json,'$.totals.total')) AS total,(SELECT MIN(mail.scheduled_at) FROM cotizaciones_email_jobs mail WHERE mail.quote_id=cotizaciones_drafts.id AND mail.delivery_status='pending' AND mail.scheduled_at>mail.created_at) AS pending_email_at FROM cotizaciones_drafts WHERE 1=1",
+            "SELECT id,version,client_name,order_number,quote_number,quote_date_search AS quote_date,CAST(JSON_LENGTH(data_json,'$.items') AS UNSIGNED) AS item_count,COALESCE(JSON_UNQUOTE(JSON_EXTRACT(data_json,'$.status')),'Borrador') AS status,JSON_UNQUOTE(JSON_EXTRACT(calculation_json,'$.valid_until')) AS valid_until,JSON_UNQUOTE(JSON_EXTRACT(calculation_json,'$.totals.total')) AS total,(SELECT MIN(mail.scheduled_at) FROM cotizaciones_email_jobs mail WHERE mail.quote_id=cotizaciones_drafts.id AND mail.delivery_status='pending' AND mail.scheduled_at>mail.created_at) AS pending_email_at FROM cotizaciones_drafts WHERE 1=1",
         );
         if let Some(q) = filter.q.as_deref().map(str::trim).filter(|q| !q.is_empty()) {
             // LOCATE treats wildcard characters literally and all values are bound.
@@ -133,7 +129,7 @@ impl QuoteService {
                 .push(",JSON_UNQUOTE(JSON_EXTRACT(data_json,'$.items[*].description')))>0)");
         }
         query
-            .push(" ORDER BY quote_date DESC,id DESC LIMIT ")
+            .push(" ORDER BY quote_date_search DESC,id DESC LIMIT ")
             .push_bind(page_size + 1)
             .push(" OFFSET ")
             .push_bind((page - 1) * page_size);

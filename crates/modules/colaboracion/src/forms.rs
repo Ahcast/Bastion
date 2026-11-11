@@ -167,7 +167,7 @@ impl CollaborationService {
         if !(1..=10000).contains(&page) || !(1..=100).contains(&size) {
             return Err(CoreError::Invalid);
         }
-        let mut tx = self.begin().await?;
+        let mut tx = self.begin_read().await?;
         self.admin
             .authorize_in_transaction(&mut tx, actor, "colaboracion", "empresa", "ver")
             .await?;

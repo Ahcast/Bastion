@@ -62,18 +62,16 @@ impl TenderService {
         capability: &str,
     ) -> Result<Transaction<'_, MySql>, CoreError> {
         let mut tx = self.database.pool().begin().await?;
-        let enabled:Option<bool>=sqlx::query_scalar("SELECT (included_in_release AND environment_allowed AND enabled) FROM module_registry WHERE module_id='licitaciones' FOR UPDATE").fetch_optional(&mut *tx).await?;
-        if enabled != Some(true) {
-            return Err(CoreError::NotFound);
-        }
+        CoreAdmin::lock_enabled_module(&mut tx, "licitaciones", capability != "ver").await?;
         self.admin
             .authorize_in_transaction(&mut tx, actor, "licitaciones", "expedientes", capability)
             .await?;
         Ok(tx)
     }
     pub async fn check_access(&self, actor: u64, capability: &str) -> Result<(), CoreError> {
-        self.begin(actor, capability).await?.commit().await?;
-        Ok(())
+        self.admin
+            .authorize_enabled_module(actor, "licitaciones", "expedientes", capability)
+            .await
     }
     pub async fn consume_request(&self, actor: u64) -> Result<(), CoreError> {
         let mut tx = self.database.pool().begin().await?;

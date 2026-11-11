@@ -1,5 +1,7 @@
 # Documentación del nuevo CastilloIT
 
+- 2026-11-10 (Honduras): mejoras de seguridad y rendimiento autorizadas tras revisión: Tokio corregido, revocación de recuperaciones pendientes al cambiar contraseña, admisión del login por IP y Argon2 fuera del runtime asíncrono, lecturas concurrentes con coordinación de activación, autorización consolidada e índice de fechas de Cotizaciones. Se conservan AWS/Bluehost/MySQL, permisos y reglas comerciales. Ver `08-seguridad-y-permisos.md`, `03-arquitectura-rust.md` y la preparación de publicación en `09-despliegue.md`.
+
 - 2026-11-01 (Honduras): MCP y OAuth habilitados en AWS y frontend en Bluehost con backend y frontend `1b27ef1e575a50d04ee9fa1eefa5435e74b39228`; respaldo y restauración de prueba verificados. La primera versión consulta cotizaciones, facturas y órdenes de compra. Queda pendiente una prueba con usuario y cliente real. Ver `06-mcp.md` y `09-despliegue.md`.
 
 - 2026-10-27: el usuario solicita permitir `.typ`, `.png` y `.jpeg` en Colaboración. `.png` y `.jpeg` ya estaban en la política predeterminada; se conserva su validación MIME. Se añade `.typ` como texto plano (`text/plain`), sujeto a los controles existentes contra scripts, HTML activo y ejecutables. No habilita ejecución de Typst ni añade funciones de plantillas de Licitaciones. Ver `modulos/colaboracion-y-archivos.md` y `modulos/colaboracion-implementacion.md`.

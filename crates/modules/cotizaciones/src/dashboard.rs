@@ -2,7 +2,7 @@ use super::*;
 use bastion_core::{DashboardPeriod, DashboardPoint, DashboardWindow};
 use sqlx::Row;
 
-const DATE: &str = "JSON_UNQUOTE(JSON_EXTRACT(data_json,'$.quote_date'))";
+const DATE: &str = "quote_date_search";
 const STATUS: &str = "COALESCE(JSON_UNQUOTE(JSON_EXTRACT(data_json,'$.status')),'Borrador')";
 const TOTAL: &str = "JSON_UNQUOTE(JSON_EXTRACT(calculation_json,'$.totals.total'))";
 fn query(select: &str, window: &DashboardWindow) -> QueryBuilder<MySql> {

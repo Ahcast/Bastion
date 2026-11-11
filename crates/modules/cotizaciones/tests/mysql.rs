@@ -79,6 +79,63 @@ async fn mysql57_drafts_permissions_idempotency_versions_and_disable() {
         .set_module_enabled(1, "cotizaciones", true)
         .await
         .unwrap();
+    // A concurrent reader holds the same module row. Lists must proceed,
+    // while writes and administrative disable remain serialized against it.
+    let mut reader = pool.begin().await.unwrap();
+    bastion_core::CoreAdmin::lock_enabled_module(&mut reader, "cotizaciones", false)
+        .await
+        .unwrap();
+    tokio::time::timeout(
+        std::time::Duration::from_secs(2),
+        service.list(1, &QuoteFilter::default()),
+    )
+    .await
+    .expect("readers must coexist")
+    .unwrap();
+    let writing = async {
+        let mut writer = pool.begin().await.unwrap();
+        bastion_core::CoreAdmin::lock_enabled_module(&mut writer, "cotizaciones", true)
+            .await
+            .unwrap();
+        writer.rollback().await.unwrap();
+    };
+    tokio::pin!(writing);
+    assert!(
+        tokio::time::timeout(std::time::Duration::from_millis(150), &mut writing)
+            .await
+            .is_err(),
+        "writes must wait for readers"
+    );
+    reader.commit().await.unwrap();
+    tokio::time::timeout(std::time::Duration::from_secs(2), writing)
+        .await
+        .unwrap();
+    let mut reader = pool.begin().await.unwrap();
+    bastion_core::CoreAdmin::lock_enabled_module(&mut reader, "cotizaciones", false)
+        .await
+        .unwrap();
+    let admin = core.admin();
+    let disabling = admin.set_module_enabled(1, "cotizaciones", false);
+    tokio::pin!(disabling);
+    assert!(
+        tokio::time::timeout(std::time::Duration::from_millis(150), &mut disabling)
+            .await
+            .is_err(),
+        "disable must wait for readers"
+    );
+    reader.commit().await.unwrap();
+    tokio::time::timeout(std::time::Duration::from_secs(2), disabling)
+        .await
+        .unwrap()
+        .unwrap();
+    assert!(matches!(
+        service.list(1, &QuoteFilter::default()).await,
+        Err(CoreError::NotFound)
+    ));
+    admin
+        .set_module_enabled(1, "cotizaciones", true)
+        .await
+        .unwrap();
     assert!(matches!(
         service.list(2, &QuoteFilter::default()).await,
         Err(CoreError::Forbidden)
@@ -115,6 +172,22 @@ async fn mysql57_drafts_permissions_idempotency_versions_and_disable() {
     assert_eq!(one.id, two.unwrap().id);
     assert_eq!(one.data.items[0].unit_price, "10.12");
     assert_eq!(one.quote_number.as_deref(), Some("COT-000001"));
+    let indexed: String =
+        sqlx::query_scalar("SELECT quote_date_search FROM cotizaciones_drafts WHERE id=?")
+            .bind(one.id)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!(indexed, "2026-10-22");
+    let legacy_order: Vec<u64> = sqlx::query_scalar("SELECT id FROM cotizaciones_drafts ORDER BY JSON_UNQUOTE(JSON_EXTRACT(data_json,'$.quote_date')) DESC,id DESC").fetch_all(&pool).await.unwrap();
+    let indexed_order: Vec<u64> = sqlx::query_scalar(
+        "SELECT id FROM cotizaciones_drafts ORDER BY quote_date_search DESC,id DESC",
+    )
+    .fetch_all(&pool)
+    .await
+    .unwrap();
+    assert_eq!(legacy_order, indexed_order);
+
     assert!(
         service
             .list(2, &QuoteFilter::default())
