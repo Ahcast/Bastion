@@ -4,6 +4,7 @@ mod admin;
 mod config;
 mod dashboard;
 mod database;
+mod document_filename;
 mod documents;
 mod login_limits;
 mod oauth_session;
@@ -17,6 +18,7 @@ pub use admin::{
 pub use config::{AppConfig, ConfigError, DatabaseConfig};
 pub use dashboard::{DashboardPeriod, DashboardPoint, DashboardQuery, DashboardWindow};
 pub use database::Database;
+pub use document_filename::pdf_filename;
 pub use documents::{DocumentCompany, DocumentService, MAX_PRIVATE_FILE_BYTES};
 pub use oauth_session::{OAuthSessionIdentity, oauth_session_in_transaction};
 pub use sar::{SarSettings, SarSettingsRecord, SarStatus};

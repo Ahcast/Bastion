@@ -95,3 +95,7 @@ La autorización posterior del 2026-10-23 habilita la integración de conversion
 ## Gestionar envíos
 
 El usuario puede consultar sus propios envíos desde la cotización. Un envío pendiente se puede cancelar mientras el trabajador aún no lo haya tomado. Se puede volver a encolar un fallo anterior a SMTP cuando la cotización conserva la misma revisión. El sistema conserva los resultados de entrega no confirmada para evitar duplicados y audita las dos acciones.
+
+## Nombre del PDF
+
+El PDF usa el número de cotización con extensión .pdf. El listado ofrece una descarga explícita con ese nombre.

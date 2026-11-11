@@ -12,6 +12,7 @@ import { QuoteClientPicker } from '../components/QuoteClientPicker.js';
 import { QuoteAttachments } from '../components/QuoteAttachments.js';
 import { Decimal, QuoteItems } from '../components/QuoteItems.js';
 import { reservePdfViewer } from '../quoteDocuments.js';
+import { downloadFile } from '../quoteAttachments.js';
 import type { DocumentReadiness, QuotePdf } from '../quoteDocuments.js';
 import { moduleCan } from '../types.js';
 import { useUnsavedChanges } from '../navigationGuard.js';
@@ -79,6 +80,12 @@ function Workspace({ processSeed, clearProcessSeed, openConverted }: ProcessQuot
     void api.request<QuotePdf>(`/api/v1/cotizaciones/${draft.id}/pdf`, { ifMatch: draft.version }).then(value => viewer.show(value))
       .catch(reason => { viewer.close(); setError(message(reason)); }).finally(() => setOpening(false));
   };
+  const downloadPdf = async (draft: QuoteSummary) => {
+    setError(''); setOpening(true);
+    try { downloadFile(await api.request<QuotePdf>(`/api/v1/cotizaciones/${draft.id}/pdf`, { ifMatch: draft.version })); }
+    catch (reason) { setError(message(reason)); }
+    finally { setOpening(false); }
+  };
   if (selected) {
     return <Editor
       key={selected === 'new' ? 'new' : selected.id}
@@ -113,6 +120,7 @@ function Workspace({ processSeed, clearProcessSeed, openConverted }: ProcessQuot
       { label: 'Enviar por correo', disabled: !editable || !documents.data?.pdf || !documents.data?.email, reason: !editable ? 'Sin permiso de edición' : !documents.data?.pdf ? 'Configura Empresa y documentos' : !documents.data?.email ? 'Configura SMTP global y tus credenciales en Mi cuenta' : undefined, run: () => setEmail(draft) },
       { label: 'Gestionar envíos', disabled: !editable, reason: !editable ? 'Sin permiso de edición' : undefined, run: () => setEmailJobs(draft) },
       { label: 'Eliminar', disabled: !removable, danger: true, run: () => setDeleting(draft) },
+      { label: 'Descargar PDF', disabled: !documents.data?.pdf, reason: !documents.data?.pdf ? 'Configura Empresa y el servicio de documentos' : undefined, run: () => void downloadPdf(draft) },
     ]} />])} /><div className="quote-pagination"><button disabled={page === 1 || opening} onClick={() => setPage(p => p - 1)}>Anterior</button><span>Página {page}</span><button disabled={!result.data.has_more || opening} onClick={() => setPage(p => p + 1)}>Siguiente</button></div></> : !result.error && <Loading />}
     </section>
     {conversion && <QuoteConversionDialog summary={conversion.summary} kind={conversion.kind} attempts={conversionAttempts.current} close={() => setConversion(null)} converted={value => {

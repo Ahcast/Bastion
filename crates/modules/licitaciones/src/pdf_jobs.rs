@@ -109,7 +109,7 @@ impl TenderService {
         actor: u64,
         id: u64,
         job: &str,
-    ) -> Result<(u64, String, u64, String), CoreError> {
+    ) -> Result<(u64, String, u64, String, String), CoreError> {
         job_id(job)?;
         let mut tx = self.begin(actor, "ver").await?;
         let exp = load(&mut tx, id).await?;
@@ -135,6 +135,7 @@ impl TenderService {
             key,
             size.ok_or(CoreError::Invalid)?,
             hash.ok_or(CoreError::Invalid)?,
+            bastion_core::pdf_filename(&exp.name, &format!("expediente-{id}")),
         );
         tx.commit().await?;
         Ok(result)
@@ -148,6 +149,16 @@ impl TenderService {
         id: u64,
         job: &str,
     ) -> Result<(std::fs::File, u64), CoreError> {
+        let (file, size, _) = self.download_named_pdf_job(actor, id, job).await?;
+        Ok((file, size))
+    }
+
+    pub async fn download_named_pdf_job(
+        &self,
+        actor: u64,
+        id: u64,
+        job: &str,
+    ) -> Result<(std::fs::File, u64, String), CoreError> {
         let metadata = self.authorized_pdf(actor, id, job).await?;
         let file = self
             .storage
@@ -156,7 +167,7 @@ impl TenderService {
         if self.authorized_pdf(actor, id, job).await? != metadata {
             return Err(CoreError::Conflict);
         }
-        Ok((file, metadata.2))
+        Ok((file, metadata.2, metadata.4))
     }
 
     /// One long-lived server task calls this serially. A database row is

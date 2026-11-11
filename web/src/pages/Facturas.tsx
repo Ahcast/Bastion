@@ -5,6 +5,7 @@ import { QuoteActions as InvoiceActions } from '../components/QuoteActions.js';
 import { QuoteClientPicker } from '../components/QuoteClientPicker.js';
 import { InvoiceCommandDialog, InvoicePaymentFields, newPayment } from '../components/InvoiceCommands.js';
 import { reservePdfViewer } from '../quoteDocuments.js';
+import { downloadFile } from '../quoteAttachments.js';
 import type { QuotePdf } from '../quoteDocuments.js';
 import { Decimal } from '../components/QuoteItems.js';
 import { InvoiceItems } from '../components/InvoiceItems.js';
@@ -50,6 +51,12 @@ function Workspace({ initialId }: { initialId?: number }) {
     setBusy(true);setError('');
     void api.request<QuotePdf>(`/api/v1/facturas/${row.id}/documents/${kind}`,{method:'POST',ifMatch:row.version}).then(value=>viewer.show(value)).catch(reason=>{viewer.close();setError(message(reason));if(reason instanceof ApiError && reason.status===412) result.reload();}).finally(()=>setBusy(false));
   };
+  const downloadPdf = async (row: InvoiceSummary, kind: string) => {
+    setBusy(true); setError('');
+    try { downloadFile(await api.request<QuotePdf>(`/api/v1/facturas/${row.id}/documents/${kind}`, { method: 'POST', ifMatch: row.version })); }
+    catch (reason) { setError(message(reason)); if (reason instanceof ApiError && reason.status === 412) result.reload(); }
+    finally { setBusy(false); }
+  };
   useEffect(() => { if (initialId) void open(initialId, 'edit'); }, [initialId, api]);
   if (selected) return <InvoiceEditor key={selected === 'new' ? 'new' : selected.id} initial={selected === 'new' ? null : selected} editable={editable && mode === 'edit' && (selected==='new' || selected.status==='Borrador' || selected.status==='Enviado')} edit={editable && selected!=='new' && (selected.status==='Borrador' || selected.status==='Enviado') && mode === 'view' ? () => setMode('edit') : undefined} close={() => { setSelected(null); result.reload(); }} />;
   return <><Heading title="Facturas" description="Administra facturas, documentos, pagos y saldos." action={editable && <button className="primary" disabled={busy} onClick={() => { setSelected('new'); setMode('edit'); }}>Nueva factura</button>} />
@@ -67,6 +74,9 @@ function Workspace({ initialId }: { initialId?: number }) {
       { label: 'Nota de entrega', disabled: !documents.data?.pdf, reason: !documents.data?.pdf ? 'Configura Empresa y el servicio de documentos' : undefined, run:()=>pdf(row,'delivery') },
       { label: 'Emitir Recibo', disabled: !documents.data?.pdf || row.status==='Borrador' || !row.invoice_number, reason: !documents.data?.pdf ? 'Configura Empresa y el servicio de documentos' : row.status==='Borrador' || !row.invoice_number ? 'Primero emite la factura' : undefined, run:()=>pdf(row,'receipt') },
       { label: 'Eliminar', disabled: !removable || row.status!=='Borrador' || (!!row.paid_total && row.paid_total!=='0.00'), danger: true, reason: !removable ? 'Sin permiso de eliminación' : row.status!=='Borrador' ? 'Una factura emitida no se elimina' : row.paid_total!=='0.00' ? 'No se elimina un borrador con pagos' : undefined, run:()=>setCommand({invoice:row,action:'delete'}) },
+      { label: 'Descargar PDF', disabled: !documents.data?.pdf, run: () => void downloadPdf(row, 'invoice') },
+      { label: 'Descargar nota de entrega', disabled: !documents.data?.pdf, run: () => void downloadPdf(row, 'delivery') },
+      { label: 'Descargar recibo', disabled: !documents.data?.pdf || row.status === 'Borrador' || !row.invoice_number, run: () => void downloadPdf(row, 'receipt') },
     ]} />])} /><nav className="quote-pagination" aria-label="Paginación de facturas"><button disabled={busy || page === 1} onClick={() => setPage(p => p - 1)}>Anterior</button><span role="status">Página {page}</span><button disabled={busy || !result.data.has_more} onClick={() => setPage(p => p + 1)}>Siguiente</button></nav></> : !result.error && <Loading />}</section>
     {command && <InvoiceCommandDialog invoice={command.invoice} action={command.action} close={()=>setCommand(null)} changed={result.reload} completed={value=>{setCommand(null);result.reload();if(value){setSelected(value);setMode('view');}notify(command.action==='delete'?'Borrador eliminado.':'Factura actualizada.');}} />}
   </>;

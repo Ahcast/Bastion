@@ -216,14 +216,16 @@ impl InvoiceService {
             .as_ref()
             .map(|(k, _)| k.clone())
             .unwrap_or_else(|| format!("{prefix}{}.pdf", DocumentService::object_suffix()));
-        let filename = format!(
-            "{kind}-{}.pdf",
-            current
-                .invoice_number
-                .as_deref()
-                .map(str::to_owned)
-                .unwrap_or_else(|| format!("borrador-{id}"))
-        );
+        let number = current
+            .invoice_number
+            .clone()
+            .unwrap_or_else(|| format!("proforma-{id}"));
+        let reference = match kind {
+            "delivery" => format!("nota-entrega-{number}"),
+            "receipt" => format!("recibo-{number}"),
+            _ => number,
+        };
+        let filename = bastion_core::pdf_filename(&reference, &format!("proforma-{id}"));
         let bytes = if let Some((_, hash)) = previous {
             let bytes = storage.get(key.clone()).await?;
             if Sha256::digest(&bytes).as_slice() != hash.as_slice() {

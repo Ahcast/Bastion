@@ -312,7 +312,15 @@ async fn mysql57_invoice_actions_numbering_payments_documents_and_preserved_orig
             .decode(doc.content_base64)
             .unwrap();
         assert!(bytes.starts_with(b"%PDF-"));
-        assert!(doc.filename.ends_with(".pdf"));
+        let number = a.invoice_number.as_deref().unwrap();
+        assert_eq!(
+            doc.filename,
+            match kind {
+                "delivery" => format!("nota-entrega-{number}.pdf"),
+                "receipt" => format!("recibo-{number}.pdf"),
+                _ => format!("{number}.pdf"),
+            }
+        );
         invoices.document(2, a.id, 4, kind).await.unwrap();
     }
     let count: i64 =

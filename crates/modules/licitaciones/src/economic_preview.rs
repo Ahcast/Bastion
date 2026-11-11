@@ -96,7 +96,7 @@ impl TenderService {
         crate::service::event(&mut tx, actor, "pdf.economic_preview", id, expected).await?;
         tx.commit().await?;
         Ok(AttachmentContent {
-            filename: format!("oferta-economica-{id}.pdf"),
+            filename: bastion_core::pdf_filename(&exp.name, &format!("expediente-{id}")),
             mime: "application/pdf".into(),
             content_base64: STANDARD.encode(bytes),
         })

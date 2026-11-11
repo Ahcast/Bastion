@@ -188,3 +188,7 @@ JICA utiliza presentación y lista de precios de importados privadas, independie
 ### Adjudicaciones y borrador revisado
 
 El 2026-11-06 el usuario confirma seleccionar ítems y cantidades adjudicadas, elegir cliente del catálogo y capturar precios e impuestos durante la revisión. El contrato nuevo está en [Adjudicaciones](licitaciones-adjudicaciones.md) y su [OpenAPI](licitaciones-adjudicaciones.openapi.yaml). Sustituye los pendientes de selección y captura de precios del mapeo inicial. Cada adjudicación conserva cantidades e instantánea y puede generar un único borrador, con autorización de ambos dominios y persistencia transaccional. Su estado de despliegue se registra en el documento de despliegue.
+
+## Nombre del expediente PDF
+
+La descarga del PDF final y la vista previa económica usan el nombre del expediente con extensión .pdf. Para expedientes antiguos sin nombre se utiliza expediente- seguido de su ID. El encabezado de descarga conserva los caracteres Unicode mediante filename*. Los caracteres incompatibles con nombres de archivo se reemplazan por guion bajo.

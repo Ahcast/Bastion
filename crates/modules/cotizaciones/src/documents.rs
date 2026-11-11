@@ -72,9 +72,9 @@ impl QuoteService {
         // A renderer owns its key, so failed/concurrent renders cannot remove or
         // overwrite another renderer's confirmed document during cleanup.
         let mut key = format!("{prefix}{}.pdf", DocumentService::object_suffix());
-        let filename = format!(
-            "{}.pdf",
-            current.quote_number.as_deref().unwrap_or("cotizacion")
+        let filename = bastion_core::pdf_filename(
+            current.quote_number.as_deref().unwrap_or(""),
+            &format!("cotizacion-{id}"),
         );
         let previous: Option<(String,Vec<u8>)> = sqlx::query_as(
             "SELECT object_key,sha256 FROM cotizaciones_documents WHERE quote_id=? AND quote_version=? AND kind='pdf' AND object_key LIKE ? ORDER BY object_key LIMIT 1",

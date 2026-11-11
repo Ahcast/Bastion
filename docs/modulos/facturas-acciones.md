@@ -95,3 +95,7 @@ El commit `ae475e8e9272b84977c2cd2b733d62c0c4883b3c` pasó [CI](https://github.c
 Por indicación del usuario, el título del PDF de borrador es «Factura Proforma» y conserva «Estado: Proforma». En ambos PDF el bloque compacto de totales se sitúa a la derecha de la página, con etiquetas e importes alineados a la izquierda. Esta indicación sustituye la ubicación anterior del bloque a la izquierda.
 
 La plantilla se desplegó en AWS en el commit `07c18775ae3b271702255fecf4ec9f55801e4b8b`, tras [CI aprobado](https://github.com/Ahcast/Bastion/actions/runs/40682083139) y revisión visual de factura y proforma con datos sintéticos. Respaldo privado previo; sin migraciones ni modificación de facturas o pagos. El ejecutable activo contiene la plantilla nueva y readiness HTTPS responde 200; documento sin sesión responde 401. Bluehost conserva la interfaz vigente al no cambiar el frontend.
+
+## Nombre de los documentos PDF
+
+La factura usa su número SAR con extensión .pdf. La nota de entrega usa nota-entrega- seguida de ese número y el recibo usa recibo- seguido del mismo número. Antes de emitir, el identificador es proforma- seguido del ID del borrador. El listado ofrece una descarga explícita con el nombre devuelto por la API.

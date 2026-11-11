@@ -183,6 +183,26 @@ impl futures_core::Stream for PdfStream {
         }
     }
 }
+fn pdf_attachment_header(filename: &str) -> Result<HeaderValue, ApiError> {
+    let ascii = filename
+        .chars()
+        .map(|ch| {
+            if ch.is_ascii_alphanumeric() || matches!(ch, '.' | '-' | '_' | ' ') {
+                ch
+            } else {
+                '_'
+            }
+        })
+        .collect::<String>();
+    let encoded = url::form_urlencoded::byte_serialize(filename.as_bytes())
+        .collect::<String>()
+        .replace('+', "%20");
+    HeaderValue::from_str(&format!(
+        "attachment; filename=\"{ascii}\"; filename*=UTF-8''{encoded}"
+    ))
+    .map_err(|_| ApiError(CoreError::Invalid))
+}
+
 async fn download_final_pdf(
     State(state): State<ApiState>,
     headers: axum::http::HeaderMap,
@@ -192,9 +212,9 @@ async fn download_final_pdf(
     let permit = super::LARGE_FILE_SLOTS
         .try_acquire()
         .map_err(|_| ApiError(CoreError::Overloaded))?;
-    let (file, size) = state
+    let (file, size, filename) = state
         .licitaciones
-        .download_pdf_job(user.id, id, &job)
+        .download_named_pdf_job(user.id, id, &job)
         .await
         .map_err(ApiError)?;
     let body = PdfStream {
@@ -209,7 +229,7 @@ async fn download_final_pdf(
     );
     headers.insert(
         axum::http::header::CONTENT_DISPOSITION,
-        HeaderValue::from_static("attachment; filename=\"licitacion.pdf\""),
+        pdf_attachment_header(&filename)?,
     );
     headers.insert(
         axum::http::header::CACHE_CONTROL,
@@ -776,6 +796,15 @@ fn response(expedient: Expedient) -> Response {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn pdf_header_preserves_the_utf8_expedient_reference() {
+        let filename = bastion_core::pdf_filename("Licitación 24/2026", "expediente-1");
+        let header = super::pdf_attachment_header(&filename).unwrap();
+        let header = header.to_str().unwrap();
+        assert!(header.contains("filename=\"Licitaci_n 24_2026.pdf\""));
+        assert!(header.contains("filename*=UTF-8''Licitaci%C3%B3n%2024_2026.pdf"));
+    }
+
     use super::*;
     #[tokio::test]
     async fn mysql57_tender_http_session_csrf_versions_and_mass_assignment() {
