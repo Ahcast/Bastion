@@ -312,7 +312,7 @@ async fn mysql57_invoice_actions_numbering_payments_documents_and_preserved_orig
             .decode(doc.content_base64)
             .unwrap();
         assert!(bytes.starts_with(b"%PDF-"));
-        let number = a.invoice_number.as_deref().unwrap();
+        let number = paid.invoice_number.as_deref().unwrap();
         assert_eq!(
             doc.filename,
             match kind {
