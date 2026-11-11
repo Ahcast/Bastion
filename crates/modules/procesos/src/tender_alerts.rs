@@ -38,7 +38,11 @@ impl ProcessService {
         // The module lock serializes with other workers and administrative disable.
         let recipient = CoreService::tender_alert_recipient(recipient_email)?;
         let recipient_key = hex::encode(Sha256::digest(recipient.as_bytes()));
-        let mut tx = self.begin(sender_id, "consulta", "ver").await?;
+        // Sending scheduled alerts retains the existing read permission, but
+        // writes deduplication receipts and the outbox: it needs an exclusive lock.
+        let mut tx = self
+            .begin_with_lock(DomainActor::User(sender_id), "consulta", "ver", true)
+            .await?;
         let mut query = QueryBuilder::<MySql>::new(
             "SELECT tender_id FROM procesos_tender_alerts WHERE recipient_key=",
         );

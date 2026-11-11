@@ -234,7 +234,8 @@ impl InvoiceService {
             let bytes = storage.render(TEMPLATE, payload).await?;
             storage.put(key.clone(), bytes.clone()).await?;
             let persist=async {
-                let mut tx=self.begin(actor,"ver").await?;let latest=load(&mut tx,id).await?;
+                // Document persistence is a write, while keeping the existing read permission.
+                let mut tx=self.begin_with_lock(actor,"ver",true).await?;let latest=load(&mut tx,id).await?;
                 if latest.version!=expected {return Err(CoreError::PreconditionFailed);}
                 sqlx::query("INSERT INTO facturas_documents(object_key,invoice_id,invoice_version,kind,filename,sha256,byte_size,created_at) VALUES (?,?,?,?,?,?,?,UTC_TIMESTAMP(6))").bind(&key).bind(id).bind(expected).bind(kind).bind(&filename).bind(Sha256::digest(&bytes).to_vec()).bind(bytes.len() as u32).execute(&mut *tx).await?;
                 CoreAdmin::record_domain_event(&mut tx,actor,"facturas","invoice.document",&id.to_string(),serde_json::json!({"version":expected,"kind":kind,"template":"factura-v1"})).await?;tx.commit().await?;Ok::<(),CoreError>(())

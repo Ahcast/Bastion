@@ -76,12 +76,22 @@ impl QuoteService {
         actor: u64,
         capability: &str,
     ) -> Result<Transaction<'_, MySql>, CoreError> {
+        self.begin_with_lock(actor, capability, capability != "ver")
+            .await
+    }
+
+    async fn begin_with_lock(
+        &self,
+        actor: u64,
+        capability: &str,
+        write: bool,
+    ) -> Result<Transaction<'_, MySql>, CoreError> {
         self.admin
             .authorize(actor, "cotizaciones", "documentos", capability)
             .await?;
         let mut tx = self.database.pool().begin().await?;
         // Same lock used by Core's administrative module toggle.
-        CoreAdmin::lock_enabled_module(&mut tx, "cotizaciones", capability != "ver").await?;
+        CoreAdmin::lock_enabled_module(&mut tx, "cotizaciones", write).await?;
         Ok(tx)
     }
 

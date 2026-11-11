@@ -23,7 +23,9 @@ jobs:
       - name: Install pinned dependency auditor
         run: cargo install cargo-audit --locked --version 0.22.2
       - name: Reject known vulnerable dependencies
-        run: cargo audit
+        run: |
+          python3 -m unittest discover -s deploy/tests -p test_rust_audit.py
+          python3 deploy/check_rust_audit.py
 
   frontend-auth:
     runs-on: ubuntu-latest

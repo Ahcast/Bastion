@@ -95,7 +95,8 @@ impl QuoteService {
             let bytes = storage.render(TEMPLATE, payload).await?;
             storage.put(key.clone(), bytes.clone()).await?;
             let persist=async {
-                let mut tx=self.begin(actor,"ver").await?;
+                // PDF persistence is a write, while keeping the existing read permission.
+                let mut tx=self.begin_with_lock(actor,"ver",true).await?;
                 let latest=load(&mut tx,id).await?;
                 if latest.version!=expected {return Err(CoreError::PreconditionFailed);}
                 sqlx::query("INSERT INTO cotizaciones_documents (object_key,quote_id,quote_version,kind,filename,mime,sha256,byte_size,created_at) VALUES (?,?,?,'pdf',?,'application/pdf',?,?,UTC_TIMESTAMP(6))")

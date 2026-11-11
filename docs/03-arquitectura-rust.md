@@ -2,6 +2,8 @@
 
 ## Ajustes de concurrencia del 2026-11-10
 
+Las alertas de Procesos y la persistencia de documentos PDF de Cotizaciones/Facturas conservan bloqueo exclusivo aunque su permiso sea `ver`, porque escriben registros de negocio. La exportación y descarga pueden añadir eventos de auditoría independientes bajo bloqueo compartido, sin modificar los datos consultados.
+
 El Core ofrece `lock_enabled_module`: las consultas usan `LOCK IN SHARE MODE`, compatible con MySQL 5.7, y las mutaciones conservan `FOR UPDATE`. Los lectores del mismo módulo pueden coexistir; una escritura o desactivación administrativa espera a que terminen. Se conservan las comprobaciones dentro de las operaciones de dominio, las versiones, la idempotencia, el orden de bloqueos entre módulos y los bloqueos exclusivos de conversiones. Colaboración opta por lectura compartida sólo en listado, comprobación de acceso, descarga/vista previa y listado de formularios; las operaciones de copia y mutación conservan sus bloqueos.
 
 La autorización general de usuario/rol/permisos se resuelve en una consulta. Las comprobaciones preliminares de Licitaciones y Reportes usan la consulta central de acceso a módulo habilitado sin abrir otra transacción. No se cachean permisos entre peticiones ni se cambia el vencimiento de sesión: se conserva la actualización de actividad por petición para no reducir la ventana de 24 horas de inactividad.

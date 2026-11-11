@@ -203,12 +203,23 @@ impl ProcessService {
         scope: &str,
         capability: &str,
     ) -> Result<Transaction<'_, MySql>, CoreError> {
+        self.begin_with_lock(actor, scope, capability, capability != "ver")
+            .await
+    }
+
+    async fn begin_with_lock(
+        &self,
+        actor: DomainActor,
+        scope: &str,
+        capability: &str,
+        write: bool,
+    ) -> Result<Transaction<'_, MySql>, CoreError> {
         self.admin
             .authorize_actor(actor, "procesos", scope, capability)
             .await?;
         let mut tx = self.database.pool().begin().await?;
         // Serialize with administrative disable and with other domain operations.
-        CoreAdmin::lock_enabled_module(&mut tx, "procesos", capability != "ver").await?;
+        CoreAdmin::lock_enabled_module(&mut tx, "procesos", write).await?;
         Ok(tx)
     }
 
