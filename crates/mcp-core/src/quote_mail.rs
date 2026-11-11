@@ -51,9 +51,23 @@ impl QuoteMailConfirmation {
         grant: u64,
     ) -> Result<(), CoreError> {
         let client: Option<u64> = sqlx::query_scalar(
-            "SELECT g.client_id FROM oauth_grants g JOIN oauth_clients c ON c.id=g.client_id +             WHERE g.id=? AND g.user_id=? AND g.revoked_at IS NULL AND g.expires_at>UTC_TIMESTAMP(6) +             AND c.enabled=1 AND c.metadata_hash=c.approved_metadata_hash +             AND JSON_CONTAINS(g.scopes_json,JSON_QUOTE('cotizaciones:write'))=1 +             AND JSON_CONTAINS(g.scopes_json,JSON_QUOTE('cotizaciones:read'))=1 +             AND EXISTS (SELECT 1 FROM oauth_client_scopes s WHERE s.client_id=c.id AND s.scope_name='cotizaciones:write') +             AND EXISTS (SELECT 1 FROM oauth_client_scopes s WHERE s.client_id=c.id AND s.scope_name='cotizaciones:read') FOR UPDATE",
+            r#"SELECT g.client_id FROM oauth_grants g
+               JOIN oauth_clients c ON c.id=g.client_id
+               WHERE g.id=? AND g.user_id=? AND g.revoked_at IS NULL
+               AND g.expires_at>UTC_TIMESTAMP(6)
+               AND c.enabled=1 AND c.metadata_hash=c.approved_metadata_hash
+               AND JSON_CONTAINS(g.scopes_json,JSON_QUOTE('cotizaciones:write'))=1
+               AND JSON_CONTAINS(g.scopes_json,JSON_QUOTE('cotizaciones:read'))=1
+               AND EXISTS (SELECT 1 FROM oauth_client_scopes s
+                   WHERE s.client_id=c.id AND s.scope_name='cotizaciones:write')
+               AND EXISTS (SELECT 1 FROM oauth_client_scopes s
+                   WHERE s.client_id=c.id AND s.scope_name='cotizaciones:read')
+               FOR UPDATE"#,
         )
-        .bind(grant).bind(user).fetch_optional(&mut **tx).await?;
+        .bind(grant)
+        .bind(user)
+        .fetch_optional(&mut **tx)
+        .await?;
         let client = client.ok_or(CoreError::Forbidden)?;
         let policy = CoreScopePolicy::new(self.core.admin(), approved_read_requirements())
             .map_err(|_| CoreError::Invalid)?;
