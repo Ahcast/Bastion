@@ -1,5 +1,7 @@
 # Documentación del nuevo CastilloIT
 
+- 2026-11-10 (Honduras): desplegadas en AWS las mejoras de seguridad y rendimiento del backend `e27376a677004b2e138324ac44bc9be5f6e5d2bc` y Cotizaciones 5. Respaldo completo con restauración verificada de 105 tablas; datos, orden de cotizaciones y activaciones conservados. HTTPS y consultas autenticadas de los módulos comprobados; frontend conservado. Véase la evidencia y los límites de verificación en [despliegue](09-despliegue.md).
+
 - 2026-11-10: la regresión MySQL detectó que las alertas de Procesos necesitan conservar exclusión mutua para deduplicar correos; se mantiene también en la persistencia de PDF. La auditoría de dependencias comprueba el grafo de dependencias activas antes de aceptar la excepción temporal de SQLite opcional documentada en `08-seguridad-y-permisos.md`.
 
 - 2026-11-10 (Honduras): mejoras de seguridad y rendimiento autorizadas tras revisión: Tokio corregido, revocación de recuperaciones pendientes al cambiar contraseña, admisión del login por IP y Argon2 fuera del runtime asíncrono, lecturas concurrentes con coordinación de activación, autorización consolidada e índice de fechas de Cotizaciones. Se conservan AWS/Bluehost/MySQL, permisos y reglas comerciales. Ver `08-seguridad-y-permisos.md`, `03-arquitectura-rust.md` y la preparación de publicación en `09-despliegue.md`.
