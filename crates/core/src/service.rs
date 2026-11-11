@@ -33,6 +33,9 @@ type HmacSha1 = Hmac<Sha1>;
 #[path = "business_mail.rs"]
 mod business_mail;
 pub use business_mail::{BusinessMail, BusinessMailAttachment};
+#[cfg(test)]
+#[path = "security_regression.rs"]
+mod security_regression;
 #[path = "totp_change.rs"]
 mod totp_change;
 
@@ -90,6 +93,7 @@ pub struct CoreService {
     cipher: Aes256Gcm,
     dummy_password_hash: String,
     password_kdf_semaphore: Arc<Semaphore>,
+    login_limits: Arc<crate::login_limits::LoginLimits>,
 }
 
 #[derive(Debug, Serialize)]
@@ -276,7 +280,54 @@ impl CoreService {
             cipher,
             dummy_password_hash,
             password_kdf_semaphore: Arc::new(Semaphore::new(4)),
+            login_limits: Arc::new(crate::login_limits::LoginLimits::default()),
         })
+    }
+
+    async fn password_work<T: Send + 'static>(
+        &self,
+        work: impl FnOnce() -> T + Send + 'static,
+    ) -> Result<T, CoreError> {
+        // Reject overload immediately. The blocking task owns the permit even
+        // if the HTTP future is cancelled; started KDF work cannot be aborted.
+        let permit = self
+            .password_kdf_semaphore
+            .clone()
+            .try_acquire_owned()
+            .map_err(|_| CoreError::Overloaded)?;
+        tokio::task::spawn_blocking(move || {
+            let _permit = permit;
+            work()
+        })
+        .await
+        .map_err(|_| CoreError::Overloaded)
+    }
+
+    async fn hash_password_async(&self, password: &str) -> Result<String, CoreError> {
+        let password = password.to_owned();
+        self.password_work(move || hash_password(&password)).await?
+    }
+
+    async fn verify_password_async(
+        &self,
+        password: &str,
+        encoded: &str,
+    ) -> Result<bool, CoreError> {
+        let password = password.to_owned();
+        let encoded = encoded.to_owned();
+        self.password_work(move || verify_password(&password, &encoded))
+            .await
+    }
+
+    async fn verify_account_password(
+        &self,
+        password: &str,
+        encoded: Option<&str>,
+    ) -> Result<bool, CoreError> {
+        let valid = self
+            .verify_password_async(password, encoded.unwrap_or(&self.dummy_password_hash))
+            .await?;
+        Ok(encoded.is_some() && valid)
     }
 
     pub fn with_public_app_origin(mut self, origin: String) -> Self {
@@ -333,7 +384,7 @@ impl CoreService {
         let setup_token = random_token();
         let now = Utc::now().naive_utc();
         let expires_at = now + chrono::Duration::minutes(10);
-        let password_hash = hash_password(password)?;
+        let password_hash = self.hash_password_async(password).await?;
         let mut tx = self.database.pool.begin().await?;
         let state=sqlx::query_as::<_,(Option<u64>,Option<NaiveDateTime>,Option<NaiveDateTime>)>("SELECT pending_user_id,pending_expires_at,completed_at FROM core_bootstrap_state WHERE id=1 FOR UPDATE")
             .fetch_one(&mut *tx).await?;
@@ -476,11 +527,7 @@ impl CoreService {
         keep_logged_in: bool,
         device_token: Option<&str>,
     ) -> Result<LoginStart, CoreError> {
-        let _kdf_permit = self
-            .password_kdf_semaphore
-            .acquire()
-            .await
-            .map_err(|_| CoreError::Overloaded)?;
+        self.login_limits.admit(ip)?;
         let email = normalize_email(email)?;
         validate_password_input(password)?;
         let mut tx = self.database.pool.begin().await?;
@@ -489,14 +536,18 @@ impl CoreService {
         ).bind(&email).fetch_optional(&mut *tx).await?;
         let Some(user) = user else {
             tx.commit().await?;
-            let _ = verify_password(password, &self.dummy_password_hash);
+            let _ = self
+                .verify_password_async(password, &self.dummy_password_hash)
+                .await?;
             self.log_security(None, "password_login", "failed", ip, safe_agent(user_agent))
                 .await?;
             return Err(CoreError::Unauthorized);
         };
         if user.status != "active" {
             tx.commit().await?;
-            let _ = verify_password(password, &self.dummy_password_hash);
+            let _ = self
+                .verify_password_async(password, &self.dummy_password_hash)
+                .await?;
             self.log_security(
                 Some(user.id),
                 "password_login",
@@ -512,12 +563,14 @@ impl CoreService {
             .is_some_and(|until| until > Utc::now().naive_utc())
         {
             tx.commit().await?;
-            return Err(CoreError::Locked);
+            let _ = self
+                .verify_password_async(password, &self.dummy_password_hash)
+                .await?;
+            return Err(CoreError::Unauthorized);
         }
-        let valid_password = user
-            .password_hash
-            .as_deref()
-            .is_some_and(|hash| verify_password(password, hash));
+        let valid_password = self
+            .verify_account_password(password, user.password_hash.as_deref())
+            .await?;
         if !valid_password {
             self.record_password_failure(&mut tx, &user, ip).await?;
             tx.commit().await?;
@@ -894,11 +947,6 @@ impl CoreService {
     ) -> Result<(), CoreError> {
         validate_password(new_password)?;
         validate_password_input(current_password)?;
-        let _permit = self
-            .password_kdf_semaphore
-            .acquire()
-            .await
-            .map_err(|_| CoreError::Overloaded)?;
         let now = Utc::now().naive_utc();
         let mut tx = self.database.pool.begin().await?;
         let row = sqlx::query_as::<_,(u64,u64,Option<String>,Option<Vec<u8>>,Option<i64>)>(
@@ -907,10 +955,9 @@ impl CoreService {
         if self.is_totp_limited(row.1, ip).await? {
             return Err(CoreError::Locked);
         }
-        if !row
-            .2
-            .as_deref()
-            .is_some_and(|hash| verify_password(current_password, hash))
+        if !self
+            .verify_account_password(current_password, row.2.as_deref())
+            .await?
         {
             sqlx::query("INSERT INTO security_events (user_id,event_type,result,ip_address,device_label,created_at) VALUES (?,'password_change','failed',?,?,?)")
                 .bind(row.1).bind(ip).bind(safe_agent(user_agent)).bind(now).execute(&mut *tx).await?;
@@ -925,13 +972,14 @@ impl CoreService {
             self.record_totp_failure(row.1, ip).await?;
             return Err(CoreError::Unauthorized);
         };
-        let password_hash = hash_password(new_password)?;
+        let password_hash = self.hash_password_async(new_password).await?;
         sqlx::query("UPDATE users SET password_hash=?,last_totp_counter=? WHERE id=?")
             .bind(password_hash)
             .bind(counter as i64)
             .bind(row.1)
             .execute(&mut *tx)
             .await?;
+        Self::supersede_account_links(&mut tx, row.1, "password_reset", now).await?;
         sqlx::query("UPDATE sessions SET revoked_at=?,revocation_reason='password_changed' WHERE user_id=? AND revoked_at IS NULL")
             .bind(now).bind(row.1).execute(&mut *tx).await?;
         sqlx::query("UPDATE oauth_grants SET revoked_at=?,revocation_reason='password_changed' WHERE user_id=? AND revoked_at IS NULL")
@@ -1125,16 +1173,11 @@ impl CoreService {
         ip: &str,
     ) -> Result<(), CoreError> {
         validate_password(new_password)?;
-        let _permit = self
-            .password_kdf_semaphore
-            .acquire()
-            .await
-            .map_err(|_| CoreError::Overloaded)?;
         let now = Utc::now().naive_utc();
         let mut tx = self.database.pool.begin().await?;
         let row=sqlx::query_as::<_,(u64,u64)>("SELECT t.id,t.user_id FROM account_tokens t JOIN users u ON u.id=t.user_id WHERE t.token_hash=? AND t.token_type='password_reset' AND t.mailed_at IS NOT NULL AND t.expires_at>? AND t.consumed_at IS NULL AND u.status='active' FOR UPDATE")
             .bind(token_hash(token).to_vec()).bind(now).fetch_optional(&mut *tx).await?.ok_or(CoreError::Unauthorized)?;
-        let password_hash = hash_password(new_password)?;
+        let password_hash = self.hash_password_async(new_password).await?;
         sqlx::query("UPDATE users SET password_hash=? WHERE id=? AND status='active'")
             .bind(password_hash)
             .bind(row.1)
@@ -1145,6 +1188,7 @@ impl CoreService {
             .bind(row.0)
             .execute(&mut *tx)
             .await?;
+        Self::supersede_account_links(&mut tx, row.1, "password_reset", now).await?;
         revoke_user_access(&mut tx, row.1, now, "password_changed").await?;
         sqlx::query("INSERT INTO security_events (user_id,event_type,result,ip_address,device_label,created_at) VALUES (?,'password_reset','success',?,'',?)").bind(row.1).bind(ip).bind(now).execute(&mut *tx).await?;
         insert_audit(
@@ -1182,12 +1226,7 @@ impl CoreService {
             return Err(CoreError::InvalidInvitationLink);
         }
         validate_password(password)?;
-        let _permit = self
-            .password_kdf_semaphore
-            .acquire()
-            .await
-            .map_err(|_| CoreError::Overloaded)?;
-        let password_hash = hash_password(password)?;
+        let password_hash = self.hash_password_async(password).await?;
         let now = Utc::now().naive_utc();
         let seed = BASE32_NOPAD.encode(&random_bytes::<20>());
         let encrypted_seed = self.encrypt(&seed)?;

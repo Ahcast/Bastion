@@ -37,11 +37,6 @@ impl CoreService {
         agent: &str,
     ) -> Result<BootstrapBegin, CoreError> {
         validate_password_input(password)?;
-        let _permit = self
-            .password_kdf_semaphore
-            .acquire()
-            .await
-            .map_err(|_| CoreError::Overloaded)?;
         let mut tx = self.database.pool.begin().await?;
         let row = lock_session(&mut tx, session_token).await?;
         if self.is_totp_limited(row.user_id, ip).await? {
@@ -49,10 +44,9 @@ impl CoreService {
         }
         let secret = self.decrypt(&row.totp_secret_enc)?;
         let counter = verify_totp(&secret, code, row.last_totp_counter.unwrap_or(-1));
-        let correct_password = row
-            .password_hash
-            .as_deref()
-            .is_some_and(|hash| verify_password(password, hash));
+        let correct_password = self
+            .verify_account_password(password, row.password_hash.as_deref())
+            .await?;
         let now = Utc::now().naive_utc();
         let Some(counter) = counter.filter(|_| correct_password) else {
             sqlx::query("INSERT INTO security_events (user_id,event_type,result,ip_address,device_label,created_at) VALUES (?,'totp_sensitive_action','failed',?,?,?)")

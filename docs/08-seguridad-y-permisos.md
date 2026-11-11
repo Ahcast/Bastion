@@ -1,5 +1,13 @@
 # Seguridad y permisos
 
+## Endurecimiento autorizado el 2026-11-10
+
+- Login de contraseña: máximo 30 solicitudes por IP verificada en una ventana de 15 minutos, antes de consultar MySQL o ejecutar Argon2. Contador en memoria compartido entre clones del Core, con máximo 4096 IP activas y rechazo controlado al agotarse la capacidad. No sustituye el bloqueo progresivo por cuenta, los límites TOTP ni el borde. Es un límite por proceso: reiniciar lo reinicia; desplegar varias réplicas requiere coordinar la cuota. No se persisten nuevas IP por este contador.
+- Cuenta inexistente, inactiva o bloqueada: misma respuesta genérica de autenticación; el límite por IP conserva 429. No se informa si el correo existe. Se conserva la política actual de contraseñas y los flujos de activación/TOTP.
+- Argon2 se ejecuta en trabajadores bloqueantes con máximo cuatro trabajos simultáneos y rechazo inmediato de sobrecarga (503). El permiso permanece dentro del trabajador aunque se cancele la petición, evitando acumular cómputo fuera del límite. No se cambia algoritmo ni parámetros de hashes existentes.
+- Cambiar la contraseña autenticándose o completar una recuperación invalida todos los enlaces pendientes de recuperación de esa cuenta en la misma transacción y cancela sus correos pendientes. Un fallo de contraseña/TOTP no consume enlaces. Las invitaciones y cambios de correo conservan su propio ciclo de vida. TOTP sigue habilitado y las sesiones/dispositivos se revocan como antes.
+- Tokio se fija a una versión mínima 1.54.1 y el lockfile usa esa versión, corregida para RUSTSEC-2026-0384. CI incorpora `cargo audit` con herramienta fijada; una compilación correcta no sustituye la auditoría de dependencias.
+
 ## Modelo
 
 El frontend usa React + TypeScript estricto y Vite conforme a ADR-0002, publicado como archivos estáticos. Renderizar datos como texto/atributos React y validar URLs según su uso; no usar HTML crudo ni ejecución dinámica. Un cliente API común conserva cookies y controles CSRF, sin credenciales en almacenamiento web. TypeScript no valida datos en ejecución ni concede permisos. Fijar dependencias por lockfile, revisar vulnerabilidades y no incluir secretos ni archivos fuente de configuración privada en el build.

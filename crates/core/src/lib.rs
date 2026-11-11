@@ -5,6 +5,7 @@ mod config;
 mod dashboard;
 mod database;
 mod documents;
+mod login_limits;
 mod oauth_session;
 mod sar;
 mod service;
