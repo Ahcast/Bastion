@@ -799,7 +799,9 @@ mod tests {
     #[test]
     fn pdf_header_preserves_the_utf8_expedient_reference() {
         let filename = bastion_core::pdf_filename("Licitación 24/2026", "expediente-1");
-        let header = super::pdf_attachment_header(&filename).unwrap();
+        let header = super::pdf_attachment_header(&filename)
+            .ok()
+            .expect("valid PDF filename");
         let header = header.to_str().unwrap();
         assert!(header.contains("filename=\"Licitaci_n 24_2026.pdf\""));
         assert!(header.contains("filename*=UTF-8''Licitaci%C3%B3n%2024_2026.pdf"));
