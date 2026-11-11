@@ -74,4 +74,6 @@ jobs:
           BASTION_TYPST_BIN: ${{ github.workspace }}/crates/mcp-core/tests/fixtures/typst.py
           BASTION_DOCUMENTS_BUCKET: bastion-synthetic-attachment-test
           BASTION_DOCUMENTS_REGION: synthetic-region
-        run: cargo test --locked --package bastion-mcp --package bastion-mcp-core --package bastion-mcp-http --package bastion-server
+        run: |
+          chmod +x crates/modules/cotizaciones/tests/fixtures/private_storage.py
+          cargo test --locked --package bastion-mcp --package bastion-mcp-core --package bastion-mcp-http --package bastion-server
