@@ -319,6 +319,23 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/PdfJob' }
         '404': { description: Trabajo no disponible }
+  /api/v1/licitaciones/{id}/oferta-economica/preview/vista:
+    get:
+      summary: Vista económica privada en el visor nativo (editar)
+      parameters:
+        - $ref: '#/components/parameters/Id'
+        - {name: version, in: query, required: true, schema: {type: integer, minimum: 1}}
+      description: Renderiza únicamente la versión guardada; conserva permisos sobre las referencias, aislamiento, límites y limpieza temporal. Rechaza navegación cross-site.
+      responses:
+        '200':
+          description: PDF con nombre del expediente y Content-Disposition inline UTF-8, sin caché pública.
+          headers:
+            Content-Disposition: {schema: {type: string}}
+          content:
+            application/pdf:
+              schema: {type: string, format: binary}
+        '403': {description: Sesión sin permiso editar o navegación cross-site}
+        '412': {description: El expediente cambió antes o durante la generación}
   /api/v1/licitaciones/{id}/pdf/trabajos/{job}/archivo:
     parameters:
       - $ref: '#/components/parameters/Id'

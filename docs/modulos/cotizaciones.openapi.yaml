@@ -389,6 +389,24 @@ paths:
                 $ref: "#/components/schemas/Pdf"
         "412": *a1
         default: *a1
+  /api/v1/cotizaciones/{id}/pdf/vista:
+    get:
+      operationId: viewQuotePdf
+      summary: Abrir el PDF privado con su nombre en el visor nativo
+      x-permission: cotizaciones/documentos/ver
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: integer, minimum: 1}}
+        - {name: version, in: query, required: true, schema: {type: integer, minimum: 1}}
+      description: Usa la sesión vigente, el generador y la caché existentes; rechaza navegación cross-site y versiones antiguas. No modifica datos comerciales.
+      responses:
+        '200':
+          description: PDF con Content-Disposition inline, filename y filename* UTF-8; sin caché pública.
+          headers:
+            Content-Disposition: {schema: {type: string}}
+          content:
+            application/pdf:
+              schema: {type: string, format: binary}
+        default: {$ref: '#/components/responses/Problem'}
   /api/v1/cotizaciones/{id}/emails:
     get:
       summary: Consulta hasta los últimos 25 envíos propios para esta cotización.

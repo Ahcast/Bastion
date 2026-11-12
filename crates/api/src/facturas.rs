@@ -19,6 +19,10 @@ pub(super) fn routes(state: ApiState) -> Router<ApiState> {
         .route("/api/v1/facturas/{id}/clone", post(clone_invoice))
         .route("/api/v1/facturas/{id}/calculate", post(preview_saved))
         .route("/api/v1/facturas/{id}/documents/{kind}", post(document))
+        .route(
+            "/api/v1/facturas/{id}/documents/{kind}/vista",
+            get(view_document),
+        )
         .layer(RequestBodyLimitLayer::new(1024 * 1024))
         .route_layer(middleware::from_fn_with_state(state, guard))
 }
@@ -162,6 +166,22 @@ async fn document(
         .map(|doc| Json(doc).into_response())
         .map_err(ApiError)
 }
+async fn view_document(
+    State(state): State<ApiState>,
+    headers: axum::http::HeaderMap,
+    Path((id, kind)): Path<(u64, String)>,
+    Query(query): Query<super::generated_pdf::ViewQuery>,
+) -> Result<Response, ApiError> {
+    let expected = query.expected(&headers)?;
+    let user = actor(&state, &headers).await?;
+    let document = state
+        .facturas
+        .document(user.id, id, expected, &kind)
+        .await
+        .map_err(ApiError)?;
+    super::generated_pdf::inline(&document.filename, &document.mime, &document.content_base64)
+}
+
 async fn delete(
     State(state): State<ApiState>,
     headers: axum::http::HeaderMap,
@@ -470,6 +490,58 @@ mod tests {
             serde_json::from_slice(&to_bytes(response.into_body(), 16384).await.unwrap()).unwrap();
         assert_eq!(value["status"], "Borrador");
         assert!(value["invoice_number"].is_null());
+        for path in [
+            "/api/v1/facturas/1/documents/invoice/vista?version=1",
+            "/api/v1/cotizaciones/1/pdf/vista?version=1",
+            "/api/v1/licitaciones/1/oferta-economica/preview/vista?version=1",
+        ] {
+            assert_eq!(
+                app.clone()
+                    .oneshot(request(
+                        "GET",
+                        path,
+                        None,
+                        false,
+                        "https://example.test",
+                        ""
+                    ))
+                    .await
+                    .unwrap()
+                    .status(),
+                StatusCode::UNAUTHORIZED
+            );
+        }
+        let native_path = "/api/v1/facturas/1/documents/invoice/vista?version=99";
+        assert_eq!(
+            app.clone()
+                .oneshot(request(
+                    "GET",
+                    native_path,
+                    Some("synthetic-viewer"),
+                    false,
+                    "https://example.test",
+                    "",
+                ))
+                .await
+                .unwrap()
+                .status(),
+            StatusCode::PRECONDITION_FAILED
+        );
+        let mut cross_site = request(
+            "GET",
+            native_path,
+            Some("synthetic-admin"),
+            false,
+            "https://example.test",
+            "",
+        );
+        cross_site
+            .headers_mut()
+            .insert("sec-fetch-site", HeaderValue::from_static("cross-site"));
+        assert_eq!(
+            app.clone().oneshot(cross_site).await.unwrap().status(),
+            StatusCode::FORBIDDEN
+        );
         for expected in [StatusCode::OK, StatusCode::PRECONDITION_FAILED] {
             let mut update = request(
                 "PUT",

@@ -89,6 +89,10 @@ fn file_routes(state: ApiState) -> Router<ApiState> {
             post(preview_economic_offer),
         )
         .route(
+            "/api/v1/licitaciones/{id}/oferta-economica/preview/vista",
+            get(view_economic_offer),
+        )
+        .route(
             "/api/v1/licitaciones/{id}/archivos",
             get(files).post(upload_file),
         )
@@ -137,6 +141,7 @@ async fn file_guard(State(state): State<ApiState>, request: Request, next: Next)
         let path = request.uri().path();
         let large = (*request.method() == Method::POST && path.ends_with("/archivos"))
             || path.ends_with("/preview")
+            || path.ends_with("/preview/vista")
             || path.ends_with("/download");
         let _permit = if large {
             Some(
@@ -689,6 +694,25 @@ async fn preview_economic_offer(
         .map(Json)
         .map_err(ApiError)
 }
+async fn view_economic_offer(
+    State(state): State<ApiState>,
+    headers: axum::http::HeaderMap,
+    Path(id): Path<u64>,
+    Query(query): Query<super::generated_pdf::ViewQuery>,
+) -> Result<Response, ApiError> {
+    if !bastion_licitaciones::TenderService::pdf_generation_enabled() {
+        return Err(ApiError(CoreError::NotFound));
+    }
+    let expected = query.expected(&headers)?;
+    let user = actor(&state, &headers).await?;
+    let document = state
+        .licitaciones
+        .preview_economic_offer(user.id, id, expected)
+        .await
+        .map_err(ApiError)?;
+    super::generated_pdf::inline(&document.filename, &document.mime, &document.content_base64)
+}
+
 async fn latest_pdf(
     State(state): State<ApiState>,
     headers: axum::http::HeaderMap,

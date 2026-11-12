@@ -98,4 +98,4 @@ El usuario puede consultar sus propios envíos desde la cotización. Un envío p
 
 ## Nombre del PDF
 
-El PDF usa el número de cotización con extensión .pdf. El listado ofrece una descarga explícita con ese nombre.
+El PDF usa el número de cotización con extensión .pdf. La acción PDF existente abre la respuesta privada de la API en el visor nativo, con Content-Disposition inline y el nombre del archivo. No se añaden botones de descarga. El enlace lleva únicamente la versión esperada; autenticación, permiso ver y control de versión se validan en el servidor.

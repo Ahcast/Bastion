@@ -35,6 +35,7 @@ mod colaboracion;
 mod cotizaciones;
 mod facturas;
 mod gastos;
+mod generated_pdf;
 mod licitaciones;
 #[cfg(test)]
 mod licitaciones_files_tests;

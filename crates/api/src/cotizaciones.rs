@@ -28,6 +28,7 @@ pub(super) fn routes(state: ApiState) -> Router<ApiState> {
             get(document_readiness),
         )
         .route("/api/v1/cotizaciones/{id}/pdf", get(pdf))
+        .route("/api/v1/cotizaciones/{id}/pdf/vista", get(view_pdf))
         .route(
             "/api/v1/cotizaciones/{id}/emails",
             get(email_jobs).post(queue_email),
@@ -86,6 +87,7 @@ static ATTACHMENT_REQUESTS: tokio::sync::Semaphore = tokio::sync::Semaphore::con
 async fn guard(State(state): State<ApiState>, request: Request, next: Next) -> Response {
     let attachment_operation = request.uri().path().contains("/attachments");
     let document_operation = request.uri().path().ends_with("/pdf")
+        || request.uri().path().ends_with("/pdf/vista")
         || request.uri().path().ends_with("/emails")
         || attachment_operation;
     let result = tokio::time::timeout(
@@ -245,6 +247,22 @@ async fn pdf(
         .map(Json)
         .map_err(ApiError)
 }
+async fn view_pdf(
+    State(state): State<ApiState>,
+    headers: axum::http::HeaderMap,
+    Path(id): Path<u64>,
+    Query(query): Query<super::generated_pdf::ViewQuery>,
+) -> Result<Response, ApiError> {
+    let expected = query.expected(&headers)?;
+    let user = actor(&state, &headers).await?;
+    let document = state
+        .cotizaciones
+        .pdf(user.id, id, expected)
+        .await
+        .map_err(ApiError)?;
+    super::generated_pdf::inline(&document.filename, &document.mime, &document.content_base64)
+}
+
 async fn queue_email(
     State(state): State<ApiState>,
     headers: axum::http::HeaderMap,
@@ -509,6 +527,22 @@ mod tests {
                 .insert(ConnectInfo("127.0.0.1:5010".parse::<SocketAddr>().unwrap()));
             request
         };
+        assert_eq!(
+            app.clone()
+                .oneshot(request(
+                    "GET",
+                    &format!("/api/v1/cotizaciones/{}/pdf/vista?version=99", quote.id),
+                    true,
+                    false,
+                    "https://example.test",
+                    None,
+                    String::new(),
+                ))
+                .await
+                .unwrap()
+                .status(),
+            StatusCode::PRECONDITION_FAILED
+        );
         assert_eq!(
             app.clone()
                 .oneshot(request(

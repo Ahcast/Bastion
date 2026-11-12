@@ -53,7 +53,7 @@ test('scheduling refreshes the list and shows Honduras time alongside the commer
     assert.match(app.container.querySelector('.quote-state')?.textContent ?? '', /BorradorEnvío programado.*22\/10\/2099.*13:00.*Honduras/);
   } finally { await app.dispose(); }
 });
-const labels = ['Ver','Editar','Marcar como enviado','Convertir a orden de compra','Convertir a factura','Aprobar','Clonar','PDF','Enviar por correo','Gestionar envíos','Eliminar','Descargar PDF'];
+const labels = ['Ver','Editar','Marcar como enviado','Convertir a orden de compra','Convertir a factura','Aprobar','Clonar','PDF','Enviar por correo','Gestionar envíos','Eliminar'];
 
 async function workspace(editable = true, clients = false, linked = false) {
   const input = newQuote(); input.client_name = 'Cliente sintético';

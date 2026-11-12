@@ -83,6 +83,23 @@ paths:
             application/json:
               schema: {$ref: '#/components/schemas/Document'}
         default: {$ref: '#/components/responses/Problem'}
+  /api/v1/facturas/{id}/documents/{kind}/vista:
+    get:
+      summary: Abrir factura, nota de entrega o recibo privado en el visor nativo (ver)
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: integer, minimum: 1}}
+        - {name: kind, in: path, required: true, schema: {type: string, enum: [invoice, delivery, receipt]}}
+        - {name: version, in: query, required: true, schema: {type: integer, minimum: 1}}
+      description: Reutiliza sesión, generador, caché y reglas de estado; rechaza navegación cross-site y versiones antiguas. No emite facturas ni registra pagos.
+      responses:
+        '200':
+          description: PDF con Content-Disposition inline y nombre de archivo UTF-8, sin caché pública.
+          headers:
+            Content-Disposition: {schema: {type: string}}
+          content:
+            application/pdf:
+              schema: {type: string, format: binary}
+        default: {$ref: '#/components/responses/Problem'}
   /api/v1/facturas/dashboard:
     get:
       summary: Resumen para Inicio (facturas/documentos/ver)

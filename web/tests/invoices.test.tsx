@@ -113,7 +113,7 @@ test('invoice client combobox saves a catalog selection and clears its snapshot 
 });
 
 test('invoice dropdown preserves the nine requested actions, permissions, keyboard and view/edit modes', async () => {
-  const labels = ['Ver', 'Editar', 'Marcar como enviado', 'Ingresar pago', 'Clonar', 'PDF', 'Nota de entrega', 'Emitir Recibo', 'Eliminar', 'Descargar PDF', 'Descargar nota de entrega', 'Descargar recibo'];
+  const labels = ['Ver', 'Editar', 'Marcar como enviado', 'Ingresar pago', 'Clonar', 'PDF', 'Nota de entrega', 'Emitir Recibo', 'Eliminar'];
   for (const editable of [true, false]) {
     const calls: string[] = [];
     const api = new ApiClient('https://example.test', async (url, init = {}) => {

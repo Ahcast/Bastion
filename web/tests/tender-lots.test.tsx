@@ -20,20 +20,20 @@ test('economic preview saves drafts first and requests only economic PDF with th
   let version = 1;
   const writes: RequestInit[] = [];
   const api = new ApiClient('https://example.test', async (url, init = {}) => {
-    assert.ok(String(url).endsWith('/oferta-economica/preview'));
     writes.push(init);
-    return Response.json({ filename:'oferta.pdf', mime:'application/pdf', content_base64:btoa('%PDF-1.4') });
+    throw new Error(`Unexpected fetch: ${url}`);
   });
   function Draft() { useUnsavedChanges(true, false, async () => { version = 2; return true; }); return null; }
   const open = window.open;
-  window.open = (() => ({ closed:true, opener:null, document:{title:'',body:{textContent:''}} })) as unknown as typeof window.open;
+  const target = { closed:false, opener:{} as unknown, document:{title:'',body:{textContent:''}}, location:{href:'about:blank',replace(value:string){this.href=value;}}, close(){this.closed=true;} };
+  window.open = (() => target) as unknown as typeof window.open;
   const container = document.createElement('div'); document.body.append(container); const root = createRoot(container);
   try {
     await act(async () => root.render(<NavigationGuardProvider><CoreContext.Provider value={{api, access, notify:()=>{}}}><Draft /><TenderEconomicPreview latest={() => ({...record,version})} /></CoreContext.Provider></NavigationGuardProvider>));
     await act(async () => container.querySelector('button')!.click());
-    assert.equal(writes.length, 1);
-    assert.equal(new Headers(writes[0]!.headers).get('if-match'), '"2"');
-    assert.equal(writes[0]!.method, 'POST');
+    assert.equal(writes.length, 0);
+    assert.equal(target.opener, null);
+    assert.equal(target.location.href, 'https://example.test/api/v1/licitaciones/7/oferta-economica/preview/vista?version=2');
   } finally { window.open = open; await act(async () => root.unmount()); container.remove(); }
 });
 after(() => window.happyDOM.abort());

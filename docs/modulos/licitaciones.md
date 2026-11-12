@@ -192,3 +192,5 @@ El 2026-11-06 el usuario confirma seleccionar ítems y cantidades adjudicadas, e
 ## Nombre del expediente PDF
 
 La descarga del PDF final y la vista previa económica usan el nombre del expediente con extensión .pdf. Para expedientes antiguos sin nombre se utiliza expediente- seguido de su ID. El encabezado de descarga conserva los caracteres Unicode mediante filename*. Los caracteres incompatibles con nombres de archivo se reemplazan por guion bajo.
+
+La vista económica guarda primero los cambios pendientes y abre una respuesta PDF privada de la API, con Content-Disposition inline y el nombre del expediente. Conserva el permiso editar y la comprobación de versión; reutiliza el trabajador y la limpieza temporal existentes. La entrega al visor no añade archivos persistentes ni botones de descarga.

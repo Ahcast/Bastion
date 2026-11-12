@@ -98,4 +98,4 @@ La plantilla se desplegó en AWS en el commit `07c18775ae3b271702255fecf4ec9f558
 
 ## Nombre de los documentos PDF
 
-La factura usa su número SAR con extensión .pdf. La nota de entrega usa nota-entrega- seguida de ese número y el recibo usa recibo- seguido del mismo número. Antes de emitir, el identificador es proforma- seguido del ID del borrador. El listado ofrece una descarga explícita con el nombre devuelto por la API.
+La factura usa su número SAR con extensión .pdf. La nota de entrega usa nota-entrega- seguida de ese número y el recibo usa recibo- seguido del mismo número. Antes de emitir, el identificador es proforma- seguido del ID del borrador. Las acciones PDF, Nota de entrega y Emitir Recibo abren una respuesta privada de la API con Content-Disposition inline; no se añaden acciones de descarga. El servidor conserva las reglas de estado, el permiso ver y la versión esperada.
