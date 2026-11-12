@@ -10,6 +10,24 @@ use crate::{
     calculate,
 };
 
+// Search only item descriptions and treat part-number wildcard characters literally.
+fn append_invoice_search(query: &mut QueryBuilder<MySql>, search: Option<&str>) {
+    let Some(term) = search.map(str::trim).filter(|value| !value.is_empty()) else {
+        return;
+    };
+    let pattern = format!(
+        "%{}%",
+        term.replace('!', "!!")
+            .replace('%', "!%")
+            .replace('_', "!_")
+    );
+    query.push(" AND (LOCATE(").push_bind(term.to_owned())
+        .push(",client_name)>0 OR LOCATE(").push_bind(term.to_owned())
+        .push(",order_number)>0 OR LOCATE(").push_bind(term.to_owned())
+        .push(",invoice_number)>0 OR JSON_SEARCH(LOWER(JSON_EXTRACT(data_json,'$.items[*].description')), 'one', LOWER(")
+        .push_bind(pattern).push("), '!') IS NOT NULL)");
+}
+
 #[derive(serde::Serialize, sqlx::FromRow)]
 struct InvoiceDashboardState {
     label: String,
@@ -138,21 +156,7 @@ impl InvoiceService {
         let mut query = QueryBuilder::<MySql>::new(
             "SELECT id,version,invoice_number,JSON_UNQUOTE(JSON_EXTRACT(calculation_json,'$.paid_total')) AS paid_total,client_name,order_number,CAST(invoice_date AS CHAR) AS invoice_date,CAST(JSON_LENGTH(data_json,'$.items') AS UNSIGNED) AS item_count,status,JSON_UNQUOTE(JSON_EXTRACT(calculation_json,'$.totals.total')) AS total,JSON_UNQUOTE(JSON_EXTRACT(calculation_json,'$.balance')) AS balance FROM facturas_drafts WHERE deleted_at IS NULL",
         );
-        if let Some(term) = filter
-            .search
-            .as_deref()
-            .map(str::trim)
-            .filter(|s| !s.is_empty())
-        {
-            query
-                .push(" AND (LOCATE(")
-                .push_bind(term)
-                .push(",client_name)>0 OR LOCATE(")
-                .push_bind(term)
-                .push(",order_number)>0 OR LOCATE(")
-                .push_bind(term)
-                .push(",invoice_number)>0)");
-        }
+        append_invoice_search(&mut query, filter.search.as_deref());
         query
             .push(" ORDER BY created_at DESC,id DESC LIMIT ")
             .push_bind(page_size + 1)
@@ -184,21 +188,7 @@ impl InvoiceService {
             .push_bind(filter.date_from)
             .push(" AND invoice_date<=")
             .push_bind(filter.date_to);
-        if let Some(term) = filter
-            .search
-            .as_deref()
-            .map(str::trim)
-            .filter(|value| !value.is_empty())
-        {
-            totals_query
-                .push(" AND (LOCATE(")
-                .push_bind(term)
-                .push(",client_name)>0 OR LOCATE(")
-                .push_bind(term)
-                .push(",order_number)>0 OR LOCATE(")
-                .push_bind(term)
-                .push(",invoice_number)>0)");
-        }
+        append_invoice_search(&mut totals_query, filter.search.as_deref());
         if let Some(status) = &filter.status {
             totals_query.push(" AND status=").push_bind(status);
         }
@@ -211,21 +201,7 @@ impl InvoiceService {
             .push_bind(filter.date_from)
             .push(" AND invoice_date<=")
             .push_bind(filter.date_to);
-        if let Some(term) = filter
-            .search
-            .as_deref()
-            .map(str::trim)
-            .filter(|value| !value.is_empty())
-        {
-            rows_query
-                .push(" AND (LOCATE(")
-                .push_bind(term)
-                .push(",client_name)>0 OR LOCATE(")
-                .push_bind(term)
-                .push(",order_number)>0 OR LOCATE(")
-                .push_bind(term)
-                .push(",invoice_number)>0)");
-        }
+        append_invoice_search(&mut rows_query, filter.search.as_deref());
         if let Some(status) = &filter.status {
             rows_query.push(" AND status=").push_bind(status);
         }

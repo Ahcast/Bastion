@@ -12,7 +12,7 @@ Corte de acciones del 2026-10-27: emisión numerada al marcar como enviado, pago
 
 | Campo | Nombre técnico | Función/validación conocida |
 |---|---|---|
-| Buscar factura o cliente | `search` | Filtra listado. |
+| Buscar factura, cliente, referencia o ítem | `search` | Filtra por número, cliente, referencia y descripción de cualquier ítem; admite coincidencias parciales. |
 | Número de factura/orden | `invoice_number`, `order_number` | Número según configuración y referencia relacionada. |
 | Cliente/manual | `id_client`, `client_name` | Selección o ingreso manual. |
 | Fecha | `invoice_date` | Fecha de emisión. |

@@ -1,5 +1,5 @@
 use bastion_core::{CoreError, CoreService, DashboardPeriod, Database};
-use bastion_facturas::{InvoiceFilter, InvoiceInput, InvoiceService};
+use bastion_facturas::{InvoiceFilter, InvoiceInput, InvoiceReportFilter, InvoiceService};
 use sqlx::mysql::MySqlPoolOptions;
 
 fn input() -> InvoiceInput {
@@ -156,6 +156,96 @@ async fn mysql57_drafts_atomic_receipts_permissions_versions_and_disable() {
             .iter()
             .all(|v| v.as_object().unwrap().len() == 1 && v.get("version").is_some())
     );
+    // Search every item description without matching private notes or duplicating invoices.
+    let current = service.detail(1, a.id).await.unwrap();
+    let mut searchable = current.data.clone();
+    searchable.notes = "private-token-987".into();
+    searchable.expenses[0].description = "private-token-987".into();
+    let mut part = searchable.items[0].clone();
+    part.description = "Tarjeta ZX-4400 rev A 100%_!".into();
+    searchable.items.extend([part.clone(), part]);
+    let updated = service
+        .replace(1, a.id, current.version, searchable.clone())
+        .await
+        .unwrap();
+    let second = service
+        .create(1, "invoice-search-second-0001", searchable)
+        .await
+        .unwrap();
+    for (term, expected) in [
+        ("zx-44", 2),
+        ("ZX-4400 rev a 100%_!", 2),
+        ("%_!", 2),
+        ("ZX-4400 rev A 100ab!", 0),
+        ("private-token-987", 0),
+    ] {
+        let page = service
+            .list(
+                2,
+                &InvoiceFilter {
+                    search: Some(term.into()),
+                    ..Default::default()
+                },
+            )
+            .await
+            .unwrap();
+        assert_eq!(page.items.len(), expected, "search: {term}");
+    }
+    let page_one = service
+        .list(
+            2,
+            &InvoiceFilter {
+                search: Some("zx-44".into()),
+                page_size: Some(1),
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
+    let page_two = service
+        .list(
+            2,
+            &InvoiceFilter {
+                search: Some("zx-44".into()),
+                page: Some(2),
+                page_size: Some(1),
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
+    assert!(page_one.has_more && !page_two.has_more);
+    assert_ne!(page_one.items[0].id, page_two.items[0].id);
+    let report = service
+        .report(
+            2,
+            &InvoiceReportFilter {
+                date_from: updated.data.invoice_date,
+                date_to: updated.data.invoice_date,
+                search: Some("zx-44".into()),
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
+    assert_eq!(report.totals.records, 2);
+    assert_eq!(report.items.len(), 2);
+    service
+        .delete(1, second.id, second.version, "invoice-search-delete-0001")
+        .await
+        .unwrap();
+    let after_delete = service
+        .list(
+            2,
+            &InvoiceFilter {
+                search: Some("zx-44".into()),
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
+    assert_eq!(after_delete.items.len(), 1);
+    assert_eq!(after_delete.items[0].id, a.id);
     core.admin()
         .set_module_enabled(1, "facturas", false)
         .await
@@ -172,7 +262,7 @@ async fn mysql57_drafts_atomic_receipts_permissions_versions_and_disable() {
         .set_module_enabled(1, "facturas", true)
         .await
         .unwrap();
-    assert_eq!(service.detail(1, a.id).await.unwrap().version, 2);
+    assert_eq!(service.detail(1, a.id).await.unwrap().version, 3);
     service.synchronize_release(false).await.unwrap();
     assert!(matches!(
         service.list(1, &InvoiceFilter::default()).await,
