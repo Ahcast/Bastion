@@ -23,3 +23,7 @@ Se integra id_supplier opcional por producto, observado en CastilloIT. supplier_
 Descripción, Proveedor y Comentario tienen columnas separadas. Ambos textos empiezan con una línea de alto y pueden ampliarse; se conservan textos y límites anteriores. El selector ofrece búsqueda paginada del catálogo, sin crear proveedores implícitos.
 
 Despliegue verificado el 2026-11-11 desde e7b60e3 (CI 43156439314): selector del catálogo existente de Proveedores y comentario compacto publicados en AWS/Bluehost. Sin migraciones ni altas implícitas; respaldo de 106 tablas, 53 archivos frontend y 51 recursos HTTPS verificados. Véase docs/09-despliegue.md.
+
+## Búsqueda por productos
+
+El buscador de Órdenes y el filtro equivalente de reportes también revisan las descripciones de todos los productos. Admiten coincidencias parciales, sin distinguir mayúsculas; %, _ y ! se tratan literalmente. Cada orden aparece una sola vez, con filtros, paginación y permisos existentes. No se buscan comentarios, gastos ni otros campos del JSON. No requiere migración de datos ni cambios de esquema.

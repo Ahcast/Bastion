@@ -9,6 +9,24 @@ use bastion_core::{
 use sha2::{Digest, Sha256};
 use sqlx::{MySql, QueryBuilder, Row, Transaction};
 
+// Match descriptions only, treating SQL LIKE metacharacters as literal part-number characters.
+fn append_order_search(query: &mut QueryBuilder<MySql>, search: Option<&str>) {
+    let Some(term) = search.map(str::trim).filter(|v| !v.is_empty()) else {
+        return;
+    };
+    let pattern = format!(
+        "%{}%",
+        term.replace('!', "!!")
+            .replace('%', "!%")
+            .replace('_', "!_")
+    );
+    query.push(" AND (LOCATE(").push_bind(term.to_owned())
+        .push(",client_name)>0 OR LOCATE(").push_bind(term.to_owned())
+        .push(",n_orders)>0 OR LOCATE(").push_bind(term.to_owned())
+        .push(",n_bill)>0 OR JSON_SEARCH(LOWER(JSON_EXTRACT(data_json,'$.products[*].description')), 'one', LOWER(")
+        .push_bind(pattern).push("), '!') IS NOT NULL)");
+}
+
 fn dashboard_query(select: &str, window: &DashboardWindow) -> QueryBuilder<MySql> {
     let mut query = QueryBuilder::new(select.to_owned());
     query.push(" FROM ordenes_orders WHERE archived_at IS NULL");
@@ -135,21 +153,7 @@ impl OrderService {
         let mut query = QueryBuilder::<MySql>::new(
             "SELECT id,version,n_orders,n_bill,client_name,CAST(order_date AS CHAR) AS order_date,status,CAST(total AS CHAR) AS total FROM ordenes_orders WHERE archived_at IS NULL",
         );
-        if let Some(term) = filter
-            .search
-            .as_deref()
-            .map(str::trim)
-            .filter(|s| !s.is_empty())
-        {
-            query
-                .push(" AND (LOCATE(")
-                .push_bind(term)
-                .push(",client_name)>0 OR LOCATE(")
-                .push_bind(term)
-                .push(",n_orders)>0 OR LOCATE(")
-                .push_bind(term)
-                .push(",n_bill)>0)");
-        }
+        append_order_search(&mut query, filter.search.as_deref());
         if let Some(status) = &filter.status {
             query.push(" AND status=").push_bind(status);
         }
@@ -195,21 +199,7 @@ impl OrderService {
             .push_bind(filter.date_from)
             .push(" AND order_date<=")
             .push_bind(filter.date_to);
-        if let Some(term) = filter
-            .search
-            .as_deref()
-            .map(str::trim)
-            .filter(|value| !value.is_empty())
-        {
-            totals_query
-                .push(" AND (LOCATE(")
-                .push_bind(term)
-                .push(",n_orders)>0 OR LOCATE(")
-                .push_bind(term)
-                .push(",n_bill)>0 OR LOCATE(")
-                .push_bind(term)
-                .push(",client_name)>0)");
-        }
+        append_order_search(&mut totals_query, filter.search.as_deref());
         if let Some(status) = &filter.status {
             totals_query.push(" AND status=").push_bind(status);
         }
@@ -222,21 +212,7 @@ impl OrderService {
             .push_bind(filter.date_from)
             .push(" AND order_date<=")
             .push_bind(filter.date_to);
-        if let Some(term) = filter
-            .search
-            .as_deref()
-            .map(str::trim)
-            .filter(|value| !value.is_empty())
-        {
-            rows_query
-                .push(" AND (LOCATE(")
-                .push_bind(term)
-                .push(",n_orders)>0 OR LOCATE(")
-                .push_bind(term)
-                .push(",n_bill)>0 OR LOCATE(")
-                .push_bind(term)
-                .push(",client_name)>0)");
-        }
+        append_order_search(&mut rows_query, filter.search.as_deref());
         if let Some(status) = &filter.status {
             rows_query.push(" AND status=").push_bind(status);
         }

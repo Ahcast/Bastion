@@ -205,6 +205,81 @@ async fn mysql57_orders_destinations_atomicity_permissions_and_conflicts() {
     );
     let events:i64=sqlx::query_scalar("SELECT COUNT(*) FROM audit_events WHERE module_id='ordenes_compra' AND action='order.create'").fetch_one(&pool).await.unwrap();
     assert_eq!(events, 1);
+    // Search every product description, once per order, without matching unrelated JSON fields.
+    let current = service.detail(1, a.id).await.unwrap();
+    let mut searchable = current.data.clone();
+    searchable.comments = "hidden-token-987".into();
+    searchable.products[0].tracking = "hidden-token-987".into();
+    let mut part = searchable.products[0].clone();
+    part.line_id.clear();
+    part.description = "Tarjeta ZX-4400 rev A 100%_!".into();
+    part.cantidad = 0;
+    searchable.products.extend([part.clone(), part]);
+    let searchable = service
+        .replace(1, a.id, current.version, searchable)
+        .await
+        .unwrap();
+    for (term, count) in [
+        ("zx-44", 1),
+        ("ZX-4400 rev a 100%_!", 1),
+        ("%_!", 1),
+        ("ZX-4400 rev A 100ab!", 0),
+        ("hidden-token-987", 0),
+    ] {
+        let result = service
+            .list(
+                2,
+                &OrderFilter {
+                    search: Some(term.into()),
+                    page_size: Some(1),
+                    ..Default::default()
+                },
+            )
+            .await
+            .unwrap();
+        assert_eq!(result.items.len(), count, "search: {term}");
+        assert!(
+            !result.has_more,
+            "matching several products must not duplicate an order"
+        );
+    }
+    let filter = OrderFilter {
+        search: Some("ZX-4400".into()),
+        page: Some(2),
+        page_size: Some(1),
+        ..Default::default()
+    };
+    assert!(service.list(2, &filter).await.unwrap().items.is_empty());
+    assert!(
+        service
+            .list(
+                2,
+                &OrderFilter {
+                    search: Some("zx-44".into()),
+                    min_total: Some("231".into()),
+                    ..Default::default()
+                }
+            )
+            .await
+            .unwrap()
+            .items
+            .is_empty()
+    );
+    let report = service
+        .report(
+            2,
+            &bastion_ordenes_compra::OrderReportFilter {
+                search: Some("zx-44".into()),
+                date_from: searchable.data.order_date,
+                date_to: searchable.data.order_date,
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
+    assert_eq!(report.items.len(), 1);
+    assert_eq!(report.totals.records, 1);
+    assert_eq!(report.items[0].id, a.id);
     // A supplier selection is canonical, authorized and preserved independently of catalog changes.
     bastion_proveedores::SupplierService::migrate(&database)
         .await

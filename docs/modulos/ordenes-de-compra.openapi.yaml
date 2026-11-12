@@ -18,7 +18,7 @@ paths:
     get:
       summary: Listar con ordenes_compra/documentos/ver
       parameters:
-        - {name: search, in: query, schema: {type: string, maxLength: 200}}
+        - {name: search, in: query, description: Busca también por descripción de los productos (modelo o número de parte) sin distinguir mayúsculas y tratando comodines como texto literal, schema: {type: string, maxLength: 200}}
         - {name: status, in: query, schema: {enum: [Pendiente, Listo, Entregado]}}
         - {name: min_total, in: query, schema: {$ref: '#/components/schemas/Money'}}
         - {name: max_total, in: query, schema: {$ref: '#/components/schemas/Money'}}
