@@ -205,6 +205,104 @@ async fn mysql57_orders_destinations_atomicity_permissions_and_conflicts() {
     );
     let events:i64=sqlx::query_scalar("SELECT COUNT(*) FROM audit_events WHERE module_id='ordenes_compra' AND action='order.create'").fetch_one(&pool).await.unwrap();
     assert_eq!(events, 1);
+    // A supplier selection is canonical, authorized and preserved independently of catalog changes.
+    bastion_proveedores::SupplierService::migrate(&database)
+        .await
+        .unwrap();
+    let suppliers = bastion_proveedores::SupplierService::new(database.clone(), core.admin());
+    suppliers.synchronize_release(true).await.unwrap();
+    core.admin()
+        .set_module_enabled(1, "proveedores", true)
+        .await
+        .unwrap();
+    let supplier = suppliers
+        .create(
+            1,
+            "order-supplier-create-01",
+            bastion_proveedores::SupplierInput {
+                supplier_name: "Proveedor original".into(),
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
+    sqlx::query("INSERT INTO role_permissions(role_id,module_id,scope_hash,scope_key,capability) VALUES(2,'ordenes_compra',UNHEX(SHA2('documentos',256)),'documentos','editar')").execute(&pool).await.unwrap();
+    let current = service.detail(1, a.id).await.unwrap();
+    let mut selected = current.data.clone();
+    selected.products[0].id_supplier = Some(supplier.id);
+    selected.products[0].supplier_name = "Nombre falsificado".into();
+    assert!(matches!(
+        service
+            .replace(2, a.id, current.version, selected.clone())
+            .await,
+        Err(CoreError::Forbidden)
+    ));
+    sqlx::query("INSERT INTO role_permissions(role_id,module_id,scope_hash,scope_key,capability) VALUES(2,'proveedores',UNHEX(SHA2('catalogo',256)),'catalogo','ver')").execute(&pool).await.unwrap();
+    let saved = service
+        .replace(2, a.id, current.version, selected.clone())
+        .await
+        .unwrap();
+    assert_eq!(saved.data.products[0].supplier_name, "Proveedor original");
+    let mut new = input();
+    new.products[0].id_supplier = Some(supplier.id);
+    new.products[0].supplier_name = "Ignorar".into();
+    let created = service
+        .create(2, "order-supplier-linked-01", new.clone())
+        .await
+        .unwrap();
+    assert_eq!(created.data.products[0].supplier_name, "Proveedor original");
+    suppliers
+        .replace(
+            1,
+            supplier.id,
+            supplier.version,
+            bastion_proveedores::SupplierInput {
+                supplier_name: "Proveedor renombrado".into(),
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
+    core.admin()
+        .set_module_enabled(1, "proveedores", false)
+        .await
+        .unwrap();
+    assert_eq!(
+        service
+            .create(2, "order-supplier-linked-01", new)
+            .await
+            .unwrap()
+            .id,
+        created.id
+    );
+    let mut keep = saved.data.clone();
+    keep.products[0].supplier_name = "Cambiar sin permiso".into();
+    let kept = service.replace(2, a.id, saved.version, keep).await.unwrap();
+    assert_eq!(kept.data.products[0].supplier_name, "Proveedor original");
+    let cloned = service
+        .clone_order(2, a.id, kept.version, "order-supplier-clone-01")
+        .await
+        .unwrap();
+    assert_eq!(cloned.data.products[0].id_supplier, Some(supplier.id));
+    assert_eq!(cloned.data.products[0].supplier_name, "Proveedor original");
+    let mut clear = kept.data.clone();
+    clear.products[0].id_supplier = None;
+    let cleared = service.replace(2, a.id, kept.version, clear).await.unwrap();
+    assert!(cleared.data.products[0].supplier_name.is_empty());
+    core.admin()
+        .set_module_enabled(1, "proveedores", true)
+        .await
+        .unwrap();
+    let mut missing = cleared.data.clone();
+    missing.products[0].id_supplier = Some(supplier.id + 999);
+    assert!(matches!(
+        service.replace(2, a.id, cleared.version, missing).await,
+        Err(CoreError::NotFound)
+    ));
+    assert_eq!(
+        service.detail(2, a.id).await.unwrap().version,
+        cleared.version
+    );
     core.admin()
         .set_module_enabled(1, "ordenes_compra", false)
         .await
@@ -221,5 +319,5 @@ async fn mysql57_orders_destinations_atomicity_permissions_and_conflicts() {
         .fetch_one(&pool)
         .await
         .unwrap();
-    assert_eq!(count, 1);
+    assert_eq!(count, 3);
 }

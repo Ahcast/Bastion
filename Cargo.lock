@@ -423,6 +423,7 @@ dependencies = [
  "base64 0.22.1",
  "bastion-core",
  "bastion-cotizaciones",
+ "bastion-proveedores",
  "chrono",
  "serde",
  "serde_json",

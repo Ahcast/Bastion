@@ -24,6 +24,10 @@ pub enum ProductStatus {
 pub struct OrderProduct {
     #[serde(default)]
     pub line_id: String,
+    #[serde(default)]
+    pub id_supplier: Option<u64>,
+    #[serde(default)]
+    pub supplier_name: String,
     pub description: String,
     pub cantidad: u32,
     // Legacy names: sale_price is cost; purchase_price is selling price.

@@ -15,3 +15,9 @@ Corrección autorizada el 2026-10-26: utilidad = total de venta − ISV − inve
 ## Publicación y despliegue verificados
 
 El 2026-10-27 se desplegó 50efa7e, CI 40540732266 aprobado. Órdenes 4, Facturas 4 y document-flows 2 aplicadas; seis tablas nuevas vacías, utilidad de la orden existente corregida sin otros cambios de negocio. Se conservaron activaciones y permisos. Se verificaron respaldo, restauración temporal de 63 tablas, hashes del frontend, readiness 200 y protección anónima 401. La interfaz autenticada en producción no se ejercitó con datos sintéticos; las pruebas completas de acciones y migraciones pasaron en CI MySQL 5.7.
+
+## Proveedor por producto y comentario compacto (2026-11-11)
+
+Se integra id_supplier opcional por producto, observado en CastilloIT. supplier_name es una instantánea resuelta por el servidor mediante un puerto de Proveedores. Seleccionar o cambiar requiere catalogo/ver y Proveedores activo, además de editar la orden. Conservar la selección existente preserva la instantánea aunque el proveedor sea renombrado o archivado; clonar conserva la referencia histórica. Quitar limpia ambos campos. Órdenes antiguas sin referencia siguen siendo válidas. Los campos se guardan en los JSON propios, sin migración SQL.
+
+Descripción, Proveedor y Comentario tienen columnas separadas. Ambos textos empiezan con una línea de alto y pueden ampliarse; se conservan textos y límites anteriores. El selector ofrece búsqueda paginada del catálogo, sin crear proveedores implícitos.

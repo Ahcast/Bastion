@@ -183,3 +183,29 @@ test('order files retain a selection and key on ambiguous retry and hide destruc
     assert.ok(!container.textContent?.includes('Retirar archivo'));
   }finally{await act(async()=>root.unmount());container.remove();}
 });
+
+test('supplier selection persists per product and the comment stays in its own compact cell',async()=>{
+ const supplierAccess:Access={...editor,modules:[...editor.modules,{module_id:'proveedores',display_name:'Proveedores'}],permissions:[...editor.permissions,{module_id:'proveedores',scope_key:'catalogo',capability:'ver'}]};
+ let body:unknown;
+ const api=new ApiClient('https://example.test',async(url,init={})=>{
+  const path=new URL(String(url)).pathname;
+  if(path.endsWith('/proveedores/catalogo'))return Response.json({items:[{id:12,supplier_name:'Proveedor de prueba'}],has_more:false});
+  if(path.endsWith('/destinations'))return Response.json(destinations);
+  if(init.method==='PUT'){body=JSON.parse(String(init.body));return Response.json({...order,data:body});}
+  return Response.json(calculation);
+ });
+ const container=document.createElement('div');document.body.append(container);const root=createRoot(container);
+ try{
+  await act(async()=>root.render(<NavigationGuardProvider><CoreContext.Provider value={{api,access:supplierAccess,notify:()=>{}}}><OrderEditor initial={order} editable close={()=>{}}/></CoreContext.Provider></NavigationGuardProvider>));
+  const input=container.querySelector<HTMLInputElement>('[aria-label="Proveedor del producto 1"]')!;
+  assert.ok(input);assert.equal(input.readOnly,false);
+  await act(async()=>{input.focus();});await click('Proveedor de prueba');
+  await submit(container);
+  assert.equal((body as {products:{id_supplier:number;supplier_name:string}[]}).products[0]?.id_supplier,12);
+  const comment=container.querySelector<HTMLTextAreaElement>('[aria-label="Comentario del producto 1"]')!;
+  assert.equal(comment.getAttribute('rows'),'1');assert.ok(comment.closest('td')?.classList.contains('order-item-comment'));
+  assert.equal(container.querySelector<HTMLTextAreaElement>('[aria-label="Descripción del producto 1"]')?.getAttribute('rows'),'1');
+  await click('×');await submit(container);
+  assert.equal((body as {products:{id_supplier:null}[]}).products[0]?.id_supplier,null);
+ }finally{await act(async()=>root.unmount());container.remove();}
+});

@@ -223,6 +223,8 @@ components:
             additionalProperties: false
             required: [description, cantidad, sale_price, purchase_price, tracking, isv, status, coments]
             properties:
+              id_supplier: {type: [integer, "null"], minimum: 1, description: Proveedor opcional; elegir o cambiar exige Proveedores catalogo/ver}
+              supplier_name: {type: string, maxLength: 255, description: Instantánea canónica resuelta por el servidor}
               line_id: {type: string, description: Identificador interno estable; conservar al editar, pattern: "^([a-f0-9]{48})?$"}
               description: {type: string, maxLength: 2000}
               cantidad: {type: integer, minimum: 0, maximum: 1000000}

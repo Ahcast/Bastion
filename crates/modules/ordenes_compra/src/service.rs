@@ -364,6 +364,8 @@ impl OrderService {
             tx.commit().await?;
             return Ok(result);
         }
+        self.resolve_suppliers(actor, &mut tx, &mut calculation.data, None)
+            .await?;
         actions::fresh_lines(&mut calculation.data);
         let data = serde_json::to_value(&calculation.data).map_err(|_| CoreError::Invalid)?;
         validate_destination(&mut tx, calculation.data.id_destination).await?;
@@ -397,6 +399,8 @@ impl OrderService {
         }
         let mut input = input;
         actions::prepare_lines(&mut tx, &current, &mut input).await?;
+        self.resolve_suppliers(actor, &mut tx, &mut input, Some(&current))
+            .await?;
         let calculation = calculate(&input)?;
         calculation.ensure_saveable()?;
         validate_destination(&mut tx, calculation.data.id_destination).await?;
@@ -465,6 +469,37 @@ impl OrderService {
         Ok(())
     }
 
+    async fn resolve_suppliers(
+        &self,
+        actor: u64,
+        tx: &mut Transaction<'_, MySql>,
+        input: &mut OrderInput,
+        current: Option<&PurchaseOrder>,
+    ) -> Result<(), CoreError> {
+        let suppliers =
+            bastion_proveedores::SupplierService::new(self.database.clone(), self.admin.clone());
+        let mut resolved = std::collections::BTreeMap::new();
+        for row in &mut input.products {
+            let previous =
+                current.and_then(|c| c.data.products.iter().find(|p| p.line_id == row.line_id));
+            if let Some(previous) = previous.filter(|p| p.id_supplier == row.id_supplier) {
+                row.supplier_name = previous.supplier_name.clone();
+            } else if let Some(id) = row.id_supplier {
+                if let std::collections::btree_map::Entry::Vacant(entry) = resolved.entry(id) {
+                    entry.insert(
+                        suppliers
+                            .document_supplier(actor, id, tx)
+                            .await?
+                            .supplier_name,
+                    );
+                }
+                row.supplier_name = resolved.get(&id).cloned().ok_or(CoreError::Invalid)?;
+            } else {
+                row.supplier_name.clear();
+            }
+        }
+        Ok(())
+    }
     pub async fn destinations(&self, actor: u64) -> Result<Vec<Destination>, CoreError> {
         let mut tx = self.begin_destinations(actor).await?;
         let rows=sqlx::query_as("SELECT id,version,destination FROM ordenes_destinations ORDER BY destination,id LIMIT 1000").fetch_all(&mut *tx).await?;

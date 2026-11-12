@@ -287,6 +287,23 @@ impl SupplierService {
     }
 }
 
+impl SupplierService {
+    /// Resolve a document reference inside the caller transaction; this module owns catalog SQL.
+    pub async fn document_supplier(
+        &self,
+        actor: u64,
+        id: u64,
+        tx: &mut Transaction<'_, MySql>,
+    ) -> Result<CatalogSupplier, CoreError> {
+        self.admin
+            .authorize_in_transaction(tx, actor, "proveedores", "catalogo", "ver")
+            .await?;
+        CoreAdmin::lock_enabled_module(tx, "proveedores", false).await?;
+        sqlx::query_as("SELECT id,supplier_name FROM proveedores_records WHERE id=? AND archived_at IS NULL LOCK IN SHARE MODE")
+            .bind(id).fetch_optional(&mut **tx).await?.ok_or(CoreError::NotFound)
+    }
+}
+
 fn list_query(fields: &str, filter: &SupplierFilter) -> Result<QueryBuilder<MySql>, CoreError> {
     let (page, size) = filter.bounds()?;
     let mut query = QueryBuilder::new(format!(

@@ -296,3 +296,5 @@ Clientes y proveedores se archivan y salen del catálogo activo. Los vínculos y
 Las descargas de Cotizaciones usan su número; las de Facturas, su número fiscal; las de Licitaciones, el nombre del expediente. Nota de entrega y recibo añaden su tipo al número de factura. Los borradores sin número fiscal usan `proforma-<id>`. El Core normaliza los nombres para archivos y la API conserva Unicode en la descarga de expedientes. Véanse las fichas de [Cotizaciones](modulos/cotizaciones-acciones.md), [Facturas](modulos/facturas-acciones.md) y [Licitaciones](modulos/licitaciones.md). El listado ofrece descargas explícitas para conservar el nombre al guardar.
 
 El ajuste quedó activo en AWS y Bluehost con la revisión `5b744a3a1dc2e7eb8cee0bed2c67098d7018d471`, con CI aprobado y verificación de hashes del ejecutable y de 47 archivos públicos. La evidencia y los límites de comprobación se registran en [Despliegue](09-despliegue.md).
+
+- 2026-11-11: Órdenes incorpora selección de proveedor por producto mediante el catálogo de Proveedores y puerto de dominio; comentario compacto en columna independiente, compatible con órdenes anteriores y sin migración de esquema.

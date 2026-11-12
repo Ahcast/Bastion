@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { ApiError, message } from '../api.js';
 import { Form, Heading, Loading, Notice, Table, useCore, useLoad } from '../ui.js';
 import { OrderDocuments } from '../components/OrderDocuments.js';
+import { OrderSupplierPicker } from '../components/OrderSupplierPicker.js';
 import { QuoteActions } from '../components/QuoteActions.js';
 import { Decimal } from '../components/QuoteItems.js';
 import { useNavigationGuard, useUnsavedChanges } from '../navigationGuard.js';
@@ -83,7 +84,7 @@ function Workspace({ initialId,openInvoice }: { initialId?: number;openInvoice?:
 }
 
 export function OrderEditor({ initial, editable, edit, close }: { initial: PurchaseOrder | null; editable: boolean; edit?: () => void; close: () => void }) {
-  const { api, notify } = useCore(), { navigate } = useNavigationGuard();
+  const { api, notify, access } = useCore(), { navigate } = useNavigationGuard();
   const [saved, setSaved] = useState(initial), [data, setData] = useState<OrderInput>(() => initial?.data ?? newOrder());
   const [dirty, setDirty] = useState(false), [busy, setBusy] = useState(false), [conflict, setConflict] = useState(false), [ambiguous, setAmbiguous] = useState(false), [error, setError] = useState('');
   const [preview, setPreview] = useState<{ input: OrderInput; value: OrderCalculation } | null>(null), [calculationError, setCalculationError] = useState('');
@@ -126,7 +127,7 @@ export function OrderEditor({ initial, editable, edit, close }: { initial: Purch
         <label>Fecha de entrega<input type="date" min="1000-01-01" max="9999-12-31" value={data.received_date ?? ''} onChange={e => change('received_date', e.target.value || null)} /></label>
         <label className="order-reference">Número de factura<input maxLength={120} value={data.n_bill} onChange={e => change('n_bill', e.target.value)} /><small>Esta referencia determina el estado Entregado; no emite una factura.</small></label>
       </div></section>
-      <OrderItems products={data.products} change={product} remove={index => change('products', data.products.filter((_, i) => i !== index))} add={() => change('products', [...data.products, newProduct()])} />
+      <OrderItems editable={editable} canSearchSuppliers={moduleCan(access, 'proveedores', 'catalogo', 'ver')} products={data.products} supplier={(index, value) => change('products', data.products.map((row,i)=> i === index ? {...row, id_supplier:value?.id ?? null,supplier_name:value?.supplier_name ?? ''}:row))} change={product} remove={index => change('products', data.products.filter((_, i) => i !== index))} add={() => change('products', [...data.products, newProduct()])} />
       <section className="quote-section" aria-labelledby="order-expenses-title"><div className="quote-section-heading"><h2 id="order-expenses-title">Gastos adicionales</h2><span>{data.expenses.length} / 200</span></div>
         <div className="order-expenses">{data.expenses.map((expense, index) => <fieldset className="order-expense" key={index}><legend>Gasto {index + 1}</legend><label>Descripción del gasto<input maxLength={255} value={expense.description} onChange={e => change('expenses', data.expenses.map((row, i) => i === index ? { ...row, description: e.target.value } : row))} /></label><Decimal label={`Monto del gasto ${index + 1} (HNL)`} caption="Monto (HNL)" value={expense.amount} change={v => change('expenses', data.expenses.map((row, i) => i === index ? { ...row, amount: v } : row))} /><button type="button" className="quote-remove" aria-label={`Quitar gasto ${index + 1}`} onClick={() => change('expenses', data.expenses.filter((_, i) => i !== index))}>Quitar gasto</button></fieldset>)}</div>
         <button type="button" className="quote-add-item order-expense-add" disabled={data.expenses.length >= 200} onClick={() => change('expenses', [...data.expenses, { description: 'Gasto', amount: '0' }])}>Agregar gasto</button>
@@ -141,20 +142,22 @@ export function OrderSummaryTotals({ calculation: c }: { calculation: OrderCalcu
   const t = c.totals, entries = [['Subtotal de venta', t.subtotal], ['Subtotal exonerado', t.subtotal_exonerado], ['ISV 15%', t.tax], ['Total de venta', t.total], ['Inversión en productos', t.products_investment], ['Otros gastos', t.other_expenses], ['Inversión total', t.investment_total], ['Utilidad estimada', t.profit]];
   return <section className="quote-totals order-totals" aria-label="Totales de orden"><h2>Resumen</h2><p className="quote-note">HNL · {c.status}</p><dl>{entries.map(([label, value]) => <div key={label}><dt>{label}</dt><dd>L {value}</dd></div>)}</dl></section>;
 }
-function OrderItems({ products, change, remove, add }: { products: OrderProduct[]; change: <K extends keyof OrderProduct>(index: number, key: K, value: OrderProduct[K]) => void; remove: (index: number) => void; add: () => void }) {
+function OrderItems({ products, supplier, editable, canSearchSuppliers, change, remove, add }: { products: OrderProduct[]; editable:boolean; canSearchSuppliers:boolean; supplier:(index:number,value:{id:number;supplier_name:string}|null)=>void; change: <K extends keyof OrderProduct>(index: number, key: K, value: OrderProduct[K]) => void; remove: (index: number) => void; add: () => void }) {
   return <section className="quote-section" aria-labelledby="order-products-title">
     <div className="quote-section-heading"><h2 id="order-products-title">Productos</h2><span>{products.length} / 200</span></div>
     <div className="quote-items-wrap"><table className="quote-items-table order-items-table" aria-label="Productos de la orden">
-      <colgroup><col className="order-col-description" /><col className="order-col-quantity" /><col className="order-col-price" /><col className="order-col-price" /><col className="order-col-tax" /><col className="order-col-status" /><col className="order-col-tracking" /><col className="order-col-remove" /></colgroup>
-      <thead><tr>{['Descripción y comentario', 'Cantidad', 'Venta unitaria', 'Costo unitario', 'ISV', 'Estado', 'Tracking'].map(label => <th scope="col" key={label}>{label}</th>)}<th scope="col"><span className="quote-sr-only">Quitar</span></th></tr></thead>
+      <colgroup><col className="order-col-description" /><col className="order-col-quantity" /><col className="order-col-price" /><col className="order-col-price" /><col className="order-col-tax" /><col className="order-col-status" /><col className="order-col-supplier" /><col className="order-col-tracking" /><col className="order-col-comment" /><col className="order-col-remove" /></colgroup>
+      <thead><tr>{['Descripción', 'Cantidad', 'Venta unitaria', 'Costo unitario', 'ISV', 'Estado', 'Proveedor', 'Tracking', 'Comentario'].map(label => <th scope="col" key={label}>{label}</th>)}<th scope="col"><span className="quote-sr-only">Quitar</span></th></tr></thead>
       <tbody>{products.map((row, index) => <tr key={index}>
-        <td className="quote-item-description"><label><span>Descripción</span><textarea aria-label={`Descripción del producto ${index + 1}`} maxLength={2000} rows={2} value={row.description} onChange={e => change(index, 'description', e.target.value)} /></label><label><span>Comentario del producto</span><textarea aria-label={`Comentario del producto ${index + 1}`} maxLength={1000} rows={2} value={row.coments} onChange={e => change(index, 'coments', e.target.value)} /></label></td>
+        <td className="quote-item-description"><label><span>Descripción</span><textarea aria-label={`Descripción del producto ${index + 1}`} maxLength={2000} rows={1} value={row.description} onChange={e => change(index, 'description', e.target.value)} /></label></td>
         <td><label><span>Cantidad</span><input aria-label={`Cantidad del producto ${index + 1}`} required type="number" min={0} max={1000000} step={1} value={row.cantidad} onChange={e => change(index, 'cantidad', Number(e.target.value))} /></label></td>
         <td><Decimal label={`Precio de venta (HNL) del producto ${index + 1}`} caption="Venta (HNL)" value={row.purchase_price} change={v => change(index, 'purchase_price', v)} /></td>
         <td><Decimal label={`Costo unitario (HNL) del producto ${index + 1}`} caption="Costo (HNL)" value={row.sale_price} change={v => change(index, 'sale_price', v)} /></td>
         <td><label className="order-tax"><span>ISV 15%</span><input aria-label={`ISV 15% del producto ${index + 1}`} type="checkbox" checked={row.isv} onChange={e => change(index, 'isv', e.target.checked)} /></label></td>
         <td><label><span>Estado</span><select aria-label={`Estado del producto ${index + 1}`} value={row.status} onChange={e => change(index, 'status', e.target.value as OrderProduct['status'])}><option>Pendiente</option><option>Comprado</option></select></label></td>
+        <td><OrderSupplierPicker index={index} selected={row.id_supplier ? {id:row.id_supplier,supplier_name:row.supplier_name??''}:null} canSearch={canSearchSuppliers} readOnly={!editable} change={value=>supplier(index,value)}/></td>
         <td><label><span>Tracking</span><input aria-label={`Tracking del producto ${index + 1}`} maxLength={255} value={row.tracking} onChange={e => change(index, 'tracking', e.target.value)} /></label></td>
+        <td className="order-item-comment"><label><span>Comentario</span><textarea aria-label={'Comentario del producto '+(index+1)} maxLength={1000} rows={1} value={row.coments} onChange={e=>change(index,'coments',e.target.value)}/></label></td>
         <td className="quote-item-remove"><button type="button" className="quote-remove" aria-label={`Quitar producto ${index + 1}`} title={`Quitar producto ${index + 1}`} onClick={() => remove(index)}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><path d="M3 6h18M9 6V3h6v3M6 6l1 15h10l1-15M10 10v7M14 10v7" /></svg></button></td>
       </tr>)}</tbody>
     </table>{products.length === 0 && <p className="empty">Agrega los productos de la orden.</p>}</div>

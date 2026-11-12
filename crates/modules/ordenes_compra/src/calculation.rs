@@ -54,6 +54,10 @@ pub fn calculate(input: &OrderInput) -> Result<OrderCalculation, CoreError> {
     text(&mut data.comments, 3000)?;
     let (mut subtotal, mut exempt, mut investment) = (0_i128, 0_i128, 0_i128);
     for row in &mut data.products {
+        if row.id_supplier == Some(0) {
+            return Err(CoreError::Invalid);
+        }
+        text(&mut row.supplier_name, 255)?;
         text(&mut row.description, 2000)?;
         text(&mut row.tracking, 255)?;
         text(&mut row.coments, 1000)?;

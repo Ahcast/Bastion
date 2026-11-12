@@ -32,6 +32,8 @@ pub fn quote_order_input(source: &QuoteDraft) -> Result<OrderInput, &'static str
         }
         products.push(OrderProduct {
             line_id: String::new(),
+            id_supplier: None,
+            supplier_name: String::new(),
             description: row.description.clone(),
             cantidad: (quantity / 10000) as u32,
             sale_price: "0".into(),
