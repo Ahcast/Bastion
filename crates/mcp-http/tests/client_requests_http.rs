@@ -82,7 +82,8 @@ async fn mysql57_client_request_http_checks_session_csrf_admin_and_scope() {
             FakeFetcher(hits.clone()),
             2,
         )
-        .unwrap(),
+        .unwrap()
+        .with_resource("https://api.example.invalid/mcp".into()),
     );
     let request = |path: &str, session: &str, origin: &str, body: serde_json::Value| {
         Request::builder()
@@ -115,6 +116,22 @@ async fn mysql57_client_request_http_checks_session_csrf_admin_and_scope() {
         StatusCode::FORBIDDEN
     );
     assert_eq!(hits.load(Ordering::SeqCst), 0);
+    let query = |scope: &str, callback: &str| {
+        let mut query = url::form_urlencoded::Serializer::new(String::new());
+        query
+            .append_pair("response_type", "code")
+            .append_pair("client_id", "https://fixture.example/metadata.json")
+            .append_pair("redirect_uri", callback)
+            .append_pair("resource", "https://api.example.invalid/mcp")
+            .append_pair("scope", scope)
+            .append_pair("state", "private-fixture-state")
+            .append_pair("code_challenge_method", "S256")
+            .append_pair(
+                "code_challenge",
+                "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM",
+            );
+        json!({"authorization_query":query.finish()})
+    };
     assert_eq!(
         router
             .clone()
@@ -130,6 +147,25 @@ async fn mysql57_client_request_http_checks_session_csrf_admin_and_scope() {
         StatusCode::BAD_REQUEST
     );
     assert_eq!(hits.load(Ordering::SeqCst), 0);
+    let inspection = router
+        .clone()
+        .oneshot(request(
+            "/oauth/clients/inspect-authorization",
+            &user_session,
+            "https://app.example.invalid",
+            query("cotizaciones:read", "https://fixture.example/cb"),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(inspection.status(), StatusCode::OK);
+    let inspection: serde_json::Value =
+        serde_json::from_slice(&to_bytes(inspection.into_body(), 8192).await.unwrap()).unwrap();
+    assert_eq!(inspection["status"], "approval_required");
+    let registered:i64=sqlx::query_scalar("SELECT COUNT(*) FROM oauth_clients WHERE client_id='https://fixture.example/metadata.json'").fetch_one(&pool).await.unwrap();
+    assert_eq!(
+        registered, 0,
+        "inspection must not register or approve a client"
+    );
     let created = router
         .clone()
         .oneshot(request(
@@ -192,7 +228,7 @@ async fn mysql57_client_request_http_checks_session_csrf_admin_and_scope() {
             .status(),
         StatusCode::FORBIDDEN
     );
-    assert_eq!(hits.load(Ordering::SeqCst), 1);
+    assert_eq!(hits.load(Ordering::SeqCst), 2);
     assert_eq!(
         router
             .clone()
@@ -207,7 +243,50 @@ async fn mysql57_client_request_http_checks_session_csrf_admin_and_scope() {
             .status(),
         StatusCode::OK
     );
-    assert_eq!(hits.load(Ordering::SeqCst), 2);
+    assert_eq!(hits.load(Ordering::SeqCst), 3);
+    for (scope, callback, expected) in [
+        (
+            "cotizaciones:read",
+            "https://fixture.example/cb",
+            Some("ready"),
+        ),
+        (
+            "cotizaciones:read facturas:read",
+            "https://fixture.example/cb",
+            Some("approval_required"),
+        ),
+        (
+            "cotizaciones:read",
+            "https://fixture.example/other-cb",
+            None,
+        ),
+    ] {
+        let inspection = router
+            .clone()
+            .oneshot(request(
+                "/oauth/clients/inspect-authorization",
+                &user_session,
+                "https://app.example.invalid",
+                query(scope, callback),
+            ))
+            .await
+            .unwrap();
+        assert_eq!(
+            inspection.status(),
+            if expected.is_some() {
+                StatusCode::OK
+            } else {
+                StatusCode::BAD_REQUEST
+            }
+        );
+        let body: serde_json::Value =
+            serde_json::from_slice(&to_bytes(inspection.into_body(), 8192).await.unwrap()).unwrap();
+        if let Some(expected) = expected {
+            assert_eq!(body["status"], expected);
+        } else {
+            assert_eq!(body["error"], "redirect_uri_mismatch");
+        }
+    }
     let pending = router
         .clone()
         .oneshot(request(
@@ -322,6 +401,27 @@ async fn mysql57_client_request_http_checks_session_csrf_admin_and_scope() {
     for scope in ["cotizaciones:read", "facturas:read"] {
         sqlx::query("INSERT INTO oauth_grants (user_id,client_id,resource_uri,scopes_json,issued_at,expires_at) VALUES (?,?,'https://api.example.invalid/mcp',JSON_ARRAY(?),UTC_TIMESTAMP(6),UTC_TIMESTAMP(6)+INTERVAL 1 DAY)")
             .bind(user).bind(client_id).bind(scope).execute(&pool).await.unwrap();
+        let listed = router
+            .clone()
+            .oneshot(managed("/oauth/connections/list", &user_session, json!({})))
+            .await
+            .unwrap();
+        assert_eq!(listed.status(), StatusCode::OK);
+        let listed: serde_json::Value =
+            serde_json::from_slice(&to_bytes(listed.into_body(), 8192).await.unwrap()).unwrap();
+        assert_eq!(listed["items"].as_array().unwrap().len(), 1);
+        assert_eq!(
+            listed["items"][0]["additional_scopes_available"],
+            scope == "cotizaciones:read"
+        );
+        assert_eq!(
+            listed["items"][0]["authorizations"],
+            if scope == "cotizaciones:read" { 1 } else { 2 }
+        );
+        assert_eq!(
+            listed["items"][0]["scopes"].as_array().unwrap().len(),
+            if scope == "cotizaciones:read" { 1 } else { 2 }
+        );
     }
     let reduce = json!({"id":client_id,"expected_scopes":["cotizaciones:read","facturas:read"],"scopes":["facturas:read"]});
     assert_eq!(
@@ -345,6 +445,89 @@ async fn mysql57_client_request_http_checks_session_csrf_admin_and_scope() {
     .await
     .unwrap();
     assert_eq!(active, 1);
+    let other_grant=sqlx::query("INSERT INTO oauth_grants (user_id,client_id,resource_uri,scopes_json,issued_at,expires_at) VALUES (?,?,'https://api.example.invalid/mcp',JSON_ARRAY('facturas:read'),UTC_TIMESTAMP(6),UTC_TIMESTAMP(6)+INTERVAL 1 DAY)")
+        .bind(admin).bind(client_id).execute(&pool).await.unwrap().last_insert_id();
+    let disconnect =
+        json!({"id":client_id,"confirmed_client_id":"https://fixture.example/metadata.json"});
+    let mut missing_csrf = managed(
+        "/oauth/connections/disconnect",
+        &user_session,
+        disconnect.clone(),
+    );
+    missing_csrf.headers_mut().remove("x-csrf-token");
+    let rejected = router.clone().oneshot(missing_csrf).await.unwrap();
+    assert_eq!(rejected.status(), StatusCode::FORBIDDEN);
+    let rejected: serde_json::Value =
+        serde_json::from_slice(&to_bytes(rejected.into_body(), 8192).await.unwrap()).unwrap();
+    assert_eq!(rejected["title"], "CSRF Validation Failed");
+    assert_eq!(
+        router
+            .clone()
+            .oneshot(request(
+                "/oauth/connections/disconnect",
+                &user_session,
+                "https://evil.invalid",
+                disconnect.clone()
+            ))
+            .await
+            .unwrap()
+            .status(),
+        StatusCode::FORBIDDEN
+    );
+    assert_eq!(
+        router
+            .clone()
+            .oneshot(managed(
+                "/oauth/connections/disconnect",
+                &user_session,
+                json!({"id":client_id,"confirmed_client_id":"wrong"})
+            ))
+            .await
+            .unwrap()
+            .status(),
+        StatusCode::NOT_FOUND
+    );
+    assert_eq!(
+        router
+            .clone()
+            .oneshot(managed(
+                "/oauth/connections/disconnect",
+                &user_session,
+                disconnect.clone()
+            ))
+            .await
+            .unwrap()
+            .status(),
+        StatusCode::OK
+    );
+    assert_eq!(
+        router
+            .clone()
+            .oneshot(managed(
+                "/oauth/connections/disconnect",
+                &user_session,
+                disconnect
+            ))
+            .await
+            .unwrap()
+            .status(),
+        StatusCode::OK
+    );
+    let listed = router
+        .clone()
+        .oneshot(managed("/oauth/connections/list", &user_session, json!({})))
+        .await
+        .unwrap();
+    let listed: serde_json::Value =
+        serde_json::from_slice(&to_bytes(listed.into_body(), 8192).await.unwrap()).unwrap();
+    assert!(listed["items"].as_array().unwrap().is_empty());
+    let other_active: bool =
+        sqlx::query_scalar("SELECT revoked_at IS NULL FROM oauth_grants WHERE id=?")
+            .bind(other_grant)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert!(other_active, "disconnect must preserve other users' access");
     let pending_request = router.clone().oneshot(managed("/oauth/clients/request", &user_session, json!({"client_id":"https://fixture.example/metadata.json","scopes":["ordenes_compra:read"]}))).await.unwrap();
     assert_eq!(pending_request.status(), StatusCode::OK);
     let pending_request: serde_json::Value =

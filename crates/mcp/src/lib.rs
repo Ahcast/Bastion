@@ -49,7 +49,10 @@ pub use protocol::{
 };
 pub use quota::{ActorQuota, MysqlQuota, QuotaError, ToolQuota};
 pub use registry::{RegistryError, ToolDescriptor, ToolRegistry, ToolRisk};
-pub use storage::{MysqlOauthStore, StoreError, revoke_user_grants_in_transaction};
+pub use storage::{
+    MysqlOauthStore, OwnConnection, OwnConnectionPage, StoreError,
+    revoke_user_grants_in_transaction,
+};
 pub use token_exchange::{
     AuthenticatedAccess, ExchangePolicy, IssuedTokens, MysqlTokenExchange, TokenExchangeError,
 };

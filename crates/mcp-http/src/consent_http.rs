@@ -33,6 +33,7 @@ pub struct DraftConsentState<P> {
     core: CoreService,
     metadata: Arc<DraftOauthMetadata>,
     origin: String,
+    integrity: Option<Arc<dyn crate::MetadataIntegrity>>,
 }
 
 impl<P: ExchangePolicy> DraftConsentState<P> {
@@ -63,7 +64,13 @@ impl<P: ExchangePolicy> DraftConsentState<P> {
             core,
             metadata,
             origin,
+            integrity: None,
         })
+    }
+
+    pub fn with_integrity_guard(mut self, guard: Arc<dyn crate::MetadataIntegrity>) -> Self {
+        self.integrity = Some(guard);
+        self
     }
 }
 
@@ -111,7 +118,52 @@ pub(crate) fn response(status: StatusCode, body: serde_json::Value) -> Response 
         .into_response()
 }
 pub(crate) fn error(status: StatusCode) -> Response {
-    response(status, json!({"error":"request_not_completed"}))
+    let detail = match status {
+        StatusCode::UNAUTHORIZED => {
+            "Inicia sesión en Bastion y vuelve a iniciar la conexión desde tu aplicación."
+        }
+        StatusCode::FORBIDDEN => {
+            "Tu cuenta no tiene autorización vigente para esta operación. Revisa tus permisos o verifica nuevamente tu identidad en Bastion."
+        }
+        StatusCode::CONFLICT => {
+            "La configuración o la solicitud cambió. Actualiza la pantalla y revisa la solicitud pendiente antes de continuar."
+        }
+        StatusCode::TOO_MANY_REQUESTS => {
+            "Hay demasiadas verificaciones simultáneas. Espera unos segundos e intenta de nuevo."
+        }
+        StatusCode::SERVICE_UNAVAILABLE => {
+            "Bastion no pudo completar la verificación. Intenta de nuevo y consulta la bitácora si persiste."
+        }
+        _ => {
+            "La solicitud es inválida o venció. Inicia una conexión nueva desde tu aplicación y revisa sus permisos en Bastion."
+        }
+    };
+    diagnostic(status, "request_not_completed", detail)
+}
+
+/// Only fixed server-owned categories and messages belong here. Never log
+/// OAuth parameters, identities, cookies, redirects, tokens or SQL errors.
+pub(crate) fn diagnostic(
+    status: StatusCode,
+    category: &'static str,
+    detail: &'static str,
+) -> Response {
+    eprintln!(
+        "mcp_browser_event category={category} status={}",
+        status.as_u16()
+    );
+    response(status, json!({"error":category,"detail":detail}))
+}
+
+pub(crate) fn browser_error(status: StatusCode) -> Response {
+    if status == StatusCode::FORBIDDEN {
+        return response(
+            status,
+            json!({"error":"browser_security_check_failed","title":"CSRF Validation Failed",
+            "detail":"La verificación de seguridad del navegador no es válida. Actualiza Bastion o inicia sesión de nuevo."}),
+        );
+    }
+    error(status)
 }
 
 pub(crate) async fn browser_session(
@@ -199,7 +251,7 @@ where
 {
     let session = match browser_session(&state.core, &state.origin, &headers).await {
         Ok(value) => value,
-        Err(status) => return error(status),
+        Err(status) => return browser_error(status),
     };
     let input: BeginRequest = match serde_json::from_slice(&body) {
         Ok(value) => value,
@@ -211,6 +263,17 @@ where
             Ok(value) => value,
             Err(_) => return error(StatusCode::BAD_REQUEST),
         };
+    if let Some(guard) = &state.integrity {
+        if guard.check_client_id(&request.client_id).await.is_err() {
+            return response(
+                StatusCode::BAD_REQUEST,
+                json!({
+                    "error":"client_review_required",
+                    "detail":"La identidad o la aprobación del cliente debe revisarse. Vuelve a verificar la solicitud antes de autorizar."
+                }),
+            );
+        }
+    }
     match state
         .consent
         .begin(&session, &request, state.metadata.resource())
@@ -234,7 +297,7 @@ where
 {
     let session = match browser_session(&state.core, &state.origin, &headers).await {
         Ok(value) => value,
-        Err(status) => return error(status),
+        Err(status) => return browser_error(status),
     };
     let input: DecisionRequest = match serde_json::from_slice(&body) {
         Ok(value) => value,

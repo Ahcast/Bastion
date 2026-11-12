@@ -18,8 +18,11 @@ use url::Url;
 
 use crate::{
     DraftMetadataFetcher, MetadataFetchError, OauthMetadataError,
-    consent_http::{browser_session, error, response},
+    consent_http::{browser_error, browser_session, diagnostic, error, response},
 };
+
+#[path = "client_onboarding.rs"]
+mod onboarding;
 
 /// Only a server-owned source may be installed; the network implementation
 /// validates DNS and TLS and is still subject to egress controls.
@@ -42,6 +45,7 @@ pub struct DraftClientRequestState<F> {
     origin: String,
     fetcher: F,
     slots: Arc<Semaphore>,
+    resource: Option<String>,
 }
 impl<F: ClientMetadataSource> DraftClientRequestState<F> {
     /// Unmounted draft. Core and pool must refer to the same database.
@@ -71,7 +75,13 @@ impl<F: ClientMetadataSource> DraftClientRequestState<F> {
             origin,
             fetcher,
             slots: Arc::new(Semaphore::new(max_concurrent)),
+            resource: None,
         })
+    }
+
+    pub fn with_resource(mut self, resource: String) -> Self {
+        self.resource = Some(resource);
+        self
     }
 }
 
@@ -81,6 +91,18 @@ pub fn draft_client_request_router<F: ClientMetadataSource>(
     state: DraftClientRequestState<F>,
 ) -> Router {
     Router::new()
+        .route(
+            "/oauth/clients/inspect-authorization",
+            post(onboarding::inspect::<F>),
+        )
+        .route(
+            "/oauth/connections/list",
+            post(onboarding::connections::<F>),
+        )
+        .route(
+            "/oauth/connections/disconnect",
+            post(onboarding::disconnect::<F>),
+        )
         .route("/oauth/clients/request", post(submit::<F>))
         .route("/oauth/clients/mine", post(mine::<F>))
         .route("/oauth/clients/pending", post(pending::<F>))
@@ -151,7 +173,7 @@ async fn submit<F: ClientMetadataSource>(
 ) -> Response {
     let session = match browser_session(&state.core, &state.origin, &headers).await {
         Ok(v) => v,
-        Err(s) => return error(s),
+        Err(s) => return browser_error(s),
     };
     let input: Submit = match serde_json::from_slice(&body) {
         Ok(v) => v,
@@ -187,6 +209,14 @@ async fn submit<F: ClientMetadataSource>(
         .await
     {
         Ok(id) => response(StatusCode::OK, json!({"request_id":id,"status":"pending"})),
+        Err(ClientRequestError::AlreadyApproved) => response(
+            StatusCode::CONFLICT,
+            json!({"error":"already_approved","detail":"El cliente ya tiene estos permisos aprobados. Vuelve a verificar la conexión para autorizar tu cuenta."}),
+        ),
+        Err(ClientRequestError::Conflict) => response(
+            StatusCode::CONFLICT,
+            json!({"error":"review_conflict","detail":"Ya existe una solicitud pendiente diferente o cambió la identidad del cliente. Pide al administrador revisar la solicitud en Ajustes → Clientes MCP y vuelve a iniciar la conexión."}),
+        ),
         Err(e) => error(status(e)),
     }
 }
@@ -199,7 +229,7 @@ async fn list<F: ClientMetadataSource>(
 ) -> Response {
     let session = match browser_session(&state.core, &state.origin, &headers).await {
         Ok(v) => v,
-        Err(s) => return error(s),
+        Err(s) => return browser_error(s),
     };
     let input: List = match serde_json::from_slice(&body) {
         Ok(v) => v,
@@ -238,7 +268,7 @@ async fn managed_list<F: ClientMetadataSource>(
 ) -> Response {
     let session = match browser_session(&state.core, &state.origin, &headers).await {
         Ok(v) => v,
-        Err(s) => return error(s),
+        Err(s) => return browser_error(s),
     };
     let input: List = match serde_json::from_slice(&body) {
         Ok(v) => v,
@@ -263,7 +293,7 @@ async fn managed_scopes<F: ClientMetadataSource>(
 ) -> Response {
     let session = match browser_session(&state.core, &state.origin, &headers).await {
         Ok(v) => v,
-        Err(s) => return error(s),
+        Err(s) => return browser_error(s),
     };
     let input: UpdateManaged = match serde_json::from_slice(&body) {
         Ok(v) => v,
@@ -309,7 +339,7 @@ async fn managed_disable<F: ClientMetadataSource>(
 ) -> Response {
     let session = match browser_session(&state.core, &state.origin, &headers).await {
         Ok(v) => v,
-        Err(s) => return error(s),
+        Err(s) => return browser_error(s),
     };
     let input: DisableManaged = match serde_json::from_slice(&body) {
         Ok(v) => v,
@@ -336,7 +366,7 @@ async fn review<F: ClientMetadataSource>(
 ) -> Response {
     let session = match browser_session(&state.core, &state.origin, &headers).await {
         Ok(v) => v,
-        Err(s) => return error(s),
+        Err(s) => return browser_error(s),
     };
     let input: Review = match serde_json::from_slice(&body) {
         Ok(v) => v,

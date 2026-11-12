@@ -133,7 +133,7 @@ La [ficha de Licitaciones](modulos/licitaciones.md) define escenarios pendientes
 - UI, API y MCP verifican en servidor la autorización por operación y por objeto/tenant, junto con la allowlist de campos editables; las herramientas de IA no amplían permisos.
 - La IA interactiva se autentica con OAuth Authorization Code + PKCE y usa los permisos vigentes del usuario que autorizó; el usuario puede listar/revocar la conexión desde `Ajustes > Mi cuenta > Aplicaciones conectadas`.
 - Solo clientes aprobados previamente por un Administrador del sistema pueden iniciar OAuth; esa aprobación administrativa no otorga acceso a datos. El usuario puede solicitar habilitar un cliente no autorizado, pero la solicitud pendiente no crea conexión, grant ni token; queda en la cola de Ajustes y genera un correo para todos los Administradores activos. Después de la aprobación administrativa, la pantalla muestra el cliente y alcances y requiere aprobación explícita de cada usuario; repite la aprobación si se solicitan alcances adicionales.
-- Si el Administrador aprueba una solicitud, el usuario ve Aprobada en Ajustes y recibe correo para completar OAuth y autorizar sus alcances; no se crean grants ni tokens hasta su consentimiento.
+- Si el Administrador aprueba una solicitud, la aprobación se registra en la bitácora y el usuario recibe correo para completar OAuth y autorizar sus alcances; no se crean grants ni tokens hasta su consentimiento.
 - Si el Administrador rechaza una solicitud, el usuario ve Rechazada en Ajustes, recibe correo y puede volver a solicitar más adelante.
 - El Administrador configura el máximo de alcances permitido por cliente; OAuth impide consentir alcances fuera de ese límite o de los permisos vigentes del usuario. El usuario puede solicitar ampliar el máximo; si se aprueba, debe consentir los nuevos alcances antes de usarlos. Si se elimina un alcance del máximo, se revocan inmediatamente los grants y tokens afectados y el usuario debe volver a consentir para conectar de nuevo.
 - Los access tokens de IA duran 15 minutos; los refresh tokens rotan y vencen como máximo a los 15 días, cuando se exige nueva autorización con TOTP. Cambio/recuperación de contraseña, desactivación, revocación manual o retirada de la aprobación administrativa del cliente invalidan los grants; retirar la aprobación revoca de inmediato todos los grants y tokens de usuario asociados.
@@ -231,3 +231,13 @@ Comprobar cifras reales de Procesos, Cotizaciones, Órdenes, Facturas y Gastos, 
 - Excluir gastos borrados y separar monedas; conservar los importes como decimales y señalar que Facturas reporta borradores.
 - Exportar resumen y detalle en Excel sin fórmulas aportadas por usuarios; rechazar el exceso de filas y auditar consultas/exportaciones.
 - Verificar permisos, agregados MySQL 5.7, paginación, fechas, borrado lógico, exportación y cuotas en base aislada. Los topes operativos siguen identificados como propuestas pendientes de cotejo Legacy.
+
+
+## Ciclo de clientes MCP
+
+- Un cliente desconocido con solicitud válida llega al frontend fijo sin lecturas SQL, registro anónimo ni descarga de metadatos.
+- La inspección autenticada verifica metadatos y retorno exacto; solicitar aprobación no crea grants ni tokens. Solo después de aprobación administrativa y decisión explícita del usuario se concede acceso.
+- Ampliar permisos administrativos exige nueva autorización individual. Cambiar metadatos conserva el bloqueo para revisión.
+- Las conexiones activas muestran únicamente accesos de la cuenta, con permisos vigentes y paginación. Desconectar requiere confirmación, revoca solo sus grants y conserva auditoría y accesos de otras cuentas.
+- Ajustes no muestra «Mis solicitudes» ni consulta su historial. Los errores indican el siguiente paso sin reflejar secretos.
+- Comprobar CI MySQL 5.7, SDK y frontend; registrar despliegue e interoperabilidad real por separado, sin declarar compatibles clientes no probados.

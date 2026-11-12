@@ -11,6 +11,30 @@ const { act } = await import('react');
 const { createRoot } = await import('react-dom/client');
 after(() => window.happyDOM.abort());
 
+test('personal connections show renewal needs and disconnect only after confirmation', async () => {
+  const calls: { path: string; body: unknown }[] = [];
+  let connected = true;
+  const api = new ApiClient('https://api.example.test', async (url, init = {}) => {
+    const path = new URL(String(url)).pathname;
+    calls.push({ path, body: JSON.parse(String(init.body)) });
+    if (path.endsWith('/disconnect')) { connected = false; return Response.json({ status: 'disconnected' }); }
+    return Response.json({ items: connected ? [{ id: 9, client_id: 'https://fixture.example/client.json', client_name: 'Mi aplicación', scopes: ['cotizaciones:read'], expires_at: '2099-01-01T00:00:00Z', authorizations: 2, additional_scopes_available: true }] : [], next_before: null });
+  });
+  const container = document.createElement('div'); document.body.append(container); const root = createRoot(container);
+  try {
+    await act(async () => root.render(<McpClients api={api} isAdministrator={false} />));
+    assert.ok(container.textContent?.includes('Hay permisos adicionales aprobados'));
+    assert.equal(calls.some(call => call.path.includes('/clients/')), false);
+    const button = (name: string) => [...container.querySelectorAll('button')].find(item => item.textContent === name)!;
+    await act(async () => button('Desconectar mis accesos').click());
+    assert.equal(calls.some(call => call.path.endsWith('/disconnect')), false);
+    await act(async () => button('Confirmar desconexión').click());
+    assert.deepEqual(calls.find(call => call.path.endsWith('/disconnect'))?.body, { id: 9, confirmed_client_id: 'https://fixture.example/client.json' });
+    assert.ok(container.textContent?.includes('Sin conexiones activas'));
+    assert.equal(container.textContent?.includes('Mis solicitudes'), false);
+  } finally { await act(async () => root.unmount()); container.remove(); }
+});
+
 test('only an administrator sees the review queue and selects scopes explicitly', async () => {
   for (const admin of [false, true]) {
     const calls: { path: string; body: Record<string, unknown> }[] = [];
@@ -19,14 +43,16 @@ test('only an administrator sees the review queue and selects scopes explicitly'
       calls.push({ path, body: JSON.parse(String(init.body)) as Record<string, unknown> });
       if (path.endsWith('/pending')) return Response.json({ items: [{ id: 3, client_name: '<img src=x>', client_id: 'https://client.example/metadata', scopes: ['cotizaciones:read'], status: 'pending' }], next_before: null });
       if (path.endsWith('/mine')) return Response.json({ items: [{ id: 2, client_name: 'Otro cliente', client_id: 'https://other.example/metadata', scopes: ['cotizaciones:read', 'facturas:read'], approved_scopes: ['cotizaciones:read'], status: 'approved' }], next_before: null });
-      if (path.endsWith('/admin/list')) return Response.json({ items: [], next_before: null });
+      if (path.endsWith('/admin/list') || path.endsWith('/connections/list')) return Response.json({ items: [], next_before: null });
       return Response.json({ status: 'reviewed' });
     });
     const container = document.createElement('div'); document.body.append(container); const root = createRoot(container);
     try {
       await act(async () => root.render(<McpClients api={api} isAdministrator={admin} />));
       assert.equal(calls.some(call => call.path.endsWith('/pending')), admin);
-      assert.ok(container.textContent?.includes('Aprobados: Consultar cotizaciones'));
+      assert.equal(calls.some(call => call.path.endsWith('/mine')), false);
+      assert.equal(container.textContent?.includes('Mis solicitudes'), false);
+      assert.equal(container.textContent?.includes('Otro cliente'), false);
       assert.ok(container.textContent?.includes('Consultar licitaciones'));
       assert.ok(container.textContent?.includes('Crear y editar órdenes pendientes sin compras ni entregas'));
       assert.ok(container.textContent?.includes('Crear y editar facturas en borrador'));

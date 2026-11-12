@@ -13,9 +13,46 @@ use serde_json::json;
 use sqlx::mysql::MySqlPoolOptions;
 use std::{
     collections::{BTreeMap, BTreeSet},
-    sync::Arc,
+    sync::{
+        Arc,
+        atomic::{AtomicBool, Ordering},
+    },
 };
 use tower::ServiceExt;
+
+struct Guard(Arc<AtomicBool>);
+impl bastion_mcp_http::MetadataIntegrity for Guard {
+    fn check_client_id<'a>(
+        &'a self,
+        _: &'a str,
+    ) -> std::pin::Pin<
+        Box<
+            dyn std::future::Future<Output = Result<(), bastion_mcp_http::MetadataIntegrityError>>
+                + Send
+                + 'a,
+        >,
+    > {
+        Box::pin(async {
+            if self.0.load(Ordering::SeqCst) {
+                Err(bastion_mcp_http::MetadataIntegrityError::Invalid)
+            } else {
+                Ok(())
+            }
+        })
+    }
+    fn check_client_pk(
+        &self,
+        _: u64,
+    ) -> std::pin::Pin<
+        Box<
+            dyn std::future::Future<Output = Result<(), bastion_mcp_http::MetadataIntegrityError>>
+                + Send
+                + '_,
+        >,
+    > {
+        self.check_client_id("")
+    }
+}
 
 #[tokio::test]
 async fn mysql57_browser_consent_requires_csrf_session_and_explicit_decision() {
@@ -91,6 +128,7 @@ async fn mysql57_browser_consent_requires_csrf_session_and_explicit_decision() {
         )
         .unwrap(),
     );
+    let changed = Arc::new(AtomicBool::new(false));
     let router = draft_consent_router(
         DraftConsentState::new(
             pool.clone(),
@@ -99,7 +137,8 @@ async fn mysql57_browser_consent_requires_csrf_session_and_explicit_decision() {
             metadata,
             "https://app.example.invalid".into(),
         )
-        .unwrap(),
+        .unwrap()
+        .with_integrity_guard(Arc::new(Guard(changed.clone()))),
     );
     let mut query = url::form_urlencoded::Serializer::new(String::new());
     query
@@ -233,13 +272,14 @@ async fn mysql57_browser_consent_requires_csrf_session_and_explicit_decision() {
             &session,
             "https://app.example.invalid",
             &csrf,
-            body,
+            body.clone(),
         ))
         .await
         .unwrap();
     let next: serde_json::Value =
         serde_json::from_slice(&to_bytes(next.into_body(), 8192).await.unwrap()).unwrap();
     let denied = router
+        .clone()
         .oneshot(request(
             "/oauth/consent/decision",
             &session,
@@ -264,4 +304,19 @@ async fn mysql57_browser_consent_requires_csrf_session_and_explicit_decision() {
         .await
         .unwrap();
     assert_eq!(count, 1);
+    changed.store(true, Ordering::SeqCst);
+    let blocked = router
+        .oneshot(request(
+            "/oauth/consent/begin",
+            &session,
+            "https://app.example.invalid",
+            &csrf,
+            body,
+        ))
+        .await
+        .unwrap();
+    assert_eq!(blocked.status(), StatusCode::BAD_REQUEST);
+    let blocked: serde_json::Value =
+        serde_json::from_slice(&to_bytes(blocked.into_body(), 8192).await.unwrap()).unwrap();
+    assert_eq!(blocked["error"], "client_review_required");
 }

@@ -133,7 +133,8 @@ pub fn compose_draft_router<F: ClientMetadataSource>(
         Arc::new(metadata.clone()),
         config.frontend_origin.clone(),
     )
-    .map_err(|_| DraftCompositionError)?;
+    .map_err(|_| DraftCompositionError)?
+    .with_integrity_guard(integrity.clone());
     let authorization = DraftAuthorizationState::new(
         pool.clone(),
         config.resource.clone(),
@@ -150,7 +151,8 @@ pub fn compose_draft_router<F: ClientMetadataSource>(
         fetcher,
         config.max_metadata_fetches,
     )
-    .map_err(|_| DraftCompositionError)?;
+    .map_err(|_| DraftCompositionError)?
+    .with_resource(config.resource.clone());
     let browser_cors = CorsLayer::new()
         .allow_origin(AllowOrigin::list([frontend]))
         .allow_credentials(true)

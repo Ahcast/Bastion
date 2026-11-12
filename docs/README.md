@@ -61,6 +61,10 @@ El informe se obtuvo de una copia de frontend Angular compilado y backend Larave
 
 ## Registro de decisiones
 
+- 2026-11-11. El usuario solicita alta autónoma y mantenimiento seguro de clientes MCP. La entrada OAuth permite llegar a la revisión sin aprobación previa, pero no concede tokens. Después de login se verifican CIMD/retorno y aprobación administrativa, seguida del consentimiento individual. Se añaden conexiones activas propias y desconexión confirmada, con auditoría y errores seguros. Se mantiene el perfil CIMD público, PKCE S256, origen/CSRF y permisos Core. Ver `06-mcp.md`.
+
+- 2026-11-11. El usuario retira «Mis solicitudes» de Clientes MCP. El historial de solicitudes, aprobaciones y rechazos permanece en la bitácora; Ajustes conserva el formulario de solicitud, los clientes autorizados y la cola administrativa pendiente. El frontend deja de consultar el historial personal.
+
 - 2026-11-11. El usuario autoriza programación de correo de Cotizaciones desde MCP con confirmación humana, pruebas, push y despliegue. El agente prepara una propuesta inmutable y el usuario la revisa/confirma en Bastion mediante sesión y CSRF. Se reutilizan correo, PDF, adjuntos, permisos e idempotencia del módulo. Migración Core 12 para propuestas cifradas vinculadas a actor/grant y vencimiento de 15 minutos. Ver `06-mcp.md`. El estado de despliegue se verifica al instalar los artifacts.
 
 - 2026-11-01: se solicita editar y eliminar clientes MCP desde Ajustes. La eliminación desactiva al cliente y revoca sus autorizaciones, sin borrar el historial; ver `06-mcp.md`.

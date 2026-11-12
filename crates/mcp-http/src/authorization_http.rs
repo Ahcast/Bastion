@@ -1,4 +1,4 @@
-use std::{collections::BTreeSet, sync::Arc};
+use std::{collections::BTreeSet, marker::PhantomData};
 
 use axum::{
     Router,
@@ -12,35 +12,33 @@ use axum::{
     response::{IntoResponse, Response},
     routing::get,
 };
-use bastion_mcp::{
-    AuthorizationParameters, ClientMetadata, ClientRequestStore, parse_authorization_parameters,
-};
+use bastion_mcp::{AuthorizationParameters, ClientMetadata, parse_authorization_parameters};
 use bastion_mcp_core::approved_read_requirements;
 use sha2::{Digest, Sha256};
 use sqlx::MySqlPool;
-use tokio::sync::Semaphore;
 use url::Url;
 
-use crate::{ClientMetadataSource, OauthMetadataError, consent_http::error};
+use crate::{
+    ClientMetadataSource, OauthMetadataError,
+    consent_http::{diagnostic, error},
+};
 
 #[derive(Clone)]
 pub struct DraftAuthorizationState<F> {
-    pool: MySqlPool,
     resource: String,
     frontend_origin: String,
     client_origins: BTreeSet<String>,
-    fetcher: F,
-    slots: Arc<Semaphore>,
+    source: PhantomData<F>,
 }
 impl<F: ClientMetadataSource> DraftAuthorizationState<F> {
     /// Trusted configuration only. Proxy logging, egress controls and per-IP
     /// limits must be verified before this isolated route can be mounted.
     pub fn new(
-        pool: MySqlPool,
+        _pool: MySqlPool,
         resource: String,
         frontend_origin: String,
         client_origins: BTreeSet<String>,
-        fetcher: F,
+        _fetcher: F,
         max_concurrent: usize,
     ) -> Result<Self, OauthMetadataError> {
         let resource_url = Url::parse(&resource).map_err(|_| OauthMetadataError)?;
@@ -78,12 +76,10 @@ impl<F: ClientMetadataSource> DraftAuthorizationState<F> {
             }
         }
         Ok(Self {
-            pool,
             resource,
             frontend_origin,
             client_origins,
-            fetcher,
-            slots: Arc::new(Semaphore::new(max_concurrent)),
+            source: PhantomData,
         })
     }
 }
@@ -97,7 +93,7 @@ pub fn draft_authorization_router<F: ClientMetadataSource>(
         .with_state(state)
 }
 
-async fn approved(
+pub(crate) async fn approved(
     pool: &MySqlPool,
     request: &AuthorizationParameters,
     metadata: Option<&ClientMetadata>,
@@ -170,36 +166,26 @@ async fn authorize<F: ClientMetadataSource>(
     };
     let request = match parse_authorization_parameters(&query, &state.resource) {
         Ok(value) => value,
-        Err(_) => return error(StatusCode::BAD_REQUEST),
+        Err(_) => {
+            return diagnostic(
+                StatusCode::BAD_REQUEST,
+                "invalid_authorization_request",
+                "El cliente debe iniciar una solicitud nueva con PKCE S256, el recurso de Bastion y permisos explícitos. Revisa su configuración MCP/OAuth.",
+            );
+        }
     };
-    match approved(&state.pool, &request, None).await {
-        Ok(true) => {}
-        Ok(false) => return error(StatusCode::BAD_REQUEST),
-        Err(_) => return error(StatusCode::SERVICE_UNAVAILABLE),
-    }
-    let Ok(_slot) = state.slots.clone().try_acquire_owned() else {
-        return error(StatusCode::TOO_MANY_REQUESTS);
-    };
-    let metadata = match state.fetcher.fetch(&request.client_id).await {
-        Ok(value) => value,
-        Err(_) => return error(StatusCode::BAD_REQUEST),
-    };
-    if metadata.client_id() != request.client_id {
+    if bastion_mcp::validate_client_identifier(&request.client_id).is_err()
+        || bastion_mcp::validate_redirect_uri(&request.redirect_uri).is_err()
+        || !request
+            .scopes
+            .is_subset(&approved_read_requirements().into_keys().collect())
+    {
         return error(StatusCode::BAD_REQUEST);
     }
-    match ClientRequestStore::new(state.pool.clone())
-        .observe_approved_metadata(&metadata)
-        .await
-    {
-        Ok(true) => {}
-        Ok(false) => return error(StatusCode::BAD_REQUEST),
-        Err(_) => return error(StatusCode::SERVICE_UNAVAILABLE),
-    }
-    match approved(&state.pool, &request, Some(&metadata)).await {
-        Ok(true) => {}
-        Ok(false) => return error(StatusCode::BAD_REQUEST),
-        Err(_) => return error(StatusCode::SERVICE_UNAVAILABLE),
-    }
+    // This is a local handoff, not an authorization. Client approval and fresh
+    // metadata are checked after login, before creating consent or tokens.
+    // Unknown clients must reach the enrollment screen. Anonymous requests
+    // never trigger metadata network requests or create registration records.
     let location = match HeaderValue::from_str(&format!(
         "{}/oauth/consent#{}",
         state.frontend_origin, query

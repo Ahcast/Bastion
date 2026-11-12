@@ -4,6 +4,7 @@ import { Notice } from '../ui.js';
 
 type PendingConsent = { handle: string; client_name: string; scopes: string[]; expires_at: string };
 type Decision = 'approve' | 'deny';
+type Inspection = { status: 'ready' | 'approval_required'; client_id: string; client_name: string; scopes: string[]; redirect_uri: string };
 
 const scopeLabels: Record<string, string> = {
   'cotizaciones:read': 'Consultar cotizaciones',
@@ -34,6 +35,17 @@ function validPending(value: unknown): value is PendingConsent {
     && typeof item.expires_at === 'string' && !Number.isNaN(Date.parse(item.expires_at));
 }
 
+function validInspection(value: unknown): value is Inspection {
+  if (typeof value !== 'object' || value === null) return false;
+  const item = value as Record<string, unknown>;
+  return (item.status === 'ready' || item.status === 'approval_required')
+    && typeof item.client_id === 'string' && item.client_id.length <= 2048
+    && typeof item.client_name === 'string' && item.client_name.length > 0 && item.client_name.length <= 255
+    && typeof item.redirect_uri === 'string'
+    && Array.isArray(item.scopes) && item.scopes.length > 0 && item.scopes.length <= 64
+    && item.scopes.every(scope => typeof scope === 'string' && Object.hasOwn(scopeLabels, scope));
+}
+
 function safeRedirect(value: unknown): string {
   if (typeof value !== 'string' || value.length > 8192) throw new Error('No se pudo completar la solicitud.');
   let url: URL;
@@ -51,6 +63,8 @@ export default function McpConsent({ api, authorizationQuery, navigate = url => 
   api: ApiClient; authorizationQuery: string; navigate?: (url: string) => void;
 }) {
   const [pending, setPending] = useState<PendingConsent | null>(null);
+  const [inspection, setInspection] = useState<Inspection | null>(null);
+  const [submitted, setSubmitted] = useState(false);
   const [busy, setBusy] = useState(false), [error, setError] = useState('');
   const inFlight = useRef(false);
 
@@ -58,9 +72,23 @@ export default function McpConsent({ api, authorizationQuery, navigate = url => 
     if (inFlight.current) return;
     inFlight.current = true; setBusy(true); setError('');
     try {
+      const inspection = await api.request<unknown>('/oauth/clients/inspect-authorization', { method: 'POST', body: { authorization_query: authorizationQuery } });
+      if (!validInspection(inspection)) throw new Error('No se pudo verificar la identidad de la aplicación.');
+      setInspection(inspection);
+      if (inspection.status !== 'ready') { setSubmitted(false); return; }
       const result = await api.request<unknown>('/oauth/consent/begin', { method: 'POST', body: { authorization_query: authorizationQuery } });
       if (!validPending(result)) throw new Error('No se pudo verificar la solicitud.');
       setPending(result);
+    } catch (reason) { setError(message(reason)); }
+    finally { inFlight.current = false; setBusy(false); }
+  }
+
+  async function requestApproval() {
+    if (!inspection || inFlight.current) return;
+    inFlight.current = true; setBusy(true); setError('');
+    try {
+      await api.request('/oauth/clients/request', { method: 'POST', body: { client_id: inspection.client_id, scopes: inspection.scopes } });
+      setSubmitted(true);
     } catch (reason) { setError(message(reason)); }
     finally { inFlight.current = false; setBusy(false); }
   }
@@ -78,7 +106,15 @@ export default function McpConsent({ api, authorizationQuery, navigate = url => 
   return <section className="auth-wrap"><div className="auth-card">
     <h1>Autorizar una aplicación</h1>
     <Notice>{error}</Notice>
-    {!pending ? <><p>Revisa los permisos solicitados antes de decidir si deseas conectar esta aplicación con Bastion.</p>
+    {!pending && inspection?.status === 'approval_required' ? <>
+      <p><strong>{inspection.client_name}</strong> necesita aprobación administrativa para estos permisos:</p>
+      <ul>{inspection.scopes.map(scope => <li key={scope}>{scopeLabels[scope]}</li>)}</ul>
+      <p>Identidad del cliente: {inspection.client_id}</p><p>Dirección de retorno verificada: {inspection.redirect_uri}</p>
+      <p>El administrador revisa la solicitud en Ajustes → Clientes MCP. Después tú decides si autorizas el acceso a tu cuenta.</p>
+      {submitted ? <p role="status">Solicitud enviada. Cuando esté aprobada, vuelve a verificar. Si la aplicación cerró la conexión pendiente, inicia una conexión nueva desde ella.</p>
+        : <button type="button" disabled={busy} onClick={() => void requestApproval()}>Solicitar aprobación</button>}
+      {' '}<button type="button" disabled={busy} onClick={() => void begin()}>Volver a verificar</button>
+    </> : !pending ? <><p>Revisa los permisos solicitados antes de decidir si deseas conectar esta aplicación con Bastion.</p>
       <button type="button" disabled={busy} onClick={() => void begin()}>{busy ? 'Verificando…' : 'Revisar solicitud'}</button></>
       : <><p><strong>{pending.client_name}</strong> solicita acceso a tu cuenta.</p>
         <p>Si autorizas, podrá realizar estas consultas según tus permisos vigentes:</p>

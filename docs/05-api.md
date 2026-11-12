@@ -142,3 +142,13 @@ POST /api/v1/account/totp/change/complete recibe el token y un código del nuevo
 ## Vista nativa de PDF con nombre de documento
 
 Las acciones existentes abren GET privados con `version` obligatoria: `/api/v1/cotizaciones/{id}/pdf/vista`, `/api/v1/facturas/{id}/documents/{kind}/vista` y `/api/v1/licitaciones/{id}/oferta-economica/preview/vista`. Devuelven `application/pdf` con `Content-Disposition: inline`, `filename` seguro y `filename*` UTF-8. La navegación lleva la cookie de sesión, sin credenciales ni datos comerciales en la URL; se comprueban permisos, versión y presupuestos existentes y se rechaza `Sec-Fetch-Site: cross-site`. Cotizaciones y Facturas conservan ver; la vista económica conserva editar y las autorizaciones de sus referencias. Los contratos JSON anteriores siguen disponibles para sus consumidores. Estas lecturas no cambian estados comerciales; reutilizan la generación y almacenamiento existentes y no añaden una copia persistente para el visor. No se agregan botones de descarga.
+
+## Ciclo de clientes MCP — 2026-11-11
+
+Los endpoints de navegador MCP requieren sesión Core, origen exacto y CSRF y devuelven `Cache-Control: no-store`. No aceptan identidad de usuario en el cuerpo.
+
+- `POST /oauth/clients/inspect-authorization`, cuerpo `{ "authorization_query": "..." }`. Verifica solicitud OAuth, permisos registrados, CIMD público y retorno exacto. Devuelve estado `ready` o `approval_required`, identidad/nombre verificados, alcances y retorno. No crea autorizaciones ni tokens.
+- `POST /oauth/connections/list`, cuerpo `{ "before": 123 }` o `{}`. Página de hasta 25 clientes con grants propios vigentes. Incluye `id`, `client_id`, `client_name`, unión de `scopes` vigentes, `expires_at` del grant más reciente, número `authorizations`, indicador `additional_scopes_available` y `next_before`. El indicador compara la aprobación administrativa con todos los grants activos del usuario.
+- `POST /oauth/connections/disconnect`, cuerpo `{ "id": 123, "confirmed_client_id": "https://cliente.example/metadata.json" }`. Comprueba confirmación, bloquea sesión/cliente y revoca solo los grants de la cuenta. Es idempotente y audita la primera revocación efectiva.
+
+La entrada pública GET de autorización solo entrega una solicitud bien formada al frontend fijo, sin consultar SQL ni descargar metadatos. La aprobación administrativa y el consentimiento individual siguen siendo obligatorios. Las solicitudes históricas permanecen en auditoría y dejan de consultarse desde Ajustes. Los errores incluyen `detail` seguro y categorías fijas, sin reflejar la consulta OAuth ni errores SQL. Ver `06-mcp.md`.

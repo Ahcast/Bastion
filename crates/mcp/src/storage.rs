@@ -3,6 +3,23 @@ use std::collections::BTreeSet;
 use chrono::NaiveDateTime;
 use sqlx::{MySql, MySqlPool, Transaction};
 
+#[derive(serde::Serialize)]
+pub struct OwnConnection {
+    pub id: u64,
+    pub client_name: String,
+    pub client_id: String,
+    pub scopes: Vec<String>,
+    pub expires_at: String,
+    pub authorizations: u64,
+    pub additional_scopes_available: bool,
+}
+
+#[derive(serde::Serialize)]
+pub struct OwnConnectionPage {
+    pub items: Vec<OwnConnection>,
+    pub next_before: Option<u64>,
+}
+
 #[derive(Clone)]
 pub struct MysqlOauthStore {
     pool: MySqlPool,
@@ -25,6 +42,106 @@ impl From<sqlx::Error> for StoreError {
 impl MysqlOauthStore {
     pub fn new(pool: MySqlPool) -> Self {
         Self { pool }
+    }
+
+    pub async fn connections_for_session<S: crate::ConsentPolicy>(
+        &self,
+        policy: &S,
+        session: &str,
+        before: Option<u64>,
+    ) -> Result<OwnConnectionPage, StoreError> {
+        if before == Some(0) {
+            return Err(StoreError::InvalidScope);
+        }
+        let mut tx = self.pool.begin().await?;
+        let actor = policy
+            .session(&mut tx, session)
+            .await?
+            .ok_or(StoreError::Forbidden)?;
+        let rows: Vec<(u64,String,String,String,NaiveDateTime,u64,bool)> = sqlx::query_as(
+            r#"SELECT c.id,c.display_name,c.client_id,
+               COALESCE((SELECT GROUP_CONCAT(s.scope_name ORDER BY s.scope_name SEPARATOR ' ')
+                 FROM oauth_client_scopes s WHERE s.client_id=c.id AND EXISTS
+                   (SELECT 1 FROM oauth_grants a WHERE a.client_id=c.id AND a.user_id=?
+                    AND a.revoked_at IS NULL AND a.expires_at>UTC_TIMESTAMP(6)
+                    AND JSON_CONTAINS(a.scopes_json,JSON_QUOTE(s.scope_name))=1)),''),
+               g.expires_at,own.authorizations,
+               EXISTS (SELECT 1 FROM oauth_client_scopes s WHERE s.client_id=c.id
+                   AND NOT EXISTS (SELECT 1 FROM oauth_grants a WHERE a.client_id=c.id
+                     AND a.user_id=? AND a.revoked_at IS NULL AND a.expires_at>UTC_TIMESTAMP(6)
+                     AND JSON_CONTAINS(a.scopes_json,JSON_QUOTE(s.scope_name))=1))
+               FROM oauth_clients c
+               JOIN (SELECT client_id,MAX(id) AS latest_id,CAST(COUNT(*) AS UNSIGNED) AS authorizations
+                     FROM oauth_grants WHERE user_id=? AND revoked_at IS NULL
+                     AND expires_at>UTC_TIMESTAMP(6) GROUP BY client_id) own ON own.client_id=c.id
+               JOIN oauth_grants g ON g.id=own.latest_id
+               WHERE c.enabled=1 AND c.metadata_hash=c.approved_metadata_hash AND c.id<?
+               ORDER BY c.id DESC LIMIT 26"#,
+        ).bind(actor.user_id).bind(actor.user_id).bind(actor.user_id).bind(before.unwrap_or(u64::MAX)).fetch_all(&mut *tx).await?;
+        tx.commit().await?;
+        let more = rows.len() > 25;
+        let items: Vec<_> = rows
+            .into_iter()
+            .take(25)
+            .map(
+                |(
+                    id,
+                    client_name,
+                    client_id,
+                    scopes,
+                    expires_at,
+                    authorizations,
+                    additional_scopes_available,
+                )| OwnConnection {
+                    id,
+                    client_name,
+                    client_id,
+                    scopes: scopes.split_whitespace().map(str::to_owned).collect(),
+                    expires_at: expires_at.and_utc().to_rfc3339(),
+                    authorizations,
+                    additional_scopes_available,
+                },
+            )
+            .collect();
+        let next_before = if more {
+            items.last().map(|row| row.id)
+        } else {
+            None
+        };
+        Ok(OwnConnectionPage { items, next_before })
+    }
+
+    pub async fn disconnect_for_session<S: crate::ConsentPolicy>(
+        &self,
+        policy: &S,
+        session: &str,
+        client: u64,
+        confirmed_client_id: &str,
+    ) -> Result<(), StoreError> {
+        if client == 0 || confirmed_client_id.is_empty() || confirmed_client_id.len() > 2048 {
+            return Err(StoreError::InvalidScope);
+        }
+        let mut tx = self.pool.begin().await?;
+        let actor = policy
+            .session(&mut tx, session)
+            .await?
+            .ok_or(StoreError::Forbidden)?;
+        let identity: Option<String> =
+            sqlx::query_scalar("SELECT client_id FROM oauth_clients WHERE id=? FOR UPDATE")
+                .bind(client)
+                .fetch_optional(&mut *tx)
+                .await?;
+        if identity.as_deref() != Some(confirmed_client_id) {
+            return Err(StoreError::NotFound);
+        }
+        let changed=sqlx::query("UPDATE oauth_grants SET revoked_at=UTC_TIMESTAMP(6),revocation_reason='user_revoked' WHERE user_id=? AND client_id=? AND revoked_at IS NULL")
+            .bind(actor.user_id).bind(client).execute(&mut *tx).await?;
+        if changed.rows_affected() > 0 {
+            sqlx::query("INSERT INTO audit_events (actor_id,module_id,action,target_type,target_id,result,created_at) VALUES (?,'core','oauth.connection.disconnect','oauth_client',?,'success',UTC_TIMESTAMP(6))")
+                .bind(actor.user_id).bind(client.to_string()).execute(&mut *tx).await?;
+        }
+        tx.commit().await?;
+        Ok(())
     }
 
     /// The actor must be obtained from a currently authenticated Core session,
