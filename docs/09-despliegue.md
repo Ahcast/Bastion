@@ -278,3 +278,9 @@ Se verificaron los ZIP, paquetes, BUILD y manifiestos de la revisión integrada,
 El 2026-11-11 se publicó únicamente el frontend de `f2bd8cb6aab21cd333706b840cbd8997cc71ed78` en Bluehost, con [Core checks aprobados](https://github.com/Ahcast/Bastion/actions/runs/43072729259). El valor del descuento y el dropdown HNL/% ocupan una sola línea, también en la disposición adaptable. Se comprobó visualmente la selección y pasaron las 174 pruebas del frontend, la compilación y CI. Los cálculos y validaciones del descuento se conservan.
 
 Se verificaron el artifact y los 50 archivos instalados; se creó un respaldo privado del sitio (4 475 907 bytes). Se preservaron config.js, las reglas de Apache y los assets anteriores. La ruta Cotizaciones respondió 200 y se cotejaron 48 recursos públicos por HTTPS. No fue necesario publicar AWS ni cambiar datos, permisos o configuración.
+
+## Favicon de Bastion — 2026-11-11
+
+El frontend de `f0d0b89a4a755a82a3b5f0cb9deca0558a2f5ecd` incorpora una fortaleza clara sobre el fondo oscuro del panel. El HTML enlaza el SVG vectorial, el ICO de 16/32/48 px y el PNG de 180 px para accesos directos móviles. Pasaron las 174 pruebas, tipos y compilación de producción en la [verificación de frontend de GitHub](https://github.com/Ahcast/Bastion/actions/runs/43155997151/job/130975940889).
+
+Se verificaron el ZIP, el paquete, BUILD y sus 53 archivos antes de instalar en Bluehost. SHA-256 del ZIP: `d34363dc9eacc417bfa52cd4ce15160dcfb4634dad0a2ce2a7596cbeb1426a8c`. Se creó y cotejó un respaldo privado del sitio de 4 589 925 bytes, preservando configuración, reglas Apache y assets anteriores. La verificación HTTPS comprobó 51 recursos, los tres iconos y sus enlaces en el HTML; SVG y PNG se sirven con los tipos MIME correspondientes. Se retiraron el instalador y el paquete de transferencia temporales. AWS y la base de datos conservaron su versión.
