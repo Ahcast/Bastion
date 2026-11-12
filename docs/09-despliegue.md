@@ -292,3 +292,11 @@ El 2026-11-11 se desplegó `e7b60e34989a9516ab940f59bd4b9476e7fd0fa5` en AWS y B
 Pasaron las 175 pruebas del frontend y las regresiones MySQL 5.7 de selección, permisos, nombre canónico, proveedor renombrado, catálogo deshabilitado, clonación y referencias inexistentes. Se comprobó visualmente el diseño con datos sintéticos locales. La ejecución local de un binario de integración fue bloqueada por Control de aplicaciones de Windows; esas pruebas se ejecutaron correctamente en CI Linux.
 
 Se verificaron artifacts, manifiestos y un respaldo privado de las 106 tablas. No se ejecutaron migraciones; los esquemas, ledgers, configuración y estados de módulos se conservaron. Bluehost instaló 53 archivos y se comprobaron 51 recursos públicos por HTTPS; favicon, config.js, reglas Apache y assets anteriores preservados. SPA y readiness 200; Órdenes y catálogo de Proveedores sin sesión 401. No se crearon proveedores ni registros de negocio de prueba en producción.
+
+## Órdenes: búsqueda por descripción de productos
+
+El 2026-11-11 se desplegó `654b724eae859eed887150181880ac70bda707d3` en AWS y Bluehost, con [Core checks aprobados](https://github.com/Ahcast/Bastion/actions/runs/43158351672). El buscador y el filtro equivalente de reportes revisan las descripciones de todos los productos, además de los campos de cabecera existentes. Admiten coincidencias parciales sin distinguir mayúsculas y tratan %, _ y ! literalmente. Cada orden aparece una sola vez antes de aplicar la paginación.
+
+Pasaron tipos, pruebas del frontend y las regresiones MySQL 5.7 en CI: coincidencias por modelo parcial, caracteres literales, exclusión de comentarios y tracking, filtros, paginación sin duplicados y consistencia con reportes. Una consulta de solo lectura comprobó la compatibilidad de la expresión JSON en el MySQL publicado sin crear registros.
+
+Se verificaron artifacts, manifiestos y un respaldo privado de 106 tablas antes de sustituir el backend. No se ejecutaron migraciones; los esquemas, ledgers, configuración y estados de módulos se conservaron. Bluehost instaló 53 archivos y se cotejaron 51 recursos públicos por HTTPS, preservando favicon, config.js, reglas Apache y assets anteriores. SPA y readiness respondieron 200; Órdenes y catálogo de Proveedores sin sesión, 401.
