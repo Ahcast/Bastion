@@ -27,3 +27,5 @@ Despliegue verificado el 2026-11-11 desde e7b60e3 (CI 43156439314): selector del
 ## Búsqueda por productos
 
 El buscador de Órdenes y el filtro equivalente de reportes también revisan las descripciones de todos los productos. Admiten coincidencias parciales, sin distinguir mayúsculas; %, _ y ! se tratan literalmente. Cada orden aparece una sola vez, con filtros, paginación y permisos existentes. No se buscan comentarios, gastos ni otros campos del JSON. No requiere migración de datos ni cambios de esquema.
+
+Despliegue verificado el 2026-11-11 desde `654b724eae859eed887150181880ac70bda707d3` en AWS y Bluehost, con CI 43158351672 aprobado. Regresiones MySQL 5.7 verifican coincidencias parciales, caracteres literales, filtros, paginación sin duplicados y consistencia con reportes. Véase docs/09-despliegue.md.
