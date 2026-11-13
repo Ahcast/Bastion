@@ -1,24 +1,43 @@
 #let d = json("data.json")
 #let money(value) = "L " + value
-#let title = if d.kind == "delivery" { "Nota de entrega" } else if d.kind == "receipt" { "Recibo" } else if not d.issued { "Factura Proforma" } else { "Factura" }
+#let title = if d.kind == "delivery" { "Nota de entrega" } else if d.kind == "receipt" { "Recibo de Pago" } else if not d.issued { "Factura Proforma" } else { "Factura" }
 #set document(title: title + " " + d.number, author: d.company.name)
-#set page(paper: "us-letter", margin: 0.5in, numbering: "1 / 1")
+#set page(paper: "us-letter", margin: 0.5in, numbering: if d.kind == "receipt" { none } else { "1 / 1" })
 #set text(font: ("Arial", "Liberation Sans", "Libertinus Serif"), size: 9pt, lang: "es")
+#if d.kind == "receipt" {
+ let muted = rgb("#65727e")
+ let border = rgb("#d0d5d9")
+ let wrap(value) = value.split(" ").map(part => if part.len() <= 35 { part } else { part.clusters().join("\u{200b}") }).join(" ")
+ grid(columns:(130pt,1fr),gutter:12pt,
+  if d.logo { image("logo.png",width:125pt,height:58pt,fit:"contain") } else { text(size:15pt,weight:"bold",wrap(d.company.name)) },
+  [#strong[RTN:] #wrap(d.company.rtn) \ #strong[Correo:] #wrap(d.company.email) \ #strong[Teléfono:] #wrap(d.company.phone) \ #strong[Dirección:] #wrap(d.company.address)])
+ v(10pt)
+ line(length:100%,stroke:0.5pt + border)
+ v(18pt)
+ grid(columns:(1fr,180pt),gutter:20pt,
+  [#text(size:18pt,weight:"bold",title) \ #v(6pt) Emitido a #strong(wrap(d.client_name)) \ Por concepto de Factura #strong(d.number)],
+  [#grid(columns:(1fr,auto),gutter:5pt,
+    text(fill:muted)[Fecha],strong(d.date),
+    text(fill:muted)[Total],strong(money(d.totals.total)))])
+ v(18pt)
+ line(length:100%,stroke:0.5pt + border)
+ v(16pt)
+ set par(justify:true)
+ [Hemos recibido de #wrap(d.client_name) la cantidad de #strong(money(d.totals.total)) por concepto de pago de la Factura #d.number.]
+ v(12pt)
+ [#strong[Total en letras:] #upper(d.total_words)]
+ v(20pt)
+ line(length:100%,stroke:0.5pt + border)
+ v(1fr)
+ grid(columns:(1fr,1fr),gutter:70pt,
+  [#text(size:8pt,weight:"bold",fill:muted)[FIRMA AUTORIZADA] \ #v(10pt) #line(length:120pt,stroke:0.7pt)],
+  [#text(size:8pt,weight:"bold",fill:muted)[FECHA] \ #v(10pt) #line(length:120pt,stroke:0.7pt)])
+} else { [
 #line(length: 100%, stroke: 2pt)
 #grid(columns: (150pt, 1fr), gutter: 18pt,
  if d.logo {image("logo.png",width:140pt,height:65pt,fit:"contain")} else {text(size:18pt,weight:"bold",d.company.name)},
  [#strong(d.company.name) \ RTN: #d.company.rtn \ #d.company.address \ #d.company.phone · #d.company.email])
 #v(12pt)
-#if d.kind == "receipt" {
- align(center, text(size:18pt, weight:"bold", title))
- v(35pt)
- set par(justify:true)
- [Hemos recibido de #d.client_name la cantidad de #money(d.totals.total) por concepto de pago de la Factura #d.number.]
- v(18pt)
- [#strong[Total en letras:] #d.total_words]
- v(45pt)
- [Firma autorizada: #line(length:180pt,stroke:0.5pt)]
-} else { [
 #text(size:18pt,weight:"bold",title)
 #v(8pt)
 #grid(columns:(1fr,1fr),gutter:16pt,
