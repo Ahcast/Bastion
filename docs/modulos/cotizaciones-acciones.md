@@ -96,6 +96,12 @@ La autorización posterior del 2026-10-23 habilita la integración de conversion
 
 El usuario puede consultar sus propios envíos desde la cotización. Un envío pendiente se puede cancelar mientras el trabajador aún no lo haya tomado. Se puede volver a encolar un fallo anterior a SMTP cuando la cotización conserva la misma revisión. El sistema conserva los resultados de entrega no confirmada para evitar duplicados y audita las dos acciones.
 
+## PDF de Colaboración en el correo
+
+El preparador de correo ofrece un botón compacto para buscar y seleccionar varios PDF de Colaboración mediante casillas. Mantiene la selección entre páginas y permite quitar archivos antes de enviar. Los PDF seleccionados sólo pertenecen a ese envío; no cambian la revisión ni los adjuntos guardados de la cotización. Se conserva el máximo conjunto de 10 adjuntos adicionales y 20 MiB, incluido el PDF de cotización.
+
+Cotizaciones usa el contrato interno de Colaboración para consultar metadatos y leer snapshots autorizados, sin SQL ajeno ni claves S3 expuestas. La selección se guarda cifrada en el trabajo de correo y se vuelven a comprobar acceso de carpeta, disponibilidad, tamaño, firma PDF e integridad antes de SMTP, también en envíos programados. Si un PDF se retira o pierde permisos, el envío se detiene. No se modifican los originales ni se conceden permisos nuevos; los correos anteriores siguen siendo compatibles. La API admite la lista opcional `collaboration_file_ids`.
+
 ## Nombre del PDF
 
 El PDF usa el número de cotización con extensión .pdf. La acción PDF existente abre la respuesta privada de la API en el visor nativo, con Content-Disposition inline y el nombre del archivo. No se añaden botones de descarga. El enlace lleva únicamente la versión esperada; autenticación, permiso ver y control de versión se validan en el servidor.

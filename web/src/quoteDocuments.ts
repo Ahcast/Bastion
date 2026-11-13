@@ -2,7 +2,7 @@ import { fileBlob } from './quoteAttachments.js';
 import type { QuoteFile } from './quoteAttachments.js';
 export interface QuotePdf { filename: string; mime: 'application/pdf'; content_base64: string }
 export interface DocumentReadiness { pdf: boolean; company: boolean; email: boolean; attachments?: boolean }
-export interface QuoteEmailInput { to: string; cc: string; bcc: string; subject: string; message: string; scheduled_at: string | null }
+export interface QuoteEmailInput { to: string; cc: string; bcc: string; subject: string; message: string; scheduled_at: string | null; collaboration_file_ids?: number[] }
 export interface QuoteEmailJob { id: number; delivery_status: 'pending' | 'delivering' | 'sent' | 'failed' | 'cancelled'; scheduled_at: string; last_error_code: string | null }
 export function pdfBlob(pdf: QuotePdf): Blob {
   if (pdf.mime !== 'application/pdf' || pdf.content_base64.length > 12 * 1024 * 1024) throw new Error('El PDF recibido no es válido.');
@@ -46,8 +46,9 @@ export function hondurasSchedule(value: string): string | null {
   return date.toISOString();
 }
 export function emailFailure(code: string | null): string {
+  if (code === 'attachment_changed') return 'Un PDF seleccionado cambió antes del envío. Revisa los archivos de Colaboración y prepara otro correo.';
   if (code === 'quote_changed') return 'La cotización cambió antes del envío. Abre su versión actual para preparar otro correo.';
-  if (code === 'authorization_changed') return 'El envío se detuvo porque cambiaron los permisos o la disponibilidad de la cotización.';
+  if (code === 'authorization_changed') return 'El envío se detuvo porque cambiaron los permisos o la disponibilidad de la cotización o de sus archivos.';
   if (code === 'configuration_invalid') return 'Revisa la configuración de empresa y las credenciales SMTP en Ajustes.';
   return 'No se pudo confirmar la entrega. Revisa tu correo enviado antes de preparar otro envío para evitar duplicados.';
 }

@@ -187,6 +187,7 @@ async fn mysql57_private_attachments_versions_receipts_permissions_and_cleanup()
                 subject: String::new(),
                 message: String::new(),
                 scheduled_at: None,
+                collaboration_file_ids: Vec::new(),
             },
         )
         .await
@@ -200,6 +201,97 @@ async fn mysql57_private_attachments_versions_receipts_permissions_and_cleanup()
     let envelope = core.unseal_domain_json(&encrypted).unwrap();
     assert_eq!(envelope["attachments"].as_array().unwrap().len(), 2);
     assert!(!String::from_utf8_lossy(&encrypted).contains("private.pdf"));
+    // Library selections stay in the encrypted mail snapshot, not in the quote.
+    bastion_colaboracion::CollaborationService::migrate(&database)
+        .await
+        .unwrap();
+    let library = bastion_colaboracion::CollaborationService::new(database.clone(), core.admin());
+    library.synchronize_release(true).await.unwrap();
+    core.admin()
+        .set_module_enabled(1, "colaboracion", true)
+        .await
+        .unwrap();
+    let mut source_ids = Vec::new();
+    for (index, mime) in [
+        (1, "application/pdf"),
+        (2, "application/pdf"),
+        (3, "text/plain"),
+    ] {
+        let source = sqlx::query("INSERT INTO colaboracion_files (scope,id_persona,folder_key,title,notes,filename,size_bytes,mime,object_key,content_hash,request_hash,actor_id,idempotency_key,state) VALUES ('empresa',NULL,'empresa',?,'',?,12,?,?,UNHEX(SHA2('synthetic',256)),UNHEX(SHA2('request',256)),1,?,'ready')")
+            .bind(format!("Library {index}")).bind(format!("library-{index}.pdf")).bind(mime).bind(format!("colaboracion/synthetic/{index}" )).bind(format!("library-synthetic-{index}")).execute(&pool).await.unwrap();
+        source_ids.push(source.last_insert_id());
+    }
+    let with_library = |ids: Vec<u64>| QuoteEmailInput {
+        to: "recipient@example.test".into(),
+        cc: String::new(),
+        bcc: String::new(),
+        subject: String::new(),
+        message: String::new(),
+        scheduled_at: Some("2099-01-01T12:00:00Z".into()),
+        collaboration_file_ids: ids,
+    };
+    let selected = mail
+        .queue(
+            1,
+            q.id,
+            3,
+            "attachment-library-mail-01",
+            with_library(source_ids[..2].to_vec()),
+        )
+        .await
+        .unwrap();
+    let payload: Vec<u8> =
+        sqlx::query_scalar("SELECT payload_ciphertext FROM cotizaciones_email_jobs WHERE id=?")
+            .bind(selected.id)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    let snapshot = core.unseal_domain_json(&payload).unwrap();
+    assert_eq!(snapshot["collaboration_files"].as_array().unwrap().len(), 2);
+    assert_eq!(snapshot["attachments"].as_array().unwrap().len(), 2);
+    assert!(!String::from_utf8_lossy(&payload).contains("library-1.pdf"));
+    assert_eq!(service.detail(1, q.id).await.unwrap().version, 3);
+    assert!(matches!(
+        mail.queue(
+            1,
+            q.id,
+            3,
+            "attachment-library-nonpdf",
+            with_library(vec![source_ids[2]])
+        )
+        .await,
+        Err(CoreError::Invalid)
+    ));
+    sqlx::query("INSERT INTO role_permissions (role_id,module_id,scope_hash,scope_key,capability) VALUES (2,'cotizaciones',UNHEX(SHA2('documentos',256)),'documentos','editar')").execute(&pool).await.unwrap();
+    sqlx::query("INSERT INTO user_smtp_credentials (user_id,smtp_email,password_ciphertext) VALUES (2,'viewer@example.test',X'01')").execute(&pool).await.unwrap();
+    assert!(matches!(
+        mail.queue(
+            2,
+            q.id,
+            3,
+            "attachment-library-denied",
+            with_library(vec![source_ids[0]])
+        )
+        .await,
+        Err(CoreError::NotFound)
+    ));
+    sqlx::query("DELETE FROM role_permissions WHERE role_id=2 AND module_id='cotizaciones' AND capability='editar'").execute(&pool).await.unwrap();
+    library
+        .delete(1, source_ids[0], source_ids[0])
+        .await
+        .unwrap();
+    sqlx::query("UPDATE cotizaciones_email_jobs SET scheduled_at='2000-01-01 00:00:00' WHERE id=?")
+        .bind(selected.id)
+        .execute(&pool)
+        .await
+        .unwrap();
+    assert!(mail.deliver_one().await.unwrap());
+    let revoked = mail.job(1, q.id, selected.id).await.unwrap();
+    assert_eq!(revoked.delivery_status, "failed");
+    assert_eq!(
+        revoked.last_error_code.as_deref(),
+        Some("authorization_changed")
+    );
     let large = vec![b'x'; MAX_ATTACHMENT_BYTES];
     let big = service
         .upload_attachment(

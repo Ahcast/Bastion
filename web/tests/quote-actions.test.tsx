@@ -54,8 +54,52 @@ test('scheduling refreshes the list and shows Honduras time alongside the commer
   } finally { await app.dispose(); }
 });
 const labels = ['Ver','Editar','Marcar como enviado','Convertir a orden de compra','Convertir a factura','Aprobar','Clonar','PDF','Enviar por correo','Gestionar envíos','Eliminar'];
+test('email selects several authorized PDFs across library pages without changing the quote or sending early', async () => {
+  const app = await workspace(true, true, true, true); try {
+    await app.action('Enviar por correo');
+    await app.click(Array.from(document.querySelectorAll('button')).find(button => button.textContent === '＋ PDF de Colaboración')!);
+    let dialog = Array.from(document.querySelectorAll('[role="dialog"]')).at(-1)!;
+    assert.equal(dialog.querySelector('[aria-label="Seleccionar Ficha 12"]'), null);
+    assert.equal(dialog.querySelector<HTMLInputElement>('[aria-label="Seleccionar Ficha 13"]')?.disabled, true);
+    const check = async (name: string) => {
+      const input = dialog.querySelector<HTMLInputElement>(`[aria-label="Seleccionar ${name}"]`)!;
+      await app.click(input);
+    };
+    await check('Ficha 11');
+    await app.click(Array.from(dialog.querySelectorAll('button')).find(button => button.textContent === 'Siguiente')!);
+    await check('Ficha 22');
+    await app.click(Array.from(dialog.querySelectorAll('button')).find(button => button.textContent === 'Agregar seleccionados')!);
+    assert.equal(app.calls.filter(call => call.method !== 'GET').length, 0);
+    assert.match(document.querySelector('.quote-email-library')?.textContent ?? '', /Ficha 11.*Ficha 22/);
+    const composer = document.querySelector('[role="dialog"]')!;
+    await act(async () => { composer.querySelector('form')!.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })); });
+    const queued = app.calls.find(call => call.path.endsWith('/emails') && call.method === 'POST');
+    assert.deepEqual(queued?.body?.collaboration_file_ids, [11,22]);
+    assert.equal(queued?.match, '"1"');
+    assert.equal(app.calls.some(call => call.method === 'PUT' || call.path.endsWith('/attachments') && call.method === 'POST'), false);
+  } finally { await app.dispose(); }
+});
 
-async function workspace(editable = true, clients = false, linked = false) {
+test('email has no library action without the module and removing a selected PDF excludes it from the queue', async () => {
+  const absent = await workspace(); try {
+    await absent.action('Enviar por correo');
+    assert.equal(document.querySelector('.quote-email-library button'), null);
+    assert.equal(absent.calls.some(call => call.path.includes('colaboracion')), false);
+  } finally { await absent.dispose(); }
+  const app = await workspace(true,true,true,true); try {
+    await app.action('Enviar por correo');
+    await app.click(document.querySelector('.quote-email-library button'));
+    const picker = Array.from(document.querySelectorAll('[role="dialog"]')).at(-1)!;
+    await app.click(picker.querySelector('[aria-label="Seleccionar Ficha 11"]'));
+    await app.click(Array.from(picker.querySelectorAll('button')).find(button => button.textContent === 'Agregar seleccionados')!);
+    await app.click(document.querySelector('[aria-label="Quitar Ficha 11 del correo"]'));
+    const composer = document.querySelector('[role="dialog"]')!;
+    await act(async () => { composer.querySelector('form')!.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })); });
+    assert.deepEqual(app.calls.find(call => call.path.endsWith('/emails') && call.method === 'POST')?.body?.collaboration_file_ids, []);
+  } finally { await app.dispose(); }
+});
+
+async function workspace(editable = true, clients = false, linked = false, library = false) {
   const input = newQuote(); input.client_name = 'Cliente sintético';
   if(linked){input.id_client=41;input.client_rtn='08011900000000';input.client_email='cliente@example.test';}
   const totals = { subtotal:'100.00', importe_exonerado:'0.00',importe_exento:'0.00',importe_gravado_15:'100.00',importe_gravado_18:'0.00',descuentos_rebajas:'0.00',isv_15:'15.00',isv_18:'0.00',total:'115.00' };
@@ -67,6 +111,11 @@ async function workspace(editable = true, clients = false, linked = false) {
   const api = new ApiClient('https://api.example.test',async (url,options) => {
     const path = new URL(String(url)).pathname, method=options?.method ?? 'GET', headers = new Headers(options?.headers);
     calls.push({path,query:new URL(String(url)).search,method,match:headers.get('If-Match'),key:headers.get('Idempotency-Key'),body:options?.body ? JSON.parse(String(options.body)) as Record<string,unknown> : null});
+    if (path === '/api/v1/colaboracion') {
+      const page = Number(new URL(String(url)).searchParams.get('page'));
+      const file = (id:number,mime='application/pdf',size_bytes=1024) => ({id,filename:'library-'+id+'.pdf',title:'Ficha '+id,mime,size_bytes,trashed_at:null});
+      return Response.json({items:page===2?[file(22)]:[file(11),file(12,'text/plain'),file(13,'application/pdf',21*1024*1024)],page,page_size:25,has_more:page===1});
+    }
     if (path === '/api/v1/clientes/catalogo') {
       const page=Number(new URL(String(url)).searchParams.get('page'));
       return Response.json({items:[{id:page===2?42:41,cliente_name:page===2?'Cliente siguiente':'Cliente del catálogo',email:'cliente@example.test',rtn:'08011900000000'}],page,page_size:25,has_more:page===1});
@@ -93,7 +142,7 @@ async function workspace(editable = true, clients = false, linked = false) {
     return Response.json(draft);
   });
   const container=document.createElement('div');container.id='app';document.body.append(container);const root=createRoot(container);
-  await act(async () => root.render(<CoreContext.Provider value={{api,access:{is_system_administrator:editable,modules:[{module_id:'cotizaciones',display_name:'Cotizaciones'},...(clients?[{module_id:'clientes',display_name:'Clientes'}]:[])],permissions:[{module_id:'cotizaciones',scope_key:'documentos',capability:'ver'}]},notify:()=>{}}}><NavigationGuardProvider><Cotizaciones/></NavigationGuardProvider></CoreContext.Provider>));
+  await act(async () => root.render(<CoreContext.Provider value={{api,access:{is_system_administrator:editable,modules:[{module_id:'cotizaciones',display_name:'Cotizaciones'},...(clients?[{module_id:'clientes',display_name:'Clientes'}]:[]),...(library?[{module_id:'colaboracion',display_name:'Colaboración'}]:[])],permissions:[{module_id:'cotizaciones',scope_key:'documentos',capability:'ver'}]},notify:()=>{}}}><NavigationGuardProvider><Cotizaciones/></NavigationGuardProvider></CoreContext.Provider>));
   const click=async (element:Element|null) => {assert.ok(element);await act(async()=>{ element.dispatchEvent(new MouseEvent('click',{bubbles:true})); });};
   const action=async(label:string)=>{await click(container.querySelector('button[aria-haspopup="menu"]'));const item=Array.from(document.querySelectorAll('button[role="menuitem"]')).find(button=>button.textContent?.startsWith(label));assert.ok(item);await click(item);};
   return {container,calls,click,action,fail:(status:number)=>{failure=status;},dispose:async()=>{await act(async()=>root.unmount());container.remove();}};

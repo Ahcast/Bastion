@@ -1,4 +1,5 @@
 use super::*;
+use bastion_colaboracion::CollaborationService;
 use bastion_core::{BusinessMail, BusinessMailAttachment, CoreService, DocumentService};
 use chrono::{DateTime, Datelike, NaiveDateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -12,6 +13,8 @@ pub struct QuoteEmailInput {
     pub subject: String,
     pub message: String,
     pub scheduled_at: Option<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub collaboration_file_ids: Vec<u64>,
 }
 #[derive(Serialize, sqlx::FromRow)]
 pub struct QuoteEmailJob {
@@ -28,6 +31,15 @@ struct Envelope {
     sha256: Vec<u8>,
     #[serde(default)]
     attachments: Vec<MailFile>,
+    #[serde(default)]
+    collaboration_files: Vec<CollaborationMailFile>,
+}
+#[derive(Serialize, Deserialize)]
+struct CollaborationMailFile {
+    id: u64,
+    filename: String,
+    sha256: Vec<u8>,
+    byte_size: u32,
 }
 #[derive(Serialize, Deserialize, sqlx::FromRow)]
 struct MailFile {
@@ -108,12 +120,33 @@ impl QuoteMailService {
         let attachments:Vec<MailFile> = sqlx::query_as("SELECT object_key,filename,mime,sha256,byte_size FROM cotizaciones_documents WHERE quote_id=? AND kind='attachment' ORDER BY created_at,attachment_id LIMIT 11")
             .bind(id).fetch_all(&mut *tx).await?;
         validate_mail_files(raw.len(), &attachments)?;
+        let library = CollaborationService::new(self.core.database(), self.core.admin());
+        let mut collaboration_files = Vec::new();
+        for source in &input.collaboration_file_ids {
+            let (file, sha256) = library
+                .file_metadata_in_transaction(&mut tx, actor, *source)
+                .await?;
+            if file.mime != "application/pdf"
+                || file.size_bytes == 0
+                || file.size_bytes > MAX_ATTACHMENT_BYTES as u64
+            {
+                return Err(CoreError::Invalid);
+            }
+            collaboration_files.push(CollaborationMailFile {
+                id: file.id,
+                filename: file.filename,
+                sha256,
+                byte_size: file.size_bytes as u32,
+            });
+        }
+        validate_combined_files(raw.len(), &attachments, &collaboration_files)?;
         let envelope = Envelope {
             input: input.clone(),
             object_key: document.object_key,
             filename: document.filename,
             sha256: Sha256::digest(&raw).to_vec(),
             attachments,
+            collaboration_files,
         };
         let encrypted = self
             .core
@@ -280,7 +313,11 @@ impl QuoteMailService {
             if Sha256::digest(&bytes).as_slice() != envelope.sha256.as_slice() {
                 return Err(CoreError::Invalid);
             }
-            validate_mail_files(bytes.len(), &envelope.attachments)?;
+            validate_combined_files(
+                bytes.len(),
+                &envelope.attachments,
+                &envelope.collaboration_files,
+            )?;
             let mut files = vec![BusinessMailAttachment {
                 filename: envelope.filename,
                 mime: "application/pdf".into(),
@@ -299,6 +336,23 @@ impl QuoteMailService {
                     filename: file.filename,
                     mime: file.mime,
                     bytes,
+                });
+            }
+            let library = CollaborationService::new(self.core.database(), self.core.admin());
+            for file in envelope.collaboration_files {
+                let snapshot = library
+                    .file_snapshot(actor, file.id, file.byte_size as usize)
+                    .await?;
+                if snapshot.sha256 != file.sha256
+                    || snapshot.bytes.len() != file.byte_size as usize
+                    || !snapshot.bytes.starts_with(b"%PDF-")
+                {
+                    return Err(CoreError::Conflict);
+                }
+                files.push(BusinessMailAttachment {
+                    filename: file.filename,
+                    mime: "application/pdf".into(),
+                    bytes: snapshot.bytes,
                 });
             }
             let (to, cc, bcc) = recipients(&envelope.input)?;
@@ -351,6 +405,7 @@ impl QuoteMailService {
                         "authorization_changed"
                     }
                     CoreError::Invalid => "configuration_invalid",
+                    CoreError::Conflict => "attachment_changed",
                     _ => "delivery_unconfirmed",
                 };
                 let mut tx = database.pool().begin().await?;
@@ -386,6 +441,17 @@ fn schedule(value: Option<&str>) -> Result<NaiveDateTime, CoreError> {
     Ok(time.naive_utc().max(now))
 }
 fn validate(input: &QuoteEmailInput) -> Result<(), CoreError> {
+    if input.collaboration_file_ids.len() > 10
+        || input.collaboration_file_ids.contains(&0)
+        || input
+            .collaboration_file_ids
+            .iter()
+            .collect::<std::collections::BTreeSet<_>>()
+            .len()
+            != input.collaboration_file_ids.len()
+    {
+        return Err(CoreError::Invalid);
+    }
     if input.to.len() > 255
         || input.cc.len() > 1000
         || input.bcc.len() > 1000
@@ -442,6 +508,36 @@ mod tests {
         assert!(validate_mail_files(1, &many).is_err());
         let older:Envelope=serde_json::from_value(serde_json::json!({"input":input(),"object_key":"cotizaciones/1/pdf/test","filename":"quote.pdf","sha256":[0]})).unwrap();
         assert!(older.attachments.is_empty());
+        assert!(older.collaboration_files.is_empty());
+    }
+    #[test]
+    fn collaboration_selection_and_combined_limits_are_enforced() {
+        let mut value = input();
+        value.collaboration_file_ids = vec![1, 2];
+        assert!(validate(&value).is_ok());
+        for ids in [vec![1, 1], vec![0], (1..=11).collect()] {
+            value.collaboration_file_ids = ids;
+            assert!(validate(&value).is_err());
+        }
+        let library = vec![CollaborationMailFile {
+            id: 1,
+            filename: "extra.pdf".into(),
+            sha256: vec![0; 32],
+            byte_size: super::super::MAX_ATTACHMENT_BYTES as u32 - 1,
+        }];
+        assert!(validate_combined_files(1, &[], &library).is_ok());
+        assert!(validate_combined_files(2, &[], &library).is_err());
+        let many: Vec<_> = (1..=11)
+            .map(|id| CollaborationMailFile {
+                id,
+                filename: "extra.pdf".into(),
+                sha256: vec![0; 32],
+                byte_size: 1,
+            })
+            .collect();
+        assert!(validate_combined_files(1, &[], &many).is_err());
+        let old_input: QuoteEmailInput = serde_json::from_value(serde_json::json!({"to":"to@example.test","cc":"","bcc":"","subject":"","message":"","scheduled_at":null})).unwrap();
+        assert!(old_input.collaboration_file_ids.is_empty());
     }
     fn input() -> QuoteEmailInput {
         QuoteEmailInput {
@@ -451,6 +547,7 @@ mod tests {
             subject: "Cotización COT-1".into(),
             message: "Texto".into(),
             scheduled_at: None,
+            collaboration_file_ids: Vec::new(),
         }
     }
     #[test]
@@ -476,6 +573,23 @@ mod tests {
         );
         assert!(schedule(Some("2099-10-22T13:00:00")).is_err());
     }
+}
+fn validate_combined_files(
+    pdf_bytes: usize,
+    files: &[MailFile],
+    library: &[CollaborationMailFile],
+) -> Result<(), CoreError> {
+    if files.len() + library.len() > 10
+        || library.iter().any(|file| {
+            file.byte_size == 0 || file.byte_size as usize > super::MAX_ATTACHMENT_BYTES
+        })
+    {
+        return Err(CoreError::Invalid);
+    }
+    let extra = library.iter().fold(0usize, |sum, file| {
+        sum.saturating_add(file.byte_size as usize)
+    });
+    validate_mail_files(pdf_bytes.saturating_add(extra), files)
 }
 fn validate_mail_files(pdf_bytes: usize, files: &[MailFile]) -> Result<(), CoreError> {
     if files.len() > 10

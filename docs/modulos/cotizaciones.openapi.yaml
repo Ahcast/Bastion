@@ -893,6 +893,13 @@ components:
           format: date-time
           description: Zona explícita. Vacío, nulo o pasado envía ahora. La UI convierte desde Honduras. Al menos un destino
             válido entre Para/CC/CCO; máximo técnico 50 destinos distintos.
+        collaboration_file_ids:
+          type: array
+          default: []
+          maxItems: 10
+          uniqueItems: true
+          items: {type: integer, minimum: 1}
+          description: PDF de Colaboración sólo para este correo. Comparte el límite de 10 adjuntos y 20 MiB; exige acceso vigente en la carpeta al encolar y entregar.
     EmailJob:
       type: object
       required:
