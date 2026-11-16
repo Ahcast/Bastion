@@ -1,5 +1,15 @@
 # Despliegue del Core
 
+## Android 0.1.1: cierre al abrir corregido — 2026-11-16
+
+La primera Preview se cerraba antes de mostrar una pantalla. El [ensayo de reproducción](https://github.com/Ahcast/Bastion/actions/runs/43937719377) instaló 0.1.0 en Android 15 y capturó `IllegalArgumentException`: Browser Helper intentaba activar `ManageDataLauncherActivity`, ausente del manifiesto. Esto confirma un fallo del APK que la compilación y la verificación de firma anteriores no detectaron.
+
+La corrección `c39b739938135cfb321832dbe503fc0d6ef7da94` declara esa actividad privada y su URL fija, y aumenta versión a `0.1.1-preview`/2. [Android APK aprobado](https://github.com/Ahcast/Bastion/actions/runs/43938747354): compilación, lint, firma, diseño móvil y pruebas de ejecución en emuladores Android 15/API 35 y Android 16/API 36. En ambos se instaló el mismo APK entregable, se observó la pantalla real «Iniciar sesión», se comprobó reapertura y se deshabilitó temporalmente Chrome para comprobar un mensaje visible sin cierre. Se revisaron capturas, resultados y logs sin excepciones. No se ingresaron credenciales ni se crearon registros en producción.
+
+El APK `bastion-0.1.1-preview.apk` pesa 4 848 897 bytes, SHA-256 `5d88a2b2e3e741e76d41694dc955aa9282e8dbe369b9ed0bcdbdd3166ab23ddf`. ZIP oficial `3777388973c84ad1eeefb960658deba2569651f92e7bab704cd0e39607bdee2c`; certificado de desarrollo SHA-256 `faf1e2126adf9667d055da4d53e3dac04abe08f34bce44394d41a75e8d8e7c75`, firma APK v2 verificada. Se cotejaron localmente ZIP, APK y BUILD. La clave temporal cambió: desinstalar la Preview 0.1.0 antes de instalar 0.1.1. Los datos de negocio permanecen en el servidor.
+
+Esta reparación sólo cambia Android y su QA. No se vuelve a desplegar Bluehost, AWS ni MySQL. La validación en emuladores no equivale a probar el teléfono físico del usuario; firma permanente y Digital Asset Links siguen pendientes para distribución estable.
+
 ## Android: APK Preview y frontend móvil publicados — 2026-11-16, Honduras
 
 Se publicó `bb5d2f2d7d2e1b4393ee6b9742c7ccd4f1456c1c` sobre `0046bfb`, conservando la actualización de dos sesiones por usuario. Pasaron [Android APK](https://github.com/Ahcast/Bastion/actions/runs/43933782305), [Core checks](https://github.com/Ahcast/Bastion/actions/runs/43933781541) y Scout. Java 17/Gradle 8.13 en CI generaron el APK Preview, lint Android y un release sin firmar. Chromium verificó 23 estados sintéticos de acceso, navegación y formulario en cinco anchos, tanto localmente como en CI. Se conservó el trabajo local ajeno y un respaldo recuperable previo.

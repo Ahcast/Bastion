@@ -35,8 +35,10 @@ manifiesto, sin ampliar acceso a datos ni cambiar el frontend. Incrementa
 `versionCode` a 2. El workflow ahora instala el APK en emuladores Android 15 y
 16 y comprueba acceso real, reapertura y un mensaje visible sin navegador.
 No usa cuentas de producción ni desactiva TLS o Digital Asset Links.
-La aprobación de estas pruebas y la huella del APK corregido se registran
-en `09-despliegue.md`. 0.1.0 queda sustituida por esta corrección.
+Las pruebas pasaron en ambos emuladores: pantalla de acceso real visible,
+reapertura y aviso sin navegador, con logs sin excepciones y capturas revisadas.
+La aprobación y la huella del APK corregido se registran en `09-despliegue.md`.
+0.1.0 queda sustituida por esta corrección.
 
 Al cambiar la firma temporal de Preview, quien tenga 0.1.0 debe desinstalarla
 antes de instalar 0.1.1; los registros de negocio siguen en el servidor.
