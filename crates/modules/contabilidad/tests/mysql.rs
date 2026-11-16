@@ -372,7 +372,7 @@ async fn mysql57_accounting_integrity_periods_permissions_and_sources() {
         )
         .await
         .unwrap();
-    let order:OrderInput=serde_json::from_value(serde_json::json!({"n_orders":"OC-TEST","n_bill":"TEST","order_date":"2026-11-15","received_date":"2026-11-16","client_name":"Cliente","client_rtn":"","id_destination":destination.id,"comments":"","products":[{"description":"Equipo","cantidad":2,"sale_price":"200","purchase_price":"100","tracking":"","isv":true,"status":"Comprado","coments":""}],"expenses":[{"description":"Casillero","amount":"5"}]})).unwrap();
+    let order:OrderInput=serde_json::from_value(serde_json::json!({"n_orders":"OC-TEST","n_bill":"TEST","order_date":"2026-11-15","received_date":"2026-11-16","client_name":"Cliente","client_rtn":"","id_destination":destination.id,"comments":"","products":[{"description":"Equipo","cantidad":2,"sale_price":"100","purchase_price":"200","tracking":"","isv":true,"status":"Comprado","coments":""}],"expenses":[{"description":"Casillero","amount":"5"}]})).unwrap();
     let order = orders
         .create(1, "accounting-order-test", order)
         .await
