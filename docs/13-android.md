@@ -43,12 +43,20 @@ el propietario; no guardar esa clave en Git ni en artifacts. La clave efímera
 de Preview cambia entre runners y no sirve como identidad de distribución.
 Ver [instalación](../android/INSTALL.md).
 
+La primera entrega se construyó desde `bb5d2f2d7d2e1b4393ee6b9742c7ccd4f1456c1c`
+con [Android APK aprobado](https://github.com/Ahcast/Bastion/actions/runs/43933782305).
+`bastion-0.1.0-preview.apk` contiene 4 848 801 bytes y SHA-256
+`9f7a71c95b1c526cae0f35f8ec6a376435d1fc2512eb3cc6bcf4ee88c1c99c35`.
+La firma APK v2 se verificó con `apksigner`; también pasaron lint Android y
+las 23 comprobaciones de diseño Chromium en CI. Se cotejaron localmente el
+digest oficial del ZIP, los APK y el commit. No se ha instalado en teléfono físico.
+
 ## Activación y comprobaciones pendientes
 
 - Generar APK no instala la aplicación en un teléfono, no despliega el frontend
   ni publica en Google Play. La interfaz del APK corresponde al sitio activo.
-- Desplegar el artifact web verificado siguiendo `09-despliegue.md`, conservando
-  configuración, assets anteriores y un respaldo recuperable.
+- El frontend móvil de esta entrega ya se desplegó en Bluehost con respaldo,
+  configuración preservada y 53 recursos HTTPS cotejados. Véase `09-despliegue.md`.
 - Para ocultar la barra del navegador, publicar en Bluehost
   `/.well-known/assetlinks.json` la relación `delegate_permission/common.handle_all_urls`,
   namespace `android_app`, package `net.castilloit.bastion` y SHA-256 del certificado

@@ -1,10 +1,14 @@
 # Despliegue del Core
 
-## Android — preparación del 2026-11-16
+## Android: APK Preview y frontend móvil publicados — 2026-11-16, Honduras
 
-Se prepara el workflow `Android APK` para generar `bastion-android-apk`: APK Preview firmado para instalación de prueba y APK release sin firmar para distribución posterior con clave permanente. Ver [requisitos y límites](13-android.md). Los ajustes móviles requieren publicación independiente en Bluehost. La compilación no despliega frontend, no configura Digital Asset Links y no acredita instalación en un teléfono. No se modifica AWS ni MySQL por esta entrega.
+Se publicó `bb5d2f2d7d2e1b4393ee6b9742c7ccd4f1456c1c` sobre `0046bfb`, conservando la actualización de dos sesiones por usuario. Pasaron [Android APK](https://github.com/Ahcast/Bastion/actions/runs/43933782305), [Core checks](https://github.com/Ahcast/Bastion/actions/runs/43933781541) y Scout. Java 17/Gradle 8.13 en CI generaron el APK Preview, lint Android y un release sin firmar. Chromium verificó 23 estados sintéticos de acceso, navegación y formulario en cinco anchos, tanto localmente como en CI. Se conservó el trabajo local ajeno y un respaldo recuperable previo.
 
-La primera sesión quedó bloqueada por permisos de herramientas. Marco autorizó continuar con instalación y publicación. Se sincronizó `origin/main` en `0046bfb`, conservando la actualización de dos sesiones por usuario y un respaldo local recuperable. Chromium verificó 23 estados sintéticos de acceso, navegación y formulario en cinco anchos de pantalla. La compilación Android y su entrega se registran por separado al completar CI; estos ajustes web todavía requieren despliegue en Bluehost.
+El archivo instalable `bastion-0.1.0-preview.apk` pesa 4 848 801 bytes. SHA-256 `9f7a71c95b1c526cae0f35f8ec6a376435d1fc2512eb3cc6bcf4ee88c1c99c35`; ZIP oficial `7365515a8e3deacbb60d11405a5297f29c6133c0fde04a89b09120770e68d2af`. `apksigner` verificó firma APK v2 con certificado de desarrollo SHA-256 `a469304e21926675ca52413d6cda4427c3066c69d0ade38db76282e60d1bd6f7`. El paquete es `net.castilloit.bastion.preview`, versión `0.1.0-preview`, mínimo API 24 y target 36. Se cotejaron localmente ZIP, APK, BUILD y metadatos. El release sin firmar no se presenta como instalable.
+
+Se instaló el frontend del mismo commit en Bluehost después de CI aprobado, con respaldo privado SHA-256 `c71d92a1428d06116ddb686335910e76f55b76ff48e25cfe6ba919f1be18e781` y cotejo de sus archivos de restauración. Se preservaron `config.js`, reglas Apache y assets anteriores; se instalaron/verificaron 55 archivos y se cotejaron 53 recursos públicos por HTTPS. El ZIP frontend es `7f80dc03e9a96a3c639b5c19eb65d4df7dbb7f7d24bbad7dfe59764305fcfeb6` y su tar `7633b2b02e20265c880f6e9490abdf28ebb41dfc284aaefb9962e9730789cfd2`. Readiness respondió 200. No se cambió backend, MySQL, activaciones ni sesiones reales.
+
+La entrega requiere Internet y un navegador compatible. No se instaló en teléfono físico ni se publicó en Google Play. La firma permanente y Digital Asset Links siguen pendientes para distribución estable; Preview conserva la barra del navegador. Ver [requisitos y límites](13-android.md).
 
 ## Seguridad y rendimiento: despliegue verificado del 2026-11-10
 

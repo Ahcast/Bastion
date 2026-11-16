@@ -1,6 +1,6 @@
 # Documentación del nuevo CastilloIT
 
-- 2026-11-16: cliente Android solicitado por Marco, con TWA/Custom Tabs y ajustes de ergonomía para pantallas de 320–430 px. Conserva frontend Bluehost y backend AWS. APK Preview y release sin firmar mediante CI; firma estable, asociación de dominio, despliegue web y pruebas en teléfono son estados separados. Ver [Android](13-android.md).
+- 2026-11-16: APK Android Preview instalable generado desde `bb5d2f2`, con firma y SHA-256 verificados, CI aprobado y 23 estados de diseño comprobados. Los ajustes para celulares se publicaron en Bluehost con respaldo y 53 recursos HTTPS cotejados. Conserva backend AWS y MySQL. Firma estable, asociación de dominio y pruebas en teléfono físico siguen pendientes. Ver [Android](13-android.md) y [evidencia de despliegue](09-despliegue.md).
 
 - 2026-11-10 (Honduras): desplegadas en AWS las mejoras de seguridad y rendimiento del backend `e27376a677004b2e138324ac44bc9be5f6e5d2bc` y Cotizaciones 5. Respaldo completo con restauración verificada de 105 tablas; datos, orden de cotizaciones y activaciones conservados. HTTPS y consultas autenticadas de los módulos comprobados; frontend conservado. Véase la evidencia y los límites de verificación en [despliegue](09-despliegue.md).
 
