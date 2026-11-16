@@ -933,7 +933,13 @@ async fn reauth_totp(
         .unwrap_or("");
     state
         .core
-        .verify_session_totp(&session, &body.code, &client_ip.0, agent)
+        .verify_session_totp(
+            &session,
+            &body.code,
+            &client_ip.0,
+            agent,
+            cookie_value(&headers, "__Host-bastion_device").as_deref(),
+        )
         .await
         .map_err(ApiError)?;
     Ok(StatusCode::NO_CONTENT)

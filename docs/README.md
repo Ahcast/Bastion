@@ -213,9 +213,9 @@ El informe se obtuvo de una copia de frontend Angular compilado y backend Larave
 - La primera cuenta se crea con un asistente web de configuración protegido por código secreto temporal; el asistente se desactiva después de crear el primer Administrador del sistema.
 - El enlace de recuperación de contraseña es de un solo uso y vence en una hora.
 - Cualquier cambio o recuperación de contraseña revoca todas las sesiones y dispositivos confiables; se requiere iniciar sesión de nuevo con TOTP.
-- En `Ajustes > Mi cuenta > Sesiones`, el usuario ve los datos de su sesión activa y puede revocarla; solo se permite una sesión activa por usuario.
+- En `Ajustes > Mi cuenta > Sesiones`, el usuario ve sus sesiones activas, identifica la actual y puede revocarlas; se permiten hasta dos simultáneas.
 - Cada sesión muestra dispositivo/navegador, IP, fecha de inicio, última actividad y si es la sesión actual.
-- Se permite una sesión activa por usuario; un nuevo acceso autenticado con contraseña y el TOTP requerido reemplaza la anterior y la notifica.
+- Se permiten hasta dos sesiones activas por usuario (PC y móvil). Un tercer acceso, sólo después de completar contraseña y el segundo factor requerido, reemplaza atómicamente la sesión más antigua por fecha de inicio e ID; la otra permanece activa. Las sesiones vencidas no ocupan cupo. La sesión reemplazada recibe aviso al siguiente intento de uso.
 - El usuario puede consultar su historial de accesos de los últimos 30 días, con fecha, IP, dispositivo y resultado.
 - Tras un acceso exitoso desde un dispositivo nuevo se intenta enviar aviso al correo registrado con las credenciales SMTP del usuario; si no están configuradas o falla el envío, se registra y no bloquea el acceso.
 - Si falla SMTP al enviar invitaciones o recuperaciones, el Core muestra el error y permite reintentar cuando se corrijan las credenciales del administrador creador o la configuración SMTP global; no utiliza otra cuenta como respaldo.
@@ -309,3 +309,7 @@ Marco autoriza iniciar Contabilidad con catálogo, períodos, asientos y balance
 
 
 El primer corte de Contabilidad quedó publicado y activo el 2026-11-16 con `ca7e3d1`: 64 cuentas, período `2026-11` abierto y ningún saldo inventado; acceso inicial sólo para Administrador del sistema. [Evidencia y límites](09-despliegue.md#contabilidad-publicada-y-activa--2026-11-16-honduras).
+
+## Dos sesiones simultáneas — 2026-11-16
+
+Decisión autorizada: ampliar el límite a dos para PC y móvil. El bloqueo transaccional del usuario serializa los accesos; un tercer acceso completo reemplaza la sesión más antigua. Se mantienen expiración, CSRF por sesión, TOTP, revocación individual y global por acciones de seguridad. La revalidación TOTP sólo renueva el dispositivo identificado por su cookie e IP. No requiere migraciones ni cambios de frontend. La verificación de seguridad usa bases desechables de CI, sin cuentas ni registros de prueba en producción.

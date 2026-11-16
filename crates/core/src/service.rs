@@ -30,6 +30,8 @@ use crate::{CoreAdmin, Database, admin::validate_person};
 
 type HmacSha1 = Hmac<Sha1>;
 
+const MAX_ACTIVE_SESSIONS: usize = 2;
+
 #[path = "business_mail.rs"]
 mod business_mail;
 pub use business_mail::{BusinessMail, BusinessMailAttachment};
@@ -1680,6 +1682,7 @@ impl CoreService {
         code: &str,
         ip: &str,
         user_agent: &str,
+        device_token: Option<&str>,
     ) -> Result<(), CoreError> {
         if session_token.is_empty() {
             return Err(CoreError::Unauthorized);
@@ -1718,8 +1721,12 @@ impl CoreService {
             .bind(row.0)
             .execute(&mut *tx)
             .await?;
-        sqlx::query("UPDATE trusted_devices SET last_totp_at=?,expires_at=? WHERE user_id=? AND revoked_at IS NULL AND expires_at>? ORDER BY last_used_at DESC LIMIT 1")
-            .bind(now).bind(now + chrono::Duration::days(15)).bind(row.1).bind(now).execute(&mut *tx).await?;
+        // Refresh only the presented device on this IP; another session's
+        // most recently used device must never inherit this TOTP verification.
+        if let Some(device) = device_token.filter(|value| !value.is_empty()) {
+            sqlx::query("UPDATE trusted_devices SET last_totp_at=?,expires_at=? WHERE user_id=? AND token_hash=? AND ip_address=? AND revoked_at IS NULL AND expires_at>?")
+                .bind(now).bind(now + chrono::Duration::days(15)).bind(row.1).bind(token_hash(device).to_vec()).bind(ip).bind(now).execute(&mut *tx).await?;
+        }
         sqlx::query("INSERT INTO security_events (user_id,event_type,result,ip_address,device_label,created_at) VALUES (?,'totp_reauth','success',?,?,?)")
             .bind(row.1).bind(ip).bind(safe_agent(user_agent)).bind(now).execute(&mut *tx).await?;
         insert_audit(
@@ -1903,9 +1910,18 @@ impl CoreService {
         let session_token = random_token();
         let csrf_token = random_token();
         let expires_at = None;
-        // The caller holds the active user lock from credential verification.
-        sqlx::query("UPDATE sessions SET revoked_at=?,revocation_reason='replaced' WHERE user_id=? AND revoked_at IS NULL")
-            .bind(now).bind(user_id).execute(&mut **tx).await?;
+        // Every caller holds the user row lock through credential verification and
+        // commit. Concurrent successful logins therefore cannot exceed the limit.
+        sqlx::query("UPDATE sessions SET revoked_at=?,revocation_reason='expired' WHERE user_id=? AND revoked_at IS NULL AND ((expires_at IS NOT NULL AND expires_at<=?) OR (keep_logged_in=0 AND last_activity_at<=?-INTERVAL 24 HOUR))")
+            .bind(now).bind(user_id).bind(now).bind(now).execute(&mut **tx).await?;
+        let active = sqlx::query_scalar::<_, u64>("SELECT id FROM sessions WHERE user_id=? AND revoked_at IS NULL ORDER BY started_at DESC,id DESC FOR UPDATE")
+            .bind(user_id).fetch_all(&mut **tx).await?;
+        // Keep the newest existing session and reserve one slot for this login.
+        // started_at/id (not last_activity_at) makes eviction deterministic.
+        for id in active.into_iter().skip(MAX_ACTIVE_SESSIONS - 1) {
+            sqlx::query("UPDATE sessions SET revoked_at=?,revocation_reason='replaced' WHERE id=? AND user_id=? AND revoked_at IS NULL")
+                .bind(now).bind(id).bind(user_id).execute(&mut **tx).await?;
+        }
         sqlx::query("INSERT INTO sessions (user_id,token_hash,csrf_hash,user_agent,ip_address,keep_logged_in,started_at,last_activity_at,last_totp_at,expires_at) VALUES (?,?,?,?,?,?,?,?,?,?)")
             .bind(user_id).bind(token_hash(&session_token).to_vec()).bind(token_hash(&csrf_token).to_vec()).bind(agent).bind(ip).bind(keep).bind(now).bind(now).bind(last_totp_at).bind(expires_at)
             .execute(&mut **tx).await?;
@@ -2731,10 +2747,14 @@ mod tests {
                 .unwrap()
                 .is_system_administrator
         );
-        assert!(matches!(
-            core.authenticate(&cookies.session_token).await,
-            Err(CoreError::SessionReplaced)
-        ));
+        assert!(core.authenticate(&cookies.session_token).await.is_ok());
+        assert_eq!(
+            core.list_sessions(dispatch.user.id, &returning.session_token)
+                .await
+                .unwrap()
+                .len(),
+            2
+        );
         admin
             .update_role(
                 administrator,
@@ -2796,6 +2816,7 @@ mod tests {
             .unwrap();
         assert_eq!(result.recovery_codes.len(), 10);
         assert!(core.current_user(&returning.session_token).await.is_err());
+        assert!(core.current_user(&cookies.session_token).await.is_err());
         let devices = core.list_trusted_devices(dispatch.user.id).await.unwrap();
         assert!(devices.is_empty());
         let old_code = &completed.recovery_codes[0];

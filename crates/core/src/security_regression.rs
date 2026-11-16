@@ -119,6 +119,8 @@ async fn mysql57_password_change_invalidates_old_links_and_preserves_totp_and_re
         .verify_login_totp(&challenge, &otp(&setup.totp_secret), None)
         .await
         .unwrap();
+    let (cookies, other_session) =
+        verify_two_session_security(&core, user, &setup.totp_secret, cookies).await;
     let first = reset_link(&core, user, "old-reset-a").await;
     let second = reset_link(&core, user, "old-reset-b").await;
     assert!(
@@ -158,6 +160,12 @@ async fn mysql57_password_change_invalidates_old_links_and_preserves_totp_and_re
     .await
     .unwrap();
     assert!(core.authenticate(&cookies.session_token).await.is_err());
+    assert!(
+        core.authenticate(&other_session.session_token)
+            .await
+            .is_err()
+    );
+    assert!(core.list_trusted_devices(user).await.unwrap().is_empty());
     for raw in ["old-reset-a", "old-reset-b"] {
         assert!(matches!(
             core.complete_password_reset(raw, "Attacker replacement password", "192.0.2.2")
@@ -236,4 +244,274 @@ async fn mysql57_password_change_invalidates_old_links_and_preserves_totp_and_re
             .await,
         Err(CoreError::Locked)
     ));
+}
+
+async fn trusted_login(core: &CoreService, device: &str, label: &str) -> AuthCookies {
+    match core
+        .start_login(
+            "security@example.test",
+            "Original synthetic password",
+            "192.0.2.1",
+            label,
+            true,
+            Some(device),
+        )
+        .await
+        .unwrap()
+    {
+        LoginStart::Authenticated(cookies) => cookies,
+        _ => panic!("trusted device must complete authentication"),
+    }
+}
+
+async fn verify_two_session_security(
+    core: &CoreService,
+    user: u64,
+    secret: &str,
+    pc: AuthCookies,
+) -> (AuthCookies, AuthCookies) {
+    let pool = core.database.pool();
+    let mobile_challenge = match core
+        .start_login(
+            "security@example.test",
+            "Original synthetic password",
+            "192.0.2.2",
+            "mobile",
+            false,
+            None,
+        )
+        .await
+        .unwrap()
+    {
+        LoginStart::TotpRequired { challenge_token } => challenge_token,
+        _ => panic!("new mobile must require TOTP"),
+    };
+    assert!(core.authenticate(&pc.session_token).await.is_ok());
+    // Fixture-only reset avoids waiting 30 seconds between independent scenarios.
+    sqlx::query("UPDATE users SET last_totp_counter=NULL WHERE id=?")
+        .bind(user)
+        .execute(pool)
+        .await
+        .unwrap();
+    let mobile = core
+        .verify_login_totp(&mobile_challenge, &otp(secret), None)
+        .await
+        .unwrap();
+    for session in [&pc, &mobile] {
+        assert!(core.authenticate(&session.session_token).await.is_ok());
+        assert!(
+            core.csrf_matches(&session.session_token, &session.csrf_token)
+                .await
+                .unwrap()
+        );
+        let sessions = core
+            .list_sessions(user, &session.session_token)
+            .await
+            .unwrap();
+        assert_eq!(sessions.len(), 2);
+        assert_eq!(sessions.iter().filter(|s| s.current).count(), 1);
+    }
+    assert!(
+        !core
+            .csrf_matches(&pc.session_token, &mobile.csrf_token)
+            .await
+            .unwrap()
+    );
+    assert!(
+        !core
+            .csrf_matches(&mobile.session_token, &pc.csrf_token)
+            .await
+            .unwrap()
+    );
+
+    // Reauthentication must not renew the most recently used (other) device.
+    sqlx::query("UPDATE trusted_devices SET last_totp_at=UTC_TIMESTAMP(6)-INTERVAL 7 DAY,expires_at=UTC_TIMESTAMP(6)+INTERVAL 8 DAY WHERE user_id=?").bind(user).execute(pool).await.unwrap();
+    let before: (NaiveDateTime, NaiveDateTime) =
+        sqlx::query_as("SELECT last_totp_at,expires_at FROM trusted_devices WHERE token_hash=?")
+            .bind(token_hash(&mobile.device_token).to_vec())
+            .fetch_one(pool)
+            .await
+            .unwrap();
+    sqlx::query("UPDATE users SET last_totp_counter=NULL WHERE id=?")
+        .bind(user)
+        .execute(pool)
+        .await
+        .unwrap();
+    core.verify_session_totp(
+        &pc.session_token,
+        &otp(secret),
+        "192.0.2.1",
+        "pc",
+        Some(&pc.device_token),
+    )
+    .await
+    .unwrap();
+    let after: (NaiveDateTime, NaiveDateTime) =
+        sqlx::query_as("SELECT last_totp_at,expires_at FROM trusted_devices WHERE token_hash=?")
+            .bind(token_hash(&mobile.device_token).to_vec())
+            .fetch_one(pool)
+            .await
+            .unwrap();
+    assert_eq!(before, after);
+    let renewed: NaiveDateTime =
+        sqlx::query_scalar("SELECT last_totp_at FROM trusted_devices WHERE token_hash=?")
+            .bind(token_hash(&pc.device_token).to_vec())
+            .fetch_one(pool)
+            .await
+            .unwrap();
+    assert!(renewed > before.0);
+
+    let pending = match core
+        .start_login(
+            "security@example.test",
+            "Original synthetic password",
+            "192.0.2.3",
+            "third device",
+            false,
+            None,
+        )
+        .await
+        .unwrap()
+    {
+        LoginStart::TotpRequired { challenge_token } => challenge_token,
+        _ => panic!("new third device must require TOTP"),
+    };
+    assert!(
+        core.start_login(
+            "security@example.test",
+            "Wrong synthetic password",
+            "192.0.2.3",
+            "third device",
+            false,
+            None
+        )
+        .await
+        .is_err()
+    );
+    assert!(
+        core.verify_login_totp(&pending, "invalid", None)
+            .await
+            .is_err()
+    );
+    assert!(
+        core.verify_login_recovery_code(&pending, "0000000000000000", None)
+            .await
+            .is_err()
+    );
+    assert!(core.authenticate(&pc.session_token).await.is_ok());
+    assert!(core.authenticate(&mobile.session_token).await.is_ok());
+
+    // Make start times equal: id is the deterministic tie breaker, regardless of activity.
+    sqlx::query("UPDATE sessions SET started_at='2026-01-01 00:00:00' WHERE user_id=? AND revoked_at IS NULL").bind(user).execute(pool).await.unwrap();
+    let third = trusted_login(core, &pc.device_token, "third").await;
+    assert!(matches!(
+        core.authenticate(&pc.session_token).await,
+        Err(CoreError::SessionReplaced)
+    ));
+    assert!(
+        !core
+            .csrf_matches(&pc.session_token, &pc.csrf_token)
+            .await
+            .unwrap()
+    );
+    assert!(core.authenticate(&mobile.session_token).await.is_ok());
+    assert!(core.authenticate(&third.session_token).await.is_ok());
+
+    // Two simultaneous valid logins must serialize the cap (not leave four sessions).
+    let (fourth, fifth) = tokio::join!(
+        trusted_login(core, &pc.device_token, "fourth"),
+        trusted_login(core, &pc.device_token, "fifth")
+    );
+    assert!(core.authenticate(&mobile.session_token).await.is_err());
+    assert!(core.authenticate(&third.session_token).await.is_err());
+    assert!(core.authenticate(&fourth.session_token).await.is_ok());
+    assert!(core.authenticate(&fifth.session_token).await.is_ok());
+    assert_eq!(
+        core.list_sessions(user, &fifth.session_token)
+            .await
+            .unwrap()
+            .len(),
+        2
+    );
+
+    // Expired sessions do not displace an otherwise valid permanent session.
+    sqlx::query(
+        "UPDATE sessions SET expires_at=UTC_TIMESTAMP(6)-INTERVAL 1 SECOND WHERE token_hash=?",
+    )
+    .bind(token_hash(&fourth.session_token).to_vec())
+    .execute(pool)
+    .await
+    .unwrap();
+    sqlx::query(
+        "UPDATE sessions SET last_activity_at=UTC_TIMESTAMP(6)-INTERVAL 25 HOUR WHERE token_hash=?",
+    )
+    .bind(token_hash(&fifth.session_token).to_vec())
+    .execute(pool)
+    .await
+    .unwrap();
+    let sixth = trusted_login(core, &pc.device_token, "sixth").await;
+    assert!(core.authenticate(&fifth.session_token).await.is_ok());
+    assert!(matches!(
+        core.authenticate(&fourth.session_token).await,
+        Err(CoreError::Unauthorized)
+    ));
+    sqlx::query("UPDATE sessions SET keep_logged_in=0,last_activity_at=UTC_TIMESTAMP(6)-INTERVAL 25 HOUR WHERE token_hash=?").bind(token_hash(&sixth.session_token).to_vec()).execute(pool).await.unwrap();
+    let seventh = trusted_login(core, &pc.device_token, "seventh").await;
+    assert!(core.authenticate(&fifth.session_token).await.is_ok());
+    assert!(matches!(
+        core.authenticate(&sixth.session_token).await,
+        Err(CoreError::Unauthorized)
+    ));
+
+    // A recovery-code login enforces the same cap and consumes the code once.
+    let recovery = "1234567890ABCDEF";
+    sqlx::query("INSERT INTO totp_recovery_codes(user_id,code_hash) VALUES (?,?)")
+        .bind(user)
+        .bind(token_hash(recovery).to_vec())
+        .execute(pool)
+        .await
+        .unwrap();
+    let recovered = core
+        .verify_login_recovery_code(&pending, recovery, None)
+        .await
+        .unwrap();
+    assert!(matches!(
+        core.authenticate(&fifth.session_token).await,
+        Err(CoreError::SessionReplaced)
+    ));
+    assert!(core.authenticate(&seventh.session_token).await.is_ok());
+    assert!(
+        core.verify_login_recovery_code(&pending, recovery, None)
+            .await
+            .is_err()
+    );
+
+    // Per-session logout and "close others" preserve only their intended target.
+    core.logout(&recovered.session_token).await.unwrap();
+    assert!(core.authenticate(&seventh.session_token).await.is_ok());
+    let eighth = trusted_login(core, &pc.device_token, "eighth").await;
+    assert_eq!(
+        core.revoke_other_sessions(user, &eighth.session_token)
+            .await
+            .unwrap(),
+        1
+    );
+    assert!(core.authenticate(&seventh.session_token).await.is_err());
+    assert!(core.authenticate(&eighth.session_token).await.is_ok());
+    let ninth = trusted_login(core, &pc.device_token, "ninth").await;
+    let session_id = core
+        .list_sessions(user, &ninth.session_token)
+        .await
+        .unwrap()
+        .into_iter()
+        .find(|s| s.current)
+        .unwrap()
+        .id;
+    assert!(core.revoke_session(user + 1000, session_id).await.is_err());
+    core.revoke_session(user, session_id).await.unwrap();
+    assert!(core.authenticate(&ninth.session_token).await.is_err());
+    assert!(core.authenticate(&eighth.session_token).await.is_ok());
+    let tenth = trusted_login(core, &pc.device_token, "tenth").await;
+    // The parent test changes the password and must invalidate both of these.
+    (tenth, eighth)
 }
