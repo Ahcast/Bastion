@@ -21,6 +21,28 @@ autorizada por la solicitud, no un requisito inferido de paridad Legacy.
 
 ## Compilación y entrega
 
+### Corrección de arranque 0.1.1 — 2026-11-16
+
+El usuario reportó que 0.1.0 se instala pero se cierra antes de la primera
+pantalla. La [reproducción en Android 15](https://github.com/Ahcast/Bastion/actions/runs/43937719377)
+confirmó `IllegalArgumentException`: `ManageDataLauncherActivity` no estaba
+declarada. Browser Helper 2.7.4 intenta habilitar/deshabilitar ese componente
+al iniciar, aunque no se usen sus ajustes. Compilar y verificar la firma no
+detectó esta omisión; la primera entrega no había probado el arranque Android.
+
+0.1.1 declara el componente privado y su URL fija de administración en el
+manifiesto, sin ampliar acceso a datos ni cambiar el frontend. Incrementa
+`versionCode` a 2. El workflow ahora instala el APK en emuladores Android 15 y
+16 y comprueba acceso real, reapertura y un mensaje visible sin navegador.
+No usa cuentas de producción ni desactiva TLS o Digital Asset Links.
+La aprobación de estas pruebas y la huella del APK corregido se registran
+en `09-despliegue.md`. 0.1.0 queda sustituida por esta corrección.
+
+Al cambiar la firma temporal de Preview, quien tenga 0.1.0 debe desinstalarla
+antes de instalar 0.1.1; los registros de negocio siguen en el servidor.
+
+### Primera entrega
+
 La primera sesión quedó limitada por permisos del entorno. Tras la autorización
 del usuario se sincronizó `origin/main` en `0046bfb`, conservando las mejoras
 de autenticación para dos sesiones simultáneas. Chromium local verificó 23

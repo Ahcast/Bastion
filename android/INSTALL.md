@@ -1,6 +1,6 @@
-# Bastion para Android · 0.1.0 Preview
+# Bastion para Android · 0.1.1 Preview
 
-Instala **bastion-0.1.0-preview.apk** en Android 7.0 o posterior. Descarga y
+Instala **bastion-0.1.1-preview.apk** en Android 7.0 o posterior. Descarga y
 descomprime el artifact `bastion-android-apk` de GitHub Actions, abre ese APK
 y permite la instalación desde la aplicación usada para abrirlo si Android lo pide.
 Abre «Bastion Preview» e inicia sesión con tu cuenta y autenticador habituales.
@@ -9,7 +9,9 @@ Necesita Internet y un navegador actualizado compatible con Custom Tabs/TWA.
 Esta entrega es una versión de prueba firmada con una clave de depuración,
 no una publicación en Google Play. Una nueva compilación puede necesitar
 desinstalar la anterior porque la clave temporal del runner cambia.
-`bastion-0.1.0-unsigned.apk` NO es instalable: es el paquete para firmar con
+Si instalaste 0.1.0, desinstala primero esa Preview: esta compilación tiene
+una firma de desarrollo diferente. Los datos de negocio permanecen en el servidor.
+`bastion-0.1.1-unsigned.apk` NO es instalable: es el paquete para firmar con
 la clave privada permanente del propietario antes de distribuir una versión estable.
 No se ha instalado ni probado esta entrega en un teléfono físico.
 

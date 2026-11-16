@@ -1,5 +1,7 @@
 # Documentación del nuevo CastilloIT
 
+- 2026-11-16: reproducido en emulador el cierre de Android 0.1.0 por ausencia de `ManageDataLauncherActivity`. Corrección 0.1.1 y pruebas obligatorias de arranque del APK en Android 15/16; la firma válida por sí sola no acredita ejecución. Ver [diagnóstico](13-android.md).
+
 - 2026-11-16: APK Android Preview instalable generado desde `bb5d2f2`, con firma y SHA-256 verificados, CI aprobado y 23 estados de diseño comprobados. Los ajustes para celulares se publicaron en Bluehost con respaldo y 53 recursos HTTPS cotejados. Conserva backend AWS y MySQL. Firma estable, asociación de dominio y pruebas en teléfono físico siguen pendientes. Ver [Android](13-android.md) y [evidencia de despliegue](09-despliegue.md).
 
 - 2026-11-10 (Honduras): desplegadas en AWS las mejoras de seguridad y rendimiento del backend `e27376a677004b2e138324ac44bc9be5f6e5d2bc` y Cotizaciones 5. Respaldo completo con restauración verificada de 105 tablas; datos, orden de cotizaciones y activaciones conservados. HTTPS y consultas autenticadas de los módulos comprobados; frontend conservado. Véase la evidencia y los límites de verificación en [despliegue](09-despliegue.md).
