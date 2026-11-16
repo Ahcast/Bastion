@@ -1,0 +1,63 @@
+/* Shared phone ergonomics, including browser/TWA safe areas and the keyboard. */
+@media (max-width: 640px) {
+  html { scroll-padding-top: 80px; }
+  .shell, .auth-wrap { min-height: 100dvh; }
+  .shell { grid-template-columns: minmax(0, 1fr); }
+  .content {
+    padding: 20px max(12px, env(safe-area-inset-right))
+      max(28px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left));
+  }
+  .topbar {
+    position: sticky; top: 0; z-index: 20;
+    padding-top: max(8px, env(safe-area-inset-top));
+    padding-left: max(12px, env(safe-area-inset-left));
+    padding-right: max(12px, env(safe-area-inset-right));
+  }
+  .sidebar {
+    padding-top: max(24px, env(safe-area-inset-top));
+    padding-bottom: max(20px, env(safe-area-inset-bottom));
+    overscroll-behavior-y: contain;
+  }
+  .sidebar .nav-close { top: max(12px, env(safe-area-inset-top)); }
+  .pagehead, .pagehead > div, .row > *, label, fieldset { min-width: 0; }
+  .pagehead h1 { font-size: 24px; overflow-wrap: anywhere; }
+  .pagehead > button { width: 100%; }
+  /* Module rules loaded later cannot shrink the shared touch controls. */
+  :is(#app, .modal) button { min-height: 44px; white-space: normal; overflow-wrap: anywhere; }
+  :is(#app, .modal) :is(input:not([type=checkbox]):not([type=radio]), select, textarea) {
+    font-size: 16px; min-height: 44px; min-width: 0; max-width: 100%;
+  }
+  input, select, textarea { scroll-margin-block: 84px 24px; }
+  input[type=file] { width: 100%; }
+  .checkbox, .document-check, .process-check { min-height: 44px; }
+  .table-wrap, .process-table-wrap { max-width: 100%; overscroll-behavior-x: contain; }
+  .modal-backdrop {
+    padding: max(8px, env(safe-area-inset-top)) max(8px, env(safe-area-inset-right))
+      max(8px, env(safe-area-inset-bottom)) max(8px, env(safe-area-inset-left));
+  }
+  .modal {
+    width: 100%; padding: 16px 12px;
+    max-height: calc(100dvh - max(8px, env(safe-area-inset-top)) - max(8px, env(safe-area-inset-bottom)));
+    overscroll-behavior-y: contain;
+  }
+  .modal-head { align-items: start; }
+  .modal-head h2 { font-size: 20px; min-width: 0; }
+  .modal-head > button { position: sticky; top: 0; }
+  .toast { bottom: max(16px, env(safe-area-inset-bottom)); }
+  .quote-pagination, .document-pagination, .process-pagination { flex-wrap: wrap; }
+  .quote-email-library li { flex-wrap: wrap; }
+  .quote-email-library li > label { flex: 1 1 180px; }
+  .tender-upload-list li { flex-wrap: wrap; }
+  .accounting-toolbar label { min-width: 0; flex-basis: 100%; max-width: none; }
+}
+@media (max-width: 380px) {
+  .auth-wrap { padding: 20px 12px; }
+  .auth-card { padding: 20px 14px; }
+  .core-table td { grid-template-columns: minmax(64px, .35fr) minmax(0, 1fr); gap: 8px; padding: 10px; }
+  .document-list .core-table td { padding: 10px; }
+  .row > label, .row > input, .row > select { flex-basis: 100%; }
+  .accounting-line { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 44px; gap: 8px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .toast { transition: none; }
+}

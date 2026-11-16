@@ -1,5 +1,11 @@
 # Despliegue del Core
 
+## Android — preparación del 2026-11-16
+
+Se prepara el workflow `Android APK` para generar `bastion-android-apk`: APK Preview firmado para instalación de prueba y APK release sin firmar para distribución posterior con clave permanente. Ver [requisitos y límites](13-android.md). Los ajustes móviles requieren publicación independiente en Bluehost. La compilación no despliega frontend, no configura Digital Asset Links y no acredita instalación en un teléfono. No se modifica AWS ni MySQL por esta entrega.
+
+La primera sesión quedó bloqueada por permisos de herramientas. Marco autorizó continuar con instalación y publicación. Se sincronizó `origin/main` en `0046bfb`, conservando la actualización de dos sesiones por usuario y un respaldo local recuperable. Chromium verificó 23 estados sintéticos de acceso, navegación y formulario en cinco anchos de pantalla. La compilación Android y su entrega se registran por separado al completar CI; estos ajustes web todavía requieren despliegue en Bluehost.
+
 ## Seguridad y rendimiento: despliegue verificado del 2026-11-10
 
 El 2026-11-10, a las 23:37 de Honduras (2026-11-11 05:37 UTC), se activó en AWS el backend `e27376a677004b2e138324ac44bc9be5f6e5d2bc`, sobre `d121e80b5236188501384c14b28018c879a36430`, con [Core checks aprobados](https://github.com/Ahcast/Bastion/actions/runs/42964090945), MCP MySQL y Scout exitosos. Se comprobaron el ZIP de GitHub, el paquete, BUILD, el manifiesto y el ejecutable del proceso activo. SHA-256 del ZIP: `0af5fa23d84960c1739a16e91d4af79d300cb1c3868bbb343c1d4cbff44986d7`. El frontend Bluehost conserva su versión anterior, compatible; se verificaron BUILD y la configuración pública sin reemplazarlos.

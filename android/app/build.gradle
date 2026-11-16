@@ -1,0 +1,34 @@
+plugins { id 'com.android.application' }
+
+android {
+    namespace 'net.castilloit.bastion'
+    compileSdk 36
+    defaultConfig {
+        applicationId 'net.castilloit.bastion'
+        minSdk 24
+        targetSdk 36
+        versionCode 1
+        versionName '0.1.0'
+    }
+    buildTypes {
+        debug {
+            applicationIdSuffix '.preview'
+            versionNameSuffix '-preview'
+            resValue 'string', 'app_name', 'Bastion Preview'
+        }
+        release {
+            minifyEnabled false
+            resValue 'string', 'app_name', 'Bastion'
+            // Sign externally with the owner's durable key; never commit it.
+        }
+    }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+    lint { abortOnError true }
+}
+
+dependencies {
+    implementation 'com.google.androidbrowserhelper:androidbrowserhelper:2.7.4'
+}

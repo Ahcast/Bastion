@@ -1,5 +1,7 @@
 # Arquitectura objetivo en Rust
 
+El cliente Android añadido el 2026-11-16 usa TWA/Custom Tabs para acceder al frontend HTTPS de Bluehost. Reutiliza la identidad y permisos del Core sin otro backend, origen API ni almacenamiento de negocio. Ver [decisión Android](13-android.md).
+
 ## Ajustes de concurrencia del 2026-11-10
 
 Las alertas de Procesos y la persistencia de documentos PDF de Cotizaciones/Facturas conservan bloqueo exclusivo aunque su permiso sea `ver`, porque escriben registros de negocio. La exportación y descarga pueden añadir eventos de auditoría independientes bajo bloqueo compartido, sin modificar los datos consultados.
