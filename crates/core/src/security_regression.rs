@@ -507,8 +507,14 @@ async fn verify_two_session_security(
         .find(|s| s.current)
         .unwrap()
         .id;
-    assert!(core.revoke_session(user + 1000, session_id).await.is_err());
-    core.revoke_session(user, session_id).await.unwrap();
+    assert!(
+        core.revoke_session(&eighth.session_token, session_id, user + 1000)
+            .await
+            .is_err()
+    );
+    core.revoke_session(&eighth.session_token, session_id, user)
+        .await
+        .unwrap();
     assert!(core.authenticate(&ninth.session_token).await.is_err());
     assert!(core.authenticate(&eighth.session_token).await.is_ok());
     let tenth = trusted_login(core, &pc.device_token, "tenth").await;
