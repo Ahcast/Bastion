@@ -172,6 +172,33 @@ async fn mysql57_drafts_atomic_receipts_permissions_versions_and_disable() {
         .create(1, "invoice-search-second-0001", searchable)
         .await
         .unwrap();
+    // Combined filters are applied by SQL before pagination, with inclusive dates.
+    for (client, from, to, status, expected) in [
+        ("% _", "2026-10-22", "2026-10-22", "Borrador", 2),
+        ("missing-client", "2026-10-22", "2026-10-22", "Borrador", 0),
+        ("% _", "2026-10-24", "2026-10-25", "Borrador", 0),
+        ("% _", "2026-10-20", "2026-10-21", "Borrador", 0),
+        ("% _", "2026-10-22", "2026-10-22", "Pagado", 0),
+    ] {
+        let page = service
+            .list(
+                2,
+                &InvoiceFilter {
+                    client: Some(client.into()),
+                    date_from: Some(from.parse().unwrap()),
+                    date_to: Some(to.parse().unwrap()),
+                    status: Some(status.into()),
+                    ..Default::default()
+                },
+            )
+            .await
+            .unwrap();
+        assert_eq!(
+            page.items.len(),
+            expected,
+            "combined filters: {client}/{from}/{to}/{status}"
+        );
+    }
     for (term, expected) in [
         ("zx-44", 2),
         ("ZX-4400 rev a 100%_!", 2),

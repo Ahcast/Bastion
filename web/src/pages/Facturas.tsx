@@ -1,3 +1,5 @@
+import { useDocumentFilters } from '../documentFilters.js';
+import { DocumentListFilters } from '../components/DocumentListFilters.js';
 import { useEffect, useRef, useState } from 'react';
 import { ApiError, message } from '../api.js';
 import { Heading, Loading, Notice, Table, useCore, useLoad } from '../ui.js';
@@ -27,10 +29,12 @@ function Workspace({ initialId }: { initialId?: number }) {
   const cloneAttempts = useRef(new Map<string,string>());
   const documents = useLoad(signal => api.request<{pdf:boolean}>('/api/v1/facturas/document-readiness', {signal}));
   const [selected, setSelected] = useState<InvoiceDraft | 'new' | null>(null), [mode, setMode] = useState<'view' | 'edit'>('view');
-  const [search, setSearch] = useState(''), [query, setQuery] = useState(''), [page, setPage] = useState(1), [error, setError] = useState(''), [busy, setBusy] = useState(false);
+  const filters = useDocumentFilters('facturas');
+  const { query, page, setPage } = filters;
+  const [error, setError] = useState(''), [busy, setBusy] = useState(false);
   const editable = moduleCan(access, 'facturas', 'documentos', 'editar');
   const removable = moduleCan(access, 'facturas', 'documentos', 'eliminar');
-  const result = useLoad(signal => api.request<InvoicePage>(`/api/v1/facturas?search=${encodeURIComponent(query)}&page=${page}&page_size=25`, { signal }), [query, page]);
+  const result = useLoad(signal => api.request<InvoicePage>(`/api/v1/facturas?${query}&page=${page}&page_size=25`, { signal }), [query, page]);
   const open = async (id: number, next: 'view' | 'edit') => {
     setError(''); setBusy(true);
     try { setSelected(await api.request<InvoiceDraft>(`/api/v1/facturas/${id}`)); setMode(next); }
@@ -53,7 +57,7 @@ function Workspace({ initialId }: { initialId?: number }) {
   return <><Heading title="Facturas" description="Administra facturas, documentos, pagos y saldos." action={editable && <button className="primary" disabled={busy} onClick={() => { setSelected('new'); setMode('edit'); }}>Nueva factura</button>} />
     <p className="quote-stage">{stage}</p>
     <section className="quote-list invoice-list" aria-labelledby="invoice-list-title"><div className="quote-list-heading"><h2 id="invoice-list-title">Listado de facturas</h2>{result.data && <span>{result.data.items.length} en esta página</span>}</div>
-    <form className="quote-search" onSubmit={e => { e.preventDefault(); setQuery(search); setPage(1); }}><label><span className="quote-sr-only">Buscar factura, cliente, referencia o descripción de ítem</span><input placeholder="Buscar factura, cliente, referencia o ítem" maxLength={200} value={search} onChange={e => setSearch(e.target.value)} /></label><button disabled={busy}>Buscar</button></form>
+    <DocumentListFilters kind="invoices" value={filters.draft} change={filters.setDraft} apply={filters.apply} clear={filters.clear} busy={busy} />
     <Notice>{error || result.error}</Notice>{initialId && error && <button disabled={busy} onClick={() => void open(initialId, 'edit')}>Reintentar abrir documento convertido</button>}{result.error && <button onClick={result.reload}>Reintentar consulta</button>}
     {result.data ? <><Table columns={['Factura / referencia', 'Cliente', 'Fecha', 'Ítems', 'Total (HNL)', 'Saldo (HNL)', 'Estado', 'Acciones']} rows={result.data.items.map(row => [<span className="quote-number">{row.invoice_number ?? `Borrador ${row.id}`}</span>, <div className="quote-list-client">{row.client_name || 'Sin cliente'}{row.order_number && <small>{row.order_number}</small>}</div>, row.invoice_date, row.item_count, <span className="quote-money">{row.total}</span>, <span className="quote-money">{row.balance}</span>, <span className="quote-status" data-state={row.status}>{row.status}</span>, <InvoiceActions number={`borrador de factura ${row.id}`} busy={busy} actions={[
       { label: 'Ver', run: () => void open(row.id, 'view') },
@@ -65,7 +69,7 @@ function Workspace({ initialId }: { initialId?: number }) {
       { label: 'Nota de entrega', disabled: !documents.data?.pdf, reason: !documents.data?.pdf ? 'Configura Empresa y el servicio de documentos' : undefined, run:()=>pdf(row,'delivery') },
       { label: 'Emitir Recibo', disabled: !documents.data?.pdf || row.status==='Borrador' || !row.invoice_number, reason: !documents.data?.pdf ? 'Configura Empresa y el servicio de documentos' : row.status==='Borrador' || !row.invoice_number ? 'Primero emite la factura' : undefined, run:()=>pdf(row,'receipt') },
       { label: 'Eliminar', disabled: !removable || row.status!=='Borrador' || (!!row.paid_total && row.paid_total!=='0.00'), danger: true, reason: !removable ? 'Sin permiso de eliminación' : row.status!=='Borrador' ? 'Una factura emitida no se elimina' : row.paid_total!=='0.00' ? 'No se elimina un borrador con pagos' : undefined, run:()=>setCommand({invoice:row,action:'delete'}) },
-    ]} />])} /><nav className="quote-pagination" aria-label="Paginación de facturas"><button disabled={busy || page === 1} onClick={() => setPage(p => p - 1)}>Anterior</button><span role="status">Página {page}</span><button disabled={busy || !result.data.has_more} onClick={() => setPage(p => p + 1)}>Siguiente</button></nav></> : !result.error && <Loading />}</section>
+    ]} />])} /><nav className="quote-pagination" aria-label="Paginación de facturas"><button disabled={busy || page === 1} onClick={() => setPage(page - 1)}>Anterior</button><span role="status">Página {page}</span><button disabled={busy || !result.data.has_more} onClick={() => setPage(page + 1)}>Siguiente</button></nav></> : !result.error && <Loading />}</section>
     {command && <InvoiceCommandDialog invoice={command.invoice} action={command.action} close={()=>setCommand(null)} changed={result.reload} completed={value=>{setCommand(null);result.reload();if(value){setSelected(value);setMode('view');}notify(command.action==='delete'?'Borrador eliminado.':'Factura actualizada.');}} />}
   </>;
 }

@@ -154,6 +154,23 @@ impl OrderService {
             "SELECT id,version,n_orders,n_bill,client_name,CAST(order_date AS CHAR) AS order_date,status,CAST(total AS CHAR) AS total FROM ordenes_orders WHERE archived_at IS NULL",
         );
         append_order_search(&mut query, filter.search.as_deref());
+        if let Some(client) = filter
+            .client
+            .as_deref()
+            .map(str::trim)
+            .filter(|s| !s.is_empty())
+        {
+            query
+                .push(" AND LOCATE(")
+                .push_bind(client)
+                .push(",client_name)>0");
+        }
+        if let Some(date) = filter.date_from {
+            query.push(" AND order_date>=").push_bind(date);
+        }
+        if let Some(date) = filter.date_to {
+            query.push(" AND order_date<=").push_bind(date);
+        }
         if let Some(status) = &filter.status {
             query.push(" AND status=").push_bind(status);
         }

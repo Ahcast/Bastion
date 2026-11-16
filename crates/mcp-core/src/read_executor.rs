@@ -292,6 +292,7 @@ impl DraftReadExecutor {
                         search: args.search,
                         page: Some(page),
                         page_size: Some(size),
+                        ..Default::default()
                     };
                     bounded(
                         &self

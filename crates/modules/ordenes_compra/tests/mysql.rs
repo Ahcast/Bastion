@@ -172,6 +172,33 @@ async fn mysql57_orders_destinations_atomicity_permissions_and_conflicts() {
         1
     );
     assert_eq!(service.detail(2, a.id).await.unwrap().version, 2);
+    // Combined filters are applied by SQL before pagination, with inclusive dates.
+    for (client, from, to, status, expected) in [
+        ("% _", "2026-10-23", "2026-10-23", "Pendiente", 1),
+        ("missing-client", "2026-10-23", "2026-10-23", "Pendiente", 0),
+        ("% _", "2026-10-24", "2026-10-25", "Pendiente", 0),
+        ("% _", "2026-10-20", "2026-10-21", "Pendiente", 0),
+        ("% _", "2026-10-23", "2026-10-23", "Entregado", 0),
+    ] {
+        let page = service
+            .list(
+                2,
+                &OrderFilter {
+                    client: Some(client.into()),
+                    date_from: Some(from.parse().unwrap()),
+                    date_to: Some(to.parse().unwrap()),
+                    status: Some(status.into()),
+                    ..Default::default()
+                },
+            )
+            .await
+            .unwrap();
+        assert_eq!(
+            page.items.len(),
+            expected,
+            "combined filters: {client}/{from}/{to}/{status}"
+        );
+    }
     for (search, expected) in [("%", 1), ("_", 1), ("' OR 1=1 --", 0)] {
         assert_eq!(
             service

@@ -19,6 +19,9 @@ paths:
       summary: Listar con ordenes_compra/documentos/ver
       parameters:
         - {name: search, in: query, description: Busca también por descripción de los productos (modelo o número de parte) sin distinguir mayúsculas y tratando comodines como texto literal, schema: {type: string, maxLength: 200}}
+        - {name: client, in: query, description: Coincidencia parcial literal en el nombre del cliente, schema: {type: string, maxLength: 200}}
+        - {name: date_from, in: query, description: Fecha del documento desde (inclusive), schema: {type: string, format: date}}
+        - {name: date_to, in: query, description: Fecha del documento hasta (inclusive), schema: {type: string, format: date}}
         - {name: status, in: query, schema: {enum: [Pendiente, Listo, Entregado]}}
         - {name: min_total, in: query, schema: {$ref: '#/components/schemas/Money'}}
         - {name: max_total, in: query, schema: {$ref: '#/components/schemas/Money'}}

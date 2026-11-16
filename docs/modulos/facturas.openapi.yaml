@@ -113,6 +113,10 @@ paths:
       summary: Listar facturas activas (facturas/documentos/ver)
       parameters:
         - {name: search, in: query, schema: {type: string, maxLength: 200}}
+        - {name: client, in: query, description: Coincidencia parcial literal en el nombre del cliente, schema: {type: string, maxLength: 200}}
+        - {name: date_from, in: query, description: Fecha del documento desde (inclusive), schema: {type: string, format: date}}
+        - {name: date_to, in: query, description: Fecha del documento hasta (inclusive), schema: {type: string, format: date}}
+        - {name: status, in: query, schema: {type: string, enum: [Borrador, Enviado, Pagado]}}
         - {name: page, in: query, schema: {type: integer, minimum: 1, maximum: 10000, default: 1}}
         - {name: page_size, in: query, schema: {type: integer, minimum: 1, maximum: 100, default: 25}}
       responses:

@@ -113,6 +113,10 @@ pub struct InvoiceDraft {
 #[serde(deny_unknown_fields)]
 pub struct InvoiceFilter {
     pub search: Option<String>,
+    pub status: Option<String>,
+    pub client: Option<String>,
+    pub date_from: Option<NaiveDate>,
+    pub date_to: Option<NaiveDate>,
     pub page: Option<u32>,
     pub page_size: Option<u32>,
 }
@@ -126,6 +130,21 @@ impl InvoiceFilter {
                 .search
                 .as_ref()
                 .is_some_and(|s| s.chars().count() > 200)
+            || self
+                .client
+                .as_ref()
+                .is_some_and(|s| s.chars().count() > 200)
+            || self
+                .date_from
+                .is_some_and(|date| !(1000..=9999).contains(&date.year()))
+            || self
+                .date_to
+                .is_some_and(|date| !(1000..=9999).contains(&date.year()))
+            || matches!((self.date_from, self.date_to), (Some(from), Some(to)) if from > to)
+            || self
+                .status
+                .as_deref()
+                .is_some_and(|s| !["Borrador", "Enviado", "Pagado"].contains(&s))
         {
             return Err(CoreError::Invalid);
         }
@@ -254,4 +273,42 @@ pub struct InvoicePayment {
     pub date: NaiveDate,
     pub method: String,
     pub reference: String,
+}
+
+#[cfg(test)]
+mod list_filter_tests {
+    use super::*;
+    #[test]
+    fn rejects_invalid_date_ranges_status_and_long_client() {
+        for filter in [
+            InvoiceFilter {
+                date_from: Some("2026-11-16".parse().unwrap()),
+                date_to: Some("2026-11-01".parse().unwrap()),
+                ..Default::default()
+            },
+            InvoiceFilter {
+                date_from: Some("0999-12-31".parse().unwrap()),
+                ..Default::default()
+            },
+            InvoiceFilter {
+                status: Some("unknown".into()),
+                ..Default::default()
+            },
+            InvoiceFilter {
+                client: Some("a".repeat(201)),
+                ..Default::default()
+            },
+        ] {
+            assert!(filter.bounds().is_err());
+        }
+        assert!(
+            InvoiceFilter {
+                date_from: Some("2026-11-16".parse().unwrap()),
+                date_to: Some("2026-11-16".parse().unwrap()),
+                ..Default::default()
+            }
+            .bounds()
+            .is_ok()
+        );
+    }
 }

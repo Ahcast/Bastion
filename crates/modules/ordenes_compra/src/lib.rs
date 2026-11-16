@@ -77,6 +77,9 @@ pub struct PurchaseOrder {
 #[serde(deny_unknown_fields)]
 pub struct OrderFilter {
     pub search: Option<String>,
+    pub client: Option<String>,
+    pub date_from: Option<NaiveDate>,
+    pub date_to: Option<NaiveDate>,
     pub status: Option<String>,
     pub min_total: Option<String>,
     pub max_total: Option<String>,
@@ -97,6 +100,17 @@ impl OrderFilter {
                 .status
                 .as_deref()
                 .is_some_and(|s| !["Pendiente", "Listo", "Entregado"].contains(&s))
+            || self
+                .client
+                .as_ref()
+                .is_some_and(|s| s.chars().count() > 200)
+            || self
+                .date_from
+                .is_some_and(|date| !(1000..=9999).contains(&date.year()))
+            || self
+                .date_to
+                .is_some_and(|date| !(1000..=9999).contains(&date.year()))
+            || matches!((self.date_from, self.date_to), (Some(from), Some(to)) if from > to)
         {
             return Err(CoreError::Invalid);
         }
@@ -224,4 +238,42 @@ pub struct OrderReport {
     pub page: u32,
     pub page_size: u32,
     pub has_more: bool,
+}
+
+#[cfg(test)]
+mod list_filter_tests {
+    use super::*;
+    #[test]
+    fn rejects_invalid_date_ranges_status_and_long_client() {
+        for filter in [
+            OrderFilter {
+                date_from: Some("2026-11-16".parse().unwrap()),
+                date_to: Some("2026-11-01".parse().unwrap()),
+                ..Default::default()
+            },
+            OrderFilter {
+                date_from: Some("0999-12-31".parse().unwrap()),
+                ..Default::default()
+            },
+            OrderFilter {
+                status: Some("unknown".into()),
+                ..Default::default()
+            },
+            OrderFilter {
+                client: Some("a".repeat(201)),
+                ..Default::default()
+            },
+        ] {
+            assert!(filter.bounds().is_err());
+        }
+        assert!(
+            OrderFilter {
+                date_from: Some("2026-11-16".parse().unwrap()),
+                date_to: Some("2026-11-16".parse().unwrap()),
+                ..Default::default()
+            }
+            .bounds()
+            .is_ok()
+        );
+    }
 }

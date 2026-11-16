@@ -1,3 +1,5 @@
+import { useDocumentFilters } from '../documentFilters.js';
+import { DocumentListFilters } from '../components/DocumentListFilters.js';
 import { useEffect, useRef, useState } from 'react';
 import { ApiError, message } from '../api.js';
 import { Form, Heading, Loading, Notice, Table, useCore, useLoad } from '../ui.js';
@@ -45,8 +47,9 @@ function Workspace({ initialId,openInvoice }: { initialId?: number;openInvoice?:
     }finally{running.current=false;setBusy(false);}
   };
   const [selected, setSelected] = useState<PurchaseOrder | 'new' | null>(null), [mode, setMode] = useState<'view' | 'edit'>('view');
-  const [search, setSearch] = useState(''), [status, setStatus] = useState(''), [min, setMin] = useState(''), [max, setMax] = useState('');
-  const [query, setQuery] = useState(''), [page, setPage] = useState(1), [error, setError] = useState(''), [busy, setBusy] = useState(false);
+  const filters = useDocumentFilters('ordenes_compra');
+  const { query, page, setPage } = filters;
+  const [error, setError] = useState(''), [busy, setBusy] = useState(false);
   useUnsavedChanges(uncertain,busy);
   const result = useLoad(signal => api.request<OrderPage>(`${base}?${query}&page=${page}&page_size=25`, { signal }), [query, page]);
   const archive = async (id: number, version: number, number: string) => {
@@ -67,18 +70,12 @@ function Workspace({ initialId,openInvoice }: { initialId?: number;openInvoice?:
   if (selected) return <OrderEditor key={selected === 'new' ? 'new' : selected.id} initial={selected === 'new' ? null : selected} editable={editable && mode === 'edit'} edit={editable && mode === 'view' ? () => setMode('edit') : undefined} close={() => { setSelected(null); result.reload(); }} />;
   return <><Heading title="Órdenes de compra" description="Sigue productos, venta, inversión y entrega de tus órdenes." action={editable && <button className="primary" disabled={busy} onClick={() => { setSelected('new'); setMode('edit'); }}>Nueva orden</button>} /><p className="quote-stage">{stage}</p>
     <section className="quote-list order-list" aria-labelledby="order-list-title"><div className="quote-list-heading"><h2 id="order-list-title">Listado de órdenes</h2>{result.data && <span>{result.data.items.length} en esta página</span>}</div>
-    <form className="order-filters" onSubmit={e => { e.preventDefault(); const params = new URLSearchParams(); if (search.trim()) params.set('search', search.trim()); if (status) params.set('status', status); if (min) params.set('min_total', min); if (max) params.set('max_total', max); setQuery(params.toString()); setPage(1); }}>
-      <label>Buscar orden, factura, cliente o descripción de producto<input maxLength={200} value={search} onChange={e => setSearch(e.target.value)} /></label>
-      <label>Estado<select value={status} onChange={e => setStatus(e.target.value)}><option value="">Todos</option>{['Pendiente', 'Listo', 'Entregado'].map(value => <option key={value}>{value}</option>)}</select></label>
-      <label>Valor mínimo (HNL)<input inputMode="decimal" pattern="[0-9]{1,12}([.][0-9]{1,4})?" maxLength={17} value={min} onChange={e => setMin(e.target.value)} /></label>
-      <label>Valor máximo (HNL)<input inputMode="decimal" pattern="[0-9]{1,12}([.][0-9]{1,4})?" maxLength={17} value={max} onChange={e => setMax(e.target.value)} /></label>
-      <div className="actions"><button disabled={busy}>Aplicar filtros</button><button type="button" disabled={busy} onClick={() => { setSearch(''); setStatus(''); setMin(''); setMax(''); setQuery(''); setPage(1); }}>Limpiar filtros</button></div>
-    </form><Notice>{error || result.error}</Notice>{uncertain&&<p role="status">No se pudo confirmar la operación. Repite la misma acción para recuperar su resultado sin duplicados.</p>}{initialId && error && <button disabled={busy} onClick={() => void open(initialId, 'edit')}>Reintentar abrir documento convertido</button>}{result.error && <button onClick={result.reload}>Reintentar consulta</button>}
+    <DocumentListFilters kind="orders" value={filters.draft} change={filters.setDraft} apply={filters.apply} clear={filters.clear} busy={busy} /><Notice>{error || result.error}</Notice>{uncertain&&<p role="status">No se pudo confirmar la operación. Repite la misma acción para recuperar su resultado sin duplicados.</p>}{initialId && error && <button disabled={busy} onClick={() => void open(initialId, 'edit')}>Reintentar abrir documento convertido</button>}{result.error && <button onClick={result.reload}>Reintentar consulta</button>}
     {result.data ? <><Table columns={['Orden', 'Factura', 'Cliente', 'Fecha', 'Total (HNL)', 'Estado', 'Acciones']} rows={result.data.items.map(row => [<span className="quote-number">{row.n_orders}</span>, <span className="quote-number">{row.n_bill || '—'}</span>, <div className="quote-list-client">{row.client_name || 'Sin cliente'}</div>, row.order_date, <span className="quote-money">{row.total}</span>, <span className="quote-status" data-state={row.status}>{row.status}</span>, <QuoteActions number={row.n_orders} busy={busy} actions={[
       { label: 'Ver', run: () => void open(row.id, 'view') }, { label: 'Editar', disabled: !editable, reason: !editable ? 'Sin permiso de edición' : undefined, run: () => void open(row.id, 'edit') },
       { label: 'Documentos', run:()=>setDocumentsId(row.id) }, { label: 'Convertir a factura', disabled:!editable||!invoiceEditable, reason:!editable||!invoiceEditable?'Requiere ver y editar en Órdenes y Facturas':undefined, run:()=>{if(window.confirm('¿Crear o abrir el borrador de factura vinculado a esta orden?'))void action(row.id,row.version,'convert/invoice');} },
       { label: 'Clonar', disabled:!editable,reason:!editable?'Sin permiso de edición':undefined,run:()=>void action(row.id,row.version,'clone') }, { label: 'Archivar', disabled: !removable || row.status !== 'Pendiente' || Boolean(row.n_bill.trim()), danger: true, reason: !removable ? 'Sin permiso de eliminación' : 'Requiere una orden pendiente sin factura, entrega ni archivos', run: () => void archive(row.id, row.version, row.n_orders) },
-    ]} />])} /><nav className="quote-pagination" aria-label="Paginación de órdenes"><button disabled={busy || page === 1} onClick={() => setPage(p => p - 1)}>Anterior</button><span role="status">Página {page}</span><button disabled={busy || !result.data.has_more} onClick={() => setPage(p => p + 1)}>Siguiente</button></nav></> : !result.error && <Loading />}
+    ]} />])} /><nav className="quote-pagination" aria-label="Paginación de órdenes"><button disabled={busy || page === 1} onClick={() => setPage(page - 1)}>Anterior</button><span role="status">Página {page}</span><button disabled={busy || !result.data.has_more} onClick={() => setPage(page + 1)}>Siguiente</button></nav></> : !result.error && <Loading />}
     </section>
   </>;
 }

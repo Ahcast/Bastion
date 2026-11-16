@@ -29,3 +29,9 @@ Despliegue verificado el 2026-11-11 desde e7b60e3 (CI 43156439314): selector del
 El buscador de Órdenes y el filtro equivalente de reportes también revisan las descripciones de todos los productos. Admiten coincidencias parciales, sin distinguir mayúsculas; %, _ y ! se tratan literalmente. Cada orden aparece una sola vez, con filtros, paginación y permisos existentes. No se buscan comentarios, gastos ni otros campos del JSON. No requiere migración de datos ni cambios de esquema.
 
 Despliegue verificado el 2026-11-11 desde `654b724eae859eed887150181880ac70bda707d3` en AWS y Bluehost, con CI 43158351672 aprobado. Regresiones MySQL 5.7 verifican coincidencias parciales, caracteres literales, filtros, paginación sin duplicados y consistencia con reportes. Véase docs/09-despliegue.md.
+
+## Filtros persistentes (solicitud del 2026-11-16)
+
+El listado combina búsqueda, nombre parcial del cliente, fecha desde/hasta inclusivas y estado. Órdenes conserva además sus límites de importe. Aplicar filtros reinicia la página; Limpiar filtros restaura el listado completo. La API aplica todas las condiciones antes de paginar, con validación del rango y estados propios de cada módulo, sin migraciones.
+
+Cada listado conserva por separado los filtros aplicados y la página en sessionStorage, por usuario y pestaña. Se restauran al volver de un documento, cambiar de módulo o recargar durante la sesión. Los cambios de campos sin aplicar no sustituyen la selección guardada. Cerrar sesión o perder la autenticación limpia esta memoria; si el navegador bloquea almacenamiento, se conserva únicamente mientras el listado permanece montado. Es una mejora solicitada, no una regla inferida de CastilloIT.

@@ -157,6 +157,26 @@ impl InvoiceService {
             "SELECT id,version,invoice_number,JSON_UNQUOTE(JSON_EXTRACT(calculation_json,'$.paid_total')) AS paid_total,client_name,order_number,CAST(invoice_date AS CHAR) AS invoice_date,CAST(JSON_LENGTH(data_json,'$.items') AS UNSIGNED) AS item_count,status,JSON_UNQUOTE(JSON_EXTRACT(calculation_json,'$.totals.total')) AS total,JSON_UNQUOTE(JSON_EXTRACT(calculation_json,'$.balance')) AS balance FROM facturas_drafts WHERE deleted_at IS NULL",
         );
         append_invoice_search(&mut query, filter.search.as_deref());
+        if let Some(client) = filter
+            .client
+            .as_deref()
+            .map(str::trim)
+            .filter(|s| !s.is_empty())
+        {
+            query
+                .push(" AND LOCATE(")
+                .push_bind(client)
+                .push(",client_name)>0");
+        }
+        if let Some(date) = filter.date_from {
+            query.push(" AND invoice_date>=").push_bind(date);
+        }
+        if let Some(date) = filter.date_to {
+            query.push(" AND invoice_date<=").push_bind(date);
+        }
+        if let Some(status) = &filter.status {
+            query.push(" AND status=").push_bind(status);
+        }
         query
             .push(" ORDER BY created_at DESC,id DESC LIMIT ")
             .push_bind(page_size + 1)
