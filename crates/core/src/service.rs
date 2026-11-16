@@ -2802,7 +2802,7 @@ mod tests {
                 "Rotation regression"
             )
             .await,
-            Err(CoreError::Unauthorized)
+            Err(CoreError::Conflict)
         ));
         let result = core
             .complete_totp_change(
@@ -2848,6 +2848,27 @@ mod tests {
             core.current_user(&rotated.session_token).await.unwrap().id,
             dispatch.user.id
         );
+        let second_rotated = match core
+            .start_login(
+                "invited@example.test",
+                password,
+                ip,
+                "Second device",
+                true,
+                Some(&rotated.device_token),
+            )
+            .await
+            .unwrap()
+        {
+            LoginStart::Authenticated(cookies) => cookies,
+            _ => panic!("recently verified device must be recognized"),
+        };
+        assert!(core.authenticate(&rotated.session_token).await.is_ok());
+        assert!(
+            core.authenticate(&second_rotated.session_token)
+                .await
+                .is_ok()
+        );
         admin
             .update_user(administrator, dispatch.user.id, None, None, Some(false))
             .await
@@ -2856,6 +2877,11 @@ mod tests {
             core.authenticate(&rotated.session_token).await,
             Err(CoreError::Unauthorized)
         ));
+        assert!(
+            core.authenticate(&second_rotated.session_token)
+                .await
+                .is_err()
+        );
     }
 
     #[test]
