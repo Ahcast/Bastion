@@ -241,3 +241,7 @@ Comprobar cifras reales de Procesos, Cotizaciones, Órdenes, Facturas y Gastos, 
 - Las conexiones activas muestran únicamente accesos de la cuenta, con permisos vigentes y paginación. Desconectar requiere confirmación, revoca solo sus grants y conserva auditoría y accesos de otras cuentas.
 - Ajustes no muestra «Mis solicitudes» ni consulta su historial. Los errores indican el siguiente paso sin reflejar secretos.
 - Comprobar CI MySQL 5.7, SDK y frontend; registrar despliegue e interoperabilidad real por separado, sin declarar compatibles clientes no probados.
+
+## Contabilidad: primer corte
+
+Verificar catálogo editable sin saldos inventados; cuentas de grupo fuera del diario; partida doble exacta; idempotencia y versión; inmutabilidad de contabilizados y reversos compensatorios; períodos cerrados protegidos; balance con apertura y movimientos; fuentes autorizadas y versionadas, sin duplicar documento. Las pruebas MySQL usan exclusivamente `bastion_contabilidad_test`. La comprobación de producción no crea asientos sintéticos. Inventario físico, activos, depreciación, planilla e informes fiscales no se declaran terminados en este corte.

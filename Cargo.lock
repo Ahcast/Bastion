@@ -183,6 +183,7 @@ dependencies = [
  "base64 0.22.1",
  "bastion-clientes",
  "bastion-colaboracion",
+ "bastion-contabilidad",
  "bastion-core",
  "bastion-cotizaciones",
  "bastion-document-flows",
@@ -228,6 +229,22 @@ version = "0.1.0"
 dependencies = [
  "base64 0.22.1",
  "bastion-core",
+ "chrono",
+ "serde",
+ "serde_json",
+ "sha2 0.10.9",
+ "sqlx",
+ "tokio",
+]
+
+[[package]]
+name = "bastion-contabilidad"
+version = "0.1.0"
+dependencies = [
+ "bastion-core",
+ "bastion-facturas",
+ "bastion-gastos",
+ "bastion-ordenes-compra",
  "chrono",
  "serde",
  "serde_json",
@@ -481,6 +498,7 @@ dependencies = [
  "bastion-api",
  "bastion-clientes",
  "bastion-colaboracion",
+ "bastion-contabilidad",
  "bastion-core",
  "bastion-cotizaciones",
  "bastion-document-flows",

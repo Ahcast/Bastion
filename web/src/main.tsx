@@ -24,3 +24,4 @@ catch (error) { root.render(<ConfigurationError error={error} />); }
 import './styles/clientes.css';
 import './styles/gastos.css';
 import './styles/reportes.css';
+import './styles/contabilidad.css';

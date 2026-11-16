@@ -16,6 +16,7 @@ pub struct AppConfig {
     pub ordenes_compra_allowed: bool,
     pub colaboracion_allowed: bool,
     pub gastos_allowed: bool,
+    pub contabilidad_allowed: bool,
     pub reportes_allowed: bool,
     pub licitaciones_allowed: bool,
 }
@@ -160,6 +161,7 @@ impl AppConfig {
             ordenes_compra_allowed: allowed_modules.contains(&"ordenes_compra"),
             colaboracion_allowed: allowed_modules.contains(&"colaboracion"),
             gastos_allowed: allowed_modules.contains(&"gastos"),
+            contabilidad_allowed: allowed_modules.contains(&"contabilidad"),
             reportes_allowed: allowed_modules.contains(&"reportes"),
             licitaciones_allowed: allowed_modules.contains(&"licitaciones"),
         })
@@ -181,6 +183,7 @@ fn parse_allowed_modules(value: &str) -> Result<Vec<&'static str>, ConfigError> 
             "ordenes_compra" => "ordenes_compra",
             "colaboracion" => "colaboracion",
             "gastos" => "gastos",
+            "contabilidad" => "contabilidad",
             "reportes" => "reportes",
             "licitaciones" => "licitaciones",
             _ => {

@@ -312,6 +312,21 @@ impl OrderService {
             "recent": recent
         }))
     }
+    /// Read-only accounting port. The caller owns the transaction; the module
+    /// retains authorization, availability and the lock on its source document.
+    pub async fn accounting_snapshot(
+        &self,
+        tx: &mut Transaction<'_, MySql>,
+        actor: u64,
+        id: u64,
+    ) -> Result<PurchaseOrder, CoreError> {
+        CoreAdmin::lock_enabled_module(tx, "ordenes_compra", false).await?;
+        self.admin
+            .authorize_in_transaction(tx, actor, "ordenes_compra", "documentos", "ver")
+            .await?;
+        load(tx, id).await
+    }
+
     pub async fn detail(&self, actor: u64, id: u64) -> Result<PurchaseOrder, CoreError> {
         let mut tx = self.begin(actor, "documentos", "ver").await?;
         let order = load(&mut tx, id).await?;

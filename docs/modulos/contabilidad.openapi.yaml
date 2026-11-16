@@ -1,0 +1,56 @@
+openapi: 3.1.0
+info:
+  title: Bastion Contabilidad
+  version: 0.1.0
+  description: Base HNL; sesión Core, CSRF en mutaciones, permisos libros y disponibilidad. Versiones If-Match. Errores 400/401/403/404/409/412/413/429/503.
+paths:
+  /api/v1/contabilidad/cuentas:
+    get:
+      responses: { '200': { description: Catálogo de hasta 500 cuentas } }
+    post:
+      description: Código, nombre, clase, cuenta padre y movimiento. Creación única por código.
+      responses: { '200': { description: Cuenta creada } }
+  /api/v1/contabilidad/cuentas/{code}:
+    parameters: [{ name: code, in: path, required: true, schema: { type: string } }]
+    put:
+      description: If-Match; sólo nombre y activa. Clasificación y código inmutables.
+      responses: { '200': { description: Cuenta actualizada } }
+  /api/v1/contabilidad/periodos:
+    get:
+      responses: { '200': { description: Períodos mensuales } }
+    post:
+      description: Abrir mes YYYY-MM explícitamente.
+      responses: { '200': { description: Período abierto } }
+  /api/v1/contabilidad/periodos/{month}:
+    parameters: [{ name: month, in: path, required: true, schema: { type: string } }]
+    put:
+      description: If-Match; cerrar o reabrir con motivo; cierre sin borradores.
+      responses: { '200': { description: Estado actualizado } }
+  /api/v1/contabilidad/asientos:
+    get:
+      description: Mes opcional, página de 50 asientos, fecha/ID descendentes.
+      responses: { '200': { description: Lista paginada } }
+    post:
+      description: Idempotency-Key; fecha, concepto, referencia, tipo, origen opcional y 2–100 líneas de cuentas con debe/haber decimales como texto. Crea borrador balanceado.
+      responses: { '200': { description: Borrador creado o reintento idéntico } }
+  /api/v1/contabilidad/asientos/{id}:
+    parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
+    get:
+      responses: { '200': { description: Detalle y evidencia de origen } }
+    put:
+      description: If-Match; sustituye borrador sin perder evidencia ni identificador.
+      responses: { '200': { description: Borrador actualizado } }
+  /api/v1/contabilidad/asientos/{id}/{action}:
+    parameters: [{ name: id, in: path, required: true, schema: { type: integer } }, { name: action, in: path, required: true, schema: { enum: [contabilizar, cancelar, reversar] } }]
+    post:
+      description: If-Match; contabilizar revalida documento fuente; cancelar sólo borrador; reversar exige fecha de período abierto y motivo y genera asiento opuesto.
+      responses: { '200': { description: Asiento resultante } }
+  /api/v1/contabilidad/origen/{module}/{id}:
+    parameters: [{ name: module, in: path, required: true, schema: { enum: [gastos, facturas, ordenes_compra] } }, { name: id, in: path, required: true, schema: { type: integer } }]
+    get:
+      description: Propuesta sin persistencia; requiere además lectura del módulo origen. No importa históricos automáticamente.
+      responses: { '200': { description: Borrador propuesto y advertencia para revisión } }
+  /api/v1/contabilidad/balance:
+    get:
+      description: date_from/date_to obligatorios; apertura anterior, movimientos y saldo de asientos contabilizados, incluidos reversos, máximo 366 días.
+      responses: { '200': { description: Balance de comprobación HNL por cuenta } }

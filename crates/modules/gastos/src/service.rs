@@ -298,6 +298,21 @@ impl ExpenseService {
         }))
     }
 
+    /// Read-only accounting port. The caller owns the transaction; the module
+    /// retains authorization, availability and the lock on its source document.
+    pub async fn accounting_snapshot(
+        &self,
+        tx: &mut Transaction<'_, MySql>,
+        actor: u64,
+        id: u64,
+    ) -> Result<Expense, CoreError> {
+        CoreAdmin::lock_enabled_module(tx, "gastos", false).await?;
+        self.admin
+            .authorize_in_transaction(tx, actor, "gastos", "registros", "ver")
+            .await?;
+        load(tx, id).await
+    }
+
     pub async fn detail(&self, actor: u64, id: u64) -> Result<Expense, CoreError> {
         let mut tx = self.begin(actor, "ver").await?;
         let expense = load(&mut tx, id).await?;

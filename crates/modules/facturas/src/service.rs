@@ -306,6 +306,21 @@ impl InvoiceService {
         }))
     }
 
+    /// Read-only accounting port. The caller owns the transaction; the module
+    /// retains authorization, availability and the lock on its source document.
+    pub async fn accounting_snapshot(
+        &self,
+        tx: &mut Transaction<'_, MySql>,
+        actor: u64,
+        id: u64,
+    ) -> Result<InvoiceDraft, CoreError> {
+        CoreAdmin::lock_enabled_module(tx, "facturas", false).await?;
+        self.admin
+            .authorize_in_transaction(tx, actor, "facturas", "documentos", "ver")
+            .await?;
+        load(tx, id).await
+    }
+
     pub async fn detail(&self, actor: u64, id: u64) -> Result<InvoiceDraft, CoreError> {
         let mut tx = self.begin(actor, "ver").await?;
         let draft = load(&mut tx, id).await?;

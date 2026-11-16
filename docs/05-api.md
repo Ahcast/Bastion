@@ -152,3 +152,5 @@ Los endpoints de navegador MCP requieren sesión Core, origen exacto y CSRF y de
 - `POST /oauth/connections/disconnect`, cuerpo `{ "id": 123, "confirmed_client_id": "https://cliente.example/metadata.json" }`. Comprueba confirmación, bloquea sesión/cliente y revoca solo los grants de la cuenta. Es idempotente y audita la primera revocación efectiva.
 
 La entrada pública GET de autorización solo entrega una solicitud bien formada al frontend fijo, sin consultar SQL ni descargar metadatos. La aprobación administrativa y el consentimiento individual siguen siendo obligatorios. Las solicitudes históricas permanecen en auditoría y dejan de consultarse desde Ajustes. Los errores incluyen `detail` seguro y categorías fijas, sin reflejar la consulta OAuth ni errores SQL. Ver `06-mcp.md`.
+
+Contabilidad publica `/api/v1/contabilidad/*` con sesión/CSRF del Core y ámbito `libros`; If-Match para cambios e Idempotency-Key para nuevos asientos. [Contrato de rutas](modulos/contabilidad.openapi.yaml) y [reglas del dominio](modulos/contabilidad.md).

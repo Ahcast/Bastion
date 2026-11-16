@@ -32,6 +32,7 @@ use url::Url;
 mod backups;
 mod clientes;
 mod colaboracion;
+mod contabilidad;
 mod cotizaciones;
 mod facturas;
 mod gastos;
@@ -62,6 +63,7 @@ struct ApiState {
     facturas: bastion_facturas::InvoiceService,
     ordenes_compra: bastion_ordenes_compra::OrderService,
     gastos: bastion_gastos::ExpenseService,
+    contabilidad: bastion_contabilidad::AccountingService,
     reportes: bastion_reportes::ReportService,
     licitaciones: bastion_licitaciones::TenderService,
     report_jobs: std::sync::Arc<tokio::sync::Semaphore>,
@@ -306,6 +308,7 @@ pub fn router(
         facturas: bastion_facturas::InvoiceService::new(core.database(), core.admin()),
         ordenes_compra: bastion_ordenes_compra::OrderService::new(core.database(), core.admin()),
         gastos: bastion_gastos::ExpenseService::new(core.database(), core.admin()),
+        contabilidad: bastion_contabilidad::AccountingService::new(core.database(), core.admin()),
         reportes: bastion_reportes::ReportService::new(core.database(), core.admin()),
         licitaciones: bastion_licitaciones::TenderService::new(core.database(), core.admin()),
         report_jobs: std::sync::Arc::new(tokio::sync::Semaphore::new(2)),
@@ -416,6 +419,7 @@ pub fn router(
         .merge(facturas::routes(api_state.clone()))
         .merge(ordenes_compra::routes(api_state.clone()))
         .merge(gastos::routes(api_state.clone()))
+        .merge(contabilidad::routes(api_state.clone()))
         .merge(reportes::routes(api_state.clone()))
         .merge(licitaciones::routes(api_state.clone()))
         .merge(backups::routes())

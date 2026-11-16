@@ -132,3 +132,7 @@ La revisión recomienda ampliar el servicio documental compartido para paquetes 
 La lectura de sesión incorpora el nombre de la persona mediante su relación existente, evitando una consulta adicional en `current_user`. La API reutiliza esa identidad únicamente dentro de la petición HTTP mediante un contexto asíncrono acotado a su token, de modo que filtros y controladores no repiten autenticación ni actualización de actividad. No se instala un servicio de caché ni se cambia la ubicación de frontend, backend o MySQL. Los límites de seguridad se describen en [Seguridad y permisos](08-seguridad-y-permisos.md#reutilización-de-identidad-dentro-de-una-petición-http).
 
 En rutas con dos llamadas a `actor`, como el detalle de Cotizaciones, el camino normal de autenticación pasa de seis operaciones SQL a dos: consulta de sesión/persona y actualización de actividad. Esta cuenta describe únicamente autenticación, no el total de consultas de la ruta ni una medición de velocidad de extremo a extremo.
+
+## Integración contable — 2026-11-16
+
+`bastion-contabilidad` posee sus cuentas, períodos y libro. Consume `accounting_snapshot` de los servicios de Gastos, Facturas y Órdenes en una transacción compartida: cada propietario comprueba disponibilidad y permiso, y bloquea su documento hasta concluir. Contabilidad no consulta SQL de esos dominios. Sus mutaciones adquieren primero el bloqueo de su módulo; los propietarios no llaman de vuelta al libro. Los asientos contabilizados son inmutables; cambios posteriores del origen requieren conciliación explícita.

@@ -302,3 +302,7 @@ Las descargas de Cotizaciones usan su número; las de Facturas, su número fisca
 El ajuste quedó activo en AWS y Bluehost con la revisión `5b744a3a1dc2e7eb8cee0bed2c67098d7018d471`, con CI aprobado y verificación de hashes del ejecutable y de 47 archivos públicos. La evidencia y los límites de comprobación se registran en [Despliegue](09-despliegue.md).
 
 - 2026-11-11: Órdenes incorpora selección de proveedor por producto mediante el catálogo de Proveedores y puerto de dominio; comentario compacto en columna independiente, compatible con órdenes anteriores y sin migración de esquema.
+
+## Base contable simple — 2026-11-16
+
+Marco autoriza iniciar Contabilidad con catálogo, períodos, asientos y balance en HNL para una operación de poco volumen. Gastos, Facturas y Órdenes exponen puertos de lectura autorizados; Contabilidad prepara propuestas revisables y conserva la versión del origen. El Core mantiene registro, identidad, activación y auditoría. No se amplía MCP. El inventario físico, fichas de activos y cálculo de planilla quedan como etapas posteriores sencillas; las cuentas correspondientes ya forman parte de la plantilla. Véase [alcance, controles y límites](modulos/contabilidad.md).

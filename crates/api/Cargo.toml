@@ -15,6 +15,7 @@ bastion-colaboracion = { path = "../modules/colaboracion" }
 bastion-facturas = { path = "../modules/facturas" }
 bastion-ordenes-compra = { path = "../modules/ordenes_compra" }
 bastion-gastos = { path = "../modules/gastos" }
+bastion-contabilidad = { path = "../modules/contabilidad" }
 bastion-cotizaciones = { path = "../modules/cotizaciones" }
 bastion-procesos = { path = "../modules/procesos" }
 futures-core = "0.3"

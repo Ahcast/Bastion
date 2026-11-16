@@ -35,3 +35,5 @@ Colaboración incorpora su primer corte con límites y retención confirmados po
 Proveedores comienza su implementación independiente con el contrato de paridad y las decisiones nuevas pendientes de cotejo Legacy identificadas. Ver [detalle](proveedores-implementacion.md) y [OpenAPI](proveedores.openapi.yaml).
 
 Reportes consulta los tres dominios mediante sus servicios y publica exportaciones Excel. Ver [implementación](reportes-implementacion.md) y [OpenAPI](reportes.openapi.yaml); los límites propuestos conservan su cotejo pendiente.
+
+Contabilidad incorpora una base nueva autorizada para operación pequeña: catálogo, diario, períodos, reversos y balance de comprobación; propuestas desde Gastos, Facturas emitidas y Órdenes recibidas. Véase [ficha](contabilidad.md) y [API](contabilidad.openapi.yaml).

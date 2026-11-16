@@ -52,6 +52,12 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
         tracing::info!("Core migrations completed; module schemas unchanged");
         return Ok(());
     }
+    if command == "migrate-contabilidad" {
+        let migrator = Database::connect_lazy(&DatabaseConfig::migrator_from_env()?);
+        bastion_contabilidad::AccountingService::migrate(&migrator).await?;
+        tracing::info!("accounting migrations completed");
+        return Ok(());
+    }
     if command == "migrate" {
         let migrator = Database::connect_lazy(&DatabaseConfig::migrator_from_env()?);
         migrator.migrate().await?;
@@ -64,6 +70,7 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
         bastion_ordenes_compra::OrderService::migrate(&migrator).await?;
         bastion_document_flows::ConversionService::migrate(&migrator).await?;
         bastion_gastos::ExpenseService::migrate(&migrator).await?;
+        bastion_contabilidad::AccountingService::migrate(&migrator).await?;
         bastion_reportes::ReportService::migrate(&migrator).await?;
         bastion_licitaciones::TenderService::migrate(&migrator).await?;
         tracing::info!("database migrations completed");
@@ -165,6 +172,9 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
         .await?;
     bastion_ordenes_compra::OrderService::new(core.database(), core.admin())
         .synchronize_release(config.ordenes_compra_allowed)
+        .await?;
+    bastion_contabilidad::AccountingService::new(core.database(), core.admin())
+        .synchronize_release(config.contabilidad_allowed)
         .await?;
     bastion_gastos::ExpenseService::new(core.database(), core.admin())
         .synchronize_release(config.gastos_allowed)
