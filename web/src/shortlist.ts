@@ -30,6 +30,19 @@ export interface TenderShortlist {
 }
 export type ShortlistReceipts = Record<string, string>;
 export type InterestTag = 'BID' | 'JICA' | 'UCP';
+export type ShortlistSort = 'priority' | 'score_desc' | 'score_asc' | 'date_asc' | 'date_desc';
+export function sortShortlist(items: ShortlistItem[], order: ShortlistSort): ShortlistItem[] {
+  if (order === 'priority') return [...items];
+  const score = order === 'score_desc' || order === 'score_asc';
+  const direction = order === 'score_desc' || order === 'date_desc' ? -1 : 1;
+  return [...items].sort((left, right) => {
+    const a = score ? left.clasificacion?.puntaje : Date.parse(left.fecha_recepcion);
+    const b = score ? right.clasificacion?.puntaje : Date.parse(right.fecha_recepcion);
+    const missingA = a == null || !Number.isFinite(a), missingB = b == null || !Number.isFinite(b);
+    if (missingA || missingB) return Number(missingA) - Number(missingB);
+    return direction * (a! - b!);
+  });
+}
 export function interestTags(item: ShortlistItem): string[] {
   return [...new Set([item.coincidencias_interes, item.posibles_interes].join(' | ').split(' | ').filter(Boolean))];
 }

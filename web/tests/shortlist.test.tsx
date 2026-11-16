@@ -7,6 +7,7 @@ import { CoreContext } from '../src/ui.js';
 import { ShortlistProvider } from '../src/components/ShortlistAlerts.js';
 import LicitacionesProcesos from '../src/components/LicitacionesProcesos.js';
 import type { ShortlistItem, TenderShortlist } from '../src/shortlist.js';
+import { sortShortlist } from '../src/shortlist.js';
 import { mainNavigation } from '../src/navigation.js';
 import type { Access } from '../src/types.js';
 
@@ -33,10 +34,11 @@ const item: ShortlistItem = {
   extraido_en: '2026-11-06T18:00:00Z',
 };
 
-async function workspace(userId: number, permitted = true) {
+async function workspace(userId: number, permitted = true, initialItems?: ShortlistItem[]) {
   let payload: TenderShortlist = { availability: 'available', checked_at: '2026-11-06T18:00:00Z',
     generated_at: '2026-11-06T18:00:00Z', scan_status: 'parcial', items: [item, { ...item, id: 'd'.repeat(64),
       expediente: 'LPN sin prioridad', coincidencias_interes: '', evidencia_interes: '' }] };
+  if (initialItems) payload.items = initialItems;
   const calls: string[] = [];
   const api = new ApiClient('https://api.example.test', async url => {
     calls.push(String(url)); return Response.json(payload);
@@ -108,4 +110,58 @@ test('background refresh uses a one minute interval', async context => {
   const app = await workspace(44);
   try { assert.deepEqual(delays, [60_000]); }
   finally { await app.dispose(); }
+});
+
+test('shortlist ordering keeps pending scores last, accepts zero, preserves ties and never mutates the feed', () => {
+  const scored = (id: string, puntaje: number | null, fecha_recepcion: string): ShortlistItem => ({ ...item, id,
+    fecha_recepcion, clasificacion: puntaje === null ? null : { puntaje, rubro: 'Equipos', resumen: 'Resumen', items: [] } });
+  const values = [scored('pending', null, '2026-11-19T18:00:00Z'), scored('zero', 0, '2026-11-19T10:00:00-06:00'),
+    scored('high', 95, '2026-11-20T18:00:00Z'), scored('tied', 95, '2026-11-19T18:00:00Z')];
+  const original = [...values];
+  const ids = (order: Parameters<typeof sortShortlist>[1]) => sortShortlist(values, order).map(value => value.id);
+  assert.deepEqual(ids('score_desc'), ['high', 'tied', 'zero', 'pending']);
+  assert.deepEqual(ids('score_asc'), ['zero', 'high', 'tied', 'pending']);
+  assert.deepEqual(ids('date_asc'), ['zero', 'pending', 'tied', 'high']);
+  assert.deepEqual(ids('date_desc'), ['high', 'pending', 'tied', 'zero']);
+  assert.deepEqual(ids('priority'), original.map(value => value.id));
+  assert.deepEqual(values, original);
+});
+
+test('the ordering selector sorts all filtered tenders before pagination and survives refresh and review', async () => {
+  const values: ShortlistItem[] = Array.from({ length: 30 }, (_, index) => ({ ...item,
+    id: index.toString(16).padStart(64, '0'), expediente: `EXP-${index}`,
+    fecha_recepcion: new Date(Date.UTC(2026, 10, 7 + index)).toISOString(),
+    clasificacion: index === 1 ? null : { puntaje: index * 3, rubro: 'Equipos', resumen: 'Resumen', items: [] },
+  }));
+  const app = await workspace(55, true, values);
+  try {
+    const selector = Array.from(app.container.querySelectorAll('select')).find(el => el.parentElement?.textContent?.startsWith('Ordenar por'))!;
+    assert.ok(selector);
+    const codes = () => Array.from(app.container.querySelectorAll('.shortlist-code')).map(el => el.textContent);
+    const select = async (value: string) => { await act(async () => { selector.value = value; selector.dispatchEvent(new Event('change', { bubbles: true })); }); };
+    assert.equal(codes().length, 25);
+    assert.equal(codes()[0], 'EXP-0');
+    await select('score_desc');
+    assert.equal(codes()[0], 'EXP-29'); // Originally outside the first page.
+    await app.click('Mostrar más');
+    assert.equal(codes().length, 30);
+    assert.equal(codes().at(-1), 'EXP-1');
+    await select('score_asc');
+    assert.equal(codes().length, 25);
+    assert.equal(codes()[0], 'EXP-0');
+    await select('date_asc');
+    assert.equal(codes()[0], 'EXP-0');
+    await select('date_desc');
+    assert.equal(codes()[0], 'EXP-29');
+    app.update({ ...app.payload(), items: [...values].reverse() });
+    await app.click('Actualizar');
+    assert.equal(selector.value, 'date_desc');
+    assert.equal(codes()[0], 'EXP-29');
+    const search = app.container.querySelector<HTMLInputElement>('input[type="search"]')!;
+    await act(async () => { Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')!.set!.call(search, 'EXP-29'); search.dispatchEvent(new Event('input', { bubbles: true })); });
+    assert.deepEqual(codes(), ['EXP-29']);
+    await app.click('Marcar resultados revisados');
+    assert.equal(selector.value, 'date_desc');
+    assert.deepEqual(codes(), ['EXP-29']);
+  } finally { await app.dispose(); }
 });

@@ -21,6 +21,14 @@ y del resto, con el próximo cierre primero dentro de cada grupo.
 La fuente Japón produce un posible JICA pendiente de verificar.
 UCP se interpreta como Unidad Coordinadora de Proyectos o Programas.
 
+Desde el 2026-11-16, el selector Ordenar por permite conservar esa prioridad de interés,
+ordenar por puntuación comercial mayor/menor o por fecha de recepción más próxima/lejana.
+Ordena todos los resultados filtrados antes de Mostrar más; los empates conservan el orden
+de interés de la entrega. Las fichas sin clasificación quedan al final en ambos sentidos
+de puntuación, y cero es un puntaje válido. El orden elegido se mantiene al filtrar,
+marcar revisiones y actualizar la entrega mientras la pestaña permanezca abierta.
+Es una opción del frontend: no cambia permisos, estadísticas, alertas ni el contrato del API.
+
 La pestaña Licitación muestra el número de coincidencias nuevas o actualizadas por
 revisar. Después de abrirla, Procesos consulta cada minuto mientras está visible. Las
 marcas de revisión se almacenan por usuario en el navegador y se sincronizan entre

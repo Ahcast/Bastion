@@ -3,17 +3,18 @@ import { Heading, Loading, Notice, useCore } from '../ui.js';
 import { moduleCan } from '../types.js';
 import { processDate } from '../processes.js';
 import { useShortlist } from './ShortlistAlerts.js';
-import { interestTags, needsShortlistReview, shortlistMatches } from '../shortlist.js';
-import type { InterestTag, ShortlistItem } from '../shortlist.js';
+import { interestTags, needsShortlistReview, shortlistMatches, sortShortlist } from '../shortlist.js';
+import type { InterestTag, ShortlistItem, ShortlistSort } from '../shortlist.js';
 
 export default function LicitacionesProcesos() {
   const { access } = useCore();
   const { data, items, receipts, error, storageFailed, unread, reload, review } = useShortlist();
   const [query, setQuery] = useState(''), [tag, setTag] = useState<InterestTag | ''>('');
   const [onlyUnread, setOnlyUnread] = useState(false);
+  const [order, setOrder] = useState<ShortlistSort>('priority');
   const [limit, setLimit] = useState(25);
   if (!moduleCan(access, 'procesos', 'consulta', 'ver')) return <Notice>Necesitas acceso a la consulta de Procesos.</Notice>;
-  const visible = items.filter(item => shortlistMatches(item, query, tag) && (!onlyUnread || needsShortlistReview(item, receipts)));
+  const visible = sortShortlist(items.filter(item => shortlistMatches(item, query, tag) && (!onlyUnread || needsShortlistReview(item, receipts))), order);
   const needsReview = visible.filter(item => needsShortlistReview(item, receipts));
   const stale = data?.generated_at && Date.parse(data.checked_at) - Date.parse(data.generated_at) > 2 * 60 * 60 * 1000;
   return <div className="shortlist-page">
@@ -40,6 +41,11 @@ export default function LicitacionesProcesos() {
           <label>Buscar<input type="search" value={query} onChange={event => { setQuery(event.target.value); setLimit(25); }} placeholder="Expediente, unidad, entidad o lugar" /></label>
           <label>Interés<select value={tag} onChange={event => { setTag(event.target.value as InterestTag | ''); setLimit(25); }}>
             <option value="">Todos</option><option>JICA</option><option>BID</option><option>UCP</option>
+          </select></label>
+          <label>Ordenar por<select value={order} onChange={event => { setOrder(event.target.value as ShortlistSort); setLimit(25); }}>
+            <option value="priority">Prioridad de interés</option>
+            <option value="score_desc">Puntuación: mayor primero</option><option value="score_asc">Puntuación: menor primero</option>
+            <option value="date_asc">Recepción: más próximas</option><option value="date_desc">Recepción: más lejanas</option>
           </select></label>
           <label className="shortlist-checkbox"><input type="checkbox" checked={onlyUnread} onChange={event => { setOnlyUnread(event.target.checked); setLimit(25); }} />Solo por revisar</label>
           <p>{visible.length} resultados</p>
