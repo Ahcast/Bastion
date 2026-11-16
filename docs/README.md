@@ -306,3 +306,6 @@ El ajuste quedó activo en AWS y Bluehost con la revisión `5b744a3a1dc2e7eb8cee
 ## Base contable simple — 2026-11-16
 
 Marco autoriza iniciar Contabilidad con catálogo, períodos, asientos y balance en HNL para una operación de poco volumen. Gastos, Facturas y Órdenes exponen puertos de lectura autorizados; Contabilidad prepara propuestas revisables y conserva la versión del origen. El Core mantiene registro, identidad, activación y auditoría. No se amplía MCP. El inventario físico, fichas de activos y cálculo de planilla quedan como etapas posteriores sencillas; las cuentas correspondientes ya forman parte de la plantilla. Véase [alcance, controles y límites](modulos/contabilidad.md).
+
+
+El primer corte de Contabilidad quedó publicado y activo el 2026-11-16 con `ca7e3d1`: 64 cuentas, período `2026-11` abierto y ningún saldo inventado; acceso inicial sólo para Administrador del sistema. [Evidencia y límites](09-despliegue.md#contabilidad-publicada-y-activa--2026-11-16-honduras).
