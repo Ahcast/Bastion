@@ -1,5 +1,10 @@
-<?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="bastion_ink">#25292d</color>
-    <string name="asset_statements" translatable="false">[{\"relation\":[\"delegate_permission/common.handle_all_urls\"],\"target\":{\"namespace\":\"web\",\"site\":\"https://bastion.castilloit.net\"}}]</string>
+    <style name="BastionTheme" parent="android:style/Theme.Material.Light.NoActionBar">
+        <item name="android:fontFamily">sans</item>
+        <item name="android:colorAccent">#006D77</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:windowBackground">#F5F6F7</item>
+        <item name="android:statusBarColor">#F5F6F7</item>
+        <item name="android:navigationBarColor">#F5F6F7</item>
+    </style>
 </resources>

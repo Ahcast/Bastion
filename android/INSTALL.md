@@ -1,30 +1,11 @@
-# Bastion para Android · 0.1.1 Preview
+# Instalar Bastion nativo 0.2.0 Preview
 
-Instala **bastion-0.1.1-preview.apk** en Android 7.0 o posterior. Descarga y
-descomprime el artifact `bastion-android-apk` de GitHub Actions, abre ese APK
-y permite la instalación desde la aplicación usada para abrirlo si Android lo pide.
-Abre «Bastion Preview» e inicia sesión con tu cuenta y autenticador habituales.
-Necesita Internet y un navegador actualizado compatible con Custom Tabs/TWA.
+1. Desinstala la Preview anterior si Android indica conflicto de firma. Los registros de negocio permanecen en Bastion.
+2. Abre `bastion-0.2.0-preview.apk` en el teléfono y permite instalar desde la aplicación que lo abrió.
+3. Abre **Bastion Preview**, introduce tu correo, contraseña y código TOTP de Bastion.
 
-Esta entrega es una versión de prueba firmada con una clave de depuración,
-no una publicación en Google Play. Una nueva compilación puede necesitar
-desinstalar la anterior porque la clave temporal del runner cambia.
-Si instalaste 0.1.0, desinstala primero esa Preview: esta compilación tiene
-una firma de desarrollo diferente. Los datos de negocio permanecen en el servidor.
-`bastion-0.1.1-unsigned.apk` NO es instalable: es el paquete para firmar con
-la clave privada permanente del propietario antes de distribuir una versión estable.
-No se ha instalado ni probado esta entrega en un teléfono físico.
+Requiere Android 7 o posterior e Internet. Funciona sin Chrome ni otro navegador. Los módulos visibles dependen de tu cuenta y de su activación en Bastion. No introduzcas una dirección web: la API está configurada en la aplicación.
 
-El APK abre `https://bastion.castilloit.net/` y usa la versión del frontend
-publicada allí. No incluye una copia de las pantallas ni funciona sin conexión.
-Los ajustes nuevos de pantalla requieren desplegar el artifact web del mismo
-commit en Bluehost; generar el APK no realiza ese despliegue.
+Los documentos PDF se consultan en el visor nativo; guardar archivos utiliza el selector Android. La carga móvil admite hasta 20 MiB, sujeta a límites menores del módulo. No hay modo offline ni guardado de borradores si Android termina el proceso.
 
-Mientras no se publique la asociación Digital Asset Links con el certificado
-de la versión estable, el navegador muestra su barra de dirección. Es el
-comportamiento seguro esperado y permite usar el sistema desde la instalación.
-La API, sesiones, permisos, TOTP, PDF, archivos y auditoría siguen a cargo del
-Core y del navegador; el APK no guarda claves ni recibe acceso directo a datos.
-
-Comprueba el SHA-256 contra `SHA256SUMS`. `BUILD.txt`, `APK-INFO.txt` y
-`SIGNATURE.txt` identifican el código, los requisitos y el certificado comprobado.
+`native-tests.apk` es únicamente para CI. El APK `unsigned` no es instalable sin firma. Esta Preview está firmada para pruebas; una versión futura con otra firma requerirá desinstalarla. La firma estable para distribución final se administra por separado.

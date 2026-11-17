@@ -1,95 +1,44 @@
-# Aplicación Android y pantallas pequeñas
+# Android nativo de Bastion
 
-## Decisión del 2026-11-16
+## Decisión del propietario — 2026-11-17
 
-Por solicitud de Marco, se añade un cliente Android ligero mediante Trusted Web
-Activity (TWA) / Custom Tabs. Reutiliza el frontend React publicado en
-`https://bastion.castilloit.net/`. No duplica reglas ni datos. Bluehost sigue
-sirviendo el frontend y MySQL; AWS conserva backend/API/MCP. La autenticación,
-cookies, CSRF, TOTP y autorización se mantienen en su origen HTTPS existente.
+Marco solicita una aplicación nativa conectada a la API, con todos los módulos. Esta decisión sustituye TWA/Custom Tabs de 0.1.0/0.1.1. Android 0.2.0 usa Java 17 y Android Views: Activity, listas, formularios, selectores, fechas y visor PdfRenderer nativos. No incluye WebView, Browser Helper, React, HTML ni JavaScript de ejecución. Los metadatos JSON incluidos en el APK describen campos y rutas de contratos revisados; no descargan ni ejecutan interfaz remota.
 
-El navegador gestiona PDF, descargas y selección de archivos con su sesión.
-El contenedor no incorpora JavaScript nativo, secretos, caché offline de datos
-privados, permisos de almacenamiento ni acceso a SQL. La actividad ignora URLs
-y extras de intents externos: siempre abre el sitio fijo.
+La aplicación web sigue publicada en Bluehost. Android accede a `https://api.bastion.castilloit.net`; AWS conserva backend/API/MCP y MySQL permanece en Bluehost. No se duplica el motor de cálculo ni se despliegan cambios del servidor para este cliente.
 
-La interfaz común incorpora ajustes para 320–430 px: encabezado accesible al
-desplazarse, controles de al menos 44 px, campos de 16 px, safe areas, modales
-con altura dinámica y paginación que puede ocupar varias líneas. Conserva
-campos, botones, permisos y cálculos existentes. Esta mejora móvil es nueva,
-autorizada por la solicitud, no un requisito inferido de paridad Legacy.
+## Áreas
 
-## Compilación y entrega
+| Área | Pantallas y operaciones nativas |
+|---|---|
+| Acceso | Contraseña, TOTP, recuperación, sesión, reautenticación y cierre |
+| Clientes / Proveedores | Búsqueda, páginas, alta, detalle, edición, archivo y selección para documentos |
+| Cotizaciones | Editor con partidas, cálculo servidor, estados, duplicación, conversiones, PDF, adjuntos y correo |
+| Órdenes de compra | Productos, proveedores, costos/venta, gastos, destinos, archivos y conversión |
+| Facturas | Borradores, edición, emisión, pagos, duplicación, factura/nota de entrega/recibo |
+| Gastos | Registro, fechas, proveedor, bases, cálculo ISV y edición |
+| Procesos | Consultas, filtros, fichas, marcas/notas, Scout, importación y exportación |
+| Licitaciones | Expedientes, variables, formularios, lotes, archivos, orden/generación PDF y adjudicaciones |
+| Colaboración | Carpetas, búsqueda, carga, descarga, títulos, papelera, restauración y política |
+| Contabilidad | Cuentas, períodos, asientos, acciones, propuestas de origen y balance |
+| Reportes | Órdenes, facturas y gastos con filtros y exportación |
+| Ajustes | Perfil, sesiones, dispositivos, seguridad, SMTP, personas, usuarios, roles, Core, SAR, módulos y auditoría |
 
-### Corrección de arranque 0.1.1 — 2026-11-16
+La disponibilidad de módulos y operaciones depende del catálogo y los permisos del usuario. El servidor es la autoridad final de estados, límites y autorizaciones. Los formularios se derivan de OpenAPI con complementos cotejados contra los DTO Rust. `android/qa/generate-contract.cjs` genera el recurso estático `contracts.json`; regenerar requiere `yaml` 2.9.1. Importes decimales se mantienen como texto y se calculan en el servidor. Las claves estables de líneas se conservan al editar.
 
-El usuario reportó que 0.1.0 se instala pero se cierra antes de la primera
-pantalla. La [reproducción en Android 15](https://github.com/Ahcast/Bastion/actions/runs/43937719377)
-confirmó `IllegalArgumentException`: `ManageDataLauncherActivity` no estaba
-declarada. Browser Helper 2.7.4 intenta habilitar/deshabilitar ese componente
-al iniciar, aunque no se usen sus ajustes. Compilar y verificar la firma no
-detectó esta omisión; la primera entrega no había probado el arranque Android.
+## Seguridad y comportamiento
 
-0.1.1 declara el componente privado y su URL fija de administración en el
-manifiesto, sin ampliar acceso a datos ni cambiar el frontend. Incrementa
-`versionCode` a 2. El workflow ahora instala el APK en emuladores Android 15 y
-16 y comprueba acceso real, reapertura y un mensaje visible sin navegador.
-No usa cuentas de producción ni desactiva TLS o Digital Asset Links.
-Las pruebas pasaron en ambos emuladores: pantalla de acceso real visible,
-reapertura y aviso sin navegador, con logs sin excepciones y capturas revisadas.
-La aprobación y la huella del APK corregido se registran en `09-despliegue.md`.
-0.1.0 queda sustituida por esta corrección.
+- Transporte HTTPS fijo, sin redirecciones ni caché; no se acepta URL de servidor desde Intents.
+- Cookies privadas cifradas AES-GCM con Android Keystore, backup deshabilitado, contraseñas/TOTP solo en memoria durante su operación.
+- Se conservan CSRF ligado a sesión, TOTP, límite de sesiones, auditoría y permisos Core. Un 428 conserva el formulario; un 412 no sobrescribe otra versión.
+- La misma carga conserva Idempotency-Key ante un fallo de red; no se reintentan automáticamente mutaciones ambiguas.
+- Los formularios permanecen en memoria mientras vive la Activity, incluida rotación. No hay edición offline; al terminar el proceso Android se pierden cambios sin guardar.
+- Selectores del sistema para archivos, sin permiso general de almacenamiento. La carga móvil se limita inicialmente a 20 MiB por archivo; los límites menores del servidor siguen aplicando.
+- PDF se muestra con PdfRenderer y se exporta por elección del usuario. Otros formatos se guardan con el selector Android. No se ejecuta HTML de archivos.
 
-Al cambiar la firma temporal de Preview, quien tenga 0.1.0 debe desinstalarla
-antes de instalar 0.1.1; los registros de negocio siguen en el servidor.
+## Validación y distribución
 
-### Primera entrega
+CI construye APK Preview firmado, release sin firmar y APK de pruebas. Verifica lint, firma, metadatos y hashes. El ensayo instala el mismo Preview entregable en Android 7/API 24, Android 15/API 35 y Android 16/API 36; deshabilita Chrome y exige controles `android.widget.EditText`, Activity propia y ausencia de WebView. Repite arranque a 320 dp y fuente 130 %. La instrumentación ejercita acceso/TOTP sintéticos, navegación de todos los módulos, escritura de cliente, serialización de documentos/contabilidad, permisos, CSRF, idempotencia y cifrado de sesión. No usa cuentas reales ni modifica producción.
 
-La primera sesión quedó limitada por permisos del entorno. Tras la autorización
-del usuario se sincronizó `origin/main` en `0046bfb`, conservando las mejoras
-de autenticación para dos sesiones simultáneas. Chromium local verificó 23
-estados de acceso, menú, clientes y formulario, a 320, 360, 390, 430 y 1280 px,
-incluyendo altura reducida de 400 px, sin desbordamiento horizontal. Las
-respuestas fueron sintéticas. Las 188 pruebas frontend, TypeScript y Vite
-pasaron en la preparación. Las comprobaciones Android corresponden al workflow
-y la evidencia de entrega registrada en `09-despliegue.md`.
+Compilar o definir estas pruebas no acredita su aprobación. Los resultados concretos, commit y hashes de entrega se registran en `09-despliegue.md` después de observar CI. No se ha probado el teléfono físico de Marco. La Preview utiliza la firma de desarrollo del entorno de compilación; para reemplazar otra Preview con distinta firma hay que desinstalarla. La distribución estable requiere la clave duradera del propietario; no se publica esa clave ni se entrega el release sin firmar como instalable.
 
-Proyecto `android/`, Java 17, Gradle 8.13, Android Gradle Plugin 8.13.2,
-compile/target SDK 36, mínimo Android 7 (API 24), Browser Helper 2.7.4.
-Con SDK y Java instalados: `gradle -p android :app:assembleDebug :app:lintDebug`.
-La versión de Gradle debe ser 8.13, como fija el workflow `Android APK`.
-
-CI genera un APK Preview instalable con ID `net.castilloit.bastion.preview`,
-firma de depuración verificada, SHA-256 y procedencia. El APK release con ID
-`net.castilloit.bastion` se entrega sin firma; **no es instalable**. Antes de
-distribución estable, firmarlo con clave permanente privada y custodiada por
-el propietario; no guardar esa clave en Git ni en artifacts. La clave efímera
-de Preview cambia entre runners y no sirve como identidad de distribución.
-Ver [instalación](../android/INSTALL.md).
-
-La primera entrega se construyó desde `bb5d2f2d7d2e1b4393ee6b9742c7ccd4f1456c1c`
-con [Android APK aprobado](https://github.com/Ahcast/Bastion/actions/runs/43933782305).
-`bastion-0.1.0-preview.apk` contiene 4 848 801 bytes y SHA-256
-`9f7a71c95b1c526cae0f35f8ec6a376435d1fc2512eb3cc6bcf4ee88c1c99c35`.
-La firma APK v2 se verificó con `apksigner`; también pasaron lint Android y
-las 23 comprobaciones de diseño Chromium en CI. Se cotejaron localmente el
-digest oficial del ZIP, los APK y el commit. No se ha instalado en teléfono físico.
-
-## Activación y comprobaciones pendientes
-
-- Generar APK no instala la aplicación en un teléfono, no despliega el frontend
-  ni publica en Google Play. La interfaz del APK corresponde al sitio activo.
-- El frontend móvil de esta entrega ya se desplegó en Bluehost con respaldo,
-  configuración preservada y 53 recursos HTTPS cotejados. Véase `09-despliegue.md`.
-- Para ocultar la barra del navegador, publicar en Bluehost
-  `/.well-known/assetlinks.json` la relación `delegate_permission/common.handle_all_urls`,
-  namespace `android_app`, package `net.castilloit.bastion` y SHA-256 del certificado
-  estable. No asociar una clave efímera de CI con el sitio productivo.
-- Sin esa asociación el fallback Custom Tabs conserva una barra de dirección.
-  No se desactiva ni simula la comprobación de dominio.
-- Probar en teléfono real inicio de sesión/TOTP, teclado, navegación, PDF,
-  subida/descarga de archivos, rotación, vuelta desde otra app y sesión expirada.
-- Las pruebas Chromium usan respuestas sintéticas y no acreditan esos flujos
-  de extremo a extremo contra producción ni equivalen a pruebas Android.
-
-Referencia: [documentación oficial TWA](https://developer.chrome.com/docs/android/trusted-web-activity/).
+El historial del fallo y reparación del contenedor 0.1.x se conserva en `09-despliegue.md`. Digital Asset Links ya no es un requisito de la aplicación nativa.

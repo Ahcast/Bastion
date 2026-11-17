@@ -1,5 +1,9 @@
 # API del core y los módulos
 
+## Cliente Android nativo (2026-11-17)
+
+Android 0.2 usa directamente `/api/v1` y las sesiones Core. Su transporte de primera parte fija el origen API HTTPS y envía `Origin: https://bastion.castilloit.net`, cookies host-only y `X-CSRF-Token` para mutaciones. Este encabezado no concede identidad: el servidor mantiene sesión, vínculo CSRF, TOTP, permisos, auditoría e invariantes. No se amplía CORS ni se añade una excepción CSRF. Reautenticación 428 conserva el formulario; 412 exige recargar la versión, y las creaciones conservan la clave idempotente para el mismo intento. OAuth de terceros no sustituye la sesión nativa.
+
 ## Propósito y principios
 
 - Una API HTTP/JSON versionada sirve al frontend, a integraciones autorizadas y al adaptador MCP. Ningún cliente accede directamente a MySQL.

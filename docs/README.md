@@ -1,5 +1,7 @@
 # Documentación del nuevo CastilloIT
 
+- 2026-11-17: el propietario aclara que Android debe ser una aplicación nativa, conectada directamente a la API, con todos los módulos. Se reemplaza TWA/Custom Tabs por Android Views y transporte HTTPS de primera parte. No se cambia la separación Bluehost/AWS/MySQL ni las reglas del servidor. Implementación y validación en [Android](13-android.md); los resultados de CI y entrega se registran por separado en despliegue.
+
 - 2026-11-16: corregido en Android 0.1.1 el cierre de 0.1.0 por ausencia de `ManageDataLauncherActivity`. APK instalado y comprobado en emuladores Android 15/16: acceso real, reapertura y aviso sin navegador. Firma y hashes verificados. Desinstalar la Preview anterior por cambio de firma temporal. Ver [diagnóstico](13-android.md) y [entrega](09-despliegue.md).
 
 - 2026-11-16: APK Android Preview instalable generado desde `bb5d2f2`, con firma y SHA-256 verificados, CI aprobado y 23 estados de diseño comprobados. Los ajustes para celulares se publicaron en Bluehost con respaldo y 53 recursos HTTPS cotejados. Conserva backend AWS y MySQL. Firma estable, asociación de dominio y pruebas en teléfono físico siguen pendientes. Ver [Android](13-android.md) y [evidencia de despliegue](09-despliegue.md).

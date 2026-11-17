@@ -1,5 +1,9 @@
 # Seguridad y permisos
 
+## Cliente nativo Android (2026-11-17)
+
+La aplicación fija el destino HTTPS de la API, rechaza redirecciones, no contiene secretos ni componentes web y conserva las políticas Core de autenticación y autorización. Las cookies se cifran con AES-GCM y una clave Android Keystore no exportable; no se guardan contraseñas ni códigos TOTP. Se deshabilitan backup Android y capturas de pantalla, y no hay caché persistente de documentos comerciales. Los archivos se seleccionan/exportan mediante el selector de Android; los PDF temporales privados se eliminan al terminar el renderizado. No hay permisos generales de almacenamiento. Las pruebas autenticadas usan un transporte sintético dentro del APK de instrumentación; no se habilita un servidor configurable ni un modo de prueba mediante enlaces o Intents de la aplicación.
+
 ## Endurecimiento autorizado el 2026-11-10
 
 - Login de contraseña: máximo 30 solicitudes por IP verificada en una ventana de 15 minutos, antes de consultar MySQL o ejecutar Argon2. Contador en memoria compartido entre clones del Core, con máximo 4096 IP activas y rechazo controlado al agotarse la capacidad. No sustituye el bloqueo progresivo por cuenta, los límites TOTP ni el borde. Es un límite por proceso: reiniciar lo reinicia; desplegar varias réplicas requiere coordinar la cuota. No se persisten nuevas IP por este contador.

@@ -1,6 +1,6 @@
 # Arquitectura objetivo en Rust
 
-El cliente Android añadido el 2026-11-16 usa TWA/Custom Tabs para acceder al frontend HTTPS de Bluehost. Reutiliza la identidad y permisos del Core sin otro backend, origen API ni almacenamiento de negocio. Ver [decisión Android](13-android.md).
+Desde la decisión del propietario del 2026-11-17, Android se implementa como cliente nativo Java/Android Views conectado directamente por HTTPS a la API en AWS. Sustituye la TWA de 0.1.x; no carga React, HTML ni un navegador. Conserva identidad, TOTP, autorización, auditoría, cálculos y datos en el Core y módulos existentes. El frontend Bluehost continúa siendo el cliente web independiente. Ver [decisión Android](13-android.md).
 
 ## Ajustes de concurrencia del 2026-11-10
 

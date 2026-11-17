@@ -23,17 +23,18 @@ jobs:
         with:
           gradle-version: '8.13'
       - name: Build and lint installable preview
-        run: gradle -p android --no-daemon --console=plain :app:assembleDebug :app:lintDebug :app:assembleRelease
+        run: gradle -p android --no-daemon --console=plain :app:assembleDebug :app:lintDebug :app:assembleRelease :app:assembleDebugAndroidTest
       - name: Verify APK and record provenance
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p dist/android
-          cp android/app/build/outputs/apk/debug/app-debug.apk dist/android/bastion-0.1.1-preview.apk
-          cp android/app/build/outputs/apk/release/app-release-unsigned.apk dist/android/bastion-0.1.1-unsigned.apk
+          cp android/app/build/outputs/apk/debug/app-debug.apk dist/android/bastion-0.2.0-preview.apk
+          cp android/app/build/outputs/apk/release/app-release-unsigned.apk dist/android/bastion-0.2.0-unsigned.apk
+          cp android/app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk dist/android/native-tests.apk
           tools="$ANDROID_HOME/build-tools/36.0.0"
-          "$tools/apksigner" verify --verbose --print-certs dist/android/bastion-0.1.1-preview.apk > dist/android/SIGNATURE.txt
-          "$tools/aapt" dump badging dist/android/bastion-0.1.1-preview.apk > dist/android/APK-INFO.txt
+          "$tools/apksigner" verify --verbose --print-certs dist/android/bastion-0.2.0-preview.apk > dist/android/SIGNATURE.txt
+          "$tools/aapt" dump badging dist/android/bastion-0.2.0-preview.apk > dist/android/APK-INFO.txt
           grep -F "net.castilloit.bastion.preview" dist/android/APK-INFO.txt
           grep -F "sdkVersion:'24'" dist/android/APK-INFO.txt
           printf '%s\n' "$GITHUB_SHA" > dist/android/BUILD.txt
@@ -52,7 +53,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        api-level: [35, 36]
+        api-level: [24, 35, 36]
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
@@ -73,7 +74,7 @@ jobs:
           arch: x86_64
           profile: pixel_2
           emulator-options: -no-window -no-snapshot -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
-          script: python3 android/qa/startup.py dist/android/bastion-0.1.1-preview.apk
+          script: python3 android/qa/startup.py dist/android/bastion-0.2.0-preview.apk dist/android/native-tests.apk
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         if: always()
         with:
