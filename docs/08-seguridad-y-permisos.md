@@ -2,6 +2,8 @@
 
 ## Cliente nativo Android (2026-11-17)
 
+Para Android 7, `network_security_config.xml` añade la raíz pública verificada ISRG Root X1 únicamente al dominio exacto de la API, conservando las raíces del sistema y la validación HTTPS estándar. La prueba real detectó la raíz ausente en API 24; no se desactiva la comprobación del certificado. Procedencia y huella en [certificados Android](../android/CERTIFICATES.md).
+
 La aplicación fija el destino HTTPS de la API, rechaza redirecciones, no contiene secretos ni componentes web y conserva las políticas Core de autenticación y autorización. Las cookies se cifran con AES-GCM y una clave Android Keystore no exportable; no se guardan contraseñas ni códigos TOTP. Se deshabilitan backup Android y capturas de pantalla, y no hay caché persistente de documentos comerciales. Los archivos se seleccionan/exportan mediante el selector de Android; los PDF temporales privados se eliminan al terminar el renderizado. No hay permisos generales de almacenamiento. Las pruebas autenticadas usan un transporte sintético dentro del APK de instrumentación; no se habilita un servidor configurable ni un modo de prueba mediante enlaces o Intents de la aplicación.
 
 ## Endurecimiento autorizado el 2026-11-10

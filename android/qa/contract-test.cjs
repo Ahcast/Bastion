@@ -8,3 +8,10 @@ for(const module of data.modules)assert.ok(data.operations.some(o=>o.module===mo
 assert.equal(data.modules.length,12);
 for(const p of ['/api/v1/cotizaciones','/api/v1/facturas','/api/v1/ordenes-compra']){const body=data.operations.find(o=>o.path===p&&o.method==='POST').body;assert.ok((body.properties.items||body.properties.products).items.properties.description);}
 console.log('PASS: native routes, required fields, document descriptions and reproducible contracts');
+const {X509Certificate}=require('node:crypto');
+const rootCert=new X509Certificate(fs.readFileSync(path.join(root,'android/app/src/main/res/raw/isrg_root_x1.pem')));
+assert.equal(rootCert.fingerprint256.replaceAll(':','').toLowerCase(),'96bcec06264976f37460779acf28c5a7cfe8a3c0aae11a8ffcee05c0bddf08c6');
+const security=fs.readFileSync(path.join(root,'android/app/src/main/res/xml/network_security_config.xml'),'utf8');
+assert.match(security,/<domain includeSubdomains="false">api\.bastion\.castilloit\.net<\/domain>/);
+assert.match(security,/<certificates src="system"/);
+console.log('PASS: official public root fingerprint and API-only trust configuration');

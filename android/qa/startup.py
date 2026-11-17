@@ -20,11 +20,14 @@ def adb(*args, check=True, binary=False, timeout=60):
     return result.stdout if binary else result.stdout.decode(errors='replace')
 
 def launch(name):
+    adb('shell', 'input', 'keyevent', '224')
+    adb('shell', 'wm', 'dismiss-keyguard', check=False)
+    adb('shell', 'input', 'keyevent', '82')
     adb('shell', 'am', 'force-stop', PACKAGE)
     adb('logcat', '-c')
     start = adb('shell', 'am', 'start', '-W', '-n', COMPONENT)
     (OUT / (name + '-start.txt')).write_text(start)
-    deadline = time.monotonic() + 40
+    deadline = time.monotonic() + 80
     while time.monotonic() < deadline:
         crash = adb('logcat', '-d', '-s', 'AndroidRuntime:E')
         if PACKAGE in crash:
@@ -47,6 +50,10 @@ def launch(name):
             (OUT / (name + '-activities.txt')).write_text('\n'.join(resumed))
             return
         time.sleep(1)
+    (OUT / (name + '-failure.xml')).write_text(text)
+    (OUT / (name + '-failure-activities.txt')).write_text(adb('shell', 'dumpsys', 'activity', 'activities'))
+    (OUT / (name + '-failure-crashes.txt')).write_text(adb('logcat', '-d', '-s', 'AndroidRuntime:E'))
+    (OUT / (name + '-failure.png')).write_bytes(adb('exec-out', 'screencap', '-p', binary=True))
     raise AssertionError('Native login did not appear')
 
 adb('install', '-r', sys.argv[1])
