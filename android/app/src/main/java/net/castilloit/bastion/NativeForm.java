@@ -46,6 +46,7 @@ final class NativeForm {
         Object seed=original==JSONObject.NULL?null:original;
         if(seed==null&&s.has("default"))seed=s.opt("default");
         if(s.has("const"))seed=s.opt("const");
+        if(seed==JSONObject.NULL)seed=null;
         String type=Contracts.type(s);
         String title=Labels.of(key)+(required&&!Contracts.nullable(s)?" *":"");
         if(type.equals("object")){
@@ -70,8 +71,18 @@ final class NativeForm {
             activity.button(group,"Agregar "+Labels.of(key).toLowerCase(new Locale("es")),()->{if(values.size()<s.optInt("maxItems",100))add.accept(null);else activity.error("Se alcanzó el máximo de elementos.");});
             return ()->{if(values.size()<s.optInt("minItems",0))throw new IllegalArgumentException(title+": faltan elementos.");JSONArray a=new JSONArray();for(Value v:values)a.put(v.get());return a;};
         }
+        if(s.optJSONArray("type")!=null&&Contracts.has(s.optJSONArray("type"),"boolean")&&Contracts.has(s.optJSONArray("type"),"string")){
+            LinearLayout group=activity.column();parent.addView(group);activity.text(group,title,14);
+            Spinner format=new Spinner(activity);format.setAdapter(new ArrayAdapter<>(activity,android.R.layout.simple_spinner_dropdown_item,new String[]{"Texto","Sí / No","Sin valor"}));format.setMinimumHeight(activity.dp(48));group.addView(format);
+            EditText text=activity.input("Valor",false);if(seed instanceof String)text.setText((String)seed);group.addView(text);
+            CheckBox check=new CheckBox(activity);check.setText("Sí");check.setChecked(Boolean.TRUE.equals(seed));group.addView(check);
+            format.setSelection(seed instanceof Boolean?1:seed==null&&Contracts.nullable(s)?2:0);
+            format.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener(){public void onNothingSelected(AdapterView<?> p){}public void onItemSelected(AdapterView<?> p,View v,int position,long id){text.setVisibility(position==0?View.VISIBLE:View.GONE);check.setVisibility(position==1?View.VISIBLE:View.GONE);}});
+            return ()->format.getSelectedItemPosition()==0?text.getText().toString():format.getSelectedItemPosition()==1?check.isChecked():JSONObject.NULL;
+        }
         if(type.equals("boolean")){
             CheckBox checkbox=new CheckBox(activity);checkbox.setText(title);checkbox.setTextSize(16);checkbox.setMinHeight(activity.dp(48));checkbox.setChecked(Boolean.TRUE.equals(seed));parent.addView(checkbox);
+            if(!required&&original==null){CheckBox include=new CheckBox(activity);include.setText("Modificar "+Labels.of(key).toLowerCase(new Locale("es")));parent.addView(include);checkbox.setEnabled(false);include.setOnCheckedChangeListener((b,on)->checkbox.setEnabled(on));return ()->include.isChecked()?checkbox.isChecked():null;}
             return checkbox::isChecked;
         }
         if(key.equals("content_base64")){

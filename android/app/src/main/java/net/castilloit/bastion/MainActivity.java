@@ -31,6 +31,7 @@ public final class MainActivity extends Activity {
     interface Work<T>{T run() throws Exception;}
     @Override public void onCreate(Bundle state){
         super.onCreate(state);
+        if(android.os.Build.VERSION.SDK_INT>=33)getOnBackInvokedDispatcher().registerOnBackInvokedCallback(android.window.OnBackInvokedDispatcher.PRIORITY_DEFAULT,this::back);
         getWindow().setFlags(WindowManager.LayoutParams.FLAG_SECURE,WindowManager.LayoutParams.FLAG_SECURE);
         root=column();root.setBackgroundColor(0xfff5f6f7);setContentView(root);
         root.setOnApplyWindowInsetsListener((view,insets)->{view.setPadding(insets.getSystemWindowInsetLeft(),insets.getSystemWindowInsetTop(),insets.getSystemWindowInsetRight(),insets.getSystemWindowInsetBottom());return insets.consumeSystemWindowInsets();});
@@ -52,7 +53,9 @@ public final class MainActivity extends Activity {
         progress=text(bar,"",14);progress.setVisibility(View.GONE);
         ScrollView scroll=new ScrollView(this);scroll.setFillViewport(true);if(body.getParent() instanceof android.view.ViewGroup)((android.view.ViewGroup)body.getParent()).removeView(body);scroll.addView(body);root.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));
     }
-    private void back(){if(busy)return;if(!history.isEmpty()){Screen s=history.pop();body=s.content;currentTitle=s.title;mount();}else if(access.length()>0)home();else super.onBackPressed();}
+    private void back(){if(busy)return;if(!history.isEmpty()){Screen s=history.pop();body=s.content;currentTitle=s.title;mount();}else moveTaskToBack(true);}
+    // API 33+ uses the platform dispatcher registered above. This override serves API 24–32.
+    @android.annotation.SuppressLint("GestureBackNavigation")
     @Override public void onBackPressed(){back();}
     private <T> void run(Work<T> work,Consumer<T> done,boolean report){
         if(busy)return;busy=true;progress.setText("Conectando con Bastion…");progress.setVisibility(View.VISIBLE);
@@ -113,7 +116,7 @@ public final class MainActivity extends Activity {
         }edit(op,vars,seed);
     }
     private String url(JSONObject op,JSONObject vars,JSONObject query){String p=Contracts.bind(op.optString("path"),vars);StringJoiner q=new StringJoiner("&");for(String key:Contracts.keys(query))if(!query.isNull(key)&&!query.optString(key).isEmpty())q.add(Uri.encode(key)+"="+Uri.encode(query.optString(key)));return p+(q.length()>0?"?"+q:"");}
-    private void load(JSONObject op,JSONObject vars,JSONObject query){run(()->api.request("GET",url(op,vars,query),null,null,null),response->{
+    private void load(JSONObject op,JSONObject vars,JSONObject query){run(()->api.request("GET",url(op,vars,query),null,vars.optString("_version",null),null),response->{
         try{if(!response.mime.contains("json")){download(response.bytes,response.mime,response.filename);return;}Object value=response.json();if(value instanceof JSONObject&&((JSONObject)value).has("content_base64")){JSONObject file=(JSONObject)value;download(android.util.Base64.decode(file.getString("content_base64"),android.util.Base64.DEFAULT),file.optString("mime","application/octet-stream"),file.optString("filename","documento"));return;}
             display(op,vars,query,value);
         }catch(Exception e){failure(e);}
@@ -155,7 +158,8 @@ public final class MainActivity extends Activity {
         }
     }
     private void edit(JSONObject op,JSONObject vars,JSONObject record){
-        page(op.optString("title"),true);JSONObject schema=op.optJSONObject("body");JSONObject initial=record.optJSONObject("data");if(initial==null)initial=record;
+        page(op.optString("title"),true);JSONObject schema=op.optJSONObject("body");if(schema!=null)schema=Contracts.copy(schema);JSONObject initial=record.optJSONObject("data");if(initial==null)initial=record.optJSONObject("credentials");if(initial==null)initial=record;
+        if(op.optString("path").endsWith("/review")&&schema!=null){JSONObject p=schema.optJSONObject("properties");if(!Contracts.allowed(access,"procesos/marcas/editar"))p.remove("marked");if(!Contracts.allowed(access,"procesos/notas/editar"))p.remove("note");}
         if(op.optString("method").equals("POST")&&!op.optString("path").contains("{"))initial=new JSONObject();
         NativeForm form=schema==null?null:new NativeForm(this,schema,initial);if(form!=null)body.addView(form.view);
         final String version=record.optString("version",record.optString("quote_version",record.optString("order_version",vars.optString("_version",null))));

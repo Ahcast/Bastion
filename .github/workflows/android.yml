@@ -24,6 +24,10 @@ jobs:
           gradle-version: '8.13'
       - name: Build and lint installable preview
         run: gradle -p android --no-daemon --console=plain :app:assembleDebug :app:lintDebug :app:assembleRelease :app:assembleDebugAndroidTest
+      - name: Verify native contract coverage
+        run: |
+          npm install --prefix "$RUNNER_TEMP/native-contracts" --no-save yaml@2.9.1
+          BASTION_YAML="$RUNNER_TEMP/native-contracts/node_modules/yaml" node android/qa/contract-test.cjs
       - name: Verify APK and record provenance
         shell: bash
         run: |
