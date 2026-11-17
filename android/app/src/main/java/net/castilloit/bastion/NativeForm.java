@@ -47,6 +47,7 @@ final class NativeForm {
         if(seed==null&&s.has("default"))seed=s.opt("default");
         if(s.has("const"))seed=s.opt("const");
         if(seed==JSONObject.NULL)seed=null;
+        if(key.equals("setup_token")){final Object token=seed;return ()->token;}
         String type=Contracts.type(s);
         String title=Labels.of(key)+(required&&!Contracts.nullable(s)?" *":"");
         if(type.equals("object")){
@@ -63,7 +64,13 @@ final class NativeForm {
             JSONObject item=s.optJSONObject("items");if(item==null)item=new JSONObject();final JSONObject itemSchema=item;
             ArrayList<Value> values=new ArrayList<>();LinearLayout rows=activity.column();group.addView(rows);
             java.util.function.Consumer<Object> add=value->{
-                LinearLayout row=activity.card(rows);Value v=field(row,"",itemSchema,value,true);values.add(v);
+                LinearLayout row=activity.card(rows);Value v;
+                if(value instanceof JSONObject&&Contracts.type(itemSchema).equals("object")){
+                    JSONObject object=(JSONObject)value;String label=object.optString("description",object.optString("descripcion",object.optString("label",object.optString("account","Elemento"))));activity.text(row,label,16);
+                    final Value[] editor={()->object};final boolean[] opened={false};LinearLayout content=activity.column();content.setVisibility(View.GONE);row.addView(content);
+                    activity.button(row,"Editar elemento",()->{if(!opened[0]){editor[0]=field(content,"",itemSchema,value,true);opened[0]=true;}content.setVisibility(content.getVisibility()==View.VISIBLE?View.GONE:View.VISIBLE);});v=()->editor[0].get();
+                }else v=field(row,"",itemSchema,value,true);
+                values.add(v);
                 activity.button(row,"Quitar",()->{values.remove(v);rows.removeView(row);});
             };
             if(seed instanceof JSONArray){JSONArray a=(JSONArray)seed;for(int i=0;i<a.length();i++)add.accept(a.opt(i));}

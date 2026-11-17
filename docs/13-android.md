@@ -21,7 +21,7 @@ La aplicación web sigue publicada en Bluehost. Android accede a `https://api.ba
 | Colaboración | Carpetas, búsqueda, carga, descarga, títulos, papelera, restauración y política |
 | Contabilidad | Cuentas, períodos, asientos, acciones, propuestas de origen y balance |
 | Reportes | Órdenes, facturas y gastos con filtros y exportación |
-| Ajustes | Perfil, sesiones, dispositivos, seguridad, SMTP, personas, usuarios, roles, Core, SAR, módulos y auditoría |
+| Ajustes | Perfil, sesiones, dispositivos, seguridad, SMTP, personas, usuarios, roles, Core, SAR, módulos, auditoría y respaldos/restauración con confirmación |
 
 La disponibilidad de módulos y operaciones depende del catálogo y los permisos del usuario. El servidor es la autoridad final de estados, límites y autorizaciones. Los formularios se derivan de OpenAPI con complementos cotejados contra los DTO Rust. `android/qa/generate-contract.cjs` genera el recurso estático `contracts.json`; regenerar requiere `yaml` 2.9.1. Importes decimales se mantienen como texto y se calculan en el servidor. Las claves estables de líneas se conservan al editar.
 
