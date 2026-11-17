@@ -74,6 +74,13 @@ public class NativeAppTest {
         instrumentation.runOnMainSync(()->assertNotNull(find(activity.getWindow().getDecorView(),"Confirmar restauración")));
         assertEquals(0,server.backupWrites);
     }
+    @Test public void anonymousHandshakeReachesRealApiOverHttps() throws Exception {
+        // One public, read-only request; no credentials, login, or production business writes.
+        BastionApi client=new BastionApi(context,new BastionApi.HttpsTransport());
+        BastionApi.Response response=client.request("GET","/api/v1/auth/csrf",null,null,null);
+        assertEquals(200,response.status);assertTrue(Contracts.object(response.json()).getString("csrf_token").length()>20);
+        assertTrue(new SessionVault(context).read().contains("__Host-bastion_csrf"));client.clear();
+    }
     @Test public void nativePdfRendersWithoutAnExternalActivity() throws Exception {
         login();android.graphics.pdf.PdfDocument document=new android.graphics.pdf.PdfDocument();android.graphics.pdf.PdfDocument.Page page=document.startPage(new android.graphics.pdf.PdfDocument.PageInfo.Builder(300,400,1).create());page.getCanvas().drawText("Bastion QA",20,30,new android.graphics.Paint());document.finishPage(page);java.io.ByteArrayOutputStream bytes=new java.io.ByteArrayOutputStream();document.writeTo(bytes);document.close();
         instrumentation.runOnMainSync(()->{try{java.lang.reflect.Method method=MainActivity.class.getDeclaredMethod("download",byte[].class,String.class,String.class);method.setAccessible(true);method.invoke(activity,bytes.toByteArray(),"application/pdf","prueba.pdf");}catch(Exception e){throw new AssertionError(e);}});idle();

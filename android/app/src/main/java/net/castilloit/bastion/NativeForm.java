@@ -103,6 +103,7 @@ final class NativeForm {
             activity.text(parent,title,14);Spinner spinner=new Spinner(activity);ArrayList<String> raw=new ArrayList<>(),labels=new ArrayList<>();
             if(!required){raw.add("");labels.add("Todos / sin seleccionar");}
             for(int i=0;i<choices.length();i++){raw.add(choices.optString(i));labels.add(Labels.of(choices.optString(i)));}
+            if(seed!=null&&!raw.contains(seed.toString())){raw.add(seed.toString());labels.add(Labels.of(seed.toString()));}
             ArrayAdapter<String> adapter=new ArrayAdapter<>(activity,android.R.layout.simple_spinner_item,labels);adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);spinner.setAdapter(adapter);spinner.setMinimumHeight(activity.dp(48));
             if(seed!=null&&raw.contains(seed.toString()))spinner.setSelection(raw.indexOf(seed.toString()));parent.addView(spinner);
             return ()->{String v=raw.get(spinner.getSelectedItemPosition());return v.isEmpty()&&!required?null:type.equals("integer")?Long.valueOf(v):v;};
