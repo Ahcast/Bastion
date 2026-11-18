@@ -5,7 +5,7 @@ import { act, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { createMemoryRouter, RouterProvider } from 'react-router';
 import { NavigationGuardProvider, useUnsavedChanges } from '../src/navigationGuard.js';
-import { RoutingProvider, useAppRoute, useRouteRecord, useRouteState, enumRoute } from '../src/routing.js';
+import { RoutingProvider, useAppRoute, useRouteRecord, useRouteState, enumRoute, pageRoute } from '../src/routing.js';
 import { modulePaths, parseRoute, routeAllowed, routeCatalog, routeHref } from '../src/routes.js';
 import type { Access, Page } from '../src/types.js';
 import type { SettingsSection } from '../src/navigation.js';
@@ -46,6 +46,12 @@ test('direct links retain module activation, scope, action and administrative pe
   assert.equal(allowed('/ajustes/cuenta/security'), true);
   assert.equal(allowed('/ajustes/mcp'), false);
   assert.equal(allowed('/cotizaciones/3'), false);
+});
+
+test('returning to page one overrides a previously remembered page', () => {
+  const encoded = pageRoute.write(1);
+  assert.equal(encoded, '1');
+  assert.equal(pageRoute.read(encoded!, 5), 1);
 });
 
 type Row = { id: number } | 'new' | null;

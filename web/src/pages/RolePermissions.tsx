@@ -1,4 +1,4 @@
-import { useRouteState, numberRoute, booleanRoute } from '../routing.js';
+import { useRouteState, numberRoute, booleanRoute, useAppRoute } from '../routing.js';
 import { useEffect, useState } from 'react';
 import { message } from '../api.js';
 import { Dialog, Form, Heading, Loading, Notice, useCore, useLoad } from '../ui.js';
@@ -15,6 +15,7 @@ export default function Roles() {
 }
 
 function RoleEditor() {
+  const routing = useAppRoute();
   const { api, notify } = useCore(), { navigate } = useNavigationGuard();
   const result = useLoad(signal => Promise.all([api.request<Role[]>('/api/v1/admin/roles', { signal }), api.request<Module[]>('/api/v1/settings/modules', { signal })]));
   const [roleId, setRoleId] = useRouteState<number | null>('registro', null, numberRoute), [loadedId, setLoadedId] = useState<number | null>(null);
@@ -28,7 +29,10 @@ function RoleEditor() {
   useUnsavedChanges(dirty, saving);
 
   useEffect(() => {
-    if (result.data && roleId === null) setRoleId((result.data[0].find(item => !item.protected) ?? result.data[0][0])?.id ?? null);
+    if (result.data && roleId === null) {
+      const id = (result.data[0].find(item => !item.protected) ?? result.data[0][0])?.id ?? null;
+      if (routing) { if (id) routing.patch('registro', String(id), true); } else setRoleId(id);
+    }
   }, [result.data, roleId]);
   useEffect(() => {
     const controller = new AbortController();

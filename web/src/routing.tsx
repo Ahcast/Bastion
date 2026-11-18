@@ -65,7 +65,7 @@ export function RoutingProvider({ children }: { children: ReactNode }) {
 
 type Codec<T> = { read: (raw: string | undefined, fallback: T) => T; write: (value: T) => string | null };
 export const numberRoute: Codec<number | null> = { read: raw => raw && /^\d+$/.test(raw) ? Number(raw) : null, write: value => value === null ? null : String(value) };
-export const pageRoute: Codec<number> = { read: (raw, fallback) => raw ? Number(raw) : fallback, write: value => value === 1 ? null : String(value) };
+export const pageRoute: Codec<number> = { read: (raw, fallback) => raw ? Number(raw) : fallback, write: value => String(value) };
 export const booleanRoute: Codec<boolean> = { read: (raw, fallback) => raw === undefined ? fallback : raw === '1', write: value => value ? '1' : null };
 export function enumRoute<T extends string>(values: readonly T[]): Codec<T> { return { read: (raw, fallback) => values.includes(raw as T) ? raw as T : fallback, write: value => value }; }
 export const nullableStringRoute: Codec<string | null> = { read: raw => raw ?? null, write: value => value };
