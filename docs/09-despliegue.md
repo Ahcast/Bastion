@@ -410,3 +410,16 @@ Se verificaron el ZIP (`cf7ec4ba1457833a4ee51a7f510cb2872d3ae09e3a48a965a4fa7268
 ## Requisito de rutas SPA — 2026-11-18
 
 La navegación web usa rutas de módulos, secciones y registros. Bluehost conserva su fallback existente a `index.html` para rutas que no sean archivos/directorios; los assets tienen referencias absolutas. Al publicar se deben conservar `config.js`, `.htaccess` y CSP, verificar el hash del paquete CI y respaldar la versión anterior. Comprobar por HTTPS rutas anidadas y sus recursos además de `/`; un HTTP 200 por sí solo no acredita que el módulo esté autorizado o funcionando. Ver [rutas y prueba manual](14-navegacion-web.md).
+
+## Rutas web publicadas — 2026-11-18 (Honduras)
+
+- Frontend activo: `3896f0032244a3446ac35c77d04cbea6bee7b0ee`, publicado a las 09:07 en Bluehost. Incluye navegación `ce32f91` y corrección de historial `9b14738`; el último commit incorpora el parche de dependencias de correo en el repositorio.
+- [Core checks 44330334149](https://github.com/Ahcast/Bastion/actions/runs/44330334149): frontend (197 pruebas), formato, auditoría Rust, compilación y pruebas completas aprobados. MCP/MySQL y Scout también aprobaron. Auditoría npm de producción: cero vulnerabilidades.
+- Artifact web `14439086424`, ZIP SHA-256 `7adf056680920108892344419f1e8bab26ee99654303a6db20c010f735cffb8a`; paquete tar.gz SHA-256 `fb11075a570671f6d68278608acf8cd62b04c74c8a83f858f03ef9f50cb37ac4`. Se verificaron BUILD y los 55 archivos del paquete; 53 recursos públicos cotejados por HTTPS y 13 rutas anidadas con el mismo index del despliegue.
+- Versión anterior `bb5d2f2d7d2e1b4393ee6b9742c7ccd4f1456c1c` respaldada fuera del directorio público: `~/.config/bastion/backups/before-web-routes-20261118T150706Z.tar.gz`, 5,657,280 bytes, SHA-256 `e06029aca8a9a5680591425d4bda8ca44e6207563ccc875bdcd8fd0a4d4d2360`. Contenido del respaldo cotejado antes de reemplazar el index. Comprobante privado `~/.config/bastion/release.json`.
+- Conservados `config.js`, `.htaccess`, CSP y assets anteriores. Los instaladores y paquetes temporales se retiran después de verificar; se conserva la entrega activa y el respaldo privado.
+- Chrome, con una sesión existente: navegación a todos los módulos y Ajustes; cotización existente en modo consulta con Atrás → listado, Adelante → documento y recarga; Mi cuenta → Seguridad → Roles con historial correcto; expediente existente → Variables con enlace persistente y recarga. Sin errores de consola observados. No se crearon cuentas, registros ni documentos de prueba en producción.
+- Las pruebas de denegación de permisos, cambios sin guardar y cancelación de cargas se ejecutaron en fixtures aislados. No se alteraron permisos ni documentos reales para comprobar esos casos.
+- Este despliegue cambia el frontend Bluehost. El parche `lettre 0.11.24` está en GitHub y pasó CI; **su activación en el backend AWS queda pendiente de un despliegue del backend**. No se reinició AWS ni se aplicaron migraciones de base de datos.
+
+Contrato y ejemplos: [Navegación web](14-navegacion-web.md).

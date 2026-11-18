@@ -1,5 +1,7 @@
 # Documentación del nuevo CastilloIT
 
+- 2026-11-18: navegación web publicada en Bluehost desde `3896f00`, con CI aprobado, respaldo privado y comprobación en Chrome de módulos, enlaces directos, recarga y Atrás/Adelante. [Evidencia y alcance del despliegue](09-despliegue.md#rutas-web-publicadas--2026-11-18-honduras). El parche de correo en GitHub aún requiere publicación del backend AWS.
+
 - 2026-11-18: por instrucción del propietario, se integra navegación por rutas en todos los módulos y secciones web con React Router: Atrás/Adelante, enlaces directos, permisos existentes y aviso de cambios sin guardar. Se conserva frontend estático Bluehost y API Rust AWS. Contrato, rutas y pruebas en [Navegación web](14-navegacion-web.md); publicación efectiva se registra en despliegue.
 
 - 2026-11-17: entregado APK nativo Android 0.2.0 desde `b4b16f3`, con todos los módulos y conexión directa a la API. Android APK, Core checks y Scout aprobados; nueve pruebas por emulador Android 7/15/16, arranque sin navegador y HTTPS real. Corregida la confianza TLS en Android 7 mediante raíz oficial limitada a la API. Firma, BUILD y hashes cotejados. Ver [entrega y límites](09-despliegue.md#android-nativo-020--2026-11-17-honduras).
