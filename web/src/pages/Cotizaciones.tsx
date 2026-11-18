@@ -1,3 +1,4 @@
+import { useRouteRecord, useRouteState, useSavedRoute, enumRoute, useAppRoute, pageRoute } from '../routing.js';
 import { useEffect, useRef, useState } from 'react';
 import type { ProcessQuoteSeed } from '../processQuote.js';
 import { ProcessQuoteNotice } from '../components/ProcessQuoteNotice.js';
@@ -27,13 +28,15 @@ export default function Cotizaciones({ processSeed, clearProcessSeed, openConver
 }
 
 function Workspace({ processSeed, clearProcessSeed, openConverted }: ProcessQuoteProps) {
+  const routing = useAppRoute();
   const [seed, setSeed] = useState(processSeed);
   const { api, access, notify } = useCore();
-  const [selected, setSelected] = useState<QuoteDraft | 'new' | null>(processSeed ? 'new' : null);
-  const [search, setSearch] = useState(''), [query, setQuery] = useState(''), [page, setPage] = useState(1), [error, setError] = useState(''), [opening, setOpening] = useState(false);
-  const [mode, setMode] = useState<'view' | 'edit'>(processSeed ? 'edit' : 'view'), [deleting, setDeleting] = useState<QuoteSummary | null>(null);
-  const [email, setEmail] = useState<QuoteSummary | null>(null);
-  const [emailJobs, setEmailJobs] = useState<QuoteSummary | null>(null);
+  const [selected, setSelected] = useRouteRecord<QuoteDraft | 'new' | null>('registro', processSeed ? 'new' : null, (id, signal) => api.request<QuoteDraft>(`/api/v1/cotizaciones/${id}`, { signal }));
+  const [search, setSearch] = useState(''), [query, setQuery] = useState(''), [page, setPage] = useRouteState('pagina', 1, pageRoute), [error, setError] = useState(''), [opening, setOpening] = useState(false);
+  const [mode, setMode] = useRouteState<'view' | 'edit'>('modo', processSeed || routing?.route?.values.registro === 'nuevo' ? 'edit' : 'view', enumRoute(['view', 'edit'])), [deleting, setDeleting] = useState<QuoteSummary | null>(null);
+  const summary = async (id: string, signal: AbortSignal): Promise<QuoteSummary> => { const q = await api.request<QuoteDraft>(`/api/v1/cotizaciones/${id}`, { signal }); return { id: q.id, version: q.version, status: q.status, quote_number: q.quote_number, client_name: q.data.client_name, order_number: q.data.order_number, quote_date: q.data.quote_date, item_count: q.data.items.length, total: q.calculation.totals.total, valid_until: q.calculation.valid_until }; };
+  const [email, setEmail] = useRouteRecord<QuoteSummary | null>('correo', null, summary);
+  const [emailJobs, setEmailJobs] = useRouteRecord<QuoteSummary | null>('envios', null, summary);
   const [conversion, setConversion] = useState<{ summary: QuoteSummary; kind: ConversionModule } | null>(null);
   const conversionAttempts = useRef(new Map<string, ConversionAttempt>());
   const cloneAttempt = useRef<{ id: number; version: number; key: string } | null>(null);
@@ -50,6 +53,7 @@ function Workspace({ processSeed, clearProcessSeed, openConverted }: ProcessQuot
     return () => clearInterval(timer);
   }, [selected, hasScheduledEmail, result.reload]);
   const open = async (draft: QuoteSummary, nextMode: 'view' | 'edit') => {
+    if (routing) { routing.patch('registro', String(draft.id)); routing.patch('modo', nextMode); return; }
     setError(''); setOpening(true);
     try { setSelected(await api.request<QuoteDraft>(`/api/v1/cotizaciones/${draft.id}`)); setMode(nextMode); }
     catch (reason) { setError(message(reason)); } finally { setOpening(false); }
@@ -140,6 +144,7 @@ function Editor({ initial, editable, edit, close, seed, storageReady }: {
   const [saved, setSaved] = useState(initial), [data, setData] = useState<QuoteInput>(() => initial?.data ?? seed?.data ?? newQuote()), [busy, setBusy] = useState(false), [error, setError] = useState(''), [dirty, setDirty] = useState(Boolean(seed)), [conflict, setConflict] = useState(false);
   const [attachmentBusy, setAttachmentBusy] = useState(false), [pendingFiles, setPendingFiles] = useState(0);
   useUnsavedChanges(dirty || pendingFiles > 0, busy || attachmentBusy);
+  useSavedRoute(saved?.id, !dirty && !busy && !attachmentBusy && pendingFiles === 0);
   const [preview, setPreview] = useState<{ input: QuoteInput; value: QuoteCalculation } | null>(null), [calculationError, setCalculationError] = useState('');
   const missingQuantities = seed ? data.items.filter(item => !item.quantity.trim()).length : 0;
   useEffect(() => {

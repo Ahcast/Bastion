@@ -245,3 +245,14 @@ Comprobar cifras reales de Procesos, Cotizaciones, Órdenes, Facturas y Gastos, 
 ## Contabilidad: primer corte
 
 Verificar catálogo editable sin saldos inventados; cuentas de grupo fuera del diario; partida doble exacta; idempotencia y versión; inmutabilidad de contabilizados y reversos compensatorios; períodos cerrados protegidos; balance con apertura y movimientos; fuentes autorizadas y versionadas, sin duplicar documento. Las pruebas MySQL usan exclusivamente `bastion_contabilidad_test`. La comprobación de producción no crea asientos sintéticos. Inventario físico, activos, depreciación, planilla e informes fiscales no se declaran terminados en este corte.
+
+## Navegación web — 2026-11-18
+
+- Módulos, secciones y registros tienen rutas reproducibles; Atrás/Adelante restauran la pantalla sin salir al sitio anterior en cada cambio interno.
+- Un enlace directo o recarga abre el registro actual mediante su API, solicita ingreso si corresponde y conserva restricciones de módulo, acción y administración.
+- La URL no contiene borradores ni secretos y no ejecuta mutaciones por sí sola.
+- Cambios sin guardar requieren decisión antes de salir; escrituras pendientes no se abandonan.
+- Guardar un documento nuevo reemplaza la URL provisional; las respuestas de lecturas abandonadas no sobrescriben el destino vigente.
+- Bluehost responde a rutas anidadas con la aplicación, conserva configuración y recursos, y ofrece un respaldo recuperable del frontend anterior.
+
+Ver [contrato y pruebas](14-navegacion-web.md).

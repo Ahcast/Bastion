@@ -1,3 +1,4 @@
+import { useRouteState, enumRoute } from '../routing.js';
 import { useState } from 'react';
 import type { FormEvent } from 'react';
 import { message } from '../api.js';
@@ -52,7 +53,7 @@ function availableTabs(access: Access) { return TABS.filter(tab => reportCan(acc
 export default function Reportes() {
   const { api, access } = useCore();
   const tabs = availableTabs(access);
-  const [kind, setKind] = useState<ReportKind>(() => tabs[0]?.id ?? 'ordenes');
+  const [kind, setKind] = useRouteState<ReportKind>('vista', () => tabs[0]?.id ?? 'ordenes', enumRoute<ReportKind>(['ordenes', 'facturas', 'gastos']));
   const initialToday = today();
   const [fromDraft, setFromDraft] = useState(firstOfMonth(initialToday));
   const [toDraft, setToDraft] = useState(initialToday);

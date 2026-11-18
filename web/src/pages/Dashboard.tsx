@@ -1,3 +1,4 @@
+import { useRouteState } from '../routing.js';
 import { useRef, useState } from 'react';
 import { Notice, useCore, useLoad } from '../ui.js';
 import { moduleCan } from '../types.js';
@@ -61,7 +62,7 @@ export function DashboardContent({ area, data, openModule }: { area: typeof area
 export default function Dashboard({ openModule }: { openModule?: (page: Page) => void }) {
   const { api, access } = useCore();
   const allowed = areas.map(entry => moduleCan(access, entry.module, entry.scope, 'ver'));
-  const [selected, setSelected] = useState(() => Math.max(0, allowed.findIndex(Boolean))), [period, setPeriod] = useState<DashboardPeriod>('month');
+  const [selected, setSelected] = useRouteState('panel', () => Math.max(0, allowed.findIndex(Boolean)), { read: (raw, fallback) => { const index = areas.findIndex(a => a.id === raw); return index >= 0 ? index : fallback; }, write: value => areas[value]?.id ?? null }), [period, setPeriod] = useState<DashboardPeriod>('month');
   const tabs = useRef<(HTMLButtonElement | null)[]>([]), area = areas[selected]!;
   const processes = useLoad(signal => allowed[0] ? api.request<ModuleDashboard>(`/api/v1/procesos/dashboard?period=${period}`, { signal }) : Promise.resolve(null), [period, allowed[0]]);
   const quotes = useLoad(signal => allowed[1] ? api.request<ModuleDashboard>(`/api/v1/cotizaciones/dashboard?period=${period}`, { signal }) : Promise.resolve(null), [period, allowed[1]]);

@@ -1,3 +1,4 @@
+import { useRouteRecord, useSavedRoute, useAppRoute, useRouteState, pageRoute } from '../routing.js';
 import { useRef, useState } from 'react';
 import { ApiError, message } from '../api.js';
 import { Heading, Loading, Notice, Table, useCore, useLoad } from '../ui.js';
@@ -20,14 +21,17 @@ export default function Clientes() {
 
 function Workspace() {
   const { api, access, notify } = useCore(), { navigate } = useNavigationGuard();
-  const [search, setSearch] = useState(''), [query, setQuery] = useState(''), [page, setPage] = useState(1);
-  const [saved, setSaved] = useState<Client | null>(null), [data, setData] = useState<ClientInput>(emptyClient), [editing, setEditing] = useState(false);
+  const [search, setSearch] = useState(''), [query, setQuery] = useState(''), [page, setPage] = useRouteState('pagina', 1, pageRoute);
+  const [saved, setSaved] = useRouteRecord<Client | null>('registro', null, (id, signal) => api.request<Client>(`/api/v1/clientes/${id}`, { signal }), { empty: () => null, restored: value => { setData(value ? clientInput(value) : emptyClient()); setDirty(false); setConflict(false); setEditing(Boolean(value) || useNew.current); } }), [data, setData] = useState<ClientInput>(emptyClient), [editing, setEditing] = useState(false);
   const [dirty, setDirty] = useState(false), [busy, setBusy] = useState(false), [error, setError] = useState(''), [conflict, setConflict] = useState(false);
   const attempt = useRef<{ body: string; key: string } | null>(null);
   const heading = useRef<HTMLHeadingElement>(null);
   const editable = moduleCan(access, 'clientes', 'catalogo', 'editar');
   const removable = moduleCan(access, 'clientes', 'catalogo', 'eliminar');
   useUnsavedChanges(dirty, busy);
+  const route = useAppRoute();
+  const useNew = useRef(false); useNew.current = route?.route?.values.registro === 'nuevo';
+  useSavedRoute(saved?.id, !dirty && !busy);
   const result = useLoad(signal => api.request<ClientPage>(`/api/v1/clientes?search=${encodeURIComponent(query)}&page=${page}&page_size=25`, { signal }), [query, page]);
   const reset = () => { setSaved(null); setData(emptyClient()); setEditing(false); setDirty(false); setConflict(false); attempt.current = null; };
   const open = async (id: number) => {
@@ -53,7 +57,7 @@ function Workspace() {
     } finally { setBusy(false); }
   };
   const change = (key: keyof ClientInput, value: string) => { setData(old => ({ ...old, [key]: value })); setDirty(true); };
-  return <><Heading title="Clientes" description="Catálogo de clientes y contactos." action={editable && <button className="primary" disabled={busy} onClick={() => void navigate(() => { reset(); setEditing(true); })}>Nuevo</button>} />
+  return <><Heading title="Clientes" description="Catálogo de clientes y contactos." action={editable && <button className="primary" disabled={busy} onClick={() => void navigate(() => { reset(); setEditing(true); route?.patch('registro', 'nuevo'); })}>Nuevo</button>} />
     <form className="row client-search" onSubmit={event => { event.preventDefault(); setQuery(search); setPage(1); }}><label>Buscar cliente, correo o RTN<input name="search" value={search} maxLength={200} onChange={event => setSearch(event.target.value)} /></label><button type="submit">Buscar</button></form>
     <Notice>{error || result.error}</Notice>
     {editing && editable && <section className="card client-editor" aria-label="Formulario de cliente"><h2 ref={heading} tabIndex={-1}>{saved ? `Editar cliente · ${saved.cliente_name}` : 'Nuevo cliente'}</h2>

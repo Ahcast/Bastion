@@ -1,3 +1,4 @@
+import { useRouteRecord, useSavedRoute, useAppRoute, useRouteState, pageRoute } from '../routing.js';
 import { useEffect, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 import { ApiError, message } from '../api.js';
@@ -22,12 +23,15 @@ export function ExpenseSettings() {
 
 function Workspace() {
   const { api, access, notify } = useCore(), { navigate } = useNavigationGuard();
-  const [search, setSearch] = useState(''), [query, setQuery] = useState(''), [dateFrom, setDateFrom] = useState(''), [dateTo, setDateTo] = useState(''), [queryFrom, setQueryFrom] = useState(''), [queryTo, setQueryTo] = useState(''), [page, setPage] = useState(1);
-  const [saved, setSaved] = useState<Expense | null>(null), [data, setData] = useState<ExpenseInput>(() => emptyExpense(todayInHonduras())), [open, setOpen] = useState(false), [dirty, setDirty] = useState(false), [busy, setBusy] = useState(false), [error, setError] = useState(''), [conflict, setConflict] = useState(false);
+  const [search, setSearch] = useState(''), [query, setQuery] = useState(''), [dateFrom, setDateFrom] = useState(''), [dateTo, setDateTo] = useState(''), [queryFrom, setQueryFrom] = useState(''), [queryTo, setQueryTo] = useState(''), [page, setPage] = useRouteState('pagina', 1, pageRoute);
+  const [saved, setSaved] = useRouteRecord<Expense | null>('registro', null, (id, signal) => api.request<Expense>(`/api/v1/gastos/${id}`, { signal }), { empty: () => null, restored: value => { setData(value ? expenseInput(value) : emptyExpense(todayInHonduras())); setDirty(false); setConflict(false); setOpen(Boolean(value) || useNew.current); } }), [data, setData] = useState<ExpenseInput>(() => emptyExpense(todayInHonduras())), [open, setOpen] = useState(false), [dirty, setDirty] = useState(false), [busy, setBusy] = useState(false), [error, setError] = useState(''), [conflict, setConflict] = useState(false);
   const attempt = useRef<{ body: string; key: string } | null>(null), heading = useRef<HTMLHeadingElement>(null);
   const editable = moduleCan(access, 'gastos', 'registros', 'editar'), removable = moduleCan(access, 'gastos', 'registros', 'eliminar');
   const [preview, setPreview] = useState<ExpenseCalculation | null>(null), [previewError, setPreviewError] = useState('');
   useUnsavedChanges(dirty, busy);
+  const route = useAppRoute();
+  const useNew = useRef(false); useNew.current = route?.route?.values.registro === 'nuevo';
+  useSavedRoute(saved?.id, !dirty && !busy);
   useEffect(() => {
     setPreview(null); setPreviewError('');
     const body = expenseInput({ ...data, taxable_amount: data.taxable_amount.trim() || '0', exempt_amount: data.exempt_amount.trim() || '0' });
@@ -45,7 +49,7 @@ function Workspace() {
     return api.request<ExpensePage>(`/api/v1/gastos?${params}`, { signal });
   }, [query, queryFrom, queryTo, page]);
 
-  const startNew = () => { setSaved(null); setData(emptyExpense(todayInHonduras())); setOpen(true); setDirty(false); setConflict(false); setError(''); attempt.current = null; heading.current?.focus(); };
+  const startNew = () => { setSaved(null); route?.patch('registro', 'nuevo'); setData(emptyExpense(todayInHonduras())); setOpen(true); setDirty(false); setConflict(false); setError(''); attempt.current = null; heading.current?.focus(); };
   const openForEdit = async (id: number) => {
     setBusy(true); setError('');
     try { const expense = await api.request<Expense>(`/api/v1/gastos/${id}`); setSaved(expense); setData(expenseInput(expense)); setOpen(true); setDirty(false); setConflict(false); attempt.current = null; heading.current?.focus(); }

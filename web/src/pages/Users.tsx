@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useRouteState, booleanRoute } from '../routing.js';
+
 import { message } from '../api.js';
 import { Dialog, Form, Heading, Loading, Notice, Table, useCore, useLoad } from '../ui.js';
 import type { PageResult, Person, Role, UserRecord } from '../types.js';
 export default function Users() {
-  const { api, notify } = useCore(), [inviting, setInviting] = useState(false);
+  const { api, notify } = useCore(), [inviting, setInviting] = useRouteState('invitar', false, booleanRoute);
   const result = useLoad(signal => api.request<PageResult<UserRecord>>('/api/v1/admin/users?page=1&page_size=50', { signal }));
   const act = async (id: number, enabled?: boolean) => { try { await api.request(`/api/v1/admin/users/${id}${enabled === undefined ? '/invitation' : ''}`, { method: enabled === undefined ? 'POST' : 'PATCH', body: enabled === undefined ? undefined : { enabled } }); result.reload(); } catch (error) { notify(message(error)); } };
   return <><Heading title="Usuarios" description="Cuentas vinculadas a una Persona y un rol." action={<button className="primary" onClick={() => setInviting(true)}>Invitar usuario</button>} /><Notice>{result.error}</Notice>{result.data ? <Table columns={['Persona', 'Correo', 'Rol', 'Estado', 'Acción']} rows={result.data.items.map(user => [user.person_name, user.email, user.role_name, user.status, <div className="actions"><button onClick={() => void act(user.id, user.status === 'disabled')}>{user.status === 'disabled' ? 'Reactivar' : 'Desactivar'}</button>{user.status === 'invitation_pending' && <button onClick={() => void act(user.id)}>Reenviar</button>}</div>])} /> : !result.error && <Loading />}{inviting && <Invite close={() => setInviting(false)} done={() => { setInviting(false); result.reload(); }} />}</>;

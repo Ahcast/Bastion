@@ -1,3 +1,4 @@
+import { useRouteRecord, findPagedRecord } from '../routing.js';
 import { useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { message } from '../api.js';
@@ -12,7 +13,7 @@ import { fileBase64 } from '../collaboration.js';
 
 export default function FormLibrary({ settings = false, installedRows = [] }: { settings?: boolean; installedRows?: ReactNode[][] }) {
   const { api, access, notify } = useCore();
-  const [page, setPage] = useState(1), [editing, setEditing] = useState<PublishedForm | 'new' | null>(null);
+  const [page, setPage] = useState(1), [editing, setEditing] = useRouteRecord<PublishedForm | 'new' | null>('registro', null, (id, signal) => findPagedRecord<PublishedForm>(api, '/api/v1/colaboracion/formularios', id, signal));
   const [removing, setRemoving] = useState<PublishedForm | null>(null), [removingAll, setRemovingAll] = useState(false), [busy, setBusy] = useState(false), [error, setError] = useState('');
   const allowed = moduleCan(access, 'colaboracion', 'empresa', 'ver');
   const result = useLoad(signal => allowed ? api.request<TenderPage<PublishedForm>>(`/api/v1/colaboracion/formularios?page=${page}`, { signal }) : Promise.resolve(null), [page, allowed]);

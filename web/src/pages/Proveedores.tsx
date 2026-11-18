@@ -1,3 +1,4 @@
+import { useRouteRecord, useSavedRoute, useAppRoute, useRouteState, pageRoute } from '../routing.js';
 import { useRef, useState } from 'react';
 import { ApiError, message } from '../api.js';
 import { Heading, Loading, Notice, Table, useCore, useLoad } from '../ui.js';
@@ -24,14 +25,17 @@ export function SupplierSettings() {
 
 function Workspace() {
   const { api, access, notify } = useCore(), { navigate } = useNavigationGuard();
-  const [search, setSearch] = useState(''), [query, setQuery] = useState(''), [page, setPage] = useState(1);
-  const [saved, setSaved] = useState<Supplier | null>(null), [data, setData] = useState<SupplierInput>(emptySupplier), [dirty, setDirty] = useState(false);
+  const [search, setSearch] = useState(''), [query, setQuery] = useState(''), [page, setPage] = useRouteState('pagina', 1, pageRoute);
+  const [saved, setSaved] = useRouteRecord<Supplier | null>('registro', null, (id, signal) => api.request<Supplier>(`/api/v1/proveedores/${id}`, { signal }), { empty: () => null, restored: value => { setData(value ? supplierInput(value) : emptySupplier()); setDirty(false); setConflict(false); } }), [data, setData] = useState<SupplierInput>(emptySupplier), [dirty, setDirty] = useState(false);
   const [busy, setBusy] = useState(false), [error, setError] = useState(''), [conflict, setConflict] = useState(false);
   const attempt = useRef<{ body: string; key: string } | null>(null);
   const heading = useRef<HTMLHeadingElement>(null);
   const editable = moduleCan(access, 'proveedores', 'catalogo', 'editar');
   const removable = moduleCan(access, 'proveedores', 'catalogo', 'eliminar');
   useUnsavedChanges(dirty, busy);
+  const route = useAppRoute();
+  const useNew = useRef(false); useNew.current = route?.route?.values.registro === 'nuevo';
+  useSavedRoute(saved?.id, !dirty && !busy);
   const result = useLoad(signal => api.request<SupplierPage>(`/api/v1/proveedores?search=${encodeURIComponent(query)}&page=${page}&page_size=25`, { signal }), [query, page]);
 
   const open = async (id: number) => {

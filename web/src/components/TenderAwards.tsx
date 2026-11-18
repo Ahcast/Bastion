@@ -1,3 +1,4 @@
+import { useRouteRecord, useRouteState, booleanRoute } from '../routing.js';
 import { useRef, useState } from 'react';
 import { ApiError, message } from '../api.js';
 import { DocumentPagination, DocumentSection } from './DocumentWorkspace.js';
@@ -13,11 +14,11 @@ import type { Expedient, TenderPage } from '../tenders.js';
 export default function TenderAwards({ record }: { record: Expedient }) {
   const { api, access, notify } = useCore();
   const [page, setPage] = useState(1);
-  const [creating, setCreating] = useState(false);
+  const [creating, setCreating] = useRouteState('crear', false, booleanRoute);
   const [opening, setOpening] = useState(false);
   const [error, setError] = useState('');
-  const [review, setReview] = useState<{ award: Award; seed: InvoiceInput } | null>(null);
-  const [invoice, setInvoice] = useState<InvoiceDraft | null>(null);
+  const [review, setReview] = useRouteRecord<{ award: Award; seed: InvoiceInput; invoice?: InvoiceDraft } | null>('adjudicacion', null, async (id, signal) => { const award = await api.request<Award>(`/api/v1/licitaciones/${record.id}/adjudicaciones/${id}`, { signal }); const existing = await api.request<TenderInvoiceResult | null>(`/api/v1/licitaciones/${record.id}/adjudicaciones/${id}/factura`, { signal }); const invoice = existing ? await api.request<InvoiceDraft>(`/api/v1/facturas/${existing.target_id}`, { signal }) : undefined; return { award, seed: invoiceFromAward(award), invoice }; }, { id: value => value ? String(value.award.id) : null });
+  const [invoice, setInvoice] = useRouteRecord<InvoiceDraft | null>('factura', null, (id, signal) => api.request<InvoiceDraft>(`/api/v1/facturas/${id}`, { signal }));
   const result = useLoad(signal => api.request<TenderPage<AwardSummary>>(
     `/api/v1/licitaciones/${record.id}/adjudicaciones?page=${page}`, { signal }), [record.id, page]);
   const editable = moduleCan(access, 'licitaciones', 'expedientes', 'editar');
@@ -46,7 +47,7 @@ export default function TenderAwards({ record }: { record: Expedient }) {
   };
 
   if (review || invoice) {
-    const save = review ? async (input: InvoiceInput, key: string) => {
+    const save = review && !review.invoice ? async (input: InvoiceInput, key: string) => {
       const target = await api.request<TenderInvoiceResult>(
         `/api/v1/licitaciones/${record.id}/adjudicaciones/${review.award.id}/factura`, {
           method: 'POST', body: input, ifMatch: review.award.version, idempotencyKey: key,
@@ -56,7 +57,7 @@ export default function TenderAwards({ record }: { record: Expedient }) {
     return <>
       {review && <p className="quote-note">Adjudicación #{review.award.id}. Elige un cliente del catálogo y revisa los precios e impuestos antes de guardar el borrador.</p>}
       <InvoiceEditor key={review ? `award-${review.award.id}` : `invoice-${invoice!.id}`}
-        initial={invoice} seed={review?.seed} saveDraft={save}
+        initial={invoice ?? review?.invoice ?? null} seed={review?.invoice ? undefined : review?.seed} saveDraft={save}
         editable={canInvoice && (!invoice || invoice.status === 'Borrador' || invoice.status === 'Enviado')}
         close={() => { setReview(null); setInvoice(null); result.reload(); }} />
     </>;
@@ -76,7 +77,7 @@ export default function TenderAwards({ record }: { record: Expedient }) {
         <DocumentPagination page={page} hasMore={result.data.has_more} change={setPage} busy={opening} />
       </> : !result.error && <Loading />}
     </DocumentSection>
-    {creating && <AwardRegistration record={record} close={() => setCreating(false)} saved={() => {
+    {creating && editable && record.state === 'enviada' && <AwardRegistration record={record} close={() => setCreating(false)} saved={() => {
       setCreating(false); result.reload(); notify('Adjudicación registrada.');
     }} />}
   </>;

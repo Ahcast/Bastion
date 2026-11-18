@@ -1,3 +1,4 @@
+import { useRouteState, numberRoute, booleanRoute } from '../routing.js';
 import { useEffect, useState } from 'react';
 import { message } from '../api.js';
 import { Dialog, Form, Heading, Loading, Notice, useCore, useLoad } from '../ui.js';
@@ -16,9 +17,9 @@ export default function Roles() {
 function RoleEditor() {
   const { api, notify } = useCore(), { navigate } = useNavigationGuard();
   const result = useLoad(signal => Promise.all([api.request<Role[]>('/api/v1/admin/roles', { signal }), api.request<Module[]>('/api/v1/settings/modules', { signal })]));
-  const [roleId, setRoleId] = useState<number | null>(null), [loadedId, setLoadedId] = useState<number | null>(null);
+  const [roleId, setRoleId] = useRouteState<number | null>('registro', null, numberRoute), [loadedId, setLoadedId] = useState<number | null>(null);
   const [original, setOriginal] = useState<Permission[] | null>(null), [draft, setDraft] = useState<Permission[]>([]);
-  const [saving, setSaving] = useState(false), [creating, setCreating] = useState(false), [error, setError] = useState(''), [success, setSuccess] = useState('');
+  const [saving, setSaving] = useState(false), [creating, setCreating] = useRouteState('crear', false, booleanRoute), [error, setError] = useState(''), [success, setSuccess] = useState('');
   const [loadVersion, setLoadVersion] = useState(0);
   const [confirmation, setConfirmation] = useState<{ permissions: Permission[]; text: string; label: string } | null>(null);
   const roles = result.data?.[0] ?? [], registry = result.data?.[1] ?? [], catalog = permissionModuleCatalog(registry);
@@ -27,7 +28,7 @@ function RoleEditor() {
   useUnsavedChanges(dirty, saving);
 
   useEffect(() => {
-    if (result.data && !result.data[0].some(item => item.id === roleId)) setRoleId((result.data[0].find(item => !item.protected) ?? result.data[0][0])?.id ?? null);
+    if (result.data && roleId === null) setRoleId((result.data[0].find(item => !item.protected) ?? result.data[0][0])?.id ?? null);
   }, [result.data, roleId]);
   useEffect(() => {
     const controller = new AbortController();
@@ -63,7 +64,7 @@ function RoleEditor() {
       try { await api.request(`/api/v1/admin/roles/${role.id}`, { method: 'DELETE' }); setOriginal(null); setDraft([]); setRoleId(null); result.reload(); notify('Rol eliminado.'); }
       catch (reason) { setError(message(reason)); } finally { setSaving(false); }
     }}>Eliminar rol</button>}</div>
-    <Notice>{result.error || error}</Notice>{success && <p className="permission-success" role="status">{success}</p>}
+    <Notice>{result.error || error || (result.data && roleId !== null && !role ? 'El rol de este enlace no está disponible.' : '')}</Notice>{success && <p className="permission-success" role="status">{success}</p>}
     {protectedRole && <p className="notice">Rol integrado: tiene acceso completo a las funciones disponibles. Sus permisos están protegidos y no se pueden modificar.</p>}
     {!result.data ? !result.error && <Loading /> : !roles.length ? <p className="empty">No hay roles disponibles. Crea un rol para configurar sus permisos.</p> : !ready ? !error ? <Loading /> : <button onClick={() => setLoadVersion(value => value + 1)}>Reintentar carga</button> : <>
       <PermissionMatrix catalog={catalog} registry={registry} permissions={draft} protectedRole={protectedRole} disabled={saving} cell={(module, column, enabled) => change(setModulePermission(draft, module, column, enabled))} row={(module, enabled) => change(setPermissionRow(draft, module, enabled))} column={(column, enabled) => change(setPermissionColumn(draft, catalog.filter(module => moduleIsConfigurable(module, registry)).map(module => module.id), column, enabled))} />

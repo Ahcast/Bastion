@@ -1,3 +1,5 @@
+import { createBrowserRouter, RouterProvider } from 'react-router';
+import { RoutingProvider } from './routing.js';
 import { createRoot } from 'react-dom/client';
 import { Component } from 'react';
 import type { ReactNode } from 'react';
@@ -19,7 +21,7 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { failed: boolean
   render() { return this.state.failed ? <section className="auth-wrap"><div className="auth-card"><h1>No se pudo cargar la pantalla</h1><p>Recarga la página para recuperar la interfaz.</p><button onClick={() => location.reload()}>Recargar</button></div></section> : this.props.children; }
 }
 const root = createRoot(document.getElementById('app')!);
-try { const mcpEnabled = window.BASTION_MCP_ENABLED === true; const mailConfirmation = takeMailConfirmation(mcpEnabled, location, path => history.replaceState(null, '', path)); const mcpQuery = takeMcpQuery(mcpEnabled, location, path => history.replaceState(null, '', path)); const api = new ApiClient(apiOrigin(window.BASTION_API_BASE)); root.render(<ErrorBoundary><NavigationGuardProvider><App api={api} mcpEnabled={mcpEnabled} mcpQuery={mcpQuery} mailConfirmation={mailConfirmation} /></NavigationGuardProvider></ErrorBoundary>); }
+try { const mcpEnabled = window.BASTION_MCP_ENABLED === true; const mailConfirmation = takeMailConfirmation(mcpEnabled, location, path => history.replaceState(null, '', path)); const mcpQuery = takeMcpQuery(mcpEnabled, location, path => history.replaceState(null, '', path)); const api = new ApiClient(apiOrigin(window.BASTION_API_BASE)); const router = createBrowserRouter([{ path: '*', element: <ErrorBoundary><NavigationGuardProvider><RoutingProvider><App api={api} mcpEnabled={mcpEnabled} mcpQuery={mcpQuery} mailConfirmation={mailConfirmation} /></RoutingProvider></NavigationGuardProvider></ErrorBoundary> }]); root.render(<RouterProvider router={router} />); }
 catch (error) { root.render(<ConfigurationError error={error} />); }
 import './styles/clientes.css';
 import './styles/gastos.css';

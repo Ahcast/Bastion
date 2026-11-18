@@ -1,8 +1,9 @@
+import { useRouteState, enumRoute } from '../routing.js';
 import BackupSettings from './BackupSettings.js';
 import CollaborationSettings from './CollaborationSettings.js';
 import SarSettings from './SarSettings.js';
 import { useNavigationGuard } from '../navigationGuard.js';
-import { lazy, Suspense, useState } from 'react';
+import { lazy, Suspense } from 'react';
 import { message } from '../api.js';
 import { Form, Heading, Loading, Notice, Table, useCore, useLoad } from '../ui.js';
 import type { Audit, Mail, Module, PageResult, Setting } from '../types.js';
@@ -30,7 +31,7 @@ export default function Settings({ section, select, mcpEnabled = false }: { sect
 }
 function CoreSettings() {
   const { navigate } = useNavigationGuard();
-  const [tab, setTab] = useState('modules');
+  const [tab, setTab] = useRouteState('vista', 'modules', enumRoute(['modules', 'company', 'smtp', 'audit', 'mail']));
   return <><Heading title="Ajustes del Core" description="Empresa y SAR, módulos, correo global, bitácora y reintentos." /><div className="row section-tabs" aria-label="Ajustes del Core">{[['modules', 'Módulos'], ['company', 'Empresa y SAR'], ['smtp', 'SMTP global'], ['audit', 'Bitácora'], ['mail', 'Envíos']].map(([id, title]) => <button key={id} aria-pressed={tab === id} onClick={() => { if (id !== tab) void navigate(() => setTab(id!)); }}>{title}</button>)}</div><section key={tab} className="card">{tab === 'modules' ? <Modules /> : tab === 'company' ? <><Company /><SarSettings /></> : tab === 'smtp' ? <Smtp /> : tab === 'audit' ? <AuditLog /> : <MailOutbox />}</section></>;
 }
 function Modules() {

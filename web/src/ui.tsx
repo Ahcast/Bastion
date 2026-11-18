@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import type { ReactNode, RefObject } from 'react';
 import { createPortal } from 'react-dom';
+import { useUnsavedChanges } from './navigationGuard.js';
 import type { ApiClient } from './api.js';
 import { message } from './api.js';
 import type { Access } from './types.js';
@@ -17,11 +18,12 @@ export function Table({ columns, rows }: { columns: string[]; rows: ReactNode[][
 }
 export interface Field { name: string; label: string; type?: string; required?: boolean; minLength?: number; maxLength?: number; inputMode?: 'numeric'; autocomplete?: string; options?: { value: string | number; label: string }[]; multiline?: boolean; help?: string }
 export function Form({ fields, initial = {}, submit = 'Guardar', onSubmit, danger = false, children }: { fields: Field[]; initial?: Record<string, string | number | null>; submit?: string; danger?: boolean; onSubmit: (values: Record<string, string>) => Promise<void>; children?: ReactNode }) {
-  const [busy, setBusy] = useState(false), [error, setError] = useState('');
-  return <form className="stack" onSubmit={async event => {
+  const [busy, setBusy] = useState(false), [error, setError] = useState(''), [dirty, setDirty] = useState(false);
+  useUnsavedChanges(dirty && submit !== 'Buscar', busy);
+  return <form className="stack" onChange={() => setDirty(true)} onSubmit={async event => {
     event.preventDefault(); if (busy) return;
     const values = Object.fromEntries(Array.from(new FormData(event.currentTarget)).map(([key, value]) => [key, String(value)]));
-    setError(''); setBusy(true); try { await onSubmit(values); } catch (reason) { setError(message(reason)); } finally { setBusy(false); }
+    setError(''); setBusy(true); try { await onSubmit(values); setDirty(false); } catch (reason) { setError(message(reason)); } finally { setBusy(false); }
   }}><Notice>{error}</Notice><fieldset disabled={busy} className="form-fields">{fields.map(field => <label key={field.name}>{field.label}{field.options ? <select name={field.name} defaultValue={initial[field.name] ?? ''} required={field.required}>{field.options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}</select> : field.multiline ? <textarea name={field.name} rows={10} defaultValue={initial[field.name] ?? ''} required={field.required} maxLength={field.maxLength} /> : <input name={field.name} type={field.type ?? 'text'} defaultValue={initial[field.name] ?? ''} required={field.required} minLength={field.minLength} maxLength={field.maxLength} inputMode={field.inputMode} autoComplete={field.autocomplete} />}{field.help && <small>{field.help}</small>}</label>)}{children}<button className={danger ? 'danger' : 'primary'} type="submit">{busy ? 'Procesando…' : submit}</button></fieldset></form>;
 }
 export function useFocusTrap(ref: RefObject<HTMLElement | null>, active: boolean, close: () => void) {

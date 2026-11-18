@@ -1,3 +1,4 @@
+import { useRouteRecord, useRouteState, useSavedRoute, enumRoute, useAppRoute } from '../routing.js';
 import { useDocumentFilters } from '../documentFilters.js';
 import { DocumentListFilters } from '../components/DocumentListFilters.js';
 import { useEffect, useRef, useState } from 'react';
@@ -24,11 +25,12 @@ export default function Facturas({ initialId }: { initialId?: number } = {}) {
 const stage = 'El número SAR se asigna al marcar como enviado. Las facturas enviadas pueden editarse; las pagadas no se editan y solo los borradores sin pagos pueden eliminarse.';
 
 function Workspace({ initialId }: { initialId?: number }) {
+  const routing = useAppRoute();
   const { api, access, notify } = useCore();
   const [command, setCommand] = useState<{invoice: InvoiceSummary; action: 'sent' | 'payment' | 'delete'} | null>(null);
   const cloneAttempts = useRef(new Map<string,string>());
   const documents = useLoad(signal => api.request<{pdf:boolean}>('/api/v1/facturas/document-readiness', {signal}));
-  const [selected, setSelected] = useState<InvoiceDraft | 'new' | null>(null), [mode, setMode] = useState<'view' | 'edit'>('view');
+  const [selected, setSelected] = useRouteRecord<InvoiceDraft | 'new' | null>('registro', null, (id, signal) => api.request<InvoiceDraft>(`/api/v1/facturas/${id}`, { signal })), [mode, setMode] = useRouteState<'view' | 'edit'>('modo', routing?.route?.values.registro === 'nuevo' ? 'edit' : 'view', enumRoute(['view', 'edit']));
   const filters = useDocumentFilters('facturas');
   const { query, page, setPage } = filters;
   const [error, setError] = useState(''), [busy, setBusy] = useState(false);
@@ -36,6 +38,7 @@ function Workspace({ initialId }: { initialId?: number }) {
   const removable = moduleCan(access, 'facturas', 'documentos', 'eliminar');
   const result = useLoad(signal => api.request<InvoicePage>(`/api/v1/facturas?${query}&page=${page}&page_size=25`, { signal }), [query, page]);
   const open = async (id: number, next: 'view' | 'edit') => {
+    if (routing) { routing.patch('registro', String(id)); routing.patch('modo', next); return; }
     setError(''); setBusy(true);
     try { setSelected(await api.request<InvoiceDraft>(`/api/v1/facturas/${id}`)); setMode(next); }
     catch (reason) { setError(message(reason)); } finally { setBusy(false); }
@@ -89,6 +92,7 @@ export function InvoiceEditor({ initial, editable, edit, close, seed, saveDraft 
   const attempt = useRef<{ body: string; key: string } | null>(null);
   const heading = useRef<HTMLHeadingElement>(null);
   useUnsavedChanges(dirty, busy);
+  useSavedRoute(saved?.id, !dirty && !busy);
   useEffect(() => { heading.current?.focus(); }, []);
   useEffect(() => {
     if (!editable || (saved && !dirty) || conflict) return;

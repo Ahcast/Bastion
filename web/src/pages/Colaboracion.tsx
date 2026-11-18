@@ -1,3 +1,4 @@
+import { useRouteState, enumRoute, booleanRoute, useRouteRecord, findPagedRecord, pageRoute } from '../routing.js';
 import { useEffect, useRef, useState } from 'react';
 import { message } from '../api.js';
 import { Dialog, Heading, Loading, Notice, Table, useCore, useLoad } from '../ui.js';
@@ -12,22 +13,22 @@ import type { CollaborationFile, FileContent, FilePage, FilePolicy } from '../co
 export default function Colaboracion() {
   const { access } = useCore();
   const { navigate } = useNavigationGuard();
-  const [tab, setTab] = useState<'files' | 'forms'>('files');
+  const [tab, setTab] = useRouteState<'files' | 'forms'>('vista', 'files', enumRoute(['files', 'forms']));
   if (!collaborationCan(access)) return <Notice>No tienes acceso a Colaboración.</Notice>;
   return <><div className="row section-tabs" aria-label="Contenido de Colaboración"><button aria-pressed={tab === 'files'} onClick={() => { void navigate(() => setTab('files')); }}>Documentos</button>{moduleCan(access, 'colaboracion', 'empresa', 'ver') && <button aria-pressed={tab === 'forms'} onClick={() => { void navigate(() => setTab('forms')); }}>Biblioteca de formularios</button>}</div>{tab === 'forms' ? <FormLibrary /> : <Workspace />}</>;
 }
 function Workspace() {
   const { api, access, notify } = useCore();
   const { navigate } = useNavigationGuard();
-  const [scope, setScope] = useState<'empresa' | 'persona'>(() => moduleCan(access, 'colaboracion', 'empresa', 'ver') ? 'empresa' : 'persona');
-  const [trash, setTrash] = useState(false), [purging, setPurging] = useState(false);
+  const [scope, setScope] = useRouteState<'empresa' | 'persona'>('ambito', () => moduleCan(access, 'colaboracion', 'empresa', 'ver') ? 'empresa' : 'persona', enumRoute(['empresa', 'persona']));
+  const [trash, setTrash] = useRouteState('papelera', false, booleanRoute), [purging, setPurging] = useState(false);
   const policy = useLoad(signal => api.request<FilePolicy>('/api/v1/colaboracion/settings', { signal }));
-  const [person, setPerson] = useState<{ id: number; full_name: string } | null>(null);
-  const [search, setSearch] = useState(''), [query, setQuery] = useState(''), [page, setPage] = useState(1);
+  const [person, setPerson] = useRouteRecord<{ id: number; full_name: string } | null>('persona', null, (id, signal) => findPagedRecord<{id:number;full_name:string}>(api, '/api/v1/colaboracion/personas', id, signal));
+  const [search, setSearch] = useState(''), [query, setQuery] = useState(''), [page, setPage] = useRouteState('pagina', 1, pageRoute);
   const [title, setTitle] = useState(''), [notes, setNotes] = useState(''), [file, setFile] = useState<File | null>(null);
   const [busy, setBusy] = useState(false), [error, setError] = useState(''), [removing, setRemoving] = useState<CollaborationFile | null>(null);
   const [editing, setEditing] = useState<CollaborationFile | null>(null), [editingTitle, setEditingTitle] = useState('');
-  const [preview, setPreview] = useState<{ title: string; url: string; mime: string; text?: string } | null>(null);
+  const [preview, setPreview] = useRouteRecord<{ id: number; title: string; url: string; mime: string; text?: string } | null>('archivo', null, async (id, signal) => { const content = await api.request<FileContent>(`/api/v1/colaboracion/${id}/preview`, { signal }); const blob = contentBlob(content, true); return { id: Number(id), title: content.filename, url: URL.createObjectURL(blob), mime: content.mime, text: content.mime === 'text/plain' ? await blob.text() : undefined }; });
   const fileInput = useRef<HTMLInputElement>(null), attempt = useRef<{ body: string; key: string } | null>(null);
   const folder = scope === 'empresa' ? 'empresa' : person ? `persona:${person.id}` : '';
   const editable = !trash && Boolean(folder) && moduleCan(access, 'colaboracion', folder, 'editar');
@@ -44,7 +45,7 @@ function Workspace() {
       if (viewer) viewer.show(content);
       else {
         const blob = contentBlob(content, show), url = URL.createObjectURL(blob);
-        if (show) setPreview({ title: record.title, url, mime: content.mime, text: content.mime === 'text/plain' ? await blob.text() : undefined });
+        if (show) setPreview({ id: record.id, title: record.title, url, mime: content.mime, text: content.mime === 'text/plain' ? await blob.text() : undefined });
         else { const link = document.createElement('a'); link.href = url; link.download = record.filename; document.body.append(link); link.click(); link.remove(); setTimeout(() => URL.revokeObjectURL(url), 60_000); }
       }
     } catch (reason) { viewer?.close(); setError(message(reason)); } finally { setBusy(false); }

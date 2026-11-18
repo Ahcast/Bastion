@@ -1,3 +1,4 @@
+import { useRouteRecord, useRouteState, useSavedRoute, enumRoute, useAppRoute, numberRoute } from '../routing.js';
 import { useDocumentFilters } from '../documentFilters.js';
 import { DocumentListFilters } from '../components/DocumentListFilters.js';
 import { useEffect, useRef, useState } from 'react';
@@ -19,11 +20,12 @@ export default function OrdenesCompra({ initialId,openInvoice }: { initialId?: n
   return moduleCan(access, 'ordenes_compra', 'documentos', 'ver') ? <Workspace initialId={initialId} openInvoice={openInvoice} /> : <Notice>No tienes acceso a Órdenes de compra.</Notice>;
 }
 function Workspace({ initialId,openInvoice }: { initialId?: number;openInvoice?:(id:number)=>void }) {
+  const routing = useAppRoute();
   const { api, access, notify } = useCore();
   const editable = moduleCan(access, 'ordenes_compra', 'documentos', 'editar');
   const removable = moduleCan(access, 'ordenes_compra', 'documentos', 'eliminar');
   const invoiceEditable=moduleCan(access,'facturas','documentos','editar')&&moduleCan(access,'facturas','documentos','ver');
-  const [documentsId,setDocumentsId]=useState<number|null>(null);
+  const [documentsId,setDocumentsId]=useRouteState<number|null>('documentos', null, numberRoute);
   const attempts=useRef(new Map<string,{key:string;version:number}>()),running=useRef(false);
   const [uncertain,setUncertain]=useState(false);
   const action=async(id:number,version:number,kind:'clone'|'convert/invoice')=>{
@@ -46,7 +48,7 @@ function Workspace({ initialId,openInvoice }: { initialId?: number;openInvoice?:
       else setUncertain(true);
     }finally{running.current=false;setBusy(false);}
   };
-  const [selected, setSelected] = useState<PurchaseOrder | 'new' | null>(null), [mode, setMode] = useState<'view' | 'edit'>('view');
+  const [selected, setSelected] = useRouteRecord<PurchaseOrder | 'new' | null>('registro', null, (id, signal) => api.request<PurchaseOrder>(`/api/v1/ordenes-compra/${id}`, { signal })), [mode, setMode] = useRouteState<'view' | 'edit'>('modo', routing?.route?.values.registro === 'nuevo' ? 'edit' : 'view', enumRoute(['view', 'edit']));
   const filters = useDocumentFilters('ordenes_compra');
   const { query, page, setPage } = filters;
   const [error, setError] = useState(''), [busy, setBusy] = useState(false);
@@ -64,7 +66,7 @@ function Workspace({ initialId,openInvoice }: { initialId?: number;openInvoice?:
       if (reason instanceof ApiError && reason.status === 412) result.reload();
     } finally { running.current = false; setBusy(false); }
   };
-  const open = async (id: number, next: 'view' | 'edit') => { setBusy(true); setError(''); try { setSelected(await api.request<PurchaseOrder>(`${base}/${id}`)); setMode(next); } catch (reason) { setError(message(reason)); } finally { setBusy(false); } };
+  const open = async (id: number, next: 'view' | 'edit') => { if (routing) { routing.patch('registro', String(id)); routing.patch('modo', next); return; } setBusy(true); setError(''); try { setSelected(await api.request<PurchaseOrder>(`${base}/${id}`)); setMode(next); } catch (reason) { setError(message(reason)); } finally { setBusy(false); } };
   useEffect(() => { if (initialId) void open(initialId, 'edit'); }, [initialId, api]);
   if(documentsId!==null)return <OrderDocuments id={documentsId} close={()=>{setDocumentsId(null);result.reload();}}/>;
   if (selected) return <OrderEditor key={selected === 'new' ? 'new' : selected.id} initial={selected === 'new' ? null : selected} editable={editable && mode === 'edit'} edit={editable && mode === 'view' ? () => setMode('edit') : undefined} close={() => { setSelected(null); result.reload(); }} />;
@@ -88,6 +90,7 @@ export function OrderEditor({ initial, editable, edit, close }: { initial: Purch
   const destinations = useLoad(signal => api.request<Destination[]>(`${base}/destinations`, { signal }));
   const attempt = useRef<{ body: string; key: string } | null>(null), heading = useRef<HTMLHeadingElement>(null);
   useUnsavedChanges(dirty || ambiguous, busy);
+  useSavedRoute(saved?.id, !dirty && !busy);
   useEffect(() => { heading.current?.focus(); }, []);
   useEffect(() => {
     if (!editable || (saved && !dirty) || conflict || ambiguous) return;
@@ -172,7 +175,7 @@ function DestinationCatalog() {
   const { api, access, notify } = useCore();
   const editable = moduleCan(access, 'ordenes_compra', 'destinos', 'editar');
   const result = useLoad(signal => api.request<Destination[]>(`${base}/destinations`, { signal }));
-  const [selected, setSelected] = useState<Destination | null>(null), [revision, setRevision] = useState(0);
+  const [selected, setSelected] = useRouteRecord<Destination | null>('registro', null, async (id, signal) => { const values = await api.request<Destination[]>(`${base}/destinations`, { signal }); const value = values.find(d => String(d.id) === id); if (!value) throw new Error('Destino no disponible.'); return value; }), [revision, setRevision] = useState(0);
   return <section className="card"><h2>Órdenes de compra · Destinos</h2><p>Los destinos se administran aquí y se seleccionan al registrar una orden. La edición conserva su identificador.</p><p>Los demás ajustes del módulo requieren definición.</p>
     <Notice>{result.error}</Notice>{result.error && <button onClick={result.reload}>Reintentar destinos</button>}
     {editable && <><Form key={`${selected?.id ?? 'new'}-${revision}`} fields={[{ name: 'destination', label: 'Nombre del destino', required: true, maxLength: 255 }]} initial={selected ? { destination: selected.destination } : {}} submit={selected ? 'Guardar destino' : 'Agregar destino'} onSubmit={async fields => {

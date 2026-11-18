@@ -224,3 +224,7 @@ La API puede reutilizar la identidad autenticada entre el filtro y el controlado
 Esto no almacena autorizaciones: cada dominio conserva sus comprobaciones de permisos, estado del módulo, cuotas, propiedad, versiones y auditoría. CSRF y origen siguen comprobándose antes de la operación. La actividad de sesión se actualiza durante la autenticación válida; no se introduce una ventana de revocación por caché compartida.
 
 Contabilidad conserva permisos Core sobre `contabilidad/libros`: lectura, edición de cuentas/períodos/borradores y contabilización; `eliminar` permite cancelar borradores o reversar. Cada fuente requiere también lectura de su módulo. No se crean grants para otros roles. Auditoría y escrituras se confirman juntas; los conflictos de versión no sobrescriben datos.
+
+## Autorización de enlaces directos — 2026-11-18
+
+Las rutas web no son autorizaciones. Antes de montar una pantalla, el frontend comprueba el catálogo activo, sección, alcance y acción con los permisos existentes. La API conserva sus comprobaciones por petición y objeto, CSRF, TOTP e idempotencia. No se incluyen credenciales, tokens ni borradores en URL/history; abrir una ruta no crea, envía, paga ni elimina datos. Las rutas de edición y administración se rechazan para cuentas sin permiso, también al pegarlas directamente. Ver [navegación web](14-navegacion-web.md).

@@ -89,3 +89,7 @@ La [infraestructura inicial de Licitaciones](modulos/licitaciones-infraestructur
 Forma técnica de representar la lista permitida por ambiente y el estado activo elegido en Ajustes, recuperación ante cambios incompatibles, compatibilidad semántica, eventos internos y política de datos al retirar un módulo. El control combinado de despliegue y Ajustes, la autorización exclusiva del Administrador y la auditoría están confirmados; artefactos cargables en runtime no forman parte del primer release.
 
 Contabilidad (`contabilidad`) se registra desactivada y requiere migración exacta y allowlist; su ámbito es `libros` (`ver`, `editar`, `eliminar`). Ajustes expone cuentas y períodos. No concede permisos a roles personalizados. Los contratos de lectura para integración pertenecen a los módulos de origen y preservan su autorización.
+
+## Rutas de los módulos web — 2026-11-18
+
+Cada pantalla navegable registra su ruta y parámetros en `web/src/routes.ts`; los estados de pestaña y registro usan el adaptador central `routing.tsx`. Reutilizar las comprobaciones de `navigation.ts` y los permisos del dominio. Una URL debe reconstruir la pantalla mediante lecturas autorizadas, nunca ejecutar una mutación. Mantener Atrás/Adelante y las guardas de cambios sin guardar. Ver [inventario de rutas](14-navegacion-web.md).

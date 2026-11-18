@@ -138,3 +138,7 @@ En rutas con dos llamadas a `actor`, como el detalle de Cotizaciones, el camino 
 ## Integración contable — 2026-11-16
 
 `bastion-contabilidad` posee sus cuentas, períodos y libro. Consume `accounting_snapshot` de los servicios de Gastos, Facturas y Órdenes en una transacción compartida: cada propietario comprueba disponibilidad y permiso, y bloquea su documento hasta concluir. Contabilidad no consulta SQL de esos dominios. Sus mutaciones adquieren primero el bloqueo de su módulo; los propietarios no llaman de vuelta al libro. Los asientos contabilizados son inmutables; cambios posteriores del origen requieren conciliación explícita.
+
+## Navegación web por URL — 2026-11-18
+
+El cliente React/TypeScript usa React Router 8.5.1 con History API. El core del frontend registra rutas y permisos en `routes.ts`, y sincroniza pantallas con el historial en `routing.tsx`. No añade renderizado en servidor ni modifica API, MySQL o despliegue estático. Ver [contrato de navegación](14-navegacion-web.md).

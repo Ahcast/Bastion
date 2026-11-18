@@ -1,11 +1,14 @@
+import { useNavigationGuard } from '../navigationGuard.js';
+import { useRouteState, enumRoute } from '../routing.js';
 import { lazy, Suspense, useState } from 'react';
 import { message } from '../api.js';
 import { Form, Heading, Loading, Notice, Table, useCore, useLoad } from '../ui.js';
 import type { Device, Enrollment, PageResult, Person, SecurityEvent, Session } from '../types.js';
 const TotpSetup = lazy(() => import('../components/TotpSetup.js'));
 export default function Account() {
-  const [tab, setTab] = useState('profile');
-  return <><Heading title="Mi cuenta" description="Perfil, sesiones, dispositivos y credenciales SMTP." /><div className="row section-tabs" aria-label="Mi cuenta">{[['profile', 'Perfil'], ['security', 'Seguridad'], ['smtp', 'SMTP personal']].map(([id, title]) => <button key={id} aria-pressed={tab === id} onClick={() => setTab(id!)}>{title}</button>)}</div><section key={tab} className="card">{tab === 'profile' ? <Profile /> : tab === 'security' ? <Security /> : <Smtp />}</section></>;
+  const { navigate } = useNavigationGuard();
+  const [tab, setTab] = useRouteState('vista', 'profile', enumRoute(['profile', 'security', 'smtp']));
+  return <><Heading title="Mi cuenta" description="Perfil, sesiones, dispositivos y credenciales SMTP." /><div className="row section-tabs" aria-label="Mi cuenta">{[['profile', 'Perfil'], ['security', 'Seguridad'], ['smtp', 'SMTP personal']].map(([id, title]) => <button key={id} aria-pressed={tab === id} onClick={() => void navigate(() => setTab(id!))}>{title}</button>)}</div><section key={tab} className="card">{tab === 'profile' ? <Profile /> : tab === 'security' ? <Security /> : <Smtp />}</section></>;
 }
 function Profile() {
   const { api, notify } = useCore(), result = useLoad(signal => api.request<Person>('/api/v1/account/profile', { signal }));

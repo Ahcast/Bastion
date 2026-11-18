@@ -1,3 +1,4 @@
+import { useRouteState, enumRoute, numberRoute, pageRoute } from '../routing.js';
 import { useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { ApiError, message } from '../api.js';
@@ -15,7 +16,7 @@ import type { Expedient, ExpedientSummary, GlobalVariable, FormSection, Publishe
 
 export default function Licitaciones() {
   const { access } = useCore();
-  const [id, setId] = useState<number | null>(null);
+  const [id, setId] = useRouteState<number | null>('registro', null, numberRoute);
   if (!moduleCan(access, 'licitaciones', 'expedientes', 'ver')) return <Notice>No tienes acceso a Licitaciones.</Notice>;
   return <div className="document-workspace">{id === null ? <ExpedientList open={setId} /> : <ExpedientWorkspace key={id} id={id} back={() => setId(null)} />}</div>;
 }
@@ -26,7 +27,7 @@ function stateLabel(state: string) {
 }
 function ExpedientList({ open }: { open: (id: number) => void }) {
   const { api, access } = useCore();
-  const [page, setPage] = useState(1), [busy, setBusy] = useState(false), [error, setError] = useState('');
+  const [page, setPage] = useRouteState('pagina', 1, pageRoute), [busy, setBusy] = useState(false), [error, setError] = useState('');
   const attempt = useRef<string | null>(null);
   const result = useLoad(signal => api.request<TenderPage<ExpedientSummary>>(`/api/v1/licitaciones?page=${page}`, { signal }), [page]);
   return <><Heading title="Licitaciones" description="Prepara y consulta tus expedientes con los formularios de la biblioteca." action={moduleCan(access, 'licitaciones', 'expedientes', 'editar') && <button className="primary" disabled={busy} onClick={async () => {
@@ -44,8 +45,9 @@ type Tab = 'resumen' | 'variables' | FormSection | 'pdf' | 'adjudicaciones';
 function ExpedientWorkspace({ id, back }: { id: number; back: () => void }) {
   const { api, access, notify } = useCore(), { navigate, saveAll, saveError } = useNavigationGuard();
   const result = useLoad(signal => api.request<Expedient>(`/api/v1/licitaciones/${id}`, { signal }), [id]);
-  const [tab, setTab] = useState<Tab>('resumen'), [copying, setCopying] = useState(false), [deleting, setDeleting] = useState(false);
-  const [visited, setVisited] = useState<Set<Tab>>(() => new Set(['resumen']));
+  const [tab, setTab] = useRouteState<Tab>('vista', 'resumen', enumRoute<Tab>(['resumen', 'variables', 'legal', 'economica', 'tecnica', 'pdf', 'adjudicaciones'])), [copying, setCopying] = useState(false), [deleting, setDeleting] = useState(false);
+  const [visited, setVisited] = useState<Set<Tab>>(() => new Set(['resumen', tab]));
+  useEffect(() => { setVisited(current => current.has(tab) ? current : new Set([...current, tab])); }, [tab]);
   const showTab = (next: Tab) => { setVisited(current => new Set([...current, next])); setTab(next); };
   const record = result.data;
   const currentRecord = useRef<Expedient | null>(null);

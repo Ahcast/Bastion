@@ -1,3 +1,4 @@
+import { useRouteState, pageRoute } from '../routing.js';
 import { useEffect, useRef, useState } from 'react';
 import TenderEconomicPreview from './TenderEconomicPreview.js';
 import { message } from '../api.js';
@@ -14,7 +15,7 @@ export default function TenderLots({ record, latest = () => record, onDraftInfo,
   const { api } = useCore();
   const count = Number(record.variables?.find(v => v.key === 'lotes')?.value ?? 0);
   const style = record.variables?.find(v => v.key === 'stylo')?.value;
-  const [number, setNumber] = useState(1), [drafts, setDrafts] = useState<Record<number, Item[]>>({}), [busy, setBusy] = useState(false), [error, setError] = useState('');
+  const [number, setNumber] = useRouteState('lote', 1, pageRoute), [drafts, setDrafts] = useState<Record<number, Item[]>>({}), [busy, setBusy] = useState(false), [error, setError] = useState('');
   const [sizes, setSizes] = useState<Record<number, string>>({});
   const baseline = useRef<Record<number, string>>({});
   const sizeBaseline = useRef<Record<number, string>>({});

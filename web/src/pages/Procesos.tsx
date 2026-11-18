@@ -1,3 +1,4 @@
+import { useRouteState, enumRoute, nullableStringRoute, pageRoute } from '../routing.js';
 import { useEffect, useRef, useState } from 'react';
 import '../styles/procesos.css';
 import '../styles/shortlist.css';
@@ -19,14 +20,15 @@ type ProcessProps = { openQuote?: (seed: ProcessQuoteSeed) => void; userId?: num
 
 export default function Procesos({ openQuote, userId = 0 }: ProcessProps = {}) {
   const { access } = useCore();
-  const [tenders, setTenders] = useState(false);
+  const [kind, setKind] = useRouteState<'compras' | 'licitaciones'>('vista', 'compras', enumRoute(['compras','licitaciones']));
+  const tenders = kind === 'licitaciones';
   const [opened, setOpened] = useState(false);
   const view = moduleCan(access, 'procesos', 'consulta', 'ver');
   const select = (next: boolean) => {
     if (next) setOpened(true);
-    setTenders(next);
+    setKind(next ? 'licitaciones' : 'compras');
   };
-  return <ShortlistProvider key={userId} userId={userId} enabled={opened && view}>
+  return <ShortlistProvider key={userId} userId={userId} enabled={(opened || tenders) && view}>
     {view && <ProcessTabs tenders={tenders} select={select} />}
     <div hidden={view && tenders}><ComprasMenores openQuote={openQuote} /></div>
     {view && tenders && <LicitacionesProcesos />}
@@ -44,7 +46,7 @@ function ProcessTabs({ tenders, select }: { tenders: boolean; select: (value: bo
 function ComprasMenores({ openQuote }: ProcessProps) {
   const { api, access, notify } = useCore();
   const [filters, setFilters] = useState<ProcessFilters>(initialProcessFilters), [search, setSearch] = useState('');
-  const [page, setPage] = useState(1), [refreshing, setRefreshing] = useState(false), [busy, setBusy] = useState(false), [selected, setSelected] = useState<string | null>(null);
+  const [page, setPage] = useRouteState('pagina', 1, pageRoute), [refreshing, setRefreshing] = useState(false), [busy, setBusy] = useState(false), [selected, setSelected] = useRouteState<string | null>('registro', null, nullableStringRoute);
   // Keep confirmed local reviews over an older response already in flight.
   const [reviews, setReviews] = useState<Record<string, ProcessReview>>({});
   const reviewed = (row: ProcessRecord): ProcessRecord => { const review = reviews[row.proceso_id]; return review && review.version >= row.version ? { ...row, ...review } : row; };
@@ -58,6 +60,8 @@ function ComprasMenores({ openQuote }: ProcessProps) {
     const data = view ? await api.request<ProcessPage>(`/api/v1/procesos/rows?${query}&page=${page}&page_size=25`, { signal }) : { items: [], total: 0, server_time: new Date().toISOString(), page, page_size: 25, has_more: false };
     return { ...data, requestedAt };
   }, [view, query, page], true);
+  const missing = Boolean(selected && result.data && !result.data.items.some(row => row.proceso_id === selected));
+  const direct = useLoad(signal => selected && view && missing ? api.request<ProcessRecord>(`/api/v1/procesos/rows/${encodeURIComponent(selected)}`, { signal }) : Promise.resolve(null), [selected, view, missing]);
   const status = useLoad(signal => view ? api.request<ProcessStatus>('/api/v1/procesos/status', { signal }) : Promise.resolve(null), [view]);
   const entities = useLoad(signal => view ? api.request<{ entities: string[] }>('/api/v1/procesos/entities', { signal }) : Promise.resolve({ entities: [] }), [view]);
   const reload = () => { result.reload(); };
@@ -123,6 +127,7 @@ function ComprasMenores({ openQuote }: ProcessProps) {
       <ProcessInsights status={status.data} /><Notice>{status.error}</Notice>
       <section className="process-workspace" aria-label="Consulta de procesos"><div className="process-list-heading"><h2>Explorar procesos vigentes</h2><p>{result.data ? `${result.data.total} resultados` : 'Consultando…'}<span> · </span>Última importación: {status.data?.last_import_at ? processDate(status.data.last_import_at) : '—'}</p></div>
         <ProcessFilterBar values={filters} entities={entities.data?.entities ?? []} change={changeFilters} /><Notice>{entities.error}</Notice>
+        <Notice>{direct.error}</Notice>{selected && direct.data && !result.data?.items.some(row => row.proceso_id === selected) && <section className="card"><button onClick={() => setSelected(null)}>Cerrar proceso</button><Detail key={selected} summary={reviewed(direct.data)} synchronize={saved} save={updateReview} openQuote={openQuote} /></section>}
         <Notice>{result.error}</Notice>{result.error && <button onClick={reload}>Reintentar consulta</button>}{result.data ? <><ProcessTable rows={result.data.items.map(reviewed)} selected={selected} select={setSelected} canMark={moduleCan(access, 'procesos', 'marcas', 'editar')} busy={busy} mark={async (row, marked) => {
           setBusy(true);
           try { await updateReview(row, { marked }); }
