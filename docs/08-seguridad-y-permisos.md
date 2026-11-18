@@ -228,3 +228,7 @@ Contabilidad conserva permisos Core sobre `contabilidad/libros`: lectura, edici�
 ## Autorización de enlaces directos — 2026-11-18
 
 Las rutas web no son autorizaciones. Antes de montar una pantalla, el frontend comprueba el catálogo activo, sección, alcance y acción con los permisos existentes. La API conserva sus comprobaciones por petición y objeto, CSRF, TOTP e idempotencia. No se incluyen credenciales, tokens ni borradores en URL/history; abrir una ruta no crea, envía, paga ni elimina datos. Las rutas de edición y administración se rechazan para cuentas sin permiso, también al pegarlas directamente. Ver [navegación web](14-navegacion-web.md).
+
+## Parche de dependencia de correo — 2026-11-18
+
+La auditoría CI detectó los avisos RUSTSEC-2026-0560 a RUSTSEC-2026-0565, publicados el 2026-11-17, sobre `lettre 0.11.23`. Se actualiza a `0.11.24` y su dependencia `email-encoding` a `0.4.3`, sin excepciones nuevas en el auditor. Fuente: [RustSec / lettre](https://github.com/RustSec/advisory-db/tree/main/crates/lettre). Compilación, pruebas de dominio y auditoría se comprueban en CI. La actualización en Git no implica que el backend activo en AWS ya tenga este parche; el despliegue de esta tarea es del frontend en Bluehost.
