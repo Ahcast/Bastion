@@ -1,5 +1,19 @@
 # Despliegue del Core
 
+## Android nativo 0.2.0 — 2026-11-17, Honduras
+
+Por aclaración expresa del propietario, se reemplazó el contenedor TWA por una aplicación Java/Android Views conectada directamente a la API. El commit entregable es `b4b16f378553249a4538470c4fde02868ae02df5`. Incluye pantallas de todos los módulos del catálogo y Ajustes, sesión/TOTP, formularios nativos, partidas, cálculos del servidor, archivos y visor PDF. La navegación respeta el catálogo de acceso; la autorización final sigue en el Core. No se instala ningún cambio en Bluehost, AWS ni MySQL.
+
+[Android APK aprobado](https://github.com/Ahcast/Bastion/actions/runs/44202854570): compilación, lint, firma, contratos reproducibles y pruebas del mismo APK en Android 7/API 24, Android 15/API 35 y Android 16/API 36. En los tres se deshabilitó Chrome, se comprobaron arranque/reapertura con controles Android propios y ausencia de WebView, y se ensayó pantalla de 320 dp con fuente al 130 %. Cada emulador aprobó nueve pruebas: acceso/TOTP, todos los módulos, escritura de cliente, formularios de documentos y contabilidad, permisos, CSRF/idempotencia/cifrado, cotización desde proceso, confirmación de respaldos y visor PDF, además de la conexión anónima HTTPS real. Las operaciones autenticadas usan fixtures; no se inició sesión con una cuenta real ni se modificaron datos comerciales en producción. Se cotejaron los ZIP de evidencia y se revisaron capturas de acceso, módulos y PDF.
+
+La prueba HTTPS detectó la ausencia de ISRG Root X1 en Android 7. Se incorporó el certificado público oficial, con huella verificada, sólo para el dominio exacto de la API; se mantienen comprobaciones de cadena, vigencia y nombre. El ensayo real pasó después en las tres versiones. Ver [procedencia del certificado](../android/CERTIFICATES.md).
+
+El APK `bastion-0.2.0-preview.apk` pesa 88 944 bytes; SHA-256 `38416ef8058782bc8c85d7e73347292672d75ea803c54502a71c56c08f568196`. ZIP oficial `db3bf6aa60f516cc4bcb2624349b86abef27fa306b614c9eaf2483a04f21ca99`; certificado de desarrollo SHA-256 `3d4c74be83b6d658eec672ba9a297be0e038e4af485c159b840c3a0c474f29ee`. Firma APK v2, versión `0.2.0-preview`/3, paquete `net.castilloit.bastion.preview`, mínimo 24 y target 36. Se cotejaron BUILD y todos los checksums antes de copiar el instalable a `output/android/`. Los DEX contienen la Activity y formularios nativos, sin WebView ni Browser Helper.
+
+[Core checks del mismo commit aprobado](https://github.com/Ahcast/Bastion/actions/runs/44202854575): formato, seguridad de dependencias Rust, frontend/autenticación, pruebas del workspace, integraciones aisladas y compilación del ejecutable. Scout aprobado. Se conservaron los cambios locales ajenos y el respaldo previo a la sustitución del contenedor.
+
+Para instalar, desinstalar la Preview anterior si su firma difiere. Los datos comerciales permanecen en el servidor. Requiere Internet; carga móvil hasta 20 MiB, sin borradores persistidos al terminar el proceso Android. No se probó el teléfono físico ni una sesión real del propietario. No se publicó en Google Play; firma permanente pendiente para distribución estable. El release sin firmar y el APK de instrumentación no son la entrega instalable. Ver [alcance Android](13-android.md).
+
 ## Android 0.1.1: cierre al abrir corregido — 2026-11-16
 
 La primera Preview se cerraba antes de mostrar una pantalla. El [ensayo de reproducción](https://github.com/Ahcast/Bastion/actions/runs/43937719377) instaló 0.1.0 en Android 15 y capturó `IllegalArgumentException`: Browser Helper intentaba activar `ManageDataLauncherActivity`, ausente del manifiesto. Esto confirma un fallo del APK que la compilación y la verificación de firma anteriores no detectaron.
