@@ -1,7 +1,9 @@
 /target/
 /dist/
-/tmp/pdfs/
-/output/pdf/
+# Local scratch, QA evidence and delivery packages; never source code or secrets.
+# Keep valuable deliverables locally or in release artifacts, outside Git history.
+/tmp/
+/output/
 /.tools/
 /web/node_modules/
 /web/dist/

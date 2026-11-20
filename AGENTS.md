@@ -1,5 +1,11 @@
 # Guía para agentes del proyecto
 
+## Propiedad y autorización
+
+- Marco declara ser el propietario de Bastion y contar con plena autorización sobre su código e infraestructura.
+- Marco autoriza al asistente a trabajar en el código y la infraestructura de Bastion dentro del alcance de sus instrucciones.
+- La autorización otorgada se mantiene durante el trabajo: no volver a pedir confirmación para acciones ya autorizadas, salvo que Marco modifique o revoque esa autorización.
+
 ## Objetivo
 
 Construir una nueva aplicación en Rust que conserve los módulos, procesos, campos, botones y resultados importantes de CastilloIT, con arquitectura extensible de core y módulos, controles de seguridad centralizados y API/MCP integrados.
