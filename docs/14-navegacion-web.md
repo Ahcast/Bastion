@@ -54,3 +54,11 @@ Bluehost debe responder con `index.html` cuando la ruta no corresponde a un arch
 Pruebas locales/CI: `npm test`, `npm run build`, `npm audit --omit=dev --audit-level=high`. Las nuevas suites `routing.test.tsx` y `app-routes.test.tsx` cubren catálogo, rechazo de parámetros ajenos, permisos, lectura directa, historial, agrupación de entradas, cancelación de cargas y guardas. No crean usuarios ni registros en producción.
 
 Comprobación manual con una cuenta existente: abrir un listado, abrir un documento, usar Atrás y Adelante; copiar la URL en otra pestaña y recargar; entrar a Ajustes y sus secciones; editar un campo y probar cancelar/descartar la salida; comprobar que un usuario de solo lectura no abre `?modo=edit`. Un documento eliminado o no autorizado debe mostrar error sin revelar su contenido.
+
+## Trabajo en varias pestañas — 2026-11-20
+
+El menú principal, las secciones de Ajustes y los accesos «Ver módulo» del inicio usan enlaces reales a las rutas centrales. Clic derecho permite abrir otra pestaña o copiar el enlace; Ctrl+clic, Cmd+clic, botón central y pulsación prolongada en móvil conservan el comportamiento nativo del navegador. El clic normal mantiene navegación SPA y sus guardas. Abrir otra pestaña no descarta el borrador de la original.
+
+Las pestañas del mismo perfil comparten la sesión de cookies existente; abrirlas no equivale a iniciar sesión en otro dispositivo. Cada pantalla mantiene sus borradores en memoria y carga los permisos actuales mediante la API. El endpoint CSRF reutiliza una cookie válida y ya tiene una regresión para recargas/pestañas. Las escrituras versionadas conservan `If-Match`: editar el mismo registro desde dos pestañas puede requerir revisar un conflicto de versión. No se comparten borradores automáticamente.
+
+`NavigationLink.tsx` intercepta solamente clic primario sin modificadores y destino en la misma pestaña. Las pruebas cubren href, modificadores, botón central, destino `_blank` y conservación del aviso de cambios sin guardar.

@@ -132,7 +132,7 @@ async function workspace(options: { editable?: boolean; quotesActive?: boolean; 
   const root = createRoot(container);
   await act(async () => root.render(<NavigationGuardProvider>{options.standaloneQuote || options.standaloneProcess ? <CoreContext.Provider value={{ api, access, notify: () => {} }}>{options.standaloneQuote ? <Cotizaciones processSeed={quoteFromProcess(record)} /> : <Procesos openQuote={() => { opened++; }} />}</CoreContext.Provider> : <App api={api} />}</NavigationGuardProvider>));
   const until = async (find: () => Element | null) => { for (let i = 0; i < 80; i++) { if (find()) return find()!; await act(async () => { await new Promise(resolve => setTimeout(resolve, 15)); }); } assert.fail('Expected element did not appear'); };
-  const button = (text: string) => Array.from(container.querySelectorAll('button')).find(button => button.textContent === text) ?? null;
+  const button = (text: string) => Array.from(container.querySelectorAll('button, a.navigation-link')).find(button => button.textContent === text) ?? null;
   const click = async (element: Element) => { await act(async () => { element.dispatchEvent(new MouseEvent('click', { bubbles: true })); }); };
   const dispose = async () => { release?.(); await act(async () => root.unmount()); container.remove(); };
   return { container, calls, button, until, click, dispose, detailCalls: () => detailCalls, opened: () => opened, release: async () => { await act(async () => { release?.(); }); } };
@@ -141,7 +141,7 @@ async function workspace(options: { editable?: boolean; quotesActive?: boolean; 
 test('real App navigation opens the prefilled editor without a modal or write; normal save retains quantities, CSRF and idempotency', async () => {
   const app = await workspace();
   try {
-    await app.click(await app.until(() => app.container.querySelector('nav button:nth-child(2)')));
+    await app.click(await app.until(() => app.container.querySelector('nav a:nth-child(2)')));
     await app.click(await app.until(() => app.container.querySelector('tbody button[aria-expanded]')));
     await app.click(await app.until(() => app.button('Convertir a cotización')));
     await app.until(() => app.container.querySelector('.quote-form'));

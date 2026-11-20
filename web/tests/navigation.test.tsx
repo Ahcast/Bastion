@@ -12,7 +12,7 @@ test('main navigation groups all account and administration screens under Ajuste
   assert.deepEqual(settingsSections(admin).map(entry => entry.label), ['Mi cuenta', 'Personas', 'Usuarios', 'Roles y permisos', 'Core', 'Respaldos y restauración']);
   const markup = renderToStaticMarkup(<SettingsNavigation access={admin} section="personas" select={() => {}} />);
   assert.ok(markup.includes('aria-label="Secciones de Ajustes"'));
-  assert.ok(markup.includes('aria-current="page">Personas'));
+  assert.match(markup, /<a[^>]*aria-current="page"[^>]*href="\/ajustes\/personas"[^>]*>Personas<\/a>/);
 });
 
 test('MCP settings are hidden unless explicitly enabled', () => {

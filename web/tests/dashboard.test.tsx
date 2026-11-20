@@ -57,12 +57,12 @@ test('selection replaces charts and rows, range changes cancel old loads and ref
     assert.equal(app.calls.length, 2); assert.ok(app.container.textContent?.includes('EXP-REAL')); assert.ok(!app.container.textContent?.includes('COT-000001'));
     await app.click(app.container.querySelectorAll('[role="tab"]')[1]!);
     assert.ok(app.container.textContent?.includes('COT-000001')); assert.ok(!app.container.textContent?.includes('EXP-REAL'));
-    await app.click(Array.from(app.container.querySelectorAll('button')).find(button => button.textContent?.startsWith('Ver cotizaciones'))!);
+    await app.click(Array.from(app.container.querySelectorAll('button, a.navigation-link')).find(button => button.textContent?.startsWith('Ver cotizaciones'))!);
     assert.equal(app.opened(), 'cotizaciones');
     const select = app.container.querySelector('select')!;
     await act(async () => { select.value = 'all'; select.dispatchEvent(new Event('change', { bubbles: true })); });
     assert.equal(app.calls.length, 4); assert.equal(app.calls[0]!.signal?.aborted, true); assert.equal(app.calls[2]!.period, 'all');
-    await app.click(Array.from(app.container.querySelectorAll('button')).find(button => button.textContent === 'Actualizar')!);
+    await app.click(Array.from(app.container.querySelectorAll('button, a.navigation-link')).find(button => button.textContent === 'Actualizar')!);
     assert.equal(app.calls.length, 6);
     await app.click(app.container.querySelectorAll('[role="tab"]')[4]!);
     assert.ok(app.container.textContent?.includes('Este módulo no está disponible')); assert.ok(!app.container.textContent?.includes('COT-000001'));

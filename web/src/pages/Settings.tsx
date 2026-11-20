@@ -1,3 +1,4 @@
+import { NavigationLink } from '../components/NavigationLink.js';
 import { useRouteState, enumRoute } from '../routing.js';
 import BackupSettings from './BackupSettings.js';
 import CollaborationSettings from './CollaborationSettings.js';
@@ -19,7 +20,7 @@ const ProcessSettings = lazy(() => import('./ProcessSettings.js'));
 const SupplierSettings = lazy(() => import('./Proveedores.js').then(module => ({ default: module.SupplierSettings })));
 const TenderSettings = lazy(() => import('./Licitaciones.js').then(module => ({ default: module.TenderSettings })));
 export function SettingsNavigation({ access, section, select, mcpEnabled = false }: { access: Access; section: SettingsSection; select: (section: SettingsSection) => void; mcpEnabled?: boolean }) {
-  return <nav className="settings-navigation" aria-label="Secciones de Ajustes">{settingsSections(access, mcpEnabled).map(entry => <button key={entry.id} aria-current={section === entry.id ? 'page' : undefined} onClick={() => select(entry.id)}>{entry.label}</button>)}</nav>;
+  return <nav className="settings-navigation" aria-label="Secciones de Ajustes">{settingsSections(access, mcpEnabled).map(entry => <NavigationLink route={{ page: 'ajustes', section: entry.id, values: {} }} key={entry.id} aria-current={section === entry.id ? 'page' : undefined} onNavigate={() => select(entry.id)}>{entry.label}</NavigationLink>)}</nav>;
 }
 const OrderSettings = lazy(() => import('./OrdenesCompra.js').then(module => ({ default: module.OrderSettings })));
 const AccountingSettings = lazy(() => import('./Contabilidad.js').then(module => ({ default: module.AccountingSettings })));

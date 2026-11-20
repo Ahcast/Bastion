@@ -325,3 +325,7 @@ El primer corte de Contabilidad quedó publicado y activo el 2026-11-16 con `ca7
 ## Dos sesiones simultáneas — 2026-11-16
 
 Decisión autorizada: ampliar el límite a dos para PC y móvil. El bloqueo transaccional del usuario serializa los accesos; un tercer acceso completo reemplaza la sesión más antigua. Se mantienen expiración, CSRF por sesión, TOTP, revocación individual y global por acciones de seguridad. La revalidación TOTP sólo renueva el dispositivo identificado por su cookie e IP. No requiere migraciones ni cambios de frontend. La verificación de seguridad usa bases desechables de CI, sin cuentas ni registros de prueba en producción.
+
+## Decisión de navegación — 2026-11-20
+
+A solicitud del propietario, se habilita abrir módulos y secciones de Ajustes en pestañas independientes mediante enlaces HTML reales. Se mantienen rutas, permisos, sesión y guardas de salida. Ver [trabajo en varias pestañas](14-navegacion-web.md#trabajo-en-varias-pestañas--2026-11-20).
