@@ -329,3 +329,5 @@ Decisión autorizada: ampliar el límite a dos para PC y móvil. El bloqueo tran
 ## Decisión de navegación — 2026-11-20
 
 A solicitud del propietario, se habilita abrir módulos y secciones de Ajustes en pestañas independientes mediante enlaces HTML reales. Se mantienen rutas, permisos, sesión y guardas de salida. Ver [trabajo en varias pestañas](14-navegacion-web.md#trabajo-en-varias-pestañas--2026-11-20).
+
+Publicado en Bluehost el 2026-11-20 con `71d210c`: enlaces nativos del menú, Ajustes e Inicio, 199 pruebas frontend aprobadas y apertura simultánea de Cotizaciones/Facturas verificada en Chrome. [Comprobante y respaldo](09-despliegue.md#navegación-en-varias-pestañas-publicada--2026-11-20-honduras).

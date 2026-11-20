@@ -423,3 +423,12 @@ La navegación web usa rutas de módulos, secciones y registros. Bluehost conser
 - Este despliegue cambia el frontend Bluehost. El parche `lettre 0.11.24` está en GitHub y pasó CI; **su activación en el backend AWS queda pendiente de un despliegue del backend**. No se reinició AWS ni se aplicaron migraciones de base de datos.
 
 Contrato y ejemplos: [Navegación web](14-navegacion-web.md).
+
+## Navegación en varias pestañas publicada — 2026-11-20 (Honduras)
+
+- Frontend activo en Bluehost: `71d210c44926d906287eefe78a69a85e8246efc9`, publicado a las 08:17. Menú principal, secciones de Ajustes y accesos a módulos desde Inicio usan enlaces nativos; el clic normal conserva navegación SPA y guardas.
+- [Core checks 44751212082](https://github.com/Ahcast/Bastion/actions/runs/44751212082): frontend aprobado con 199 pruebas, compilación y auditoría npm sin vulnerabilidades. Las regresiones incluyen modificadores, botón central, destinos y aviso de cambios sin guardar. Formato y auditoría Rust aprobados.
+- Artifact web `14635830912`: ZIP SHA-256 `2ff5c0490e11e2522efa9aa226e1969c4d7e718769d2a6c6ec4aa7f9ca0aaddc`; paquete tar.gz SHA-256 `94aea2b7d951a94d7359b370fe491d67526bab032bf1841a827737911a06c16d`. BUILD y 55 archivos verificados; 53 recursos públicos cotejados por HTTPS.
+- Respaldo privado anterior: `~/.config/bastion/backups/before-new-tabs-20261120T141704Z.tar.gz`, 5,829,518 bytes, SHA-256 `a064390ca38e9cfd69ca3c514b51e9c6e1dbefd1e67e3d84332312379aa76114`. Contenido cotejado antes de reemplazar el index. Conservados config.js, reglas Apache, CSP y assets anteriores. Instaladores temporales retirados; entrega activa y respaldo conservados.
+- Chrome con una sesión existente: clic normal a Cotizaciones y Ctrl+clic a Facturas; ambas pestañas cargaron sus respectivos módulos, conservando la original en Cotizaciones y sin nuevo ingreso. No se crearon cuentas ni registros de prueba en producción.
+- Esta publicación modifica únicamente el frontend Bluehost. No cambia permisos, límite de sesiones, API ni MySQL; no se reinició AWS ni se aplicaron migraciones. La publicación pendiente del parche de correo del backend conserva el estado registrado el 2026-11-18.
