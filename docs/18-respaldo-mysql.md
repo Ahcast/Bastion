@@ -46,3 +46,13 @@ El temporizador existente inicia a las 17:00 America/Tegucigalpa. Se configuró 
 Se verificó en AWS la copia programada `backups/bastion-backup-2026-11-06-170131.zip` (73.194.318 bytes). Coincidieron su SHA-256, el inventario, los hashes de las entradas y la firma comprobada con la clave independiente de S3. Contiene la exportación MySQL, 10 archivos locales y 83 objetos S3. La copia corresponde al backend `1e64d1c5f82ac49ce170c3c3108148c1074eccac`.
 
 En MySQL 5.7.44 portátil, aislado y sin conexiones TCP, se exportó y restauró una base ficticia de 87 tablas con factura, cotización y orden. Se ensayaron los tres cambios de esquema de Adjudicaciones → Facturas. Tras revertirlos, una nueva exportación coincidió byte por byte. Se detuvo el proceso temporal. No se exportaron datos reales fuera de AWS ni se importó el respaldo real; la recuperación completa sigue sin ensayar.
+
+## Recuperación integral aislada verificada — 2026-11-20
+
+La recuperación completa de datos que seguía pendiente el 6 de noviembre se ensayó con el respaldo real `backups/bastion-backup-2026-11-20-105759.zip`: 80,006,485 bytes, SHA-256 `84278edb5d13fcf5b558d7f2264db1b5dd329521aa53c52a419e0c22165b9871`. El ZIP y la clave independiente se recuperaron desde S3 dentro de AWS; se verificaron firma, inventario y hashes.
+
+El motor instalado restauró 112 tablas en MySQL 5.7.44 nuevo, 10 archivos locales y 104 objetos mediante una API S3 temporal aislada. Se cotejaron esquemas y todas las filas contra una importación de referencia, admitiendo sólo la revocación esperada de sesiones/dispositivos. Se comprobaron hashes de objetos/archivos, integridad de dos SQLite, recuperación de clave y descifrado de cinco valores. El backend original arrancó sobre la copia; el backend actualizado también pasó lectura/cálculo de 41 documentos, PDF y controles de acceso.
+
+No se escribió contra MySQL/S3 productivos durante la restauración. El ensayo no repone infraestructura AWS ni sobrescribe el bucket real: valida el motor de datos usando protocolo S3 en Moto dentro de namespaces sin red externa y chroot sin credenciales productivas. Duración del ensayo preparado: 197.7 segundos; no incluye provisionamiento ni descarga. Todos los datos y servicios temporales se retiraron. [Método, comprobantes y límites](21-cierre-operativo-produccion.md).
+
+Para una pérdida real de servidor se mantiene el procedimiento anterior: instalar el commit del manifiesto, recuperar configuración de infraestructura por el canal del operador, preparar base vacía y almacenamiento privado, restaurar y verificar antes de habilitar acceso. Nunca usar la base productiva para repetir este ensayo.

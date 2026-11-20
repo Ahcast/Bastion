@@ -432,3 +432,13 @@ Contrato y ejemplos: [Navegación web](14-navegacion-web.md).
 - Respaldo privado anterior: `~/.config/bastion/backups/before-new-tabs-20261120T141704Z.tar.gz`, 5,829,518 bytes, SHA-256 `a064390ca38e9cfd69ca3c514b51e9c6e1dbefd1e67e3d84332312379aa76114`. Contenido cotejado antes de reemplazar el index. Conservados config.js, reglas Apache, CSP y assets anteriores. Instaladores temporales retirados; entrega activa y respaldo conservados.
 - Chrome con una sesión existente: clic normal a Cotizaciones y Ctrl+clic a Facturas; ambas pestañas cargaron sus respectivos módulos, conservando la original en Cotizaciones y sin nuevo ingreso. No se crearon cuentas ni registros de prueba en producción.
 - Esta publicación modifica únicamente el frontend Bluehost. No cambia permisos, límite de sesiones, API ni MySQL; no se reinició AWS ni se aplicaron migraciones. La publicación pendiente del parche de correo del backend conserva el estado registrado el 2026-11-18.
+
+## Backend actualizado y recuperación ensayada — 2026-11-20
+
+Se publicó `71d210c44926d906287eefe78a69a85e8246efc9` en Lightsail a las 11:03 de Honduras, con [Core checks aprobados](https://github.com/Ahcast/Bastion/actions/runs/44751212082). Queda activado el parche de correo `lettre 0.11.24` / `email-encoding 0.4.3` que estaba pendiente el 18 de noviembre. No hubo migraciones ni cambios de configuración o arquitectura. Bluehost ya tenía el frontend de ese commit.
+
+Se verificó el ejecutable del proceso activo, readiness HTTPS/MySQL 200, cuatro rutas privadas anónimas 401 y CORS para el origen exacto. Continúan activos API, respaldos, Scout, protección de salida MCP y socket PDF. Se conservaron la versión anterior y el respaldo integral de 80,006,485 bytes generado antes de publicar.
+
+La recuperación de ese respaldo real pasó en un entorno aislado: 112 tablas y sus datos/esquemas, 10 archivos locales, dos SQLite íntegras y 104 objetos por API S3 local. Clave recuperada desde S3, descifrado comprobado, sesiones/dispositivos de la copia revocados y backend recuperado disponible. El candidato nuevo leyó 41 registros y recalculó sus importes sin diferencias; generó PDF de cotización/factura y rechazó solicitudes sin CSRF o permisos. El destinatario autorizado confirmó recepción en Recibidos del único mensaje SMTP de comprobación.
+
+No se crearon cuentas ni datos de prueba en producción. Se retiraron de AWS todos los procesos, copias de datos, MySQL, S3 temporal e instaladores del ensayo. Se conservan únicamente versiones, respaldo y comprobantes privados. [Evidencia, hashes, alcance y límites del cierre operativo](21-cierre-operativo-produccion.md).

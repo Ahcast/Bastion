@@ -14,11 +14,11 @@ El catálogo inicial se deriva del apartado 4 de `../01-aplicacion-actual-y-pari
 | Procesos | Importar, revisar, marcar, anotar y exportar CSV | `procesos.md` |
 | Colaboración y archivos | Archivos comunes y de personas | `colaboracion-y-archivos.md` |
 
-## Módulos nuevos en diseño
+## Módulos nuevos autorizados
 
 | Módulo | Alcance propuesto | Ficha y estado |
 |---|---|---|
-| Licitaciones | Expedientes legal/económico/técnico, variables, copias de Colaboración, PDF único y futura creación de borradores en Facturas | [licitaciones.md](licitaciones.md); [infraestructura inicial local](licitaciones-infraestructura.md), sin formularios ni campos precargados; sin despliegue/activación. [Fuente v1.2](licitaciones-propuesta-v1.2.md). |
+| Licitaciones | Expedientes legal/económico/técnico, variables, copias de Colaboración, PDF único y futura creación de borradores en Facturas | [licitaciones.md](licitaciones.md); módulo publicado con expedientes, documentos y adjudicaciones. El diseño inicial y su activación histórica se conservan en [infraestructura](licitaciones-infraestructura.md); consultar [despliegues](../09-despliegue.md) y [alcance verificado](../21-cierre-operativo-produccion.md), sin atribuir capacidades no ensayadas. [Fuente v1.2](licitaciones-propuesta-v1.2.md). |
 
 ## Settings
 

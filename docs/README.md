@@ -331,3 +331,7 @@ Decisión autorizada: ampliar el límite a dos para PC y móvil. El bloqueo tran
 A solicitud del propietario, se habilita abrir módulos y secciones de Ajustes en pestañas independientes mediante enlaces HTML reales. Se mantienen rutas, permisos, sesión y guardas de salida. Ver [trabajo en varias pestañas](14-navegacion-web.md#trabajo-en-varias-pestañas--2026-11-20).
 
 Publicado en Bluehost el 2026-11-20 con `71d210c`: enlaces nativos del menú, Ajustes e Inicio, 199 pruebas frontend aprobadas y apertura simultánea de Cotizaciones/Facturas verificada en Chrome. [Comprobante y respaldo](09-despliegue.md#navegación-en-varias-pestañas-publicada--2026-11-20-honduras).
+
+## Cierre operativo del alcance publicado — 2026-11-20
+
+Por autorización de Marco se actualizó el backend a `71d210c`, se comprobó correo autenticado con recepción confirmada y se ensayó recuperación integral real en aislamiento. Se verificaron 112 tablas, 104 objetos, 10 archivos locales y 41 documentos comerciales con sus cálculos; controles de CSRF/permisos y PDF aprobados. No se crearon cuentas ni datos de prueba en producción y se retiró el entorno temporal. La migración histórica permanece pendiente por decisión del propietario. [Estado vigente, alcance y evidencia](21-cierre-operativo-produccion.md).

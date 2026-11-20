@@ -170,7 +170,7 @@ La [ficha de Licitaciones](modulos/licitaciones.md) define escenarios pendientes
 
 Screenshots de cada pantalla/estado, ejemplos de datos anonimizados, esquema MySQL, ejemplos request/response y trazabilidad entre requisito y prueba. Datos productivos privados no se anexan.
 
-## Pendientes actuales
+## Pendientes del inventario inicial (histórico)
 
 Esquema SQL completo y límites MySQL para los campos; versión de mantenimiento exacta y capacidades TLS del plan Bluehost; validación de migraciones sobre esa versión; ruta de actualización de MySQL antes de producción; asignaciones de roles personalizados por módulo/área; contratos completos; cálculo fiscal verificado; criterios de aceptación detallados por módulo.
 
@@ -256,3 +256,9 @@ Verificar catálogo editable sin saldos inventados; cuentas de grupo fuera del d
 - Bluehost responde a rutas anidadas con la aplicación, conserva configuración y recursos, y ofrece un respaldo recuperable del frontend anterior.
 
 Ver [contrato y pruebas](14-navegacion-web.md).
+
+## Cierre operativo verificado — 2026-11-20
+
+Los pendientes acordados de backend, correo, recuperación integral y revisión de los módulos comerciales publicados se cierran con la [evidencia de producción](21-cierre-operativo-produccion.md). La comparación abarca las 112 tablas, archivos, S3 y clave de recuperación; el backend nuevo valida lectura/cálculo de 41 registros, PDF y controles de acceso sobre la copia aislada. La numeración, pagos, conversiones, concurrencia y permisos conservan sus regresiones MySQL/HTTP aprobadas en CI.
+
+Las listas iniciales de pendientes y primeros cortes de este documento son trazabilidad histórica, no un inventario vigente de funciones ausentes. La migración Legacy, ampliaciones contables y Android estable continúan fuera de este cierre. Los límites y capacidades no medidos de otros módulos no se declaran verificados por este ensayo. El mantenimiento del motor MySQL de Bluehost no se modifica; se registra su versión efectiva y la compatibilidad comprobada.
